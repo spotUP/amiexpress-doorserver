@@ -108,6 +108,16 @@ async function main(): Promise<void> {
   captures.push(await capture('manifest-type-xim', '/manifest?type=XIM'));
   captures.push(await capture('list-type-xim', '/list.txt?type=XIM'));
   captures.push(await capture('manifest-q', '/manifest?q=door'));
+  // The one deliberate divergence in the port: the BBS's ?q= filter also
+  // searches installed_as, a per-node column this server's schema drops.
+  // `q=door` (above) matches 249 doors on the live catalog with ZERO of
+  // them matched via installed_as alone, so it proves nothing about this
+  // difference. `q=KICKBOX` matches exactly one door, 187-KB1.LZH, and
+  // ONLY through installed_as - verified against the live catalog. Named
+  // `divergence-*` so the generic comparison loop in tests/parity.test.ts
+  // excludes it (it is SUPPOSED to differ) and a dedicated test pins the
+  // difference explicitly instead.
+  captures.push(await capture('divergence-q-installed-as', '/manifest?q=KICKBOX'));
   for (const a of archives) {
     const enc = encodeURIComponent(a);
     captures.push(await capture(`files-${a}`, `/files/${enc}`));

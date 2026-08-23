@@ -65,7 +65,12 @@ describeOrSkip('parity with the BBS-hosted API', () => {
   });
   const app = createApp(cfg);
 
-  for (const c of captures) {
+  // `divergence-*` captures record a KNOWN, deliberate difference (see the
+  // dedicated test below) rather than a parity claim - running them through
+  // this byte-equality loop would fail by design, not by regression.
+  const parityCaptures = captures.filter((c) => !c.name.startsWith('divergence-'));
+
+  for (const c of parityCaptures) {
     it(`${c.name} matches`, async () => {
       const agent = request(app);
       const res = await (c.method === 'HEAD'
@@ -95,8 +100,22 @@ describeOrSkip('parity with the BBS-hosted API', () => {
       // (24 chars), so Content-Length above stays a valid check.
       // EVERY other endpoint is compared byte-for-byte.
       // A HEAD response has no body by definition; its status and headers are
-      // the whole contract.
-      if (c.method === 'HEAD') return;
+      // the whole contract - but the capture recorded that emptiness too, so
+      // assert it rather than skipping the body check entirely.
+      //
+      // supertest/superagent never invokes a custom body parser for a HEAD
+      // request - verified with a standalone probe (a HEAD against a route
+      // whose GET body is non-empty still yields res.body === {}) - so
+      // res.body is NOT the Buffer our .parse() callback produces for every
+      // other method here; it stays superagent's untouched default. That IS
+      // the emptiness guarantee worth asserting: if a future supertest ever
+      // started parsing a HEAD body, this fails loudly. The actual byte
+      // count a GET would have sent is already pinned by the Content-Length
+      // equality check above.
+      if (c.method === 'HEAD') {
+        expect(res.body).toEqual({});
+        return;
+      }
 
       const body = res.body as Buffer;
       expect(body.length).toBe(c.byteLength);
@@ -118,7 +137,13 @@ describeOrSkip('parity with the BBS-hosted API', () => {
           expect(parsed.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
         }
         const { digest, doorCount } = jsonBodyDigest(body);
-        expect(doorCount).toBe(c.doorCount);
+        // /health's body has no `doors` array at all, so jsonBodyDigest
+        // reports doorCount: 0 for it - a trivially-true assertion that
+        // reads stronger than it is. Only assert the count where it means
+        // something: a manifest capture that actually carries doors.
+        if (c.doorCount !== undefined && c.doorCount > 0) {
+          expect(doorCount).toBe(c.doorCount);
+        }
         expect(digest).toBe(c.jsonDigest);
         return;
       }
@@ -138,4 +163,21 @@ describeOrSkip('parity with the BBS-hosted API', () => {
       expect(body.toString('base64')).toBe(c.bodyBase64);
     });
   }
+
+  // The one deliberate divergence in the port. The BBS's ?q= filter also
+  // searches installed_as - a per-node column this server's schema drops -
+  // so a query that matches ONLY through that column returns one door there
+  // and none here. Verified against the live catalog: 187-KB1.LZH is matched
+  // by q=KICKBOX solely through installed_as. This test exists so the
+  // divergence is a recorded decision rather than a surprise, and so it
+  // fails loudly if a later phase ever restores the column.
+  it('known divergence: ?q= no longer searches the per-node installed_as column', async () => {
+    const capture = captures.find((c) => c.name === 'divergence-q-installed-as');
+    expect(capture).toBeDefined();
+    expect(capture?.doorCount).toBe(1);
+
+    const res = await request(app).get('/api/door-repo/manifest?q=KICKBOX');
+    expect(res.status).toBe(200);
+    expect(res.body.doors).toHaveLength(0);
+  });
 });

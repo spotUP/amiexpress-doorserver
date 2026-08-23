@@ -96,6 +96,22 @@
   "byteLength": 194349
  },
  {
+  "name": "divergence-q-installed-as",
+  "method": "GET",
+  "requestPath": "/manifest?q=KICKBOX",
+  "requestHeaders": {},
+  "status": 200,
+  "headers": {
+   "content-type": "application/json; charset=utf-8",
+   "content-length": "1075",
+   "etag": "\"c3301-t1787029906\"",
+   "x-door-repo-revision": "c3301-t1787029906"
+  },
+  "jsonDigest": "f03b39402ab4aa8b1becbdd44816ab51254a131c6ef04ef6765af580be72553b",
+  "doorCount": 1,
+  "byteLength": 1075
+ },
+ {
   "name": "files-ACC-V103.LHA",
   "method": "GET",
   "requestPath": "/files/ACC-V103.LHA",

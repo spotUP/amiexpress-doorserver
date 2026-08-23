@@ -37,3 +37,15 @@ commit), not via a routine `npm update`.
 | type-check | `npm run typecheck` |
 | test | `npm test` |
 | test (CI) | `npm run test:ci` |
+| parity vs the BBS | `npm run test:parity` |
+
+`npm run test:parity` compares this server byte-for-byte against fixtures
+captured from the BBS-hosted door-repo API (`tests/fixtures/parity/`, see
+`tests/parity.test.ts`). It needs `PARITY_DB` (a copy of the BBS's
+`database.sqlite`) and `PARITY_ARCHIVES` (the archive corpus directory) -
+`test:parity` defaults them to the paths used to capture the committed
+fixtures, but they can be overridden. **The suite SKIPS itself, rather than
+failing, when those two are unset** - which is also true of a plain `npm
+test`/`npm run test:ci`. A skipped parity run is not a passing one; run
+`npm run test:parity` explicitly whenever `src/` changes anything the
+BBS-hosted API also serves.
