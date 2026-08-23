@@ -117,6 +117,49 @@ export function applyOverrides<T extends object>(row: T, id: string, overrides: 
   return out as T;
 }
 
+// ─── doors taken out of the repository ─────────────────────────────────
+//
+// Hiding, not deleting, and for the same reason edits are overrides: the
+// next corpus scan rewrites door_catalog, so a DELETE would undo itself.
+// A hidden door disappears from every listing, its archive stops
+// downloading, and putting it back is one DELETE from this table.
+
+export function hasHiddenTable(db: Database.Database): boolean {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'door_hidden'").get();
+  return row !== undefined;
+}
+
+/**
+ * A SQL fragment excluding hidden doors, for the queries that must count and
+ * page in the database rather than in memory. Returns '' when the table does
+ * not exist yet, so an unmigrated catalog still serves.
+ */
+export function hiddenExclusion(db: Database.Database, column = 'id'): string {
+  return hasHiddenTable(db) ? `${column} NOT IN (SELECT catalog_id FROM door_hidden)` : '';
+}
+
+export function isHidden(db: Database.Database, catalogId: string): boolean {
+  if (!hasHiddenTable(db)) return false;
+  return db.prepare('SELECT 1 FROM door_hidden WHERE catalog_id = ?').get(catalogId) !== undefined;
+}
+
+/**
+ * The most recent hide or restore, as a unix timestamp. Part of the catalog
+ * revision for the same reason the override stamp is: hiding a door changes
+ * what every endpoint says without touching door_catalog.
+ */
+export function hiddenStamp(db: Database.Database): number {
+  if (!hasHiddenTable(db)) return 0;
+  const row = db.prepare('SELECT COALESCE(MAX(hidden_at), 0) AS t, COUNT(*) AS n FROM door_hidden').get() as {
+    t: number;
+    n: number;
+  };
+  // The count travels with the timestamp so that RESTORING the most recently
+  // hidden door - which lowers MAX(hidden_at) back to an older value, or to
+  // zero - still changes the revision.
+  return row.n === 0 ? 0 : row.t + row.n;
+}
+
 /** Was this door's `field` written by a human rather than the scanner? */
 export function isOverridden(id: string, field: OverridableField, overrides: OverrideMap): boolean {
   const fields = overrides.get(id);

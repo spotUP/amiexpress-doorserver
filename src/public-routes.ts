@@ -13,7 +13,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { openDb } from './db';
 import { getCatalogRevision, getArchiveFiles, getCatalogEntryByArchive } from './catalog';
 import { analyseDoor, buildGroupTags, readName, type NameSource } from './describe';
-import { applyOverrides, isOverridden, loadOverrides, type OverrideMap } from './effective';
+import { applyOverrides, hiddenExclusion, isOverridden, loadOverrides, type OverrideMap } from './effective';
 import { AmigaGuideParser } from './amigaguide-parser';
 import type { ServerConfig } from './config';
 
@@ -226,10 +226,11 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       );
       params.push(like, like, like, like, like, like);
     }
-    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-
     const db = openDb(cfg, { readonly: true });
     try {
+      const hidden = hiddenExclusion(db);
+      if (hidden) where.push(hidden);
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
       const total = (
         db.prepare(`SELECT COUNT(*) AS n FROM door_catalog ${whereSql}`).get(...params) as { n: number }
       ).n;
@@ -325,6 +326,9 @@ export function createPublicRouter(cfg: ServerConfig): Router {
   router.get('/facets', (_req: Request, res: Response) => {
     const db = openDb(cfg, { readonly: true });
     try {
+      const hidden = hiddenExclusion(db);
+      const visible = hidden ? `WHERE ${hidden}` : '';
+      const andVisible = hidden ? `AND ${hidden}` : '';
       const counted = (sql: string) => db.prepare(sql).all() as { value: string | null; n: number }[];
       res.json({
         revision: getCatalogRevision(cfg),
@@ -333,18 +337,18 @@ export function createPublicRouter(cfg: ServerConfig): Router {
                        THEN substr(archive_path, 1, instr(archive_path, '/') - 1)
                        ELSE 'Unsorted' END AS value,
                   COUNT(*) AS n
-             FROM door_catalog GROUP BY value ORDER BY n DESC`
+             FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
         ),
         types: counted(
-          'SELECT door_type AS value, COUNT(*) AS n FROM door_catalog GROUP BY value ORDER BY n DESC'
+          `SELECT door_type AS value, COUNT(*) AS n FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
         ),
         categories: counted(
           `SELECT category AS value, COUNT(*) AS n FROM door_catalog
-            WHERE category IS NOT NULL AND category <> '' GROUP BY value ORDER BY n DESC`
+            WHERE category IS NOT NULL AND category <> '' ${andVisible} GROUP BY value ORDER BY n DESC`
         ),
         requires: counted(
           `SELECT requires_bbs AS value, COUNT(*) AS n FROM door_catalog
-            WHERE requires_bbs IS NOT NULL AND requires_bbs <> '' GROUP BY value ORDER BY n DESC`
+            WHERE requires_bbs IS NOT NULL AND requires_bbs <> '' ${andVisible} GROUP BY value ORDER BY n DESC`
         ),
       });
     } finally {

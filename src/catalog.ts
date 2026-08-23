@@ -12,7 +12,7 @@
  */
 import * as path from 'path';
 import { openDb } from './db';
-import { applyOverrides, loadOverrides, overridesStamp } from './effective';
+import { applyOverrides, hiddenExclusion, isHidden, loadOverrides, overridesStamp, hiddenStamp } from './effective';
 import type { ServerConfig } from './config';
 
 export interface CatalogEntry {
@@ -51,7 +51,16 @@ export function resolveArchivePath(cfg: ServerConfig, archivePath: string): stri
   return path.join(cfg.archivesRoot, archivePath);
 }
 
-export function getCatalogEntryByArchive(cfg: ServerConfig, archiveName: string): CatalogEntry | null {
+/**
+ * One door by archive name. A hidden door is INVISIBLE here, which is what
+ * makes /archive, /files and /diz stop answering for it - opts.includeHidden
+ * is for the admin console, the one caller that must still see it.
+ */
+export function getCatalogEntryByArchive(
+  cfg: ServerConfig,
+  archiveName: string,
+  opts?: { includeHidden?: boolean }
+): CatalogEntry | null {
   const db = openDb(cfg, { readonly: true });
   try {
     // COLLATE NOCASE matches the BBS original (door-catalog.service.ts:150):
@@ -60,6 +69,7 @@ export function getCatalogEntryByArchive(cfg: ServerConfig, archiveName: string)
       .prepare('SELECT * FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
       .get(archiveName) as CatalogEntry | undefined;
     if (!row) return null;
+    if (!opts?.includeHidden && isHidden(db, row.id)) return null;
     // Human corrections win over the scan, here as everywhere else.
     return applyOverrides(row, row.id, loadOverrides(db));
   } finally {
@@ -88,8 +98,13 @@ export function getCatalogRevision(cfg: ServerConfig): string {
   try {
     const db = openDb(cfg, { readonly: true });
     try {
+      const exclude = hiddenExclusion(db);
       const row = db
-        .prepare('SELECT COUNT(*) AS n, COALESCE(MAX(indexed_at), 0) AS t FROM door_catalog')
+        .prepare(
+          `SELECT COUNT(*) AS n, COALESCE(MAX(indexed_at), 0) AS t FROM door_catalog${
+            exclude ? ` WHERE ${exclude}` : ''
+          }`
+        )
         .get() as { n: number; t: number };
       // A human edit changes what every endpoint says without touching
       // door_catalog, so the revision has to carry it - otherwise every
@@ -97,7 +112,7 @@ export function getCatalogRevision(cfg: ServerConfig): string {
       // ETag. The segment is appended ONLY when an edit exists, so a catalog
       // nobody has corrected still produces the byte-identical revision the
       // AmigaDOS clients have always seen.
-      const edits = overridesStamp(db);
+      const edits = overridesStamp(db) + hiddenStamp(db);
       return edits > 0 ? `c${row.n}-t${row.t}-o${edits}` : `c${row.n}-t${row.t}`;
     } finally {
       db.close();
@@ -107,10 +122,16 @@ export function getCatalogRevision(cfg: ServerConfig): string {
   }
 }
 
+/** How many doors the repository actually offers - hidden ones excluded. */
 export function getDoorCount(cfg: ServerConfig): number {
   const db = openDb(cfg, { readonly: true });
   try {
-    return (db.prepare('SELECT COUNT(*) AS n FROM door_catalog').get() as { n: number }).n;
+    const exclude = hiddenExclusion(db);
+    return (
+      db.prepare(`SELECT COUNT(*) AS n FROM door_catalog${exclude ? ` WHERE ${exclude}` : ''}`).get() as {
+        n: number;
+      }
+    ).n;
   } finally {
     db.close();
   }

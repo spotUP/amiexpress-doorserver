@@ -19,7 +19,7 @@ import {
   type AuthedRequest,
 } from './auth';
 import { analyseDoor, buildGroupTags } from './describe';
-import { OVERRIDABLE_FIELDS, isOverridableField, loadOverrides } from './effective';
+import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides } from './effective';
 import type { ServerConfig } from './config';
 
 /**
@@ -120,6 +120,9 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         res.status(404).json({ error: 'no such door' });
         return;
       }
+      // Deliberately not filtered: this is the console, and a hidden door
+      // has to be visible HERE or it could never be restored.
+      const hidden = isHidden(db, row.id as string);
       const overrides = loadOverrides(db);
       const edits = overrides.get(row.id as string) ?? {};
       const groupTags = buildGroupTags(
@@ -141,6 +144,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       res.json({
         id: row.id,
         archiveName: row.archive_name,
+        hidden,
         fileIdDiz: row.file_id_diz,
         doc: row.doc_raw,
         docFilename: row.doc_filename,
@@ -293,6 +297,85 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         groupTags
       );
       res.json(facts);
+    } finally {
+      db.close();
+    }
+  });
+
+  /**
+   * Take a door OUT of the repository.
+   *
+   * Not a DELETE: door_catalog is rewritten by every corpus scan, so a
+   * deleted row would come back and the archive would still be on disk.
+   * The removal is recorded beside the catalog instead - which makes it
+   * reversible, auditable, and effective everywhere at once: the door
+   * vanishes from /doors, list.txt, index.tsv and the manifest, and its
+   * archive stops downloading.
+   */
+  router.delete('/doors/:archiveName', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const reason = typeof (req.body as { reason?: unknown })?.reason === 'string'
+      ? ((req.body as { reason: string }).reason).slice(0, 500)
+      : null;
+    const db = openDb(cfg);
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'no such door' });
+        return;
+      }
+      db.prepare(
+        `INSERT INTO door_hidden (catalog_id, reason, hidden_by, hidden_at)
+         VALUES (?, ?, ?, strftime('%s','now'))
+         ON CONFLICT(catalog_id) DO UPDATE SET
+           reason = excluded.reason, hidden_by = excluded.hidden_by, hidden_at = excluded.hidden_at`
+      ).run(row.id, reason, req.admin?.id ?? null);
+      recordAudit(db, req.admin?.id ?? null, 'hide', row.id, { archiveName, reason });
+      res.json({ ok: true, hidden: true, archiveName });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Put a hidden door back into the repository. */
+  router.post('/doors/:archiveName/restore', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const db = openDb(cfg);
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'no such door' });
+        return;
+      }
+      const result = db.prepare('DELETE FROM door_hidden WHERE catalog_id = ?').run(row.id);
+      if (result.changes > 0) {
+        recordAudit(db, req.admin?.id ?? null, 'restore', row.id, { archiveName });
+      }
+      res.json({ ok: true, restored: result.changes > 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Everything currently taken out of the repository. */
+  router.get('/hidden', requireAdmin(cfg), (_req: AuthedRequest, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const rows = db
+        .prepare(
+          `SELECT c.archive_name AS archiveName, c.name AS catalogName, h.reason, h.hidden_at AS hiddenAt,
+                  u.username AS hiddenBy
+             FROM door_hidden h
+             JOIN door_catalog c ON c.id = h.catalog_id
+             LEFT JOIN admin_users u ON u.id = h.hidden_by
+            ORDER BY h.hidden_at DESC`
+        )
+        .all();
+      res.json({ rows });
     } finally {
       db.close();
     }

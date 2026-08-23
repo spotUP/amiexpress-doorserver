@@ -92,9 +92,19 @@ export interface FieldState {
   isEdited: boolean;
 }
 
+export interface HiddenDoor {
+  archiveName: string;
+  catalogName: string;
+  reason: string | null;
+  hiddenAt: number;
+  hiddenBy: string | null;
+}
+
 export interface AdminDoor {
   id: string;
   archiveName: string;
+  /** True when this door has been taken out of the repository. */
+  hidden: boolean;
   fileIdDiz: string | null;
   doc: string | null;
   docFilename: string | null;

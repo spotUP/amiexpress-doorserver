@@ -12,6 +12,7 @@ import type { AdminUser, DoorFacts } from '../api/types';
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
 import { FieldEditor } from './FieldEditor';
+import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
 
 const MULTILINE_FIELDS = new Set(['description', 'suggested_tooltypes']);
@@ -143,6 +144,7 @@ export function DoorDetailDialog({
 
               {admin && (
                 <Tabs.Content value="edit" className="space-y-3">
+                  {archiveName && <RemoveDoor archiveName={archiveName} hidden={Boolean(adminDoor?.hidden)} />}
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={() => redescribe.mutateAsync().then(setPreview)}

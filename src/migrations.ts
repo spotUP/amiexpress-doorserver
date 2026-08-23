@@ -109,6 +109,25 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_audit_at ON admin_audit(at)');
     },
   },
+  {
+    version: 3,
+    name: 'door_hidden',
+    up: (db) => {
+      // Taking a door out of the repository is not a DELETE. door_catalog is
+      // machine-written: the next corpus scan would simply put the row back,
+      // and the archive would still be on disk. So a removal is recorded
+      // beside the catalog, exactly like an edit - which also makes it
+      // reversible and auditable.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS door_hidden (
+          catalog_id TEXT PRIMARY KEY,
+          reason     TEXT,
+          hidden_by  INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+          hidden_at  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_hidden_at ON door_hidden(hidden_at)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

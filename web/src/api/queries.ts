@@ -6,7 +6,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from './client';
-import type { AdminDoor, AuditEntry, DoorDetail, DoorFacts, DoorPage, Facets } from './types';
+import type { AdminDoor, AuditEntry, DoorDetail, DoorFacts, DoorPage, Facets, HiddenDoor } from './types';
 
 export interface DoorQuery {
   q?: string;
@@ -42,6 +42,7 @@ export const doorKeys = {
   admin: (archive: string) => ['doors', 'admin', archive] as const,
   facets: ['facets'] as const,
   audit: ['audit'] as const,
+  hidden: ['hidden'] as const,
 };
 
 export function useDoors(query: DoorQuery) {
@@ -78,6 +79,44 @@ export function useAudit(enabled: boolean) {
     queryFn: () => api.get<{ rows: AuditEntry[] }>('/admin/audit?limit=100'),
     enabled,
   });
+}
+
+export function useHiddenDoors(enabled: boolean) {
+  return useQuery({
+    queryKey: doorKeys.hidden,
+    queryFn: () => api.get<{ rows: HiddenDoor[] }>('/admin/hidden'),
+    enabled,
+  });
+}
+
+/**
+ * Taking a door out of the repository, and putting it back. Both invalidate
+ * every door query: the listing, the facet counts and the door's own page
+ * all change at once.
+ */
+export function useHideDoor(archiveName: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) =>
+      api.del<{ ok: true }>(`/admin/doors/${encodeURIComponent(archiveName)}`, { reason }),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
+export function useRestoreDoor() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (archiveName: string) =>
+      api.post<{ ok: true; restored: boolean }>(`/admin/doors/${encodeURIComponent(archiveName)}/restore`),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
+function invalidateEverything(client: ReturnType<typeof useQueryClient>): void {
+  void client.invalidateQueries({ queryKey: doorKeys.all });
+  void client.invalidateQueries({ queryKey: doorKeys.facets });
+  void client.invalidateQueries({ queryKey: doorKeys.hidden });
+  void client.invalidateQueries({ queryKey: doorKeys.audit });
 }
 
 export function useSaveField(archiveName: string) {

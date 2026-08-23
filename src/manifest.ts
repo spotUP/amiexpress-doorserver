@@ -29,7 +29,7 @@
 import Database from 'better-sqlite3';
 import { getArchiveChecksums } from './checksums';
 import { analyseDoor, buildGroupTags } from './describe';
-import { applyOverrides, isOverridden, loadOverrides } from './effective';
+import { applyOverrides, hiddenExclusion, isOverridden, loadOverrides } from './effective';
 import { resolveArchivePath, getCatalogRevision } from './catalog';
 import { openDb } from './db';
 import type { ServerConfig } from './config';
@@ -159,6 +159,11 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: 
       );
       params.push(like, like, like, like, like);
     }
+
+    // A door taken out of the repository is out of every listing: list.txt,
+    // the manifest and index.tsv all come through here.
+    const hidden = hiddenExclusion(db);
+    if (hidden) conditions.push(hidden);
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     // doc_raw is deliberately NOT selected — it is the full documentation

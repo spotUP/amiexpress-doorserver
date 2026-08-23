@@ -3,7 +3,7 @@
  * asked for on this path - the corpus is public, and reading it is the point.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { LogIn, LogOut, Search, Shield } from 'lucide-react';
+import { LogIn, LogOut, Search, Shield, Trash2 } from 'lucide-react';
 import { useDoors, useFacets, useLiveRevision } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
@@ -12,6 +12,7 @@ import { DoorTable, type SortState } from '../components/DoorTable';
 import { DoorDetailDialog } from '../components/DoorDetail';
 import { LoginDialog } from '../components/LoginDialog';
 import { AuditPanel } from './Audit';
+import { HiddenPanel } from './Hidden';
 import { Button, Input, Select } from '../components/ui';
 
 const PER_PAGE = 50;
@@ -28,6 +29,7 @@ export function Browse() {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [hiddenOpen, setHiddenOpen] = useState(false);
 
   useLiveRevision();
 
@@ -84,6 +86,9 @@ export function Browse() {
               <span className="text-xs text-muted">
                 signed in as <span className="text-ink">{admin.username}</span>
               </span>
+              <Button variant="ghost" onClick={() => setHiddenOpen(true)}>
+                <Trash2 size={14} /> Removed
+              </Button>
               <Button variant="ghost" onClick={() => setAuditOpen(true)}>
                 <Shield size={14} /> Audit
               </Button>
@@ -166,6 +171,7 @@ export function Browse() {
       <DoorDetailDialog archiveName={open} admin={admin} onClose={() => setOpen(null)} />
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} onSignedIn={setAdmin} />
       <AuditPanel open={auditOpen} onOpenChange={setAuditOpen} enabled={Boolean(admin)} />
+      <HiddenPanel open={hiddenOpen} onOpenChange={setHiddenOpen} enabled={Boolean(admin)} />
     </div>
   );
 }
