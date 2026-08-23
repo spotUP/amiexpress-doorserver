@@ -30,7 +30,8 @@ jobs:
             git reset --hard origin/main
             echo "== prune builder cache + dangling/unused images (host runs at 91% disk, 3.6 GB free) =="
             docker builder prune -f
-            docker image prune -af
+            # Dangling layers only: -a would remove all unused images, dangerous on unattended live host
+            docker image prune -f
             echo "== build + up =="
             GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
             echo "== health =="
