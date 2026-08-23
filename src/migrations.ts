@@ -37,6 +37,73 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_door_catalog_requires ON door_catalog(requires_bbs)');
     },
   },
+  {
+    version: 2,
+    name: 'admin tables: overrides, users, submissions, audit',
+    up: (db) => {
+      // Per-field human corrections. A row exists only for a field someone
+      // touched, so a corpus re-scan can rewrite door_catalog freely and an
+      // edit is reverted by DELETEing one row - never by guessing what the
+      // scanner would have said. See src/effective.ts.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS door_catalog_overrides (
+          catalog_id TEXT NOT NULL,
+          field      TEXT NOT NULL,
+          value      TEXT,
+          edited_by  INTEGER REFERENCES admin_users(id),
+          edited_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+          PRIMARY KEY (catalog_id, field)
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_overrides_edited_at ON door_catalog_overrides(edited_at)');
+
+      // Admins. Passwords are argon2id hashes; the bootstrap account is
+      // created from DOORSERVER_ADMIN_KEYS on first start (phase 2).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS admin_users (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          username      TEXT NOT NULL UNIQUE,
+          password_hash TEXT NOT NULL,
+          role          TEXT NOT NULL DEFAULT 'admin',
+          created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+          last_login_at INTEGER
+        )`);
+
+      // Anonymous submissions wait here. The file itself sits in
+      // /data/quarantine and is never served until a human approves it.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS door_submissions (
+          id              TEXT PRIMARY KEY,
+          archive_name    TEXT NOT NULL,
+          quarantine_path TEXT NOT NULL,
+          size            INTEGER NOT NULL,
+          md5             TEXT NOT NULL,
+          sha256          TEXT NOT NULL,
+          submitter_note  TEXT,
+          submitter_ip    TEXT NOT NULL,
+          status          TEXT NOT NULL DEFAULT 'pending',
+          reject_reason   TEXT,
+          parsed_name     TEXT,
+          parsed_diz      TEXT,
+          parsed_files    TEXT,
+          created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+          decided_by      INTEGER REFERENCES admin_users(id),
+          decided_at      INTEGER
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_submissions_status ON door_submissions(status)');
+
+      // Who changed what. Every admin write appends one row.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS admin_audit (
+          id       INTEGER PRIMARY KEY AUTOINCREMENT,
+          admin_id INTEGER REFERENCES admin_users(id),
+          action   TEXT NOT NULL,
+          target   TEXT NOT NULL,
+          detail   TEXT,
+          at       INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_audit_at ON admin_audit(at)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

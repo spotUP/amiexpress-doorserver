@@ -29,6 +29,7 @@
 import Database from 'better-sqlite3';
 import { getArchiveChecksums } from './checksums';
 import { analyseDoor, buildGroupTags } from './describe';
+import { applyOverrides, isOverridden, loadOverrides } from './effective';
 import { resolveArchivePath, getCatalogRevision } from './catalog';
 import { openDb } from './db';
 import type { ServerConfig } from './config';
@@ -43,6 +44,8 @@ export type { ManifestDoor, DoorRepoManifest };
 // writes to door_catalog.
 
 export interface DoorCatalogRow {
+  /** Catalog id - needed to find this door's human corrections. */
+  id: string;
   archive_name: string;
   archive_path: string;
   binary_name: string | null;
@@ -58,6 +61,13 @@ export interface DoorCatalogRow {
   sha256: string | null;
   junk_live: number;
   has_doc: number;
+  /**
+   * 1 when a human wrote this row's description. The catalog's own
+   * `description` column is raw DIZ art nobody serves, so the renderers ask
+   * the classifier for a description UNLESS a person has overridden it -
+   * this flag is how they tell the two cases apart.
+   */
+  description_overridden: number;
 }
 
 /**
@@ -157,7 +167,7 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: 
     // build. The emptiness test runs in SQL and only the flag comes back.
     const filesTable = hasFilesTable(db);
     const sql = `
-      SELECT archive_name, archive_path, binary_name, door_type, name, author, release_group,
+      SELECT id, archive_name, archive_path, binary_name, door_type, name, author, release_group,
              category, description, file_id_diz, archive_size, md5, sha256,
              ${filesTable ? 'COALESCE(j.n, 0)' : 'junk_count'} AS junk_live,
              (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc
@@ -166,14 +176,26 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: 
       ${where}
       ORDER BY archive_name COLLATE NOCASE ASC
     `;
-    return db.prepare(sql).all(...params) as DoorCatalogRow[];
+    // One query for every human correction in the catalog, then applied in
+    // memory: a per-row lookup would be 3300 extra statements per render.
+    const overrides = loadOverrides(db);
+    return (db.prepare(sql).all(...params) as DoorCatalogRow[]).map((row) => ({
+      ...applyOverrides(row, row.id, overrides),
+      description_overridden: isOverridden(row.id, 'description', overrides) ? 1 : 0,
+    }));
   } finally {
     db.close();
   }
 }
 
-/** One row's description, read by the classifier in ./describe.ts. */
-function describeRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string {
+/**
+ * One row's description: what a human wrote if anyone has, otherwise what
+ * ./describe.ts reads out of the door's FILE_ID.DIZ.
+ */
+export function describeRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string {
+  if (row.description_overridden) {
+    return row.description ?? '';
+  }
   return analyseDoor(
     {
       dizText: row.file_id_diz,

@@ -14,9 +14,9 @@
  * the door's FILE_ID.DIZ. This module only renders; it holds no rules about
  * what a description is.
  */
-import { fetchCatalogRows, toLatin1Safe, type DoorCatalogRow } from './manifest';
+import { describeRow, fetchCatalogRows, toLatin1Safe, type DoorCatalogRow } from './manifest';
 import { getCatalogRevision } from './catalog';
-import { analyseDoor, buildGroupTags } from './describe';
+import { buildGroupTags } from './describe';
 import type { ServerConfig } from './config';
 
 /** Collapse whitespace, strip control characters. No length cap. */
@@ -64,18 +64,7 @@ function renderRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string 
   const filename = tsvField(row.archive_name);
   const pathCol = tsvField(system);
   const size = formatSize(row.archive_size ?? 0);
-  const facts = analyseDoor(
-    {
-      dizText: row.file_id_diz,
-      name: row.name,
-      archiveName: row.archive_name,
-      binaryName: row.binary_name,
-      catalogVersion: null,
-      catalogAuthor: row.author,
-    },
-    groupTags
-  );
-  return `${filename}\t${pathCol}\t${size}\t${pathCol}\t${tsvField(facts.description)}`;
+  return `${filename}\t${pathCol}\t${size}\t${pathCol}\t${tsvField(describeRow(row, groupTags))}`;
 }
 
 export function renderIndexTsv(cfg: ServerConfig, opts?: { type?: string; q?: string }): Buffer {

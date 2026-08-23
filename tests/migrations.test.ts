@@ -32,7 +32,7 @@ describe('runMigrations', () => {
     const db = openDb(cfg);
     expect(hasColumn(db, 'door_catalog', 'requires_bbs')).toBe(false);
     const ran = runMigrations(db);
-    expect(ran).toEqual(['1:door_catalog.requires_bbs']);
+    expect(ran).toEqual(MIGRATIONS.map((m) => `${m.version}:${m.name}`));
     expect(hasColumn(db, 'door_catalog', 'requires_bbs')).toBe(true);
     db.close();
   });
@@ -55,6 +55,20 @@ describe('runMigrations', () => {
     runMigrations(db);
     const rows = db.prepare('SELECT version, name FROM schema_migrations ORDER BY version').all();
     expect(rows).toEqual(MIGRATIONS.map((m) => ({ version: m.version, name: m.name })));
+    db.close();
+  });
+
+  it('creates the admin tables', () => {
+    const db = openDb(cfg);
+    runMigrations(db);
+    const tables = (
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(tables).toEqual(
+      expect.arrayContaining(['door_catalog_overrides', 'admin_users', 'door_submissions', 'admin_audit'])
+    );
     db.close();
   });
 

@@ -12,6 +12,7 @@
  */
 import * as path from 'path';
 import { openDb } from './db';
+import { applyOverrides, loadOverrides, overridesStamp } from './effective';
 import type { ServerConfig } from './config';
 
 export interface CatalogEntry {
@@ -58,7 +59,9 @@ export function getCatalogEntryByArchive(cfg: ServerConfig, archiveName: string)
     const row = db
       .prepare('SELECT * FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
       .get(archiveName) as CatalogEntry | undefined;
-    return row ?? null;
+    if (!row) return null;
+    // Human corrections win over the scan, here as everywhere else.
+    return applyOverrides(row, row.id, loadOverrides(db));
   } finally {
     db.close();
   }
@@ -88,7 +91,14 @@ export function getCatalogRevision(cfg: ServerConfig): string {
       const row = db
         .prepare('SELECT COUNT(*) AS n, COALESCE(MAX(indexed_at), 0) AS t FROM door_catalog')
         .get() as { n: number; t: number };
-      return `c${row.n}-t${row.t}`;
+      // A human edit changes what every endpoint says without touching
+      // door_catalog, so the revision has to carry it - otherwise every
+      // cache in the fleet keeps serving pre-edit bytes under an unchanged
+      // ETag. The segment is appended ONLY when an edit exists, so a catalog
+      // nobody has corrected still produces the byte-identical revision the
+      // AmigaDOS clients have always seen.
+      const edits = overridesStamp(db);
+      return edits > 0 ? `c${row.n}-t${row.t}-o${edits}` : `c${row.n}-t${row.t}`;
     } finally {
       db.close();
     }
