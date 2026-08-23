@@ -18,7 +18,7 @@ beforeEach(() => {
   fs.writeFileSync(path.join(dir, 'Archives', 'FAME', 'ACC-V103.LHA'), 'x');
   const dbPath = path.join(dir, 'doors.db');
   fs.writeFileSync(dbPath, '');
-  cfg = { dbPath, archivesRoot: path.join(dir, 'Archives'), port: 3010, adminKeys: [] };
+  cfg = { dbPath, archivesRoot: path.join(dir, 'Archives'), port: 3010, adminKeys: [], jwtSecret: null };
   const db = openDb(cfg);
   applySchema(db);
   db.prepare(

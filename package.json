@@ -13,8 +13,10 @@
     "test:parity": "PARITY_DB=${PARITY_DB:-/tmp/parity-source.db} PARITY_ARCHIVES=${PARITY_ARCHIVES:-/Users/spot/Code/amiexpress_doors/Archives} jest --config jest.config.ts tests/parity.test.ts"
   },
   "dependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "better-sqlite3": "^11.10.0",
-    "express": "5.1.0"
+    "express": "5.1.0",
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",

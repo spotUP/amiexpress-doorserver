@@ -20,6 +20,13 @@ export interface ServerConfig {
   archivesRoot: string;
   port: number;
   adminKeys: AdminKey[];
+  /**
+   * HS256 signing key for admin sessions. Optional on purpose: a server
+   * without it serves the public API exactly as before and refuses every
+   * admin request with 503. Falling back to a built-in default would be a
+   * predictable signing key on a public host - worse than no admin at all.
+   */
+  jwtSecret: string | null;
 }
 
 const DEFAULT_PORT = 3010;
@@ -61,5 +68,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   if (!Number.isInteger(port) || port <= 0) {
     throw new ConfigError(`PORT is "${env.PORT}", which is not a usable port number`);
   }
-  return { dbPath, archivesRoot, port, adminKeys: parseAdminKeys(env.DOORSERVER_ADMIN_KEYS) };
+  const jwtSecret = env.DOORSERVER_JWT_SECRET?.trim() || null;
+  if (jwtSecret !== null && jwtSecret.length < 32) {
+    throw new ConfigError('DOORSERVER_JWT_SECRET is shorter than 32 characters; use a real random secret');
+  }
+  return { dbPath, archivesRoot, port, adminKeys: parseAdminKeys(env.DOORSERVER_ADMIN_KEYS), jwtSecret };
 }

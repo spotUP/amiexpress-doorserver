@@ -50,7 +50,10 @@ export const MIGRATIONS: Migration[] = [
           catalog_id TEXT NOT NULL,
           field      TEXT NOT NULL,
           value      TEXT,
-          edited_by  INTEGER REFERENCES admin_users(id),
+          -- ON DELETE SET NULL: an edit outlives the person who made it.
+          -- Deleting an admin must not delete the corrections they made, nor
+          -- fail because those corrections exist.
+          edited_by  INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
           edited_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
           PRIMARY KEY (catalog_id, field)
         )`);
@@ -86,7 +89,7 @@ export const MIGRATIONS: Migration[] = [
           parsed_diz      TEXT,
           parsed_files    TEXT,
           created_at      INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-          decided_by      INTEGER REFERENCES admin_users(id),
+          decided_by      INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
           decided_at      INTEGER
         )`);
       db.exec('CREATE INDEX IF NOT EXISTS idx_submissions_status ON door_submissions(status)');
@@ -95,7 +98,9 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`
         CREATE TABLE IF NOT EXISTS admin_audit (
           id       INTEGER PRIMARY KEY AUTOINCREMENT,
-          admin_id INTEGER REFERENCES admin_users(id),
+          -- The audit trail is the point: it must survive the account it
+          -- describes being removed.
+          admin_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
           action   TEXT NOT NULL,
           target   TEXT NOT NULL,
           detail   TEXT,

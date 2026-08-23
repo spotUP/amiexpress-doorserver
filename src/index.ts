@@ -4,6 +4,7 @@ import type { ServerConfig } from './config';
 import { getDoorCount, getCatalogRevision } from './catalog';
 import { openDb } from './db';
 import { runMigrations } from './migrations';
+import { bootstrapAdmins } from './auth';
 
 /**
  * Refuse to serve a catalog that cannot be read, or that reads clean but
@@ -48,6 +49,12 @@ function main(): void {
     const db = openDb(cfg);
     try {
       for (const step of runMigrations(db)) console.log(`[INFO] migration ${step}`);
+      // DOORSERVER_ADMIN_KEYS becomes accounts: the label is the username,
+      // the key is the password. An existing account is never touched.
+      for (const username of bootstrapAdmins(db, cfg)) console.log(`[INFO] admin account created: ${username}`);
+      if (!cfg.jwtSecret) {
+        console.log('[INFO] admin API disabled: DOORSERVER_JWT_SECRET is not set');
+      }
     } finally {
       db.close();
     }

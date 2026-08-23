@@ -12,7 +12,7 @@ function tmpConfig(): { cfg: ServerConfig; dir: string } {
   fs.writeFileSync(dbPath, '');
   return {
     dir,
-    cfg: { dbPath, archivesRoot: path.join(dir, 'Archives'), port: 3010, adminKeys: [] },
+    cfg: { dbPath, archivesRoot: path.join(dir, 'Archives'), port: 3010, adminKeys: [], jwtSecret: null },
   };
 }
 

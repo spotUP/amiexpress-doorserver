@@ -1,5 +1,6 @@
 import express from 'express';
 import { createRouter } from './routes';
+import { createAdminRouter } from './admin-routes';
 import { doorRepoCors } from './cors';
 import type { ServerConfig } from './config';
 
@@ -12,6 +13,9 @@ export function createApp(cfg: ServerConfig): express.Express {
   // cors.ts for why this exists and what it deliberately does not
   // restrict.
   app.use('/api/door-repo', doorRepoCors());
+  // Before the public router: /admin/* must not be shadowed by a public
+  // route, and it carries its own JSON body parser.
+  app.use('/api/door-repo/admin', createAdminRouter(cfg));
   app.use('/api/door-repo', createRouter(cfg));
   return app;
 }
