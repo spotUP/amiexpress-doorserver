@@ -265,7 +265,7 @@ I/O or a plain text-file line reader.
 | `archiveSize` | integer                  | Archive size in bytes. `0` if unknown.                                 |
 | `md5`         | string, or empty         | Lowercase hex MD5 of the archive file, recorded when the server indexed that archive (see "Digest freshness" below). Empty string when no digest has been recorded and one could not be computed on request; such a row still appears in the listing, and only the download in section 5 fails. |
 | `name`        | string, possibly empty   | Door name from the catalog metadata.                                   |
-| `description` | string, possibly empty   | See truncation/collapsing rules below.                                 |
+| `description` | string, possibly empty   | What the door IS, read out of its `FILE_ID.DIZ` -- NOT the catalog's raw column. See below. |
 | `author`      | string, possibly empty   | Author from the catalog metadata; empty when unknown (never the literal `null`). Truncated to 48 characters. One of the six fields `?q=` searches (section 8). |
 | `releaseGroup`| string, possibly empty   | Release group, same rules as `author`; truncated to 32 characters. Also searched by `?q=`. |
 | `junkCount`   | integer                  | How many files inside the archive are flagged as ads/junk. `0` means the archive is clean. This is the live per-file count, the same number `GET /files/<archive>` reports in its header line (section 6). |
@@ -430,6 +430,22 @@ single space before the row is assembled -- the same field-safety principle
 (section 3), adapted to TSV's own delimiter. Bytes outside ISO-8859-1 are
 replaced with `?`, identically to `list.txt`.
 
+### Where descriptions come from (all three endpoints)
+
+`list.txt`, `/manifest` and `index.tsv` all serve the SAME description, read
+out of the door's `FILE_ID.DIZ` by `src/describe.ts`. None of them serves the
+catalog's raw `description` column any more.
+
+That is a deliberate divergence from the BBS-hosted API this server replaced,
+and it is the only one in the description path: `tests/parity.test.ts` proves
+it by putting the raw column back into a freshly rendered body and asserting
+the result still hashes to the byte the old API produced. Measured over the
+live 3301-door catalog: every row's description changed, and no other field
+did.
+
+`?q=` still searches the catalog's raw `description` column, so a search can
+match text the rendered description no longer shows.
+
 ### Description column
 
 The catalog's `description` field (`FILE_ID.DIZ` mined from scene releases)
@@ -537,7 +553,7 @@ Each entry in `doors` has this shape:
 | `author`       | string or null   |                                                                    |
 | `releaseGroup` | string or null   |                                                                    |
 | `category`     | string or null   |                                                                    |
-| `description`  | string or null   | Raw text, not escaped or truncated (unlike the `list.txt` field). |
+| `description`  | string           | Read from `FILE_ID.DIZ` by the classifier -- the same string `list.txt` and `index.tsv` serve; not escaped or truncated (unlike the `list.txt` field). |
 | `fileIdDiz`    | string or null   | Raw FILE_ID.DIZ contents, if any, newlines included.             |
 | `archiveSize`  | integer or null  | Bytes.                                                            |
 | `md5`          | string or null   | Lowercase hex, recorded when the server indexed that archive (see "Digest freshness" below). `null` when no digest has been recorded and one could not be computed on request. |
@@ -988,9 +1004,8 @@ is a different, ASCII-art-named entry):
 }
 ```
 
-(`description` and `fileIdDiz` omitted above for brevity -- they are present
-in the real response and are ASCII-art banner text, unrelated to the filter
-demonstration.)
+(`fileIdDiz` omitted above for brevity -- it is present in the real response
+and is ASCII-art banner text, unrelated to the filter demonstration.)
 
 Real example: `GET /api/door-repo/list.txt?type=DD` against the same
 catalog produced the header line:

@@ -74,8 +74,22 @@ describe('renderListTxt', () => {
   });
 
   it('collapses embedded newlines so one door is one line', () => {
+    // The description column no longer reaches list.txt - it is read out of
+    // FILE_ID.DIZ now (src/describe.ts) - so the one-row/one-line invariant
+    // is exercised through a field that still comes from the catalog
+    // verbatim, plus a DIZ that spans lines.
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, file_id_diz, indexed_at)
+       VALUES ('id2', 'NL.LHA', 'NL.LHA', 'Name one\nName two', 'XIM',
+               'Sysop paging door for /X\nwith a second line', 1700000000)`
+    ).run();
+    db.close();
     const body = renderListTxt(buildManifest(cfg)).toString('latin1');
-    expect(body).toContain('Line one Line two');
+    expect(body).toContain('Name one Name two');
+    const dataLines = body.split('\r\n').filter((l) => l.length > 0 && !l.startsWith('DOORREPO|'));
+    expect(dataLines).toHaveLength(2);
+    for (const line of dataLines) expect(line.split('|')).toHaveLength(10);
   });
 
   it('separates every row with CRLF and terminates the body with one', () => {
@@ -114,10 +128,20 @@ describe('renderListTxt', () => {
       `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, description, indexed_at)
        VALUES ('id4', 'PIPE.LHA', 'PIPE.LHA', 'A|B', 'XIM', 'has | a pipe', 1700000000)`
     ).run();
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, file_id_diz, indexed_at)
+       VALUES ('id5', 'PIPE2.LHA', 'PIPE2.LHA', 'Pipe Two', 'XIM',
+               'A chat door | with a pipe in its own DIZ', 1700000000)`
+    ).run();
     db.close();
     const body = renderListTxt(buildManifest(cfg)).toString('latin1');
     expect(body).toContain('A!B');
-    expect(body).toContain('has ! a pipe');
+    // A pipe cannot reach the description from a DIZ at all: in a box it IS
+    // a pillar, so the classifier splits the line on it and describes the
+    // cell (src/describe.ts, CELL_SPLIT). Either way no field can invent a
+    // column - asserted for every row by the field count below.
+    const pipe2 = body.split('\r\n').find((l) => l.startsWith('PIPE2.LHA'));
+    expect(pipe2).toContain('with a pipe in its own DIZ');
     const dataLines = body.split('\r\n').filter((l) => l.length > 0 && !l.startsWith('DOORREPO|'));
     for (const line of dataLines) {
       expect(line.split('|')).toHaveLength(10);

@@ -14,8 +14,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import request from 'supertest';
+import Database from 'better-sqlite3';
 import { createApp } from '../src/app';
 import { jsonBodyDigest } from '../scripts/capture-parity-fixtures';
+import { buildManifest, renderListTxt } from '../src/manifest';
 import { loadConfig } from '../src/config';
 
 const CAPTURES = path.join(__dirname, 'fixtures', 'parity', 'captures.json');
@@ -71,7 +73,18 @@ describeOrSkip('parity with the BBS-hosted API', () => {
   // `divergence-*` captures record a KNOWN, deliberate difference (see the
   // dedicated test below) rather than a parity claim - running them through
   // this byte-equality loop would fail by design, not by regression.
-  const parityCaptures = captures.filter((c) => !c.name.startsWith('divergence-'));
+  //
+  // The same is true of every capture that carries a DESCRIPTION. The BBS
+  // served the catalog's raw `description` column, which is scene box art as
+  // often as it is words; this server reads what the door IS out of its
+  // FILE_ID.DIZ (src/describe.ts). That was a deliberate change, and the
+  // test below proves it is the ONLY change: it rebuilds each of these
+  // bodies with the raw column put back and asserts the result still hashes
+  // to the byte the old API produced.
+  const DESCRIPTION_DIVERGENT = new Set(['manifest', 'list', 'manifest-type-xim', 'list-type-xim', 'manifest-q']);
+  const parityCaptures = captures.filter(
+    (c) => !c.name.startsWith('divergence-') && !DESCRIPTION_DIVERGENT.has(c.name)
+  );
 
   for (const c of parityCaptures) {
     it(`${c.name} matches`, async () => {
@@ -166,6 +179,65 @@ describeOrSkip('parity with the BBS-hosted API', () => {
       expect(body.toString('base64')).toBe(c.bodyBase64);
     });
   }
+
+  /**
+   * Put the raw catalog `description` back into a rendered body, exactly
+   * where the classifier's answer sits now. If every other byte of the port
+   * is faithful, the result must be what the old API sent.
+   */
+  function rawDescriptions(): Map<string, string | null> {
+    const db = new Database(process.env.PARITY_DB as string, { readonly: true });
+    try {
+      const rows = db
+        .prepare('SELECT archive_name, description FROM door_catalog')
+        .all() as { archive_name: string; description: string | null }[];
+      return new Map(rows.map((r) => [r.archive_name, r.description]));
+    } finally {
+      db.close();
+    }
+  }
+
+  describe('known divergence: descriptions are now read from FILE_ID.DIZ', () => {
+    const raw = rawDescriptions();
+    const withRawDescriptions = (opts?: { type?: string; q?: string }) => {
+      const m = buildManifest(cfg, opts);
+      return { ...m, doors: m.doors.map((d) => ({ ...d, description: raw.get(d.archiveName) ?? null })) };
+    };
+
+    it.each([
+      ['list', undefined],
+      ['list-type-xim', { type: 'XIM' }],
+    ] as const)('%s differs from the BBS in the description column and nowhere else', (name, opts) => {
+      const capture = captures.find((c) => c.name === name);
+      expect(capture?.sha256).toBeDefined();
+      const restored = renderListTxt(withRawDescriptions(opts));
+      expect(crypto.createHash('sha256').update(restored).digest('hex')).toBe(capture?.sha256);
+      expect(restored.length).toBe(capture?.byteLength);
+    });
+
+    it.each([
+      ['manifest', undefined],
+      ['manifest-type-xim', { type: 'XIM' }],
+      ['manifest-q', { q: 'door' }],
+    ] as const)('%s differs from the BBS in the description field and nowhere else', (name, opts) => {
+      const capture = captures.find((c) => c.name === name);
+      expect(capture?.jsonDigest).toBeDefined();
+      const restored = Buffer.from(JSON.stringify(withRawDescriptions(opts)), 'utf-8');
+      const { digest, doorCount } = jsonBodyDigest(restored);
+      expect(digest).toBe(capture?.jsonDigest);
+      if (capture?.doorCount) expect(doorCount).toBe(capture.doorCount);
+    });
+
+    it('and the classified description is actually what gets served', async () => {
+      const res = await request(app).get('/api/door-repo/manifest?q=ALSTER');
+      expect(res.status).toBe(200);
+      const door = res.body.doors.find((d: { archiveName: string }) => d.archiveName === '!ALSTER.LHA');
+      // The catalog's own column for this row is box art; the served
+      // description is the door's own line, read out of the DIZ.
+      expect(raw.get('!ALSTER.LHA')).toMatch(/[_\\/]{3,}/);
+      expect(door.description).toBe('Children - This tool starts only for NEWUSERS /X');
+    });
+  });
 
   // The one deliberate divergence in the port. The BBS's ?q= filter also
   // searches installed_as - a per-node column this server's schema drops -

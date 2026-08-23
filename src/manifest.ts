@@ -28,6 +28,7 @@
  */
 import Database from 'better-sqlite3';
 import { getArchiveChecksums } from './checksums';
+import { analyseDoor, buildGroupTags } from './describe';
 import { resolveArchivePath, getCatalogRevision } from './catalog';
 import { openDb } from './db';
 import type { ServerConfig } from './config';
@@ -171,8 +172,29 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: 
   }
 }
 
+/** One row's description, read by the classifier in ./describe.ts. */
+function describeRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string {
+  return analyseDoor(
+    {
+      dizText: row.file_id_diz,
+      name: row.name,
+      archiveName: row.archive_name,
+      binaryName: row.binary_name,
+      catalogVersion: null,
+      catalogAuthor: row.author,
+    },
+    groupTags
+  ).description;
+}
+
 export function buildManifest(cfg: ServerConfig, opts?: { type?: string; q?: string }): DoorRepoManifest {
   const rows = fetchCatalogRows(cfg, opts);
+  // Release-group tags are derived from the corpus itself (a prefix counts
+  // only when three or more archives carry it), so they are built from the
+  // WHOLE result set before any row is described - a filtered manifest
+  // (?q=) would otherwise see too few archives to recognise a tag and would
+  // describe the same door differently from an unfiltered one.
+  const groupTags = buildGroupTags(rows.map((r) => r.archive_name));
 
   let lazyFallbacksUsed = 0;
 
@@ -209,7 +231,13 @@ export function buildManifest(cfg: ServerConfig, opts?: { type?: string; q?: str
       author: row.author,
       releaseGroup: row.release_group,
       category: row.category,
-      description: row.description,
+      // What the door IS, read out of its FILE_ID.DIZ by ./describe.ts -
+      // NOT the catalog's raw `description` column, which is scene box art
+      // as often as it is words. Both readers of this field (list.txt for
+      // the AmigaDOS clients, and the JSON manifest for web consumers) get
+      // the same answer as index.tsv, so no two endpoints describe the same
+      // door differently.
+      description: describeRow(row, groupTags),
       fileIdDiz: row.file_id_diz,
       archiveSize: row.archive_size,
       md5,
