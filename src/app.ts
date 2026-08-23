@@ -1,6 +1,7 @@
 import express from 'express';
 import { createRouter } from './routes';
 import { createAdminRouter } from './admin-routes';
+import { createPublicRouter } from './public-routes';
 import { doorRepoCors } from './cors';
 import type { ServerConfig } from './config';
 
@@ -16,6 +17,9 @@ export function createApp(cfg: ServerConfig): express.Express {
   // Before the public router: /admin/* must not be shadowed by a public
   // route, and it carries its own JSON body parser.
   app.use('/api/door-repo/admin', createAdminRouter(cfg));
+  // The web API: JSON, free to grow. routes.ts below it stays the byte-exact
+  // contract the AmigaDOS clients depend on.
+  app.use('/api/door-repo', createPublicRouter(cfg));
   app.use('/api/door-repo', createRouter(cfg));
   return app;
 }
