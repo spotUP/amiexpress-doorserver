@@ -53,8 +53,10 @@ export function resolveArchivePath(cfg: ServerConfig, archivePath: string): stri
 export function getCatalogEntryByArchive(cfg: ServerConfig, archiveName: string): CatalogEntry | null {
   const db = openDb(cfg, { readonly: true });
   try {
+    // COLLATE NOCASE matches the BBS original (door-catalog.service.ts:150):
+    // archive-name lookup is case-insensitive, and clients rely on it.
     const row = db
-      .prepare('SELECT * FROM door_catalog WHERE archive_name = ?')
+      .prepare('SELECT * FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
       .get(archiveName) as CatalogEntry | undefined;
     return row ?? null;
   } finally {

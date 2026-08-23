@@ -54,6 +54,10 @@ describe('catalog reads', () => {
     expect(getCatalogEntryByArchive(cfg, 'NOPE.LHA')).toBeNull();
   });
 
+  it('finds an entry whose name differs only in case', () => {
+    expect(getCatalogEntryByArchive(cfg, 'acc-v103.lha')?.id).toBe('id1');
+  });
+
   it('returns the archive files in path order with junk flags', () => {
     const files = getArchiveFiles(cfg, 'id1');
     expect(files.map((f) => f.path)).toEqual(['Account/AccEd.Rexx', 'TC.displayme']);
