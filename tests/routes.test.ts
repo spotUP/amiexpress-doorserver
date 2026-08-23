@@ -152,6 +152,75 @@ describe('read API', () => {
   });
 });
 
+describe('index.tsv', () => {
+  it('serves the TSV index with the revision header and LF endings', async () => {
+    const res = await request(app).get('/api/door-repo/index.tsv');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('ISO-8859-1');
+    expect(res.headers['x-door-repo-revision']).toBe('c1-t1700000000');
+    expect(res.text.split('\n')[0]).toBe('Filename\tPath\tSize\tSystem\tDescription');
+    expect(res.text).not.toContain('\r');
+  });
+
+  it('carries a row for the seeded archive with a description derived from its DIZ', async () => {
+    const res = await request(app).get('/api/door-repo/index.tsv');
+    const row = res.text.split('\n').find((l: string) => l.startsWith('ACC-V103.LHA'));
+    expect(row).toBe('ACC-V103.LHA\tUnsorted\t5B\tUnsorted\tDIZ line');
+  });
+
+  it('honours ?type=', async () => {
+    const res = await request(app).get('/api/door-repo/index.tsv?type=DD');
+    expect(res.text.split('\n').filter((l: string) => l.startsWith('ACC-V103.LHA'))).toHaveLength(0);
+  });
+});
+
+describe('archive route: system segment and .diz basename (uhcsearch compatibility)', () => {
+  it('resolves /archive/<system>/<filename> to the same bytes as /archive/<filename>', async () => {
+    const direct = await request(app).get('/api/door-repo/archive/ACC-V103.LHA');
+    const viaSystem = await request(app).get('/api/door-repo/archive/AmiExpress/ACC-V103.LHA');
+    expect(viaSystem.status).toBe(200);
+    expect(viaSystem.headers['x-archive-md5']).toBe(direct.headers['x-archive-md5']);
+  });
+
+  it('serves /archive/<basename>.diz as the FILE_ID.DIZ text', async () => {
+    const res = await request(app).get('/api/door-repo/archive/ACC-V103.diz');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('ISO-8859-1');
+    expect(res.text).toBe('DIZ line');
+  });
+
+  it('serves /archive/<system>/<basename>.diz the same way', async () => {
+    const res = await request(app).get('/api/door-repo/archive/AmiExpress/ACC-V103.diz');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('DIZ line');
+  });
+
+  it('404s a .diz request for an unknown basename', async () => {
+    const res = await request(app).get('/api/door-repo/archive/NOPE.diz');
+    expect(res.status).toBe(404);
+    expect(res.text).toBe('NOT FOUND: NOPE.diz\r\n');
+  });
+
+  it('resolves an exact full-name match before the basename search', async () => {
+    // Requesting the FULL name (extension included) plus ".diz" hits the
+    // exact-match branch, not the basename search.
+    const res = await request(app).get('/api/door-repo/archive/ACC-V103.LHA.diz');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('DIZ line');
+  });
+
+  it('404s rather than guessing when two archives share a basename', async () => {
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, file_id_diz, indexed_at)
+       VALUES ('id2', 'ACC-V103.LZX', 'ACC-V103.LZX', 'Account Editor (LZX)', 'XIM', 'other diz', 1700000000)`
+    ).run();
+    db.close();
+    const res = await request(app).get('/api/door-repo/archive/ACC-V103.diz');
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('candidateArchiveNames', () => {
   it('decodes a normal UTF-8 percent-encoding', () => {
     expect(candidateArchiveNames('ACC%2DV103.LHA')).toContain('ACC-V103.LHA');

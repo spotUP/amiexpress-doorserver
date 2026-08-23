@@ -105,3 +105,55 @@ export function getDoorCount(cfg: ServerConfig): number {
     db.close();
   }
 }
+
+/**
+ * `archiveName` with its own trailing extension removed (everything after
+ * the last '.'), or the whole name when there is no '.'. Deliberately
+ * generic rather than a hardcoded list of known extensions (.LHA, .LZX,
+ * .LZH, ...) - the corpus is not guaranteed to stay within that set, and
+ * "everything after the last dot" is what every one of those actually is.
+ */
+export function stripArchiveExtension(archiveName: string): string {
+  const dot = archiveName.lastIndexOf('.');
+  return dot === -1 ? archiveName : archiveName.slice(0, dot);
+}
+
+/**
+ * Resolves `GET /archive/<basename>.diz` (routes.ts) to the one catalog
+ * archive it means, so a client can fetch a door's FILE_ID.DIZ without
+ * knowing its exact extension.
+ *
+ * Two passes, in this order:
+ *   1. Exact, case-insensitive match against the FULL archive_name. This
+ *      lets a client that already knows the exact filename (extension
+ *      included) just append ".diz" - e.g. archive/ACC-V103.LHA.diz - and
+ *      also protects against the case below: if a real archive happens to
+ *      be named exactly `basename`, that is unambiguous even if some other
+ *      archive's basename-with-extension-stripped later collides.
+ *   2. Unique match on `basename` against every catalog row's own
+ *      extension-stripped name. `archive_name` is UNIQUE in the schema, so
+ *      this can only be ambiguous when two DIFFERENT archives share a
+ *      basename under different extensions (e.g. FOO.LHA and FOO.LZX) - in
+ *      which case this returns 'ambiguous' rather than guessing which one
+ *      the client meant.
+ *
+ * Returns the resolved archive_name, 'ambiguous', or null (no match).
+ */
+export function findArchiveNameForDizBasename(cfg: ServerConfig, basename: string): string | 'ambiguous' | null {
+  const db = openDb(cfg, { readonly: true });
+  try {
+    const exact = db
+      .prepare('SELECT archive_name FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+      .get(basename) as { archive_name: string } | undefined;
+    if (exact) return exact.archive_name;
+
+    const rows = db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[];
+    const target = basename.toLowerCase();
+    const matches = rows.filter((r) => stripArchiveExtension(r.archive_name).toLowerCase() === target);
+    if (matches.length === 1) return matches[0].archive_name;
+    if (matches.length > 1) return 'ambiguous';
+    return null;
+  } finally {
+    db.close();
+  }
+}

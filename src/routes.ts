@@ -28,8 +28,16 @@ import express, { NextFunction, Request, Response } from 'express';
 import * as fs from 'fs';
 import { pipeline } from 'stream';
 import { buildManifest, renderListTxt, renderListTxtCached } from './manifest';
+import { renderIndexTsvCached } from './index-tsv';
 import { getArchiveChecksums } from './checksums';
-import { getArchiveFiles, getCatalogEntryByArchive, getCatalogRevision, getDoorCount, resolveArchivePath } from './catalog';
+import {
+  findArchiveNameForDizBasename,
+  getArchiveFiles,
+  getCatalogEntryByArchive,
+  getCatalogRevision,
+  getDoorCount,
+  resolveArchivePath,
+} from './catalog';
 import type { ServerConfig } from './config';
 
 function parseManifestQuery(req: Request): { type?: string; q?: string } {
@@ -182,6 +190,18 @@ export function createRouter(cfg: ServerConfig): express.Router {
     res.send(body);
   });
 
+  // GET /index.tsv — tab-separated, ISO-8859-1/LF index for UHC Tools'
+  // uhcsearch (docs/DOOR-REPO-API.md). Same query/cache shape as /list.txt
+  // (renderIndexTsvCached mirrors renderListTxtCached) — see index-tsv.ts.
+  doorRepoRouter.get('/index.tsv', (req: Request, res: Response) => {
+    const query = parseManifestQuery(req);
+    const body = renderIndexTsvCached(cfg, query);
+
+    res.set('X-Door-Repo-Revision', getCatalogRevision(cfg));
+    res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
+    res.send(body);
+  });
+
   // GET /archive/:archiveName — stream the archive + checksum headers.
   //
   // The declared Content-Length and the streamed bytes MUST come from the
@@ -242,6 +262,46 @@ export function createRouter(cfg: ServerConfig): express.Router {
     res.set('X-Archive-SHA256', checksums.sha256);
 
     streamArchive(fd, res, archiveName);
+  }
+
+  // GET /archive/<basename>.diz — the archive's own FILE_ID.DIZ, resolved
+  // by basename rather than exact archive name, so a client (uhcsearch)
+  // that only knows the archive's basename can read a description without
+  // downloading the archive. See findArchiveNameForDizBasename (catalog.ts)
+  // for the exact-name-then-unique-basename resolution order, and
+  // docs/DOOR-REPO-API.md section 5c for the ambiguity rule.
+  //
+  // `basenameCandidates` are the UTF-8/Latin-1 decodings of the requested
+  // segment with its trailing ".diz" already stripped (see the dispatcher
+  // below) — same candidate-list shape candidateArchiveNames() produces for
+  // every other per-entry route, so a basename with non-ASCII characters
+  // (e.g. "$CP-BUß1") resolves the same way an exact archive name does.
+  function handleArchiveDizRequest(res: Response, basenameCandidates: string[]): void {
+    res.set('X-Door-Repo-Revision', getCatalogRevision(cfg));
+
+    let resolved: string | 'ambiguous' | null = null;
+    for (const candidate of basenameCandidates) {
+      const found = findArchiveNameForDizBasename(cfg, candidate);
+      if (found) {
+        resolved = found;
+        break;
+      }
+    }
+
+    const requestedName = `${basenameCandidates[0]}.diz`;
+    if (!resolved || resolved === 'ambiguous') {
+      sendNotFound(res, requestedName);
+      return;
+    }
+
+    const entry = getCatalogEntryByArchive(cfg, resolved);
+    if (!entry || !entry.file_id_diz) {
+      sendNotFound(res, requestedName);
+      return;
+    }
+
+    res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
+    res.send(Buffer.from(entry.file_id_diz, 'latin1'));
   }
 
   // GET /health — { status, revision, doors }. Uses getDoorCount(), NOT
@@ -366,7 +426,37 @@ export function createRouter(cfg: ServerConfig): express.Router {
     }
 
     const kind = match[1];
-    const names = candidateArchiveNames(match[2]);
+    let segment = match[2];
+
+    // /archive/<name> is also reachable as /archive/<system>/<name> — the
+    // shape uhcsearch's own client builds from index.tsv's Path + "/" +
+    // Filename columns (index-tsv.ts, docs/DOOR-REPO-API.md). Archives are
+    // keyed by name alone and always have been, so the system segment is
+    // accepted and ignored for lookup: take only the last path segment.
+    // diz/files/doc don't need this — uhcsearch's URL construction is
+    // archive-specific — so their dispatch below is unchanged.
+    if (kind === 'archive') {
+      const lastSlash = segment.lastIndexOf('/');
+      if (lastSlash !== -1) {
+        segment = segment.slice(lastSlash + 1);
+      }
+
+      // /archive/<basename>.diz (Feature 3). Checked on the raw, still
+      // percent-encoded segment: '.', 'd', 'i', 'z' are all ASCII, so no
+      // encoding of the basename can hide or fake this suffix.
+      if (/\.diz$/i.test(segment)) {
+        const basenameCandidates = candidateArchiveNames(segment.slice(0, -'.diz'.length));
+        handleArchiveDizRequest(res, basenameCandidates);
+        return;
+      }
+
+      const names = candidateArchiveNames(segment);
+      const name = names.find((n) => getCatalogEntryByArchive(cfg, n)) ?? names[0];
+      handleArchiveRequest(res, name);
+      return;
+    }
+
+    const names = candidateArchiveNames(segment);
     // Prefer a spelling that actually exists in the catalog; otherwise use the
     // first, so the 404 body echoes what the client most likely meant.
     const name = names.find((n) => getCatalogEntryByArchive(cfg, n)) ?? names[0];
@@ -375,10 +465,8 @@ export function createRouter(cfg: ServerConfig): express.Router {
       handleDizRequest(res, name);
     } else if (kind === 'files') {
       handleFilesRequest(res, name);
-    } else if (kind === 'doc') {
-      handleDocRequest(res, name);
     } else {
-      handleArchiveRequest(res, name);
+      handleDocRequest(res, name);
     }
   });
 

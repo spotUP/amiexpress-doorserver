@@ -41,7 +41,7 @@ export type { ManifestDoor, DoorRepoManifest };
 // only place in this server that opens a database — this module never
 // writes to door_catalog.
 
-interface DoorCatalogRow {
+export interface DoorCatalogRow {
   archive_name: string;
   archive_path: string;
   door_type: string;
@@ -114,9 +114,18 @@ export const LAZY_CHECKSUM_FALLBACK_LIMIT = 25;
 
 // ─── Manifest builder ───────────────────────────────────────────────────
 
-export function buildManifest(cfg: ServerConfig, opts?: { type?: string; q?: string }): DoorRepoManifest {
+/**
+ * The one place that queries door_catalog for a filtered listing. Both
+ * buildManifest() (below) and index-tsv.ts's renderer call this — Feature
+ * 1 (index.tsv) is required to honour the same ?type=/?q= filters as the
+ * manifest WITHOUT writing a second catalog query, and this is that shared
+ * query. index-tsv.ts needs archive_path (for its Path/System columns) and
+ * file_id_diz (for its description classifier), both already selected here
+ * for the manifest's own fileIdDiz field and the lazy-checksum fallback's
+ * resolveArchivePath() call — nothing had to be added to the SELECT list.
+ */
+export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: string }): DoorCatalogRow[] {
   const db = openDb(cfg, { readonly: true });
-  let rows: DoorCatalogRow[];
   try {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
@@ -150,10 +159,14 @@ export function buildManifest(cfg: ServerConfig, opts?: { type?: string; q?: str
       ${where}
       ORDER BY archive_name COLLATE NOCASE ASC
     `;
-    rows = db.prepare(sql).all(...params) as DoorCatalogRow[];
+    return db.prepare(sql).all(...params) as DoorCatalogRow[];
   } finally {
     db.close();
   }
+}
+
+export function buildManifest(cfg: ServerConfig, opts?: { type?: string; q?: string }): DoorRepoManifest {
+  const rows = fetchCatalogRows(cfg, opts);
 
   let lazyFallbacksUsed = 0;
 
@@ -261,7 +274,7 @@ function oneLine(s: string): string {
 // Iterates by Unicode code point (not UTF-16 code unit), so an astral
 // character encoded as a surrogate pair collapses to exactly one '?'
 // ("a single '?' per character"), not two.
-function toLatin1Safe(s: string): string {
+export function toLatin1Safe(s: string): string {
   let out = '';
   for (const ch of s) {
     const cp = ch.codePointAt(0) ?? 0;

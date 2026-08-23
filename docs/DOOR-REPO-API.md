@@ -149,7 +149,9 @@ amiexpress-web backend.
 |--------|------------------------------------|--------------------------------------------|
 | GET    | `/api/door-repo/manifest`          | JSON manifest of the catalog (filterable)  |
 | GET    | `/api/door-repo/list.txt`          | Plain-text, byte-exact index (filterable)  |
+| GET    | `/api/door-repo/index.tsv`         | Tab-separated index for UHC Tools' `uhcsearch` (filterable) |
 | GET    | `/api/door-repo/archive/:name`     | Download one archive by its archive name   |
+| GET    | `/api/door-repo/archive/:basename.diz` | `FILE_ID.DIZ` by archive basename, no download needed |
 | GET    | `/api/door-repo/diz/:name`         | Raw `FILE_ID.DIZ`, newlines intact         |
 | GET    | `/api/door-repo/files/:name`       | What is inside the archive, + ad count     |
 | GET    | `/api/door-repo/doc/:name`         | The door's own documentation, raw bytes    |
@@ -350,6 +352,111 @@ by appending them. A client parsing `list.txt`:
   field is removed or an existing field's position, meaning, or type changes
   (see section 10).
 
+## 3b. `index.tsv` format
+
+`GET /api/door-repo/index.tsv` -- also accepts `?type=` and `?q=` (section 8),
+applied through the same filtered catalog query `manifest` and `list.txt`
+use -- there is only one query that answers "?type=/?q= filtered", not one
+per format.
+
+This exists for UHC Tools' `uhcsearch` (an Amiga package manager). Its
+constraints are stricter than `list.txt`'s AmigaDOS-client audience in three
+specific ways, which is why this is a second, separate format rather than a
+third field appended to `list.txt`:
+
+- **Tab-separated, not pipe-delimited** -- `uhcsearch`'s own index format is
+  TSV.
+- **LF line endings, not CRLF.** This is the one place this API's plain-text
+  output differs from `list.txt` -- `uhcsearch`'s format spec is explicit
+  that its index file uses LF, and getting this wrong (emitting CRLF here
+  too) would leave a stray `\r` at the end of every field `uhcsearch` reads.
+- **A short, non-art description with no archive download required.** See
+  "Description column" below.
+
+Encoding is otherwise the same as every other plain-text endpoint in this
+API: **ISO-8859-1**, `Content-Type: text/plain; charset=ISO-8859-1`.
+
+### Columns
+
+Header line (always first, literal column names, not data):
+
+```
+Filename	Path	Size	System	Description
+```
+
+`Filename` and `Path` are the first two columns, in that order, because
+`uhcsearch` treats them specially: it builds a download URL as
+`basePath + Path + "/" + Filename`. That URL always resolves -- see section
+5, "Archive download via a system-segment URL".
+
+| Column        | Meaning                                                                 |
+|---------------|---------------------------------------------------------------------------|
+| `Filename`    | The archive's filename, e.g. `ACC-V103.LHA`.                            |
+| `Path`        | The corpus system directory: the first path segment of the catalog's internal `archive_path` (`AmiExpress/ACC-V103.LHA` -> `AmiExpress`), or `Unsorted` when `archive_path` has no directory segment. Structural -- this is the piece `uhcsearch` concatenates into its download URL. |
+| `Size`        | Integer KiB with a `K` suffix (`671K`), or `NNNB` for anything under 1024 bytes (`512B`). No padding. |
+| `System`      | The same corpus system directory as `Path`, and always the same value on any given row. Kept as its own column deliberately: `Path` is structural (URL construction breaks if a client repurposes it), `System` is descriptive (safe to relabel, drop, or replace with something else later without touching how downloads resolve). |
+| `Description` | A short, human-readable one-liner. See below.                           |
+
+**Field safety:** a tab or newline embedded in any field would break the
+column structure, so tab/CR/LF runs in every field are replaced with a
+single space before the row is assembled -- the same field-safety principle
+`list.txt` applies with its own pipe-escaping and newline-collapsing rules
+(section 3), adapted to TSV's own delimiter. Bytes outside ISO-8859-1 are
+replaced with `?`, identically to `list.txt`.
+
+### Description column
+
+The catalog's `description` field (`FILE_ID.DIZ` mined from scene releases)
+routinely opens with box-drawing ASCII art -- a border like
+`______    ________.  /\    ______.__________` -- before, or instead of,
+any actual words. **759 of the 3301 catalogued doors have this shape.** A
+`Description` column that surfaced that border verbatim would read as noise
+on every one of those rows, so this column is not that field: it runs a
+dedicated classifier, in this order:
+
+1. The FILE_ID.DIZ, walked line by line: the first line containing a run of
+   3+ letters where letters and digits outnumber punctuation/box-drawing
+   characters.
+2. If no DIZ line qualifies: the catalog's `name` field, tested the same
+   way.
+3. If that also fails: the archive's own base name with its extension
+   stripped (e.g. `ACC-V103`) -- always accepted, no test, since it is
+   guaranteed short and non-empty.
+
+Then: whitespace is collapsed, control characters are stripped, and the
+result is capped at 60 characters.
+
+Real example of the fallback actually firing (archive `AE_DOORS.LHA`, whose
+entire FILE_ID.DIZ and catalog `name` are both the literal string
+`XXXX....`, which fails the classifier at both step 1 and step 2 -- four
+letters, four punctuation characters, not a majority):
+
+```
+AE_DOORS.LHA	AmiExpress	10K	AmiExpress	AE_DOORS
+```
+
+### Real example
+
+Header plus the first 10 rows in `archive_name` order, captured against the
+live 3301-door catalog:
+
+```
+Filename	Path	Size	System	Description
+!ALSTER.LHA	AmiExpress	39K	AmiExpress	-*- iNDEPENDENT cONNECTION pRESENTS -*-
+$CP-BUß1.LZX	AmiExpress	15K	AmiExpress	| | | | | | released today !
+$CP-PS12.LZX	AmiExpress	17K	AmiExpress	: Status V1.2 for the great /X-Press :
+$CP-ST13.LZX	AmiExpress	21K	AmiExpress	: Status Door V1.3 minor Update :
+$CP-ST14.LZX	AmiExpress	25K	AmiExpress	| Status Door V1.4 © by C/XD |
+-D-CALC.LHA	AmiExpress	10K	AmiExpress	CALCULATOR V1.0 by VASCAL/DLT
+-D-DOR11.LHA	AmiExpress	7K	AmiExpress	dOOR-mENU v.1.1 by vASCAL/dLT
+-D-INF21.LHA	AmiExpress	70K	AmiExpress	| sYSTEM iNFO v.2.1 by vASCAL/dLT fOR /X |
+-J-LCV30.LHA	AmiExpress	91K	AmiExpress	-LASTCALLER- V3.0 · WRITTEN BY iRoNCoDE!
+-L-OFFL.LHA	AmiExpress	34K	AmiExpress	»» oFFLiner V1.1 New /X UtiL by Crew-One ««
+```
+
+`X-Door-Repo-Revision` is present on this response too, same as every other
+endpoint in this API.
+
 ## 4. JSON manifest
 
 `GET /api/door-repo/manifest` -- also accepts `?type=` and `?q=` (section 8).
@@ -485,6 +592,28 @@ body: (empty)
 
 `:archiveName` is the exact `archiveName` value from a manifest or
 `list.txt` row (e.g. `AETRIV10.LHA`). Matching is case-insensitive.
+
+### Archive download via a system-segment URL
+
+`GET /api/door-repo/archive/<system>/<archiveName>` also works and returns
+identical bytes and headers to `GET /api/door-repo/archive/<archiveName>`.
+
+This exists because `index.tsv` (section 3b) gives `uhcsearch` a `Path`
+column alongside `Filename`, and `uhcsearch` builds its download URL as
+`basePath + Path + "/" + Filename` -- it does not know, and does not need to
+know, that `Path` isn't actually part of the lookup key. Archives are keyed
+by name alone and always have been: the `<system>` segment is accepted,
+and then ignored entirely for lookup -- only the last path segment is used
+as the archive name. Both of these therefore resolve to the exact same
+archive:
+
+```
+GET /api/door-repo/archive/ACC-V103.LHA
+GET /api/door-repo/archive/AmiExpress/ACC-V103.LHA
+```
+
+Existing clients that only ever request the single-segment form are
+unaffected -- this is purely additive.
 
 On success (`200`), the response is the raw archive bytes with these
 headers:
@@ -672,6 +801,48 @@ The source filename travels in an `X-Doc-Filename` response header rather
 than the body, so the body stays byte-exact.
 
 `404` when the archive is unknown or has no doc.
+
+## 5c. `FILE_ID.DIZ` by archive basename
+
+`GET /api/door-repo/archive/<basename>.diz`
+
+This exists for `uhcsearch`'s readme feature so it can show a door's
+description without downloading a 25 KB archive first: given only a
+basename -- `ACC-V103`, not `ACC-V103.LHA` -- it can fetch
+`archive/ACC-V103.diz` directly rather than downloading `archive/ACC-V103.LHA`
+just to look at a few bytes inside it.
+
+Response shape is identical to `GET /diz/<archiveName>` (section 5b): raw
+`FILE_ID.DIZ` text, newlines preserved, `Content-Type: text/plain;
+charset=ISO-8859-1`, and the **same `404` behavior** -- unknown archive and
+"archive exists but has no DIZ" are deliberately not distinguished, so a
+client has exactly one case to handle either way.
+
+Also resolvable under a system segment, exactly like archive download
+(above): `GET /archive/AmiExpress/ACC-V103.diz` behaves identically to
+`GET /archive/ACC-V103.diz`.
+
+### Basename resolution and the ambiguity rule
+
+`<basename>` is resolved against the catalog by stripping each candidate
+archive's own extension (several exist across the corpus -- `.LHA`, `.LZX`,
+`.LZH`) and comparing what's left, case-insensitively, in this order:
+
+1. **Exact match on the full archive name first.** If `<basename>` (with
+   the trailing `.diz` already removed) is itself, case-insensitively, a
+   real `archiveName` in the catalog, that row wins outright -- this lets a
+   client that already knows the exact filename, extension included, just
+   append `.diz` (`archive/ACC-V103.LHA.diz`) and get an unambiguous answer
+   regardless of what else is in the catalog.
+2. **Otherwise, a unique basename match.** Every catalog archive name has
+   its own extension stripped and compared against `<basename>`. Exactly
+   one match resolves normally.
+3. **Two or more archives sharing a basename under different extensions is
+   a `404`, not a guess.** `archive_name` is unique in the catalog, so this
+   can only happen when, for example, both `FOO.LHA` and `FOO.LZX` exist --
+   in that case `archive/FOO.diz` has no single correct answer, and this API
+   would rather tell a client "not found" than silently pick one archive
+   over the other and be wrong half the time.
 
 ## 6. Health check
 
