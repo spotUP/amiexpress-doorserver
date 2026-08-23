@@ -51,6 +51,30 @@ export function SubmissionsPanel({
                   <span className="font-mono text-[12px] text-accent">{row.archiveName}</span>
                   <span className="text-xs text-muted">{formatSize(row.size)}</span>
                 </div>
+                {row.derived && (
+                  // What the archive says it is. A curator approves a door,
+                  // not a filename.
+                  <dl className="mt-2 grid grid-cols-[5rem_1fr] gap-x-3 gap-y-0.5 rounded-md border border-line bg-bg px-3 py-2 text-xs">
+                    {[
+                      ['Name', row.derived.name],
+                      ['Version', row.derived.version],
+                      ['Needs', row.derived.requiresBbs],
+                      ['Author', row.derived.author],
+                      ['Description', row.derived.description],
+                      ['Files', `${row.derived.files.length}`],
+                    ].map(([label, value]) => (
+                      <div key={label} className="contents">
+                        <dt className="text-muted">{label}</dt>
+                        <dd className="truncate text-ink">{value || '-'}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {row.derived && !row.derived.fileIdDiz && (
+                  <p className="mt-1 text-xs text-warn">
+                    No FILE_ID.DIZ could be read from this archive - the fields above are guesses from its name.
+                  </p>
+                )}
                 {row.note && <p className="mt-1 text-muted">{row.note}</p>}
                 <p className="mt-1 font-mono text-[11px] text-muted">md5 {row.md5}</p>
                 <p className="text-xs text-muted">

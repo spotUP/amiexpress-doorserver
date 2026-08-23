@@ -391,14 +391,22 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         .prepare(
           `SELECT s.id, s.archive_name AS archiveName, s.size, s.md5, s.sha256,
                   s.submitter_note AS note, s.status, s.reject_reason AS rejectReason,
-                  s.created_at AS createdAt, s.decided_at AS decidedAt, u.username AS decidedBy
+                  s.created_at AS createdAt, s.decided_at AS decidedAt, u.username AS decidedBy,
+                  s.parsed_name AS derived
              FROM door_submissions s
              LEFT JOIN admin_users u ON u.id = s.decided_by
             WHERE (? = 'all' OR s.status = ?)
             ORDER BY s.created_at DESC LIMIT 200`
         )
-        .all(status, status);
-      res.json({ rows });
+        .all(status, status) as (Record<string, unknown> & { derived: string | null })[];
+      res.json({
+        // What the archive said about itself when it arrived, so a curator
+        // decides on a door rather than on a filename.
+        rows: rows.map(({ derived, ...row }) => ({
+          ...row,
+          derived: derived ? (JSON.parse(derived) as unknown) : null,
+        })),
+      });
     } finally {
       db.close();
     }

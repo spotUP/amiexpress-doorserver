@@ -29,6 +29,8 @@ import * as path from 'path';
 import type { Request } from 'express';
 import Busboy from 'busboy';
 import type Database from 'better-sqlite3';
+import { readLhaContents } from './archive-reader';
+import { analyseDoor, buildGroupTags, clean, displayName, looksLikeName, toPlain } from './describe';
 import type { ServerConfig } from './config';
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -166,12 +168,97 @@ export function receiveUpload(req: Request): Promise<ReceivedUpload> {
   });
 }
 
+// ─── what the archive says about itself ────────────────────────────────
+
+/**
+ * The member most likely to BE the door: an Amiga executable has no
+ * extension at all, or one of the door-type extensions. Documentation,
+ * icons and data files are not it.
+ */
+const PROGRAM_EXT = /\.(exe|xim|aim|fim|sim|tim|iim|rexx)$/i;
+const NOT_PROGRAM = /\.(info|doc|txt|readme|me|guide|diz|nfo|dat|cfg|prefs|bak|library|font|iff|ilbm|png|gif|jpg|mod|8svx)$/i;
+
+function pickProgram(files: { path: string; size: number }[]): string | null {
+  const candidates = files.filter((f) => {
+    const base = f.path.split('/').pop() ?? '';
+    if (!base || NOT_PROGRAM.test(base)) return false;
+    return PROGRAM_EXT.test(base) || !base.includes('.');
+  });
+  if (!candidates.length) return null;
+  // The biggest one: a door ships helpers, and the door is the largest.
+  const best = candidates.reduce((a, b) => (b.size > a.size ? b : a));
+  return best.path.split('/').pop() ?? null;
+}
+
+/** The first line of a DIZ that reads as a name rather than as border art. */
+function firstNameLine(diz: string | null): string | null {
+  if (!diz) return null;
+  for (const line of diz.replace(/\r/g, '').split('\n')) {
+    const candidate = toPlain(clean(line));
+    if (looksLikeName(candidate)) return candidate;
+  }
+  return null;
+}
+
+export interface DerivedMetadata {
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  requiresBbs: string;
+  binaryName: string | null;
+  fileIdDiz: string | null;
+  docFilename: string | null;
+  doc: string | null;
+  files: { path: string; size: number }[];
+}
+
+/**
+ * Read a submitted archive the way the catalog reads a scanned one, so an
+ * approved door arrives with its Name, Version, Description, Needs and
+ * Author already filled in rather than as an empty row waiting for the next
+ * corpus scan.
+ *
+ * Only LHA can be read here (see ./archive-reader). For anything else the
+ * fields come back empty and a curator fills them in.
+ */
+export function deriveMetadata(bytes: Buffer, archiveName: string, groupTags: ReadonlySet<string>): DerivedMetadata {
+  const contents = sniffArchive(bytes.subarray(0, 16)) === 'lha'
+    ? readLhaContents(bytes)
+    : { files: [], fileIdDiz: null, docFilename: null, doc: null };
+
+  const binaryName = pickProgram(contents.files);
+  const facts = analyseDoor(
+    {
+      dizText: contents.fileIdDiz,
+      name: firstNameLine(contents.fileIdDiz),
+      archiveName,
+      binaryName,
+    },
+    groupTags
+  );
+
+  return {
+    name: displayName(firstNameLine(contents.fileIdDiz), binaryName, archiveName, groupTags),
+    description: facts.description,
+    version: facts.version,
+    author: facts.author,
+    requiresBbs: facts.requiresBbs,
+    binaryName,
+    fileIdDiz: contents.fileIdDiz,
+    docFilename: contents.docFilename,
+    doc: contents.doc,
+    files: contents.files,
+  };
+}
+
 export interface StoredSubmission {
   id: string;
   archiveName: string;
   size: number;
   md5: string;
   sha256: string;
+  derived: DerivedMetadata;
 }
 
 /**
@@ -225,6 +312,16 @@ export function storeSubmission(
     throw new UploadError(`that archive is already waiting to be looked at, as ${queued.archive_name}`, 409);
   }
 
+  // Read now, not at approval: a curator should see what the archive says
+  // about itself while deciding, and reading is cheap while the bytes are
+  // already in memory.
+  const groupTags = buildGroupTags(
+    (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
+      (r) => r.archive_name
+    )
+  );
+  const derived = deriveMetadata(upload.bytes, archiveName, groupTags);
+
   const id = crypto.randomUUID();
   const dir = ensureQuarantine(cfg);
   // Named after the submission, NOT after anything the submitter chose.
@@ -233,11 +330,24 @@ export function storeSubmission(
 
   db.prepare(
     `INSERT INTO door_submissions
-       (id, archive_name, quarantine_path, size, md5, sha256, submitter_note, submitter_ip, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
-  ).run(id, archiveName, quarantinePath, upload.bytes.length, md5, sha256, upload.note, ip);
+       (id, archive_name, quarantine_path, size, md5, sha256, submitter_note, submitter_ip, status,
+        parsed_name, parsed_diz, parsed_files)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+  ).run(
+    id,
+    archiveName,
+    quarantinePath,
+    upload.bytes.length,
+    md5,
+    sha256,
+    upload.note,
+    ip,
+    JSON.stringify(derived),
+    derived.fileIdDiz,
+    JSON.stringify(derived.files)
+  );
 
-  return { id, archiveName, size: upload.bytes.length, md5, sha256 };
+  return { id, archiveName, size: upload.bytes.length, md5, sha256, derived };
 }
 
 export interface SubmissionRow {
@@ -249,17 +359,30 @@ export interface SubmissionRow {
   sha256: string;
   submitter_note: string | null;
   status: string;
+  parsed_name: string | null;
+  parsed_diz: string | null;
+  parsed_files: string | null;
+}
+
+/** The metadata read from the archive when it arrived, or nothing. */
+export function derivedOf(row: SubmissionRow): DerivedMetadata | null {
+  if (!row.parsed_name) return null;
+  try {
+    return JSON.parse(row.parsed_name) as DerivedMetadata;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Accept a submission into the repository: the file moves out of quarantine
- * into the archive root and a catalog row appears.
+ * into the archive root and a catalog row appears, carrying what the archive
+ * said about itself when it arrived - name, version, author, which BBS it
+ * needs, its FILE_ID.DIZ, its documentation and its file list.
  *
- * The row is thin on purpose - archive, size, checksums, and the name the
- * submitter gave it. Everything else (FILE_ID.DIZ, the file list, the junk
- * flags) comes from the corpus builder, which unpacks archives; this server
- * does not, and inventing metadata it cannot read would be worse than
- * leaving the fields empty for the next scan to fill.
+ * An LZX or DMS submission has none of that (only LHA can be read here), so
+ * those rows arrive with the archive's own name and empty fields for a
+ * curator to fill in.
  */
 export function approveSubmission(
   db: Database.Database,
@@ -285,20 +408,41 @@ export function approveSubmission(
   fs.mkdirSync(path.dirname(destination), { recursive: true });
 
   const catalogId = crypto.randomUUID();
+  const derived = derivedOf(row);
+  const files = derived?.files ?? [];
+
   const commit = db.transaction(() => {
+    // Everything the archive said about itself when it arrived: an approved
+    // door is a first-class row, not a placeholder waiting for a re-scan.
     db.prepare(
       `INSERT INTO door_catalog
-         (id, archive_name, archive_path, name, door_type, archive_size, md5, sha256, source, indexed_at)
-       VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, 'submission', strftime('%s','now'))`
+         (id, archive_name, archive_path, name, binary_name, door_type, version, author,
+          requires_bbs, description, file_id_diz, doc_filename, doc_raw,
+          archive_size, md5, sha256, source, indexed_at)
+       VALUES (?, ?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'submission', strftime('%s','now'))`
     ).run(
       catalogId,
       row.archive_name,
       relativePath,
-      path.basename(row.archive_name, path.extname(row.archive_name)),
+      derived?.name || path.basename(row.archive_name, path.extname(row.archive_name)),
+      derived?.binaryName ?? null,
+      derived?.version || null,
+      derived?.author || null,
+      derived?.requiresBbs || null,
+      derived?.description || null,
+      derived?.fileIdDiz ?? null,
+      derived?.docFilename ?? null,
+      derived?.doc ?? null,
       row.size,
       row.md5,
       row.sha256
     );
+    if (files.length) {
+      const addFile = db.prepare(
+        'INSERT OR REPLACE INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)'
+      );
+      for (const file of files) addFile.run(catalogId, file.path, file.size);
+    }
     db.prepare(
       "UPDATE door_submissions SET status = 'approved', decided_by = ?, decided_at = strftime('%s','now') WHERE id = ?"
     ).run(adminId, id);

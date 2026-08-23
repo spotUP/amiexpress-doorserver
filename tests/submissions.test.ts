@@ -187,6 +187,54 @@ describe('what a submission may be', () => {
   });
 });
 
+describe('what the archive says about itself', () => {
+  /** A real LHA, taken from the corpus, or null when it is not to hand. */
+  function corpusArchive(name: string): Buffer | null {
+    const candidate = path.join('/Users/spot/Code/amiexpress_doors/Archives/AmiExpress', name);
+    return fs.existsSync(candidate) ? fs.readFileSync(candidate) : null;
+  }
+
+  it('fills Name, Version, Needs, Author and Description from the DIZ', async () => {
+    const archive = corpusArchive('MST-MT20.LHA');
+    if (!archive) return; // corpus not present in this checkout
+    const res = await submit(archive, 'MST-MT20.LHA');
+    expect(res.status).toBe(202);
+
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    const derived = queue.body.rows[0].derived;
+    expect(derived.description).toContain('Top Utility');
+    expect(derived.version).toBe('2.0');
+    expect(derived.files.length).toBeGreaterThan(1);
+    expect(derived.fileIdDiz).toContain('MultiTop');
+  });
+
+  it('carries all of it into the catalog on approval', async () => {
+    const archive = corpusArchive('MST-MT20.LHA');
+    if (!archive) return;
+    const id = (await submit(archive, 'MST-MT20.LHA')).body.id as string;
+    await request(app()).post(`/api/door-repo/admin/submissions/${id}/approve`).set(auth());
+    _clearIndexTsvCacheForTests();
+
+    const door = await request(app()).get('/api/door-repo/doors/MST-MT20.LHA');
+    expect(door.status).toBe(200);
+    expect(door.body.description).toContain('Top Utility');
+    expect(door.body.version).toBe('2.0');
+    expect(door.body.fileIdDiz).toContain('MultiTop');
+    // The file list comes with it, so the door's page is complete rather
+    // than empty until the next corpus scan.
+    expect(door.body.files.length).toBeGreaterThan(1);
+  });
+
+  it('says plainly when an archive could not be read', async () => {
+    // A valid LHA header with nothing readable inside it.
+    await submit(lhaBytes('not really an archive body'), 'BROKEN.LHA');
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    expect(queue.body.rows[0].derived.fileIdDiz).toBeNull();
+    // Still a usable row: the name falls back to the archive's own.
+    expect(queue.body.rows[0].derived.name).toBe('Broken');
+  });
+});
+
 describe('the queue', () => {
   async function queueOne(name = 'NEWDOOR.LHA') {
     const res = await submit(lhaBytes(name), name);

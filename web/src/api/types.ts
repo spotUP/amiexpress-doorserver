@@ -111,7 +111,22 @@ export interface AdminDoor {
   fields: Record<string, FieldState>;
 }
 
+export interface DerivedMetadata {
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  requiresBbs: string;
+  binaryName: string | null;
+  fileIdDiz: string | null;
+  docFilename: string | null;
+  doc: string | null;
+  files: { path: string; size: number }[];
+}
+
 export interface Submission {
+  /** Read out of the archive when it arrived; null for a format we cannot read. */
+  derived: DerivedMetadata | null;
   id: string;
   archiveName: string;
   size: number;
