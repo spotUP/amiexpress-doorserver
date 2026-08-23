@@ -3,7 +3,7 @@
  * asked for on this path - the corpus is public, and reading it is the point.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { LogIn, LogOut, Search, Shield, Trash2 } from 'lucide-react';
+import { Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload } from 'lucide-react';
 import { useDoors, useFacets, useLiveRevision } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
@@ -13,6 +13,8 @@ import { DoorDetailDialog } from '../components/DoorDetail';
 import { LoginDialog } from '../components/LoginDialog';
 import { AuditPanel } from './Audit';
 import { HiddenPanel } from './Hidden';
+import { SubmissionsPanel } from './Submissions';
+import { SubmitDialog } from '../components/SubmitDialog';
 import { Button, Input, Select } from '../components/ui';
 
 const PER_PAGE = 50;
@@ -30,6 +32,8 @@ export function Browse() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [hiddenOpen, setHiddenOpen] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
 
   useLiveRevision();
 
@@ -81,11 +85,17 @@ export function Browse() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => setSubmitOpen(true)}>
+            <Upload size={14} /> Send in a door
+          </Button>
           {admin ? (
             <>
               <span className="text-xs text-muted">
                 signed in as <span className="text-ink">{admin.username}</span>
               </span>
+              <Button variant="ghost" onClick={() => setQueueOpen(true)}>
+                <Inbox size={14} /> Submitted
+              </Button>
               <Button variant="ghost" onClick={() => setHiddenOpen(true)}>
                 <Trash2 size={14} /> Removed
               </Button>
@@ -172,6 +182,8 @@ export function Browse() {
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} onSignedIn={setAdmin} />
       <AuditPanel open={auditOpen} onOpenChange={setAuditOpen} enabled={Boolean(admin)} />
       <HiddenPanel open={hiddenOpen} onOpenChange={setHiddenOpen} enabled={Boolean(admin)} />
+      <SubmissionsPanel open={queueOpen} onOpenChange={setQueueOpen} enabled={Boolean(admin)} />
+      <SubmitDialog open={submitOpen} onOpenChange={setSubmitOpen} />
     </div>
   );
 }

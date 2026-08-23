@@ -5,6 +5,7 @@ import { getDoorCount, getCatalogRevision } from './catalog';
 import { openDb } from './db';
 import { runMigrations } from './migrations';
 import { bootstrapAdmins } from './auth';
+import { ensureQuarantine } from './submissions';
 
 /**
  * Refuse to serve a catalog that cannot be read, or that reads clean but
@@ -72,6 +73,9 @@ function main(): void {
     }
     process.exit(1);
   }
+
+  // Uploads land on the data volume, which is empty on a fresh host.
+  ensureQuarantine(cfg);
 
   const app = createApp(cfg);
   app.listen(cfg.port, () => {

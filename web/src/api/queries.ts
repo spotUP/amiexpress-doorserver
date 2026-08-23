@@ -6,7 +6,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from './client';
-import type { AdminDoor, AuditEntry, DoorDetail, DoorFacts, DoorPage, Facets, HiddenDoor } from './types';
+import type {
+  AdminDoor,
+  AuditEntry,
+  DoorDetail,
+  DoorFacts,
+  DoorPage,
+  Facets,
+  HiddenDoor,
+  Submission,
+} from './types';
 
 export interface DoorQuery {
   q?: string;
@@ -43,6 +52,7 @@ export const doorKeys = {
   facets: ['facets'] as const,
   audit: ['audit'] as const,
   hidden: ['hidden'] as const,
+  submissions: ['submissions'] as const,
 };
 
 export function useDoors(query: DoorQuery) {
@@ -117,6 +127,32 @@ function invalidateEverything(client: ReturnType<typeof useQueryClient>): void {
   void client.invalidateQueries({ queryKey: doorKeys.facets });
   void client.invalidateQueries({ queryKey: doorKeys.hidden });
   void client.invalidateQueries({ queryKey: doorKeys.audit });
+  void client.invalidateQueries({ queryKey: doorKeys.submissions });
+}
+
+export function useSubmissions(status: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...doorKeys.submissions, status],
+    queryFn: () => api.get<{ rows: Submission[] }>(`/admin/submissions?status=${encodeURIComponent(status)}`),
+    enabled,
+  });
+}
+
+export function useApproveSubmission() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ ok: true }>(`/admin/submissions/${encodeURIComponent(id)}/approve`),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
+export function useRejectSubmission() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.post<{ ok: true }>(`/admin/submissions/${encodeURIComponent(id)}/reject`, { reason }),
+    onSuccess: () => invalidateEverything(client),
+  });
 }
 
 export function useSaveField(archiveName: string) {

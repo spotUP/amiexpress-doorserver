@@ -111,6 +111,20 @@ export interface AdminDoor {
   fields: Record<string, FieldState>;
 }
 
+export interface Submission {
+  id: string;
+  archiveName: string;
+  size: number;
+  md5: string;
+  sha256: string;
+  note: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectReason: string | null;
+  createdAt: number;
+  decidedAt: number | null;
+  decidedBy: string | null;
+}
+
 export interface AuditEntry {
   id: number;
   action: string;

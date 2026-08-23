@@ -22,6 +22,8 @@ services:
       # to everything and the public site is unaffected - so this host can run
       # without it and gain an admin console the moment it is set.
       DOORSERVER_JWT_SECRET: ${DOORSERVER_JWT_SECRET:-}
+      # Uploads wait in /data/quarantine (beside the database, never inside
+      # the archive root); the server creates it at startup.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3010/api/door-repo/health"]
       interval: 30s

@@ -16,8 +16,10 @@
     "dev:web": "npm --prefix web run dev"
   },
   "dependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/jsonwebtoken": "^9.0.10",
     "better-sqlite3": "^11.10.0",
+    "busboy": "^1.6.0",
     "express": "5.1.0",
     "jsonwebtoken": "^9.0.3"
   },

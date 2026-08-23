@@ -15,6 +15,7 @@ import { getCatalogRevision, getArchiveFiles, getCatalogEntryByArchive } from '.
 import { analyseDoor, buildGroupTags, readName, type NameSource } from './describe';
 import { applyOverrides, hiddenExclusion, isOverridden, loadOverrides, type OverrideMap } from './effective';
 import { AmigaGuideParser } from './amigaguide-parser';
+import { UploadError, discardBody, receiveUpload, storeSubmission } from './submissions';
 import type { ServerConfig } from './config';
 
 const DEFAULT_PER_PAGE = 50;
@@ -354,6 +355,42 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     } finally {
       db.close();
     }
+  });
+
+  /**
+   * Send in a door. Anyone may; nobody publishes. The file waits in
+   * quarantine until a curator approves it - see src/submissions.ts for what
+   * is checked before it reaches disk.
+   */
+  router.post('/submissions', (req: Request, res: Response) => {
+    void (async () => {
+      const db = openDb(cfg);
+      try {
+        const upload = await receiveUpload(req);
+        const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+        const stored = storeSubmission(db, cfg, upload, ip);
+        res.status(202).json({
+          ok: true,
+          id: stored.id,
+          archiveName: stored.archiveName,
+          size: stored.size,
+          message: 'Thank you - it is in the queue and a curator will look at it.',
+        });
+      } catch (error) {
+        if (error instanceof UploadError) {
+          res.status(error.status).json({ error: error.message });
+          // The refusal is worth reading, so let the upload finish arriving
+          // rather than closing the socket under it.
+          discardBody(req);
+          return;
+        }
+        // eslint-disable-next-line no-console
+        console.log(`[door-repo] WARN submission failed: ${(error as Error).message}`);
+        res.status(500).json({ error: 'that upload could not be stored' });
+      } finally {
+        db.close();
+      }
+    })();
   });
 
   router.get('/events', (req: Request, res: Response) => subscribe(cfg, req, res));

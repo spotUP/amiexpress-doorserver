@@ -20,6 +20,7 @@ import {
 } from './auth';
 import { analyseDoor, buildGroupTags } from './describe';
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides } from './effective';
+import { UploadError, approveSubmission, rejectSubmission } from './submissions';
 import type { ServerConfig } from './config';
 
 /**
@@ -376,6 +377,73 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         )
         .all();
       res.json({ rows });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** The submission queue. Pending first unless asked otherwise. */
+  router.get('/submissions', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const status = typeof req.query.status === 'string' ? req.query.status : 'pending';
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const rows = db
+        .prepare(
+          `SELECT s.id, s.archive_name AS archiveName, s.size, s.md5, s.sha256,
+                  s.submitter_note AS note, s.status, s.reject_reason AS rejectReason,
+                  s.created_at AS createdAt, s.decided_at AS decidedAt, u.username AS decidedBy
+             FROM door_submissions s
+             LEFT JOIN admin_users u ON u.id = s.decided_by
+            WHERE (? = 'all' OR s.status = ?)
+            ORDER BY s.created_at DESC LIMIT 200`
+        )
+        .all(status, status);
+      res.json({ rows });
+    } finally {
+      db.close();
+    }
+  });
+
+  /**
+   * Accept a submission: the file leaves quarantine for the archive root and
+   * a catalog row appears. The submitter's IP is deliberately not in the
+   * listing above - a curator decides on the archive, not on who sent it.
+   */
+  router.post('/submissions/:id/approve', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const id = Array.isArray(req.params.id) ? '' : req.params.id;
+    const db = openDb(cfg);
+    try {
+      const result = approveSubmission(db, cfg, id, req.admin?.id ?? null);
+      recordAudit(db, req.admin?.id ?? null, 'approve', id, result);
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      if (error instanceof UploadError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      throw error;
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Turn a submission down, and delete the file from quarantine. */
+  router.post('/submissions/:id/reject', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const id = Array.isArray(req.params.id) ? '' : req.params.id;
+    const reason = typeof (req.body as { reason?: unknown })?.reason === 'string'
+      ? ((req.body as { reason: string }).reason).slice(0, 500)
+      : null;
+    const db = openDb(cfg);
+    try {
+      rejectSubmission(db, id, req.admin?.id ?? null, reason);
+      recordAudit(db, req.admin?.id ?? null, 'reject', id, { reason });
+      res.json({ ok: true });
+    } catch (error) {
+      if (error instanceof UploadError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      throw error;
     } finally {
       db.close();
     }
