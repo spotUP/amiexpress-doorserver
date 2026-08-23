@@ -72,4 +72,43 @@ describe('migrateFromBbs', () => {
     db.close();
     expect(n).toBe(1);
   });
+
+  it('refuses to migrate a database into itself', () => {
+    expect(() => migrateFromBbs({ sourceDb: source, targetDb: source }))
+      .toThrow(/same file|itself/i);
+  });
+
+  // The live BBS writes to its database while this runs. Attaching it
+  // read-write from a second process would contend for its WAL locks, so
+  // the script must copy before it attaches - and must leave no trace
+  // beside the original.
+  it('does not write to, or lock, the source database', () => {
+    const before = fs.statSync(source).mtimeMs;
+    migrateFromBbs({ sourceDb: source, targetDb: target });
+    expect(fs.statSync(source).mtimeMs).toBe(before);
+    expect(fs.existsSync(`${source}-wal`)).toBe(false);
+    expect(fs.existsSync(`${source}-shm`)).toBe(false);
+  });
+
+  it('carries every migrated column, not just the row count', () => {
+    const db = new Database(source);
+    db.prepare(
+      `UPDATE door_catalog SET binary_name='BIN', version='1.2', author='AUTH',
+         release_group='GRP', description='DESC', file_id_diz='DIZ',
+         doc_filename='DOC.txt', suggested_tooltypes='TT', category='CAT',
+         archive_size=4711, junk_count=3, corpus_id='CORP', source='scan',
+         md5='aa', sha256='bb' WHERE id='id1'`
+    ).run();
+    db.close();
+    migrateFromBbs({ sourceDb: source, targetDb: target });
+    const out = new Database(target, { readonly: true });
+    const row = out.prepare('SELECT * FROM door_catalog WHERE id = ?').get('id1') as Record<string, unknown>;
+    out.close();
+    expect(row).toMatchObject({
+      binary_name: 'BIN', version: '1.2', author: 'AUTH', release_group: 'GRP',
+      description: 'DESC', file_id_diz: 'DIZ', doc_filename: 'DOC.txt',
+      suggested_tooltypes: 'TT', category: 'CAT', archive_size: 4711,
+      junk_count: 3, corpus_id: 'CORP', source: 'scan', md5: 'aa', sha256: 'bb',
+    });
+  });
 });

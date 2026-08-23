@@ -6,9 +6,23 @@
  * mangled it before. The per-node columns (installed, installed_as,
  * install_dir) are deliberately not copied - they describe one node and
  * move to that node's own door_installs table.
+ *
+ * Idempotent means "re-running does not duplicate rows" (INSERT OR
+ * REPLACE), NOT "converges to the source": a row deleted upstream between
+ * runs is never removed from the target here, it goes stale silently.
+ * A real incremental sync would need an explicit reconciliation pass.
+ *
+ * The source is never attached directly. sourceDb is opened read-write by
+ * ATTACH's default mode, and the BBS may be writing to the live database
+ * (WAL/SHM) while this runs, so the source is copied to a throwaway temp
+ * file first and that snapshot is what gets attached. This also means a
+ * caller who forgets to `cp` the live database first still cannot touch
+ * it - the temp copy is the only thing this script ever opens read-write.
  */
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { applySchema } from '../src/db';
 
 const COLUMNS = [
@@ -27,25 +41,37 @@ export function migrateFromBbs(opts: { sourceDb: string; targetDb: string }): Mi
   if (!fs.existsSync(opts.sourceDb)) {
     throw new Error(`source database ${opts.sourceDb} does not exist`);
   }
-  const db = new Database(opts.targetDb);
+  if (path.resolve(opts.sourceDb) === path.resolve(opts.targetDb)) {
+    throw new Error('sourceDb and targetDb resolve to the same file - refusing to migrate a database into itself');
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-mig-src-'));
+  const snapshot = path.join(tmpDir, 'source-snapshot.db');
   try {
-    applySchema(db);
-    db.prepare('ATTACH DATABASE ? AS src').run(opts.sourceDb);
+    fs.copyFileSync(opts.sourceDb, snapshot);
+
+    const db = new Database(opts.targetDb);
     try {
-      const cols = COLUMNS.join(', ');
-      db.exec(`INSERT OR REPLACE INTO main.door_catalog (${cols}) SELECT ${cols} FROM src.door_catalog`);
-      db.exec(
-        `INSERT OR REPLACE INTO main.door_catalog_files (catalog_id, path, size, is_junk, junk_reason)
-         SELECT catalog_id, path, size, is_junk, junk_reason FROM src.door_catalog_files`
-      );
-      const entries = (db.prepare('SELECT COUNT(*) AS n FROM main.door_catalog').get() as { n: number }).n;
-      const files = (db.prepare('SELECT COUNT(*) AS n FROM main.door_catalog_files').get() as { n: number }).n;
-      return { entries, files };
+      applySchema(db);
+      db.prepare('ATTACH DATABASE ? AS src').run(snapshot);
+      try {
+        const cols = COLUMNS.join(', ');
+        db.exec(`INSERT OR REPLACE INTO main.door_catalog (${cols}) SELECT ${cols} FROM src.door_catalog`);
+        db.exec(
+          `INSERT OR REPLACE INTO main.door_catalog_files (catalog_id, path, size, is_junk, junk_reason)
+           SELECT catalog_id, path, size, is_junk, junk_reason FROM src.door_catalog_files`
+        );
+        const entries = (db.prepare('SELECT COUNT(*) AS n FROM main.door_catalog').get() as { n: number }).n;
+        const files = (db.prepare('SELECT COUNT(*) AS n FROM main.door_catalog_files').get() as { n: number }).n;
+        return { entries, files };
+      } finally {
+        db.exec('DETACH DATABASE src');
+      }
     } finally {
-      db.exec('DETACH DATABASE src');
+      db.close();
     }
   } finally {
-    db.close();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
