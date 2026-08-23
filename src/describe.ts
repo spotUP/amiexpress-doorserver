@@ -277,6 +277,34 @@ export function bestCell(line: string): Scored {
  * name is known, skip a block that only restates it - the top block is often
  * the header cell ("JoinCnf 4.0"), and the name already has its own column.
  */
+/**
+ * The single best LINE, used only when no paragraph qualifies.
+ *
+ * Block selection needs two consecutive prose lines to work with; a DIZ that
+ * offers exactly one usable line between walls of art produces no block at
+ * all. This is the prototype's `describe()` - the same scan, scoring each
+ * line by its best cell, with a bonus for the line right after a release
+ * banner (which is where the door's own name usually sits).
+ */
+export function describeLine(diz: string | null): string {
+  const lines = (diz ?? '').replace(/\r/g, '').split('\n');
+  let best: { score: number; index: number; text: string } | null = null;
+  lines.forEach((line, i) => {
+    const s = bestCell(line);
+    if (s.score <= -50) return;
+    const bonus = i > 0 && BANNER_RE.test(lines[i - 1]) ? 10 : 0;
+    const score = s.score + bonus;
+    if (!best || score > best.score) best = { score, index: i, text: s.text };
+  });
+  if (!best || (best as { score: number }).score <= 0) return '';
+  const text = (best as { text: string }).text.replace(
+    /^(presents?|brings?|proudly|releases?|presenting|bringing)\b[\s:.-]*/i,
+    ''
+  );
+  // A chosen line can trail scene decoration a frame-strip leaves behind.
+  return finalise(text).replace(/(\s+[^A-Za-z0-9À-ÿ]{1,3})+$/, '');
+}
+
 export function describeBlock(diz: string | null, cap = 70, prog?: string | null): string {
   const lines = (diz ?? '').replace(/\r/g, '').split('\n');
   const blocks: Scored[][] = [];
@@ -297,7 +325,8 @@ export function describeBlock(diz: string | null, cap = 70, prog?: string | null
     }
   });
   if (cur.length) blocks.push(cur);
-  if (!blocks.length) return '';
+  // No paragraph qualified - fall back to the best single line.
+  if (!blocks.length) return describeLine(diz);
 
   const blockScore = (b: Scored[], firstLine: number): number =>
     Math.max(...b.map((x) => x.score)) + Math.min(b.length, 4) * 4 - firstLine;
@@ -793,6 +822,12 @@ export interface DoorInput {
  * Read a door's four facts out of its DIZ, its catalog row and its archive
  * name, in that order of trust.
  */
+/** The archive's own name with its extension stripped. */
+function archiveBase(archiveName: string): string {
+  const dot = archiveName.lastIndexOf('.');
+  return dot === -1 ? archiveName : archiveName.slice(0, dot);
+}
+
 export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): DoorFacts {
   const prettyProg = prettifyProgram(toPlain(input.binaryName ?? ''), groupTags);
   // binary_name is sometimes a stray token like "8" or "."; a program name
@@ -811,8 +846,7 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
     // rather than being returned at the end, so it gets the same treatment
     // as any other body - "AE_DOORS" loses its group tag and "DATELINE"
     // stops shouting.
-    const dot = input.archiveName.lastIndexOf('.');
-    body = dot === -1 ? input.archiveName : input.archiveName.slice(0, dot);
+    body = archiveBase(input.archiveName);
   }
   body = toPlain(prettifyInText(body, groupTags));
 
@@ -832,7 +866,14 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
   prog = capitaliseName(stripVersionTail(prog, ver.version));
   if (prog && progCoveredByBody(prog, body)) prog = '';
 
-  const description = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))));
+  let description = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))));
+  if (!description) {
+    // Everything the DIZ offered was a credit: KDZ!LUDB.LHA's only prose
+    // line is "dONE bY sERAPH - !BUGFIXED VERSION", which moves wholesale
+    // into the author field and leaves nothing behind. A row with no
+    // description at all is worse than one named after its archive.
+    description = finalise(toPlain(tidyCase(prettifyInText(archiveBase(input.archiveName), groupTags))));
+  }
 
   return {
     description,

@@ -20,7 +20,13 @@ import {
 
 // The corpus derives its group tags from the archive names; these are the
 // prefixes the real catalog yields for the archives used below.
-const TAGS = buildGroupTags(['MST-A.LHA', 'MST-B.LHA', 'MST-C.LHA', '5D-A.LHA', '5D-B.LHA', '5D-C.LHA']);
+const TAGS = buildGroupTags([
+  'MST-A.LHA', 'MST-B.LHA', 'MST-C.LHA',
+  '5D-A.LHA', '5D-B.LHA', '5D-C.LHA',
+  'DLT-A.LHA', 'DLT-B.LHA', 'DLT-C.LHA',
+  'KDZ!A.LHA', 'KDZ!B.LHA', 'KDZ!C.LHA',
+  'CRZ-A.LHA', 'CRZ-B.LHA', 'CRZ-C.LHA',
+]);
 
 function read(
   diz: string | null,
@@ -254,6 +260,43 @@ describe('which BBS the door needs', () => {
 });
 
 describe('falling back', () => {
+  it('uses the best single LINE when no paragraph qualifies', () => {
+    // The real DLT-UL11.LHA: walls of art with exactly one usable line
+    // between them, so block selection - which needs consecutive prose
+    // lines - finds nothing to work with.
+    const diz = [
+      '                     __    ____  _     _',
+      '  CR/\\ZE aND!       /\\_\\ __\\',
+      '__________________  \\/_/  ____________/\\____',
+      ' ____ _ / __  /  /_____  / ____/  /  /\u00b7  _ /',
+      ' /  / //  ___/  /  /   \\/  /  /     //   \\/',
+      '/____ /_____/_____/_____\\___ /__/__/______\\.',
+      'Sk\u00a1n\\/---------- PRESENTS -\\/--------------+',
+      '(\u00ab uSER lIST v1.1 - uPDATE \u00a9 nIKE/cRZ^dLT \u00bb)',
+      '+------------------------------------------+',
+    ].join('\n');
+    const { description, version } = read(diz, 'userlist', 'userlist', 'DLT-UL11.LHA');
+    expect(description).toBe('User List - Update Nike/Dlt');
+    expect(version).toBe('1.1');
+  });
+
+  it('names a door after its archive rather than leaving it blank', () => {
+    // The real KDZ!LUDB.LHA: its one prose line is a credit, so the author
+    // field takes the whole of it and nothing is left to describe the door.
+    const diz = [
+      '  ___. __________   __. _________',
+      ' /   |/  _/   __ \\_/  |/  _/  __/__   kEKS',
+      '/    \\    \\_  \\___/   \\    \\_____  \\_ cNET',
+      '\\____|\\    /____  \\___|\\    /_______/ dESiGN',
+      '       \\__/kDZ!\\___/    \\__/cD!',
+      ' LAST-UDLOAD v1.0b - Release Date: 12-07-95',
+      '    dONE bY sERAPH   -  !BUGFIXED VERSION!',
+    ].join('\n');
+    const { description, author } = read(diz, null, 'LE-win5-96.exe', 'KDZ!LUDB.LHA');
+    expect(author).toContain('Seraph');
+    expect(description).toBe('Ludb');
+  });
+
   it('uses the catalog name when every DIZ line is art', () => {
     const diz = '______    ________.  /\\    ______.__________\n____ _____________';
     expect(read(diz, null, 'Account Editor', 'ACC-V103.LHA').description).toBe('Account Editor');
