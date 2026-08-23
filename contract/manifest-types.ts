@@ -18,6 +18,14 @@ export interface ManifestDoor {
   archiveSize: number | null;
   md5: string | null;
   sha256: string | null;
+  // Number of files inside the archive flagged as ads/junk, and whether the
+  // row carries documentation at all. Both exist so a client can decide what
+  // to OFFER before it fetches anything: DOORMAN gates its [S]trip and
+  // [V]iew doc footer keys on exactly these two values
+  // (amiexpress-web's Doors/door-manager/app.ts, repoViewFooterParts), and a
+  // list.txt client had no way to answer either question without a
+  // per-entry round trip to /files or /doc — so it advertised keys that
+  // then turned out to do nothing.
   junkCount: number;
   hasDoc: boolean;
 }

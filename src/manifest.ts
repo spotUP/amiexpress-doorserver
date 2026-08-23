@@ -6,10 +6,11 @@
  * DoorRepoManifest for modern (web) consumers.
  *
  * Checksums are read straight off the door_catalog row (md5/sha256 columns,
- * populated at index time by dev/scripts/door-corpus/build-door-catalog.ts —
- * see door-repo-checksums.ts's getArchiveChecksums, the function it reuses
- * for hashing). This is what keeps buildManifest() cheap: on a cold process
- * cache, synchronously fs.readFileSync + hashing ~3300 archives (167 MB)
+ * populated at index time by amiexpress-web's
+ * dev/scripts/door-corpus/build-door-catalog.ts — see this repo's
+ * checksums.ts's getArchiveChecksums, the function it reuses for hashing).
+ * This is what keeps buildManifest() cheap: on a cold process cache,
+ * synchronously fs.readFileSync + hashing ~3300 archives (167 MB)
  * blocks the Node event loop for ~22 SECONDS — during which the whole BBS
  * (telnet/SSH, WebSocket heartbeats, every other route) stalls. Reading a
  * precomputed column is a plain SELECT; no per-request hashing.
@@ -36,10 +37,9 @@ export type { ManifestDoor, DoorRepoManifest };
 
 // ─── DB access ──────────────────────────────────────────────────────────
 //
-// Mirrors door-catalog.service.ts's DB-open approach (same resolved path,
-// same env vars) rather than reimplementing catalog resolution. That
-// module doesn't export a reusable open handle, so we open the same
-// resolved path READONLY here — this module never writes to door_catalog.
+// This module opens the catalog READONLY through openDb() from ./db, the
+// only place in this server that opens a database — this module never
+// writes to door_catalog.
 
 interface DoorCatalogRow {
   archive_name: string;
@@ -219,11 +219,12 @@ export function buildManifest(cfg: ServerConfig, opts?: { type?: string; q?: str
 // with a trailing CRLF after the last row.
 //
 // Fields 7-10 are an APPEND, added 2026-08-18. The format contract
-// (docs/DOOR-REPO-API.md section 3) states that appending trailing fields
-// never bumps the header's version number, because a conforming client
-// reads the first six fields by position and ignores the rest — so the
-// header still says 1 and every already-deployed client keeps working
-// byte-for-byte. Fields 1-6 keep their exact position, meaning and type.
+// (amiexpress-web's docs/DOOR-REPO-API.md section 3) states that appending
+// trailing fields never bumps the header's version number, because a
+// conforming client reads the first six fields by position and ignores the
+// rest — so the header still says 1 and every already-deployed client keeps
+// working byte-for-byte. Fields 1-6 keep their exact position, meaning and
+// type.
 //
 // Why these four: author and releaseGroup are two of the six fields the
 // server's own ?q= search matches (section 8) and two of the six DOORMAN

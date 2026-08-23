@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { openDb, applySchema } from '../src/db';
-import { buildManifest, renderListTxt, renderListTxtCached } from '../src/manifest';
+import { buildManifest, renderListTxt, renderListTxtCached, _clearListCacheForTests } from '../src/manifest';
 import type { ServerConfig } from '../src/config';
 
 let dir: string;
@@ -29,6 +29,10 @@ beforeEach(() => {
      VALUES ('id1', 'TC.displayme', 1346, 1, 'ad'), ('id1', 'Account/AccEd.Rexx', 25552, 0, NULL)`
   ).run();
   db.close();
+});
+
+beforeEach(() => {
+  _clearListCacheForTests();
 });
 
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -74,16 +78,65 @@ describe('renderListTxt', () => {
     expect(body).toContain('Line one Line two');
   });
 
-  it('terminates lines with CRLF', () => {
-    expect(renderListTxt(buildManifest(cfg)).toString('latin1')).toContain('\r\n');
+  it('separates every row with CRLF and terminates the body with one', () => {
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES ('id2', 'B.LHA', 'B.LHA', 'Bee', 'XIM', 1700000000)`
+    ).run();
+    db.close();
+    const body = renderListTxt(buildManifest(cfg)).toString('latin1');
+    expect(body.endsWith('\r\n')).toBe(true);
+    expect(body).not.toMatch(/[^\r]\n/);
+    expect(body.split('\r\n').filter((l) => l.length > 0)).toHaveLength(3);
+  });
+
+  it('writes high-bit text as single Latin-1 bytes and replaces what Latin-1 cannot hold', () => {
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES ('id3', 'UML.LHA', 'UML.LHA', 'Gr` + `üße Ж', 'XIM', 1700000000)`
+    ).run();
+    db.close();
+    const body = renderListTxt(buildManifest(cfg));
+    // u-umlaut and sharp-s are ONE Latin-1 byte each, never a UTF-8 pair.
+    expect(body.includes(Buffer.from([0xfc]))).toBe(true);
+    expect(body.includes(Buffer.from([0xdf]))).toBe(true);
+    expect(body.includes(Buffer.from([0xc3, 0xbc]))).toBe(false);
+    // Cyrillic ZHE has no Latin-1 byte, so it becomes a literal '?' rather
+    // than the silent low-byte truncation Buffer.from(..., 'latin1') does.
+    expect(body.toString('latin1')).toContain('Grüße ?');
+  });
+
+  it('escapes a pipe so a field cannot invent a column', () => {
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, description, indexed_at)
+       VALUES ('id4', 'PIPE.LHA', 'PIPE.LHA', 'A|B', 'XIM', 'has | a pipe', 1700000000)`
+    ).run();
+    db.close();
+    const body = renderListTxt(buildManifest(cfg)).toString('latin1');
+    expect(body).toContain('A!B');
+    expect(body).toContain('has ! a pipe');
+    const dataLines = body.split('\r\n').filter((l) => l.length > 0 && !l.startsWith('DOORREPO|'));
+    for (const line of dataLines) {
+      expect(line.split('|')).toHaveLength(10);
+    }
   });
 });
 
 describe('renderListTxtCached', () => {
-  it('returns identical bytes on a repeat call', () => {
-    const a = renderListTxtCached(cfg);
-    const b = renderListTxtCached(cfg);
-    expect(Buffer.compare(a, b)).toBe(0);
+  it('serves a repeat call from the cache while the revision is unchanged', () => {
+    const first = renderListTxtCached(cfg).toString('latin1');
+    const db = openDb(cfg);
+    // Same row count and same max(indexed_at), so the revision - and the
+    // cache key - do not move. A cache hit must therefore still show the
+    // OLD name, while the uncached path sees the new one.
+    db.prepare("UPDATE door_catalog SET name = 'Renamed Editor' WHERE id = 'id1'").run();
+    db.close();
+    expect(renderListTxtCached(cfg).toString('latin1')).toBe(first);
+    expect(renderListTxtCached(cfg).toString('latin1')).not.toContain('Renamed Editor');
+    expect(renderListTxt(buildManifest(cfg)).toString('latin1')).toContain('Renamed Editor');
   });
 
   it('re-renders after the catalog revision changes', () => {
