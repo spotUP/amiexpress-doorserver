@@ -10,7 +10,11 @@ export interface SortState {
 
 const COLUMNS: { key: string; label: string; sortable: boolean; className?: string }[] = [
   { key: 'archive', label: 'Archive', sortable: true, className: 'w-56' },
-  { key: 'name', label: 'Door', sortable: true, className: 'w-56' },
+  // The catalog's `name` field is the DIZ's first line for 1031 of 3301
+  // rows - border art. What this column shows is the cleaned reading of it
+  // (src/describe.ts, displayName), never the raw value.
+  { key: 'name', label: 'Name', sortable: true, className: 'w-48' },
+  { key: 'version', label: 'Version', sortable: true, className: 'w-20' },
   { key: 'description', label: 'Description', sortable: false },
   { key: 'requires', label: 'Needs', sortable: true, className: 'w-28' },
   { key: 'author', label: 'Author', sortable: true, className: 'w-40' },
@@ -61,7 +65,10 @@ export function DoorTable({
               onClick={() => onOpen(door)}
             >
               <td className="px-3 py-2 font-mono text-[12px] text-accent">{door.archiveName}</td>
-              <td className="px-3 py-2">{door.name}</td>
+              <td className="px-3 py-2">
+                <span className={door.nameSource === 'archive' ? 'text-muted' : undefined}>{door.name}</span>
+              </td>
+              <td className="px-3 py-2 font-mono text-[12px] text-muted">{door.version || '-'}</td>
               <td className="px-3 py-2 text-muted">
                 {door.description}
                 {door.descriptionSource === 'edited' && (

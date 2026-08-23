@@ -22,6 +22,8 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        // For text the Amiga drew: DIZ art, .guide documents, tooltypes.
+        amiga: ['TopazPlus', 'Topaz', 'ui-monospace', 'Menlo', 'monospace'],
       },
     },
   },

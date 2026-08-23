@@ -12,8 +12,9 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { openDb } from './db';
 import { getCatalogRevision, getArchiveFiles, getCatalogEntryByArchive } from './catalog';
-import { analyseDoor, buildGroupTags } from './describe';
+import { analyseDoor, buildGroupTags, readName, type NameSource } from './describe';
 import { applyOverrides, isOverridden, loadOverrides, type OverrideMap } from './effective';
+import { AmigaGuideParser } from './amigaguide-parser';
 import type { ServerConfig } from './config';
 
 const DEFAULT_PER_PAGE = 50;
@@ -32,6 +33,7 @@ const SORT_COLUMNS: Record<string, string> = {
   type: 'door_type COLLATE NOCASE',
   category: 'category COLLATE NOCASE',
   requires: 'requires_bbs COLLATE NOCASE',
+  version: 'version COLLATE NOCASE',
   indexed: 'indexed_at',
 };
 
@@ -75,7 +77,12 @@ function strParam(value: unknown): string | undefined {
 interface DoorJson {
   archiveName: string;
   system: string;
+  /** A short label fit for a column: never the DIZ's border art. */
   name: string;
+  /** What the corpus scan put in the `name` column, art and all. */
+  catalogName: string;
+  /** Where the displayed name came from: 'archive' means it is a guess. */
+  nameSource: NameSource;
   description: string;
   descriptionSource: 'edited' | 'diz';
   version: string | null;
@@ -111,11 +118,14 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     },
     groupTags
   );
+  const named = readName(corrected.name, corrected.binary_name, corrected.archive_name, groupTags);
   const system = firstPathSegment(corrected.archive_path);
   return {
     archiveName: corrected.archive_name,
     system,
-    name: corrected.name,
+    name: named.name,
+    catalogName: corrected.name,
+    nameSource: named.source,
     description: edited ? corrected.description ?? '' : facts.description,
     descriptionSource: edited ? 'edited' : 'diz',
     version: corrected.version ?? facts.version ?? null,
@@ -131,6 +141,44 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     hasDoc: corrected.has_doc === 1,
     downloadUrl: `/api/door-repo/archive/${encodeURIComponent(corrected.archive_name)}`,
   };
+}
+
+/**
+ * 1125 of the 3218 documented doors ship an AmigaGuide file rather than a
+ * plain README: hypertext with @node sections and links between them. Served
+ * raw it reads as markup.
+ */
+function isAmigaGuide(doc: string | null): boolean {
+  return Boolean(doc && /^\s*@database\b/i.test(doc));
+}
+
+interface GuideJson {
+  database: string;
+  mainNode: string;
+  nodes: { name: string; title: string; content: string; links: { text: string; target: string }[] }[];
+}
+
+/** The document as nodes the browser can walk, or null when it is not one. */
+function parseGuide(doc: string | null): GuideJson | null {
+  if (!isAmigaGuide(doc)) return null;
+  try {
+    const parser = new AmigaGuideParser();
+    const parsed = parser.parse(doc as string);
+    return {
+      database: parsed.database,
+      mainNode: parsed.mainNode,
+      nodes: Array.from(parsed.nodes.values()).map((node) => ({
+        name: node.name,
+        title: node.title,
+        content: node.content,
+        links: node.links.map((link) => ({ text: link.text, target: link.target })),
+      })),
+    };
+  } catch {
+    // A malformed guide is still readable as text; it must never 500 the
+    // door's own page.
+    return null;
+  }
 }
 
 export function createPublicRouter(cfg: ServerConfig): Router {
@@ -262,6 +310,8 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       docFilename: entry.doc_filename,
       doc: entry.doc_raw,
       suggestedTooltypes: entry.suggested_tooltypes,
+      docFormat: isAmigaGuide(entry.doc_raw) ? 'amigaguide' : 'text',
+      guide: parseGuide(entry.doc_raw),
       files: getArchiveFiles(cfg, entry.id).map((f) => ({
         path: f.path,
         size: f.size,

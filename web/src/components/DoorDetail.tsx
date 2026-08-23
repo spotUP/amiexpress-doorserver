@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { useAdminDoor, useDoor, useRedescribe, useRevertField, useSaveField } from '../api/queries';
 import type { AdminUser, DoorFacts } from '../api/types';
 import { DizView } from './DizView';
+import { GuideView } from './GuideView';
 import { FieldEditor } from './FieldEditor';
 import { Badge, Button, formatSize } from './ui';
 
@@ -74,7 +75,9 @@ export function DoorDetailDialog({
                 ['about', 'About'],
                 ['diz', 'FILE_ID.DIZ'],
                 ['files', `Files${door ? ` (${door.files.length})` : ''}`],
-                ...(door?.doc ? [['doc', 'Documentation'] as const] : []),
+                ...(door?.doc
+                  ? [['doc', door.docFormat === 'amigaguide' ? 'Guide' : 'Documentation'] as const]
+                  : []),
                 ...(admin ? [['edit', 'Edit'] as const] : []),
               ].map(([value, label]) => (
                 <Tabs.Trigger
@@ -130,7 +133,11 @@ export function DoorDetailDialog({
 
               {door?.doc && (
                 <Tabs.Content value="doc">
-                  <DizView text={door.doc} label={door.docFilename ?? 'documentation'} />
+                  {door.guide ? (
+                    <GuideView guide={door.guide} />
+                  ) : (
+                    <DizView text={door.doc} label={door.docFilename ?? 'documentation'} />
+                  )}
                 </Tabs.Content>
               )}
 

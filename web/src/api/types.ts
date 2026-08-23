@@ -3,7 +3,12 @@
 export interface Door {
   archiveName: string;
   system: string;
+  /** A short label fit for a column: never the DIZ's border art. */
   name: string;
+  /** What the corpus scan put in the `name` column, art and all. */
+  catalogName: string;
+  /** Where the shown name came from; 'archive' means it is a guess. */
+  nameSource: 'catalog' | 'program' | 'archive';
   description: string;
   descriptionSource: 'edited' | 'diz';
   version: string | null;
@@ -27,7 +32,23 @@ export interface DoorFile {
   junkReason: string | null;
 }
 
+export interface GuideNode {
+  name: string;
+  title: string;
+  content: string;
+  links: { text: string; target: string }[];
+}
+
+export interface Guide {
+  database: string;
+  mainNode: string;
+  nodes: GuideNode[];
+}
+
 export interface DoorDetail extends Door {
+  /** 'amigaguide' when the door ships a .guide rather than a README. */
+  docFormat: 'amigaguide' | 'text';
+  guide: Guide | null;
   fileIdDiz: string | null;
   docFilename: string | null;
   doc: string | null;

@@ -15,7 +15,7 @@ export function DizView({ text, label }: { text: string; label: string }) {
     <ScrollArea.Root className="overflow-hidden rounded-md border border-line bg-bg">
       <ScrollArea.Viewport className="max-h-[26rem] w-full">
         <pre
-          className="w-max px-4 py-3 font-mono text-[12px] leading-[1.35] text-ink"
+          className="w-max px-4 py-3 font-amiga text-[15px] leading-[1.2] text-ink"
           aria-label={label}
         >
           {text}

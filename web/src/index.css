@@ -1,3 +1,22 @@
+/**
+ * Topaz - the Amiga's own screen font, the one every FILE_ID.DIZ and .guide
+ * in this corpus was drawn on. Any other face breaks the art: the box
+ * borders only line up at Topaz's cell width.
+ *
+ * Same files the BBS front end serves (amiexpress-web:
+ * web/frontend/public/fonts).
+ */
+@font-face {
+  font-family: 'TopazPlus';
+  src: url('/fonts/TopazPlus_a1200_v1.0.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Topaz';
+  src: url('/fonts/Topaz_a1200_v1.0.ttf') format('truetype');
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

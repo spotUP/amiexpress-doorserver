@@ -796,6 +796,121 @@ export function versionFromFilename(archiveName: string): string {
   return `${Number(d[0])}.${d[1]}`;
 }
 
+/** The archive's own name with its extension stripped. */
+function archiveBase(archiveName: string): string {
+  const dot = archiveName.lastIndexOf('.');
+  return dot === -1 ? archiveName : archiveName.slice(0, dot);
+}
+
+// ─── the door's short name ─────────────────────────────────────────────
+//
+// The catalog's `name` is whatever the corpus builder found at the top of
+// the DIZ, so for 1031 of 3301 rows it is the box border itself and for
+// others it is a whole banner line. A listing needs a NAME.
+
+const NAME_WORDS = 4;
+
+/**
+ * A value shaped like a filename rather than a name: it ends in a program
+ * extension, or - the scene-signature case - it BEGINS with one.
+ * "exe.-l0S-eND0S-bBS-.exe" is the catalog name AND binary_name of 41
+ * archives.
+ */
+const FILENAME_SHAPED = /\.(exe|info|rexx|xim|aim|fim|sim|tim|iim|lha|lzx|dms)\s*$|^(?:exe|com|bat|dll)\./i;
+
+/**
+ * Is this a NAME rather than a piece of box art? The bar is lower than for a
+ * description: "Bull", "DMS" and "Avail" are real door names and would fail
+ * the description scorer's six-character minimum. What a name may not be is
+ * decoration.
+ */
+export function looksLikeName(text: string): boolean {
+  const t = (text ?? '').trim();
+  if (!t || t.length > 40) return false;
+  if (ART_RE.test(t)) return false;
+  if (!WORD_RE.test(t)) return false;
+  if (highBitShare(t) > 0.3) return false;
+  return alnumShare(t) > 0.5;
+}
+
+/**
+ * A short label for a door: its catalog name when that reads as a name, then
+ * its program name, then the archive's own name. Never box art.
+ *
+ * A name is ONE CELL of a box row and at most four words - past that it is a
+ * sentence, and the program name reads better in a column.
+ */
+/** Where a door's displayed name came from - what the admin UI needs to
+ * know which names are real and which are guesses from a filename. */
+export type NameSource = 'catalog' | 'program' | 'archive';
+
+export function displayName(
+  name: string | null,
+  binaryName: string | null,
+  archiveName: string,
+  groupTags: ReadonlySet<string>
+): string {
+  return readName(name, binaryName, archiveName, groupTags).name;
+}
+
+export function readName(
+  name: string | null,
+  binaryName: string | null,
+  archiveName: string,
+  groupTags: ReadonlySet<string>
+): { name: string; source: NameSource } {
+  const raw = (name ?? '').trim();
+  const fromArchive = (): { name: string; source: NameSource } => ({
+    name: tidyCase(toPlain(prettifyInText(archiveBase(archiveName), groupTags))),
+    source: 'archive',
+  });
+  const prog = prettifyProgram(toPlain(binaryName ?? ''), groupTags);
+  const progOk = prog.length >= 3 && (prog.match(/[A-Za-zÀ-ÿ]/g) ?? []).length >= 3 && alnumShare(prog) > 0.5;
+
+  if (FILENAME_SHAPED.test(raw)) {
+    // ...and when the program name is the same junk, the archive's own name
+    // is the only honest label left.
+    if (progOk && !FILENAME_SHAPED.test((binaryName ?? '').trim())) {
+      return { name: tidyCase(capitaliseName(prog)), source: 'program' };
+    }
+    return fromArchive();
+  }
+
+  let candidate = toPlain(clean(raw));
+  // A banner names the GROUP and then the door, so the door is what follows
+  // it - the same split the description rules make. When nothing usable
+  // follows (the rest is a date, or border), what precedes it is tried too,
+  // and if neither reads as a name the archive has the last word.
+  const split = splitBannerCredit(candidate);
+  if (split.text !== candidate) {
+    candidate = looksLikeName(split.text) ? split.text : '';
+  } else if (BANNER_RE.test(candidate)) {
+    // A banner word with nothing usable after it ("Ir\/ANA presents ---
+    // 02/15/98"): the group and a date, and no door name anywhere in it.
+    candidate = '';
+  }
+  for (const cell of candidate.split(CELL_SPLIT_RE)) {
+    if (cell === undefined) continue;
+    const cleaned = toPlain(clean(cell));
+    if (looksLikeName(cleaned)) {
+      candidate = cleaned;
+      break;
+    }
+  }
+
+  const words = candidate.split(/\s+/).filter(Boolean);
+  if (looksLikeName(candidate) && words.length <= NAME_WORDS) {
+    return { name: tidyCase(capitaliseName(candidate)), source: 'catalog' };
+  }
+  if (progOk) {
+    return { name: tidyCase(capitaliseName(prog)), source: 'program' };
+  }
+  if (looksLikeName(candidate)) {
+    return { name: tidyCase(capitaliseName(words.slice(0, NAME_WORDS).join(' '))), source: 'catalog' };
+  }
+  return fromArchive();
+}
+
 // ─── the whole reading ─────────────────────────────────────────────────
 
 export interface DoorFacts {
@@ -822,12 +937,6 @@ export interface DoorInput {
  * Read a door's four facts out of its DIZ, its catalog row and its archive
  * name, in that order of trust.
  */
-/** The archive's own name with its extension stripped. */
-function archiveBase(archiveName: string): string {
-  const dot = archiveName.lastIndexOf('.');
-  return dot === -1 ? archiveName : archiveName.slice(0, dot);
-}
-
 export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): DoorFacts {
   const prettyProg = prettifyProgram(toPlain(input.binaryName ?? ''), groupTags);
   // binary_name is sometimes a stray token like "8" or "."; a program name

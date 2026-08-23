@@ -9,6 +9,9 @@
  */
 import {
   analyseDoor,
+  displayName,
+  looksLikeName,
+  readName,
   bestCell,
   buildGroupTags,
   bodyAddsNothing,
@@ -26,6 +29,7 @@ const TAGS = buildGroupTags([
   'DLT-A.LHA', 'DLT-B.LHA', 'DLT-C.LHA',
   'KDZ!A.LHA', 'KDZ!B.LHA', 'KDZ!C.LHA',
   'CRZ-A.LHA', 'CRZ-B.LHA', 'CRZ-C.LHA',
+  'D-A.LHA', 'D-B.LHA', 'D-C.LHA',
 ]);
 
 function read(
@@ -256,6 +260,55 @@ describe('which BBS the door needs', () => {
   it('normalises the BBS name and the wildcard case', () => {
     expect(normaliseRequirement('AE', '3,30')).toBe('/X 3.30');
     expect(normaliseRequirement('AmiExpress', '4.X')).toBe('AmiExpress 4.x');
+  });
+});
+
+describe("a door's short name", () => {
+  const name = (n: string | null, binary: string | null, archive: string) => displayName(n, binary, archive, TAGS);
+
+  it('uses the catalog name when it reads as a name', () => {
+    expect(name('Account Editor', 'AccEd', 'ACC-V103.LHA')).toBe('Account Editor');
+  });
+
+  it('accepts a short name a description would reject', () => {
+    // "Bull", "DMS" and "Avail" are real door names, well under the six
+    // characters the description scorer demands.
+    expect(name('Bull', null, '5150-B10.LHA')).toBe('Bull');
+    expect(looksLikeName('DMS')).toBe(true);
+  });
+
+  it('never shows box art', () => {
+    // The catalog `name` is the DIZ's first line for 1031 of 3301 rows.
+    expect(name('______    ________.  /\\    ______.__________', null, '-D-CALC.LHA')).toBe('Calc');
+    expect(name(':    .    :    .', null, '$CP-BU1.LZX')).toBe('Cp-Bu1');
+  });
+
+  it('takes one cell of a banner row, not the whole row', () => {
+    expect(name('Aquawho -] ____ [-Aquarius/Otl', null, 'OTL-AW.LHA')).toBe('Aquawho');
+  });
+
+  it('drops a banner word and what follows it', () => {
+    expect(name('Ir\\/ANA presents ----------- 02/15/98', null, 'NRV_LWAL.LHA')).toBe('Nrv_Lwal');
+  });
+
+  it('refuses a filename, and falls through to the program name', () => {
+    expect(name('5D-Who.xim', '5D-Who', '5D-WHO24.LZH')).toBe('Who');
+  });
+
+  it('falls back to the archive when the name AND the program are the same junk', () => {
+    // The real ADN-C120.LHA: both fields are "exe.-l0S-eND0S-bBS-.exe".
+    expect(name('exe.-l0S-eND0S-bBS-.exe', 'exe.-l0S-eND0S-bBS-.exe', 'ADN-C120.LHA')).toBe('Adn-C120');
+  });
+
+  it('says where the name came from, so a guess can be spotted', () => {
+    expect(readName('Account Editor', null, 'ACC-V103.LHA', TAGS).source).toBe('catalog');
+    expect(readName('____________', 'AccEd', 'ACC-V103.LHA', TAGS).source).toBe('program');
+    expect(readName('____________', null, 'ACC-V103.LHA', TAGS).source).toBe('archive');
+  });
+
+  it('is never empty', () => {
+    expect(name(null, null, 'X.LHA')).toBe('X');
+    expect(name('', '', 'ACC-V103.LHA')).toBe('Acc-V103');
   });
 });
 
