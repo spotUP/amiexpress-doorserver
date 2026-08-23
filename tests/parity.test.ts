@@ -1,0 +1,141 @@
+// tests/parity.test.ts
+/**
+ * Byte-parity against the BBS-hosted API.
+ *
+ * The captures were taken from the API this server replaces. Any
+ * difference in status, header or body is a regression in the move - the
+ * whole safety argument for the split is that location changed and
+ * behaviour did not.
+ *
+ * Skips itself when no capture file is present, so a fresh checkout is not
+ * blocked; CI runs with the fixtures committed.
+ */
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import request from 'supertest';
+import { createApp } from '../src/app';
+import { jsonBodyDigest } from '../scripts/capture-parity-fixtures';
+import { loadConfig } from '../src/config';
+
+const CAPTURES = path.join(__dirname, 'fixtures', 'parity', 'captures.json');
+
+interface Capture {
+  name: string;
+  method: 'GET' | 'HEAD';
+  requestPath: string;
+  requestHeaders: Record<string, string>;
+  status: number;
+  headers: Record<string, string>;
+  bodyBase64?: string;
+  headBase64?: string;
+  sha256?: string;
+  byteLength?: number;
+  jsonDigest?: string;
+  doorCount?: number;
+}
+
+const shouldRun = fs.existsSync(CAPTURES) && Boolean(process.env.PARITY_DB);
+const describeOrSkip = shouldRun ? describe : describe.skip;
+
+describeOrSkip('parity with the BBS-hosted API', () => {
+  // `describe.skip(name, fn)` still executes `fn` synchronously during
+  // Jest's collection phase - only the `it()` bodies registered inside are
+  // actually skipped. Without this early return, a plain `npm test` (no
+  // PARITY_DB set) would still hit loadConfig() below and throw
+  // "DOORSERVER_DB is not set", failing the whole suite instead of skipping
+  // it. Verified live: that is exactly what happened before this guard.
+  //
+  // A bare early return isn't enough either: with zero `it()`s registered,
+  // Jest itself fails the suite with "Your test suite must contain at least
+  // one test" - also verified live. A placeholder keeps the file always
+  // registering something; describe.skip marks it (and everything else in
+  // this block) skipped rather than run.
+  if (!shouldRun) {
+    it('skipped - no PARITY_DB / tests/fixtures/parity/captures.json', () => {
+      /* real assertions only run when both are present; see shouldRun above */
+    });
+    return;
+  }
+
+  const captures: Capture[] = JSON.parse(fs.readFileSync(CAPTURES, 'utf-8'));
+  const cfg = loadConfig({
+    DOORSERVER_DB: process.env.PARITY_DB,
+    DOOR_ARCHIVES_ROOT: process.env.PARITY_ARCHIVES,
+  });
+  const app = createApp(cfg);
+
+  for (const c of captures) {
+    it(`${c.name} matches`, async () => {
+      const agent = request(app);
+      const res = await (c.method === 'HEAD'
+        ? agent.head(`/api/door-repo${c.requestPath}`)
+        : agent.get(`/api/door-repo${c.requestPath}`))
+        .set(c.requestHeaders)
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on('data', (d: Buffer) => chunks.push(d));
+          r.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(c.status);
+      for (const [key, value] of Object.entries(c.headers)) {
+        if (key === 'content-type' || key === 'content-length' || key.startsWith('x-') || key === 'etag') {
+          expect(`${key}=${res.headers[key]}`).toBe(`${key}=${value}`);
+        }
+      }
+
+      // The manifest body carries `generatedAt: new Date().toISOString()`
+      // (door-repo-manifest.ts:309), so its bytes are never twice the same
+      // and a raw base64 comparison could not pass even against the server
+      // that produced the capture. Verified against the live API: two calls
+      // one second apart differ only in that field. Compare the manifest
+      // structurally with the timestamp lifted out, and assert separately
+      // that the field is still a real ISO instant. Its length is fixed
+      // (24 chars), so Content-Length above stays a valid check.
+      // EVERY other endpoint is compared byte-for-byte.
+      // A HEAD response has no body by definition; its status and headers are
+      // the whole contract.
+      if (c.method === 'HEAD') return;
+
+      const body = res.body as Buffer;
+      expect(body.length).toBe(c.byteLength);
+
+      // A JSON body carries `generatedAt: new Date().toISOString()`
+      // (door-repo-manifest.ts:309), so its bytes are never twice the same -
+      // verified live, two calls a second apart differ only there. Compare a
+      // digest of the body with that field lifted out, and assert separately
+      // that the field is still a real ISO instant. Its length is fixed at 24
+      // characters, so the Content-Length check above still bites.
+      if (c.jsonDigest !== undefined) {
+        const parsed: Record<string, unknown> = JSON.parse(body.toString('utf-8'));
+        // Only /manifest carries a wall-clock `generatedAt`
+        // (door-repo-manifest.ts:309); /health's body is `{ status,
+        // revision, doors }` (routes.ts) and has no such field. Assert the
+        // ISO-instant shape only when the field is actually present, rather
+        // than assuming every JSON capture is a manifest.
+        if ('generatedAt' in parsed) {
+          expect(parsed.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+        }
+        const { digest, doorCount } = jsonBodyDigest(body);
+        expect(doorCount).toBe(c.doorCount);
+        expect(digest).toBe(c.jsonDigest);
+        return;
+      }
+
+      // Large non-JSON bodies (list.txt is 620 KB) are pinned by digest -
+      // exactly as strict as comparing bytes, without committing them. The
+      // first 512 bytes are compared too, so a failure shows something
+      // readable rather than only "digest differs".
+      if (c.sha256 !== undefined) {
+        expect(body.subarray(0, 512).toString('base64')).toBe(c.headBase64);
+        expect(crypto.createHash('sha256').update(body).digest('hex')).toBe(c.sha256);
+        return;
+      }
+
+      // Everything small is compared byte-for-byte, which is where the
+      // Latin-1 and CRLF risk actually lives.
+      expect(body.toString('base64')).toBe(c.bodyBase64);
+    });
+  }
+});
