@@ -227,26 +227,28 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       );
       params.push(like, like, like, like, like, like);
     }
+    // Where a name came from is DERIVED, not stored, so this one filter
+    // cannot be a WHERE clause: the rows are read, read-named, filtered and
+    // only then paged. It costs a full scan, and only when it is asked for -
+    // it exists so a curator can work through the names that are guesses.
+    const nameSource = strParam(req.query.name_source);
+
     const db = openDb(cfg, { readonly: true });
     try {
       const hidden = hiddenExclusion(db);
       if (hidden) where.push(hidden);
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-      const total = (
-        db.prepare(`SELECT COUNT(*) AS n FROM door_catalog ${whereSql}`).get(...params) as { n: number }
-      ).n;
-      const rows = db
-        .prepare(
-          `SELECT id, archive_name, archive_path, binary_name, door_type, name, version, author,
+      const SELECT_ROW = `SELECT id, archive_name, archive_path, binary_name, door_type, name, version, author,
                   release_group, category, description, requires_bbs, file_id_diz, archive_size,
                   md5, sha256, junk_count, indexed_at,
                   (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc
              FROM door_catalog
              ${whereSql}
-             ORDER BY ${sort} ${dir}, archive_name COLLATE NOCASE ASC
-             LIMIT ? OFFSET ?`
-        )
-        .all(...params, perPage, (page - 1) * perPage) as DoorRow[];
+             ORDER BY ${sort} ${dir}, archive_name COLLATE NOCASE ASC`;
+
+      let total: number;
+      let rows: DoorRow[];
+      let filterBySource: ((row: DoorRow) => boolean) | null = null;
 
       // Group tags come from the WHOLE catalog, not the page: a prefix is a
       // release tag only if three or more archives carry it, and one page of
@@ -256,6 +258,24 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       ).map((r) => r.archive_name);
       const groupTags = buildGroupTags(allNames);
       const overrides = loadOverrides(db);
+
+      if (nameSource) {
+        filterBySource = (row) =>
+          readName(
+            applyOverrides(row, row.id, overrides).name,
+            row.binary_name,
+            row.archive_name,
+            groupTags
+          ).source === nameSource;
+        const matching = (db.prepare(SELECT_ROW).all(...params) as DoorRow[]).filter(filterBySource);
+        total = matching.length;
+        rows = matching.slice((page - 1) * perPage, page * perPage);
+      } else {
+        total = (
+          db.prepare(`SELECT COUNT(*) AS n FROM door_catalog ${whereSql}`).get(...params) as { n: number }
+        ).n;
+        rows = db.prepare(`${SELECT_ROW} LIMIT ? OFFSET ?`).all(...params, perPage, (page - 1) * perPage) as DoorRow[];
+      }
 
       res.json({
         revision: getCatalogRevision(cfg),

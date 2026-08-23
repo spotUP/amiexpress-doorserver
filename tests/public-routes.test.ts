@@ -144,6 +144,41 @@ describe('GET /doors', () => {
   });
 });
 
+describe('finding the names that are guesses', () => {
+  it('filters by where the name came from', async () => {
+    // LOOSE.LHA's catalog name reads as a name; give one door art for a
+    // name and no program, and its name can only come from the archive.
+    const db = openDb(cfg);
+    db.prepare("UPDATE door_catalog SET name = '____________________' WHERE id = 'id2'").run();
+    db.close();
+
+    const guesses = await get('/doors?name_source=archive');
+    expect(guesses.body.rows.map((r: { archiveName: string }) => r.archiveName)).toEqual(['CHATT101.LHA']);
+    expect(guesses.body.total).toBe(1);
+    expect(guesses.body.rows[0].nameSource).toBe('archive');
+
+    const real = await get('/doors?name_source=catalog');
+    expect(real.body.total).toBe(2);
+  });
+
+  it('pages the filtered set, not the whole catalog', async () => {
+    const res = await get('/doors?name_source=catalog&per_page=1&page=2');
+    expect(res.body.total).toBe(3);
+    expect(res.body.rows).toHaveLength(1);
+  });
+
+  it('an edited name counts as a real name, not a guess', async () => {
+    const db = openDb(cfg);
+    db.prepare("UPDATE door_catalog SET name = '____________________' WHERE id = 'id2'").run();
+    db.prepare(
+      "INSERT INTO door_catalog_overrides (catalog_id, field, value, edited_at) VALUES ('id2', 'name', 'Chat Time', 1700001000)"
+    ).run();
+    db.close();
+    const guesses = await get('/doors?name_source=archive');
+    expect(guesses.body.total).toBe(0);
+  });
+});
+
 describe('GET /doors/:archiveName', () => {
   it('returns the full FILE_ID.DIZ, the doc and the file list', async () => {
     const res = await get('/doors/ACC-V103.LHA');

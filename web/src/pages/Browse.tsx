@@ -3,7 +3,7 @@
  * asked for on this path - the corpus is public, and reading it is the point.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload } from 'lucide-react';
+import { Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2 } from 'lucide-react';
 import { useDoors, useFacets, useLiveRevision } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
@@ -25,6 +25,7 @@ export function Browse() {
   const [system, setSystem] = useState('');
   const [type, setType] = useState('');
   const [requires, setRequires] = useState('');
+  const [guessedOnly, setGuessedOnly] = useState(false);
   const [sortState, setSortState] = useState<SortState>({ sort: 'archive', dir: 'asc' });
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
@@ -57,8 +58,18 @@ export function Browse() {
   }, []);
 
   const query = useMemo(
-    () => ({ q, system, type, requires, sort: sortState.sort, dir: sortState.dir, page, perPage: PER_PAGE }),
-    [q, system, type, requires, sortState, page]
+    () => ({
+      q,
+      system,
+      type,
+      requires,
+      nameSource: guessedOnly ? 'archive' : undefined,
+      sort: sortState.sort,
+      dir: sortState.dir,
+      page,
+      perPage: PER_PAGE,
+    }),
+    [q, system, type, requires, guessedOnly, sortState, page]
   );
   const { data, isLoading } = useDoors(query);
   const { data: facets } = useFacets();
@@ -155,6 +166,21 @@ export function Browse() {
           }}
           options={(facets?.requires ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
         />
+        {admin && (
+          // A curator's working view: the doors whose name had to be guessed
+          // from the filename, which are the ones worth typing a real name
+          // into.
+          <Button
+            variant={guessedOnly ? 'primary' : 'ghost'}
+            onClick={() => {
+              setGuessedOnly((on) => !on);
+              setPage(1);
+            }}
+            title="Doors whose name was guessed from the archive filename"
+          >
+            <Wand2 size={14} /> Needs a name
+          </Button>
+        )}
       </div>
 
       <DoorTable
