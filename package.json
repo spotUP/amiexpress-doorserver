@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.ts",
     "test:ci": "jest --config jest.config.ts --ci",
-    "test:parity": "PARITY_DB=${PARITY_DB:-/tmp/parity-source.db} PARITY_ARCHIVES=${PARITY_ARCHIVES:-/Users/spot/Code/amiexpress_doors/Archives} jest --config jest.config.ts tests/parity.test.ts"
+    "test:parity": "PARITY_DB=${PARITY_DB:-/tmp/parity-source.db} PARITY_ARCHIVES=${PARITY_ARCHIVES:-/Users/spot/Code/amiexpress_doors/Archives} jest --config jest.config.ts tests/parity.test.ts",
+    "build:web": "npm --prefix web ci && npm --prefix web run build",
+    "build:all": "npm run build:web && npm run build",
+    "dev:web": "npm --prefix web run dev"
   },
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",

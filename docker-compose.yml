@@ -18,6 +18,10 @@ services:
       DOOR_ARCHIVES_ROOT: /data/Archives
       PORT: "3010"
       DOORSERVER_ADMIN_KEYS: ${DOORSERVER_ADMIN_KEYS:-}
+      # Signing key for admin sessions. UNSET means the admin API answers 503
+      # to everything and the public site is unaffected - so this host can run
+      # without it and gain an admin console the moment it is set.
+      DOORSERVER_JWT_SECRET: ${DOORSERVER_JWT_SECRET:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3010/api/door-repo/health"]
       interval: 30s

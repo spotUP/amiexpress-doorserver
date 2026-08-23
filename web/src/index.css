@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+  }
+  /* A focus ring is how a keyboard user knows where they are. Never removed. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
+  }
+}
