@@ -57,6 +57,11 @@ const COPYRIGHT_RE = /©|\(c\)/i;
 /** A handle on a line of its own: "sNoW^5D", "Jordan/5D". */
 const HANDLE_RE = /^[A-Za-z0-9!._-]{2,20}\s*[\^/]\s*[A-Za-z0-9!._-]{2,20}$/;
 
+/** Is this line a person's handle rather than a door's name? */
+export function looksLikeHandle(text: string): boolean {
+  return HANDLE_RE.test((text ?? '').trim());
+}
+
 // JS word boundaries are ASCII-only where Python's are Unicode-aware, so
 // "v2.1ß" looked like a clean version here and not there - a 12-point
 // scoring difference that changed which paragraph a row was described by.

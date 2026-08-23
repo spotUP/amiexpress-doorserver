@@ -225,6 +225,35 @@ describe('what the archive says about itself', () => {
     expect(door.body.files.length).toBeGreaterThan(1);
   });
 
+  it('names the door after the member its DIZ mentions, not the biggest one', async () => {
+    // MST-KB13 ships an "ExTract" utility that is larger than the door
+    // itself; the DIZ names KiLLER-BAUD, and that is the door.
+    const archive = corpusArchive('MST-KB13.LHA');
+    if (!archive) return;
+    await submit(archive, 'MST-KB13.LHA');
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    expect(queue.body.rows[0].derived.name).toBe('Killer Baud');
+    expect(queue.body.rows[0].derived.author).toBe('Killraven/Mystic');
+  });
+
+  it('does not name a door after the handle at the top of its DIZ', async () => {
+    // MST-MT21's first legible line is "bObO/mYStiC" - the coder.
+    const archive = corpusArchive('MST-MT21.LHA');
+    if (!archive) return;
+    await submit(archive, 'MST-MT21.LHA');
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    expect(queue.body.rows[0].derived.name).toBe('Multi Top');
+  });
+
+  it('keeps the version out of the name', async () => {
+    const archive = corpusArchive('ACC-V103.LHA');
+    if (!archive) return;
+    await submit(archive, 'ACC-V103.LHA');
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    expect(queue.body.rows[0].derived.name).not.toMatch(/1\.03|V103/i);
+    expect(queue.body.rows[0].derived.version).toBe('1.03');
+  });
+
   it('says plainly when an archive could not be read', async () => {
     // A valid LHA header with nothing readable inside it.
     await submit(lhaBytes('not really an archive body'), 'BROKEN.LHA');

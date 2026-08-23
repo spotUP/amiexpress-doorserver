@@ -30,7 +30,16 @@ import type { Request } from 'express';
 import Busboy from 'busboy';
 import type Database from 'better-sqlite3';
 import { readLhaContents } from './archive-reader';
-import { analyseDoor, buildGroupTags, clean, displayName, looksLikeName, toPlain } from './describe';
+import {
+  analyseDoor,
+  buildGroupTags,
+  clean,
+  displayName,
+  looksLikeHandle,
+  stripVersionTail,
+  looksLikeName,
+  toPlain,
+} from './describe';
 import type { ServerConfig } from './config';
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -178,24 +187,50 @@ export function receiveUpload(req: Request): Promise<ReceivedUpload> {
 const PROGRAM_EXT = /\.(exe|xim|aim|fim|sim|tim|iim|rexx)$/i;
 const NOT_PROGRAM = /\.(info|doc|txt|readme|me|guide|diz|nfo|dat|cfg|prefs|bak|library|font|iff|ilbm|png|gif|jpg|mod|8svx)$/i;
 
-function pickProgram(files: { path: string; size: number }[]): string | null {
+function squash(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function pickProgram(files: { path: string; size: number }[], diz: string | null): string | null {
   const candidates = files.filter((f) => {
     const base = f.path.split('/').pop() ?? '';
     if (!base || NOT_PROGRAM.test(base)) return false;
     return PROGRAM_EXT.test(base) || !base.includes('.');
   });
   if (!candidates.length) return null;
-  // The biggest one: a door ships helpers, and the door is the largest.
-  const best = candidates.reduce((a, b) => (b.size > a.size ? b : a));
+
+  // A door ships helpers, and "the biggest member" picks the wrong one often
+  // enough to matter: MST-KB13 ships an "ExTract" utility larger than the
+  // door itself. The DIZ names the door, so a member the DIZ mentions wins
+  // over a member it does not.
+  const dizText = squash(diz ?? '');
+  const named = candidates.filter((f) => {
+    const base = squash((f.path.split('/').pop() ?? '').replace(PROGRAM_EXT, ''));
+    return base.length >= 3 && dizText.includes(base);
+  });
+  const pool = named.length ? named : candidates;
+  const best = pool.reduce((a, b) => (b.size > a.size ? b : a));
   return best.path.split('/').pop() ?? null;
 }
 
-/** The first line of a DIZ that reads as a name rather than as border art. */
+/**
+ * The first line of a DIZ that reads as a door's name.
+ *
+ * Not merely the first line that is not art: the top of a scene DIZ is the
+ * group's, and its first legible cell is usually a handle. Live proof -
+ * MST-MT21.LHA's first readable line is "bObO/mYStiC", which is the coder,
+ * and taking it named the door after him.
+ */
 function firstNameLine(diz: string | null): string | null {
   if (!diz) return null;
   for (const line of diz.replace(/\r/g, '').split('\n')) {
-    const candidate = toPlain(clean(line));
-    if (looksLikeName(candidate)) return candidate;
+    for (const cell of line.split(/[|¦]+/)) {
+      const candidate = toPlain(clean(cell));
+      if (!looksLikeName(candidate) || looksLikeHandle(candidate)) continue;
+      // A cell that is only a group tag ("mYSTIC!") is not a name either.
+      if (!/[A-Za-zÀ-ÿ]{3}/.test(candidate)) continue;
+      return candidate;
+    }
   }
   return null;
 }
@@ -227,7 +262,7 @@ export function deriveMetadata(bytes: Buffer, archiveName: string, groupTags: Re
     ? readLhaContents(bytes)
     : { files: [], fileIdDiz: null, docFilename: null, doc: null };
 
-  const binaryName = pickProgram(contents.files);
+  const binaryName = pickProgram(contents.files, contents.fileIdDiz);
   const facts = analyseDoor(
     {
       dizText: contents.fileIdDiz,
@@ -238,8 +273,18 @@ export function deriveMetadata(bytes: Buffer, archiveName: string, groupTags: Re
     groupTags
   );
 
+  // For a submission the PROGRAM name is the better source: the archive's
+  // own member list is unambiguous, while the top of a scene DIZ is the
+  // group's business card - MST-JC40's first legible cell is
+  // "MYSTiC /X-POWER", which is a group and a BBS, not a door. The DIZ line
+  // is used only when the archive ships nothing that looks like a program.
+  const named = binaryName
+    ? displayName(null, binaryName, archiveName, groupTags)
+    : displayName(firstNameLine(contents.fileIdDiz), null, archiveName, groupTags);
+
   return {
-    name: displayName(firstNameLine(contents.fileIdDiz), binaryName, archiveName, groupTags),
+    // "Account Ed V1.03" - the version has its own column.
+    name: stripVersionTail(named, facts.version) || named,
     description: facts.description,
     version: facts.version,
     author: facts.author,
