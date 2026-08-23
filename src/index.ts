@@ -2,6 +2,8 @@ import { createApp } from './app';
 import { loadConfig, ConfigError } from './config';
 import type { ServerConfig } from './config';
 import { getDoorCount, getCatalogRevision } from './catalog';
+import { openDb } from './db';
+import { runMigrations } from './migrations';
 
 /**
  * Refuse to serve a catalog that cannot be read, or that reads clean but
@@ -38,6 +40,20 @@ function main(): void {
       process.exit(1);
     }
     throw err;
+  }
+
+  // Before anything reads the catalog: the volume is seeded by hand and a
+  // column added after the first deploy exists only if a migration adds it.
+  try {
+    const db = openDb(cfg);
+    try {
+      for (const step of runMigrations(db)) console.log(`[INFO] migration ${step}`);
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    console.error(`[ERROR] migrating ${cfg.dbPath} failed: ${(err as Error).message}`);
+    process.exit(1);
   }
 
   let doors: number;

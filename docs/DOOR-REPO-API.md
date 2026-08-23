@@ -433,72 +433,57 @@ replaced with `?`, identically to `list.txt`.
 ### Description column
 
 The catalog's `description` field (`FILE_ID.DIZ` mined from scene releases)
-routinely opens with box-drawing ASCII art -- a border like
-`______    ________.  /\    ______.__________` -- before, or instead of,
-any actual words, and even when it does contain words, that text is more
-often WHO shipped the door (a "<group> presents" banner) than WHAT the
-door is. A `Description` column that surfaced any of that verbatim would
-read as noise -- or as a release-group ad -- on a large share of rows, so
-this column is not that field: it runs a dedicated classifier
-(`describeDoor`, `src/index-tsv.ts`).
+is a picture of a box, not a paragraph: the door's name, its version, the
+group that released it, the handle that coded it and the BBS version it
+needs are scattered across the cells of an ASCII frame. Surfacing it
+verbatim reads as noise, or as a release-group advert. So this column is
+not that field: it is read by a dedicated classifier, `src/describe.ts`.
 
-**Step 1 -- find a descriptive line**, walking the FILE_ID.DIZ line by
-line (falling back to the catalog's `name` field under the same rules if
-no DIZ line qualifies). A line qualifies when, after trimming a run of
-frame punctuation (`_ . / \ : | - = * # ~ ( ) [ ] < > + ' " , » « · ° ® `
-and en/em dash) from both its ends:
+That module is the same classifier as the prototype at
+`amiexpress-web:dev/scripts/door-index/description_rules.py`, which the
+catalog's owner tuned over fifteen rounds against real rows. The two are
+verified equal row for row across the whole 3301-door catalog; each has its
+own test suite (`tests/describe.test.ts` here) asserting the same fixtures.
 
-- it has a run of 3+ letters (the Latin-1 accented range counts too, so
-  `Größe` reads as one word rather than breaking at `ö`);
-- letters and digits are a clear supermajority (at least 3x) of everything
-  else in the line that isn't whitespace;
-- it is not a copyright/credit line (contains `©` or `(c)`);
-- it is not a single space-free token dense with digits (a serial number
-  or hash, e.g. `JU6V13GOZY2WB4LCSE85` -- seen for real in this corpus as a
-  `name` field with no usable DIZ);
-- it is not a run of one repeated character (`XXXX....` trims to `XXXX`,
-  which is not a word even though it trivially clears every ratio check);
-- trimming did not throw away more than half the original line -- this is
-  what stops a lone incidental real word surviving out of an otherwise
-  solid wall of decoration (`\/\/\/\/[for]\/\/\/\/` trims down to the bare
-  word `for`, which the other checks alone would accept).
+How a row is read:
 
-**A banner line is skipped, not returned.** When a qualifying line matches
-`presents?|brings?|proudly|releases?` (case-insensitive), the classifier
-does not use it as-is -- that is the group naming itself, not the door.
-Instead it tries, in order: (a) the remainder of that same line after the
-LAST matched word if that remainder itself qualifies, then (b) the next
-qualifying line, looking ahead at most 3 lines. If neither works, the
-banner line contributes nothing and scanning continues normally from the
-next line.
+1. **A line is scored by its best CELL.** A DIZ line is a row of a box:
+   `+[ MYSTiC /X-POWER ]-----[ JoinCnf 4.0 ]---+` holds two independent
+   cells, and `.---\/---\/-/X-pOwEr!-\/^----|` is a border with one word
+   trapped in it. Rows are split on border runs and pillars, and a cell torn
+   out of a border must stand on its own to count -- two words, or one word
+   carrying a version or a door word.
+2. **The best PARAGRAPH wins, not the best line**, because DIZ text wraps.
+   Consecutive prose lines form a block; the block that says something the
+   door's name does not is preferred, since the top block is often the
+   header cell (`JoinCnf 4.0`) and the name has its own column already.
+3. **What is not a description is removed**: release banners
+   (`<group> presents`), credits and dates, copyright lines, compatibility
+   notes (`Now working on /X 3.30`), release metadata (`[RELEASE 2]`),
+   brackets emptied by extraction (`(Version )`), ANSI colour sequences,
+   and CP437 box art -- a word needs ASCII letters in it, so `³Y³ Óääù`
+   never reads as one.
+4. **Facts move to their own fields.** The door's version, the coder's
+   handle and the required BBS version are pulled OUT of the description.
+   `Description` therefore carries what the door IS; `index.tsv` has no
+   column for the other three, but they are stored on the catalog row
+   (`version`, `author`, `requires_bbs`) for the JSON API to serve.
+5. **The program name is composed in.** `binary_name` is a filename, so it
+   is prettified first (`5D-SendMessage` -> `Send Message`) using release
+   tags derived from the corpus itself -- a prefix counts as a group tag
+   only when it appears on three or more archives, which is what keeps
+   `MB-MAKER` from becoming `MAKER`. The name is skipped when the line
+   already carries it, so no row names the door twice.
+6. **Fallbacks**, in order: the catalog `name`, then the archive's own base
+   name -- which goes through the same prettifying, so `AE_DOORS.LHA`
+   renders as `Doors` rather than shouting its filename.
+7. **`/X` keeps its slash.** It is the name of this BBS, not punctuation:
+   no strip, and no border run, may eat it.
 
-**Step 2 -- compose with `binary_name`.** The catalog's `binary_name`
-column (the door's actual program -- `Children`, `Statusbbs`, `offliner`;
-populated for 2398 of 3301 rows) is preferred over a DIZ-mined line for
-saying what the door IS. The two are composed as `<binary_name> -
-<descriptive line>`; when no descriptive line survived step 1, the
-`Description` is `binary_name` alone; when the descriptive line already
-contains `binary_name` (case-insensitive -- e.g. a DIZ line reading
-`Snes-Tool v1.10` for a door whose `binary_name` is `Snes-Tool`), the
-prefix is skipped so the name isn't repeated. With no `binary_name` at
-all, the descriptive line is used alone.
-
-**Step 3 -- final fallback.** If nothing above produced a result, the
-archive's own base name with its extension stripped (e.g. `ACC-V103`) is
-used unconditionally -- it is guaranteed short, ASCII and non-empty.
-
-Then, regardless of which step produced it: whitespace is collapsed,
-control characters are stripped, and the result is capped at 60
-characters.
-
-Real example of the step-3 fallback actually firing (archive `AE_DOORS.LHA`,
-whose entire FILE_ID.DIZ and catalog `name` are both the literal string
-`XXXX....` -- a repeated-character placeholder, rejected by the
-repeated-character check above even after `....` trims off the end):
-
-```
-AE_DOORS.LHA	AmiExpress	10K	AmiExpress	AE_DOORS
-```
+Finally: whitespace collapsed, control characters stripped, and the result
+capped at 60 characters ON A WORD BOUNDARY -- a cut that severs a bracket
+group (`[RELEASE 2]` -> `[RELEASE 2`) reads as corruption, so a group left
+hanging open is dropped rather than shown.
 
 ### Real example
 
@@ -508,15 +493,15 @@ live 3301-door catalog:
 ```
 Filename	Path	Size	System	Description
 !ALSTER.LHA	AmiExpress	39K	AmiExpress	Children - This tool starts only for NEWUSERS /X
-$CP-BUß1.LZX	AmiExpress	15K	AmiExpress	! | ! | Bulletin Viewer V1.0 ß ¡
-$CP-PS12.LZX	AmiExpress	17K	AmiExpress	Statusbbs - Status V1.2 for the great /X-Press
-$CP-ST13.LZX	AmiExpress	21K	AmiExpress	Status Door V1.3 minor Update
-$CP-ST14.LZX	AmiExpress	25K	AmiExpress	made by Piwi / $ceptic '94 / C/XD
--D-CALC.LHA	AmiExpress	10K	AmiExpress	CALCULATOR V1.0 by VASCAL/DLT
--D-DOR11.LHA	AmiExpress	7K	AmiExpress	dOOR-mENU v.1.1 by vASCAL/dLT
--D-INF21.LHA	AmiExpress	70K	AmiExpress	Avail - sYSTEM iNFO v.2.1 by vASCAL/dLT fOR /X
--J-LCV30.LHA	AmiExpress	91K	AmiExpress	stripp - LASTCALLER- V3.0 · WRITTEN BY iRoNCoDE!
--L-OFFL.LHA	AmiExpress	34K	AmiExpress	oFFLiner V1.1 New /X UtiL by Crew-One
+$CP-BUß1.LZX	AmiExpress	15K	AmiExpress	Bulletin Viewer
+$CP-PS12.LZX	AmiExpress	17K	AmiExpress	Statusbbs - Status for the great /Press
+$CP-ST13.LZX	AmiExpress	21K	AmiExpress	Status Door minor Update
+$CP-ST14.LZX	AmiExpress	25K	AmiExpress	Coconut /Dee Sign released today
+-D-CALC.LHA	AmiExpress	10K	AmiExpress	Today Calculator
+-D-DOR11.LHA	AmiExpress	7K	AmiExpress	Today Door-Menu
+-D-INF21.LHA	AmiExpress	70K	AmiExpress	Avail - Today System Info
+-J-LCV30.LHA	AmiExpress	91K	AmiExpress	Stripp - Lastcaller
+-L-OFFL.LHA	AmiExpress	34K	AmiExpress	Offliner New /X Util
 ```
 
 (`!ALSTER.LHA` and `-D-INF21.LHA` show the banner-skip in action -- both

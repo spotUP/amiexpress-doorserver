@@ -1,0 +1,71 @@
+/**
+ * Forward-only schema migrations.
+ *
+ * schema.sql creates tables that do not exist yet; it cannot change a table
+ * that does. The live catalog is a seeded volume, so every column added
+ * after the first deploy needs a migration, and the deploy is unattended -
+ * it has to run itself, exactly once, before the server serves anything.
+ *
+ * Each migration is a numbered, idempotent step recorded in
+ * schema_migrations. A step that has already run is skipped; a step that
+ * throws stops startup rather than serving a half-migrated catalog.
+ */
+import type Database from 'better-sqlite3';
+
+export interface Migration {
+  version: number;
+  name: string;
+  up: (db: Database.Database) => void;
+}
+
+/** Does `table` already have a column called `column`? */
+export function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  return rows.some((r) => r.name === column);
+}
+
+export const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    name: 'door_catalog.requires_bbs',
+    up: (db) => {
+      // Which BBS version a door needs ("/X 3.38+") is the fact a sysop
+      // checks before installing it, and it is not the door's own version.
+      if (!hasColumn(db, 'door_catalog', 'requires_bbs')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN requires_bbs TEXT');
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS idx_door_catalog_requires ON door_catalog(requires_bbs)');
+    },
+  },
+];
+
+function appliedVersions(db: Database.Database): Set<number> {
+  db.exec(
+    `CREATE TABLE IF NOT EXISTS schema_migrations (
+       version    INTEGER PRIMARY KEY,
+       name       TEXT NOT NULL,
+       applied_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+     )`
+  );
+  const rows = db.prepare('SELECT version FROM schema_migrations').all() as { version: number }[];
+  return new Set(rows.map((r) => r.version));
+}
+
+/**
+ * Run every migration this database has not seen, in order. Returns the
+ * names of the migrations that actually ran, so startup can report them.
+ */
+export function runMigrations(db: Database.Database, migrations: Migration[] = MIGRATIONS): string[] {
+  const done = appliedVersions(db);
+  const ran: string[] = [];
+  for (const m of [...migrations].sort((a, b) => a.version - b.version)) {
+    if (done.has(m.version)) continue;
+    const apply = db.transaction(() => {
+      m.up(db);
+      db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)').run(m.version, m.name);
+    });
+    apply();
+    ran.push(`${m.version}:${m.name}`);
+  }
+  return ran;
+}
