@@ -25,6 +25,12 @@ beforeEach(() => {
       catalog_id TEXT NOT NULL, path TEXT NOT NULL, size INTEGER, is_junk INTEGER,
       junk_reason TEXT, PRIMARY KEY (catalog_id, path));
   `);
+  // The live BBS database this stands in for runs in WAL mode, and the
+  // hazard being guarded here is WAL lock contention: a read-write ATTACH
+  // of a WAL database creates -shm/-wal sidecars beside it. With a plain
+  // rollback-journal fixture the assertion below cannot fail, so the
+  // fixture has to match reality for the test to mean anything.
+  db.pragma('journal_mode = WAL');
   db.prepare(
     `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, doc_raw,
       installed, installed_as, install_dir, indexed_at)
@@ -35,6 +41,10 @@ beforeEach(() => {
     `INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason)
      VALUES ('id1','Account/AccEd.Rexx',25552,0,NULL)`
   ).run();
+  // Checkpoint and close cleanly so the fixture's own WAL sidecars are
+  // gone before any test runs - otherwise a leftover -wal from setup could
+  // make the lock test below pass for the wrong reason.
+  db.pragma('wal_checkpoint(TRUNCATE)');
   db.close();
 });
 
@@ -78,16 +88,35 @@ describe('migrateFromBbs', () => {
       .toThrow(/same file|itself/i);
   });
 
-  // The live BBS writes to its database while this runs. Attaching it
-  // read-write from a second process would contend for its WAL locks, so
-  // the script must copy before it attaches - and must leave no trace
-  // beside the original.
-  it('does not write to, or lock, the source database', () => {
-    const before = fs.statSync(source).mtimeMs;
-    migrateFromBbs({ sourceDb: source, targetDb: target });
-    expect(fs.statSync(source).mtimeMs).toBe(before);
-    expect(fs.existsSync(`${source}-wal`)).toBe(false);
-    expect(fs.existsSync(`${source}-shm`)).toBe(false);
+  // The live BBS database runs in WAL mode, and WAL must create -wal/-shm
+  // sidecars BESIDE the database file. So a source sitting in a directory
+  // we cannot write to is exactly a source that must not be attached
+  // read-write: the attach fails, while copying it elsewhere first works.
+  // That is the difference between this script touching the live BBS
+  // database and leaving it alone, and it is why the snapshot exists.
+  //
+  // Skipped as root, which bypasses file permissions entirely.
+  const itUnlessRoot = process.getuid && process.getuid() === 0 ? it.skip : it;
+
+  itUnlessRoot('never attaches the source itself, so a read-only location still migrates', () => {
+    const lockedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-ro-'));
+    const lockedSource = path.join(lockedDir, 'bbs.db');
+    fs.copyFileSync(source, lockedSource);
+    const seed = new Database(lockedSource);
+    seed.pragma('journal_mode = WAL');
+    seed.close();
+    fs.rmSync(`${lockedSource}-wal`, { force: true });
+    fs.rmSync(`${lockedSource}-shm`, { force: true });
+    fs.chmodSync(lockedDir, 0o555);
+    try {
+      const counts = migrateFromBbs({ sourceDb: lockedSource, targetDb: target });
+      expect(counts.entries).toBe(1);
+      expect(fs.existsSync(`${lockedSource}-wal`)).toBe(false);
+      expect(fs.existsSync(`${lockedSource}-shm`)).toBe(false);
+    } finally {
+      fs.chmodSync(lockedDir, 0o755);
+      fs.rmSync(lockedDir, { recursive: true, force: true });
+    }
   });
 
   it('carries every migrated column, not just the row count', () => {
