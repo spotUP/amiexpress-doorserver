@@ -44,6 +44,7 @@ export type { ManifestDoor, DoorRepoManifest };
 export interface DoorCatalogRow {
   archive_name: string;
   archive_path: string;
+  binary_name: string | null;
   door_type: string;
   name: string | null;
   author: string | null;
@@ -122,7 +123,12 @@ export const LAZY_CHECKSUM_FALLBACK_LIMIT = 25;
  * query. index-tsv.ts needs archive_path (for its Path/System columns) and
  * file_id_diz (for its description classifier), both already selected here
  * for the manifest's own fileIdDiz field and the lazy-checksum fallback's
- * resolveArchivePath() call — nothing had to be added to the SELECT list.
+ * resolveArchivePath() call. binary_name IS an addition to this SELECT
+ * (2026-08-23) — index-tsv.ts's description classifier prefers it (the
+ * door's actual program name, populated for 2398 of 3301 rows) over a
+ * DIZ-mined line; ManifestDoor (the JSON /manifest contract) does not
+ * expose it, so adding it here does not change a single byte of
+ * /manifest's response — verified by parity, which digests that JSON body.
  */
 export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: string }): DoorCatalogRow[] {
   const db = openDb(cfg, { readonly: true });
@@ -150,7 +156,7 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: 
     // build. The emptiness test runs in SQL and only the flag comes back.
     const filesTable = hasFilesTable(db);
     const sql = `
-      SELECT archive_name, archive_path, door_type, name, author, release_group,
+      SELECT archive_name, archive_path, binary_name, door_type, name, author, release_group,
              category, description, file_id_diz, archive_size, md5, sha256,
              ${filesTable ? 'COALESCE(j.n, 0)' : 'junk_count'} AS junk_live,
              (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc

@@ -143,17 +143,31 @@ amiexpress-web backend.
   answered with `204` and allows `If-None-Match`, `If-Modified-Since`,
   `Range` and `Content-Type`.
 
-  **This policy is identical on both hosts.** `bbs.uprough.net`
-  (amiexpress-web) and a standalone amiexpress-doorserver deployment send
-  exactly the same CORS headers, verified header-for-header against a live
-  `bbs.uprough.net` response. A browser client should have no reason to
-  prefer one host's CORS behavior over the other's -- pick a host for its
-  other properties (a standalone doorserver deployment does not depend on
-  the BBS process being up), not because one blocks cross-origin `fetch()`
-  and the other doesn't. The wildcard origin is a deliberate, permanent
-  policy on both: this is a public, read-only catalog with no session to
-  protect, and the point is that anyone can build a client against it.
-  There is no allowlist to request an addition to.
+  **This policy is the same on both hosts**, checked against the two
+  servers' own CORS source rather than assumed: `Access-Control-Allow-Origin:
+  *`, `Access-Control-Expose-Headers`, no `Access-Control-Allow-Credentials`,
+  `Cross-Origin-Resource-Policy: cross-origin`, and the same
+  `204`/empty-body `OPTIONS` preflight shape. `bbs.uprough.net`
+  (amiexpress-web) sets these via `helmet` plus its own door-repo CORS
+  middleware; a standalone amiexpress-doorserver deployment has no helmet
+  and sets all of them itself (see `src/cors.ts` in that repo). A browser
+  client should have no reason to prefer one host's CORS behavior over the
+  other's -- pick a host for its other properties (a standalone doorserver
+  deployment does not depend on the BBS process being up), not because one
+  blocks cross-origin `fetch()` and the other doesn't. The wildcard origin
+  is a deliberate, permanent policy on both: this is a public, read-only
+  catalog with no session to protect, and the point is that anyone can
+  build a client against it. There is no allowlist to request an addition
+  to.
+
+  **`Cross-Origin-Resource-Policy: cross-origin` is load-bearing**, not
+  decorative: without it, a browser page running under
+  `Cross-Origin-Embedder-Policy` cannot load this catalog, or an archive
+  download, as a subresource. **`Cross-Origin-Opener-Policy` is
+  deliberately NOT sent** by either host for this API -- it governs
+  top-level browsing-context isolation (windows/tabs) and has no effect on
+  a JSON or plain-text API response, so sending it here would be
+  cargo-culting a header that does nothing for this endpoint shape.
 
 ### Endpoints at a glance
 
@@ -421,27 +435,66 @@ replaced with `?`, identically to `list.txt`.
 The catalog's `description` field (`FILE_ID.DIZ` mined from scene releases)
 routinely opens with box-drawing ASCII art -- a border like
 `______    ________.  /\    ______.__________` -- before, or instead of,
-any actual words. **759 of the 3301 catalogued doors have this shape.** A
-`Description` column that surfaced that border verbatim would read as noise
-on every one of those rows, so this column is not that field: it runs a
-dedicated classifier, in this order:
+any actual words, and even when it does contain words, that text is more
+often WHO shipped the door (a "<group> presents" banner) than WHAT the
+door is. A `Description` column that surfaced any of that verbatim would
+read as noise -- or as a release-group ad -- on a large share of rows, so
+this column is not that field: it runs a dedicated classifier
+(`describeDoor`, `src/index-tsv.ts`).
 
-1. The FILE_ID.DIZ, walked line by line: the first line containing a run of
-   3+ letters where letters and digits outnumber punctuation/box-drawing
-   characters.
-2. If no DIZ line qualifies: the catalog's `name` field, tested the same
-   way.
-3. If that also fails: the archive's own base name with its extension
-   stripped (e.g. `ACC-V103`) -- always accepted, no test, since it is
-   guaranteed short and non-empty.
+**Step 1 -- find a descriptive line**, walking the FILE_ID.DIZ line by
+line (falling back to the catalog's `name` field under the same rules if
+no DIZ line qualifies). A line qualifies when, after trimming a run of
+frame punctuation (`_ . / \ : | - = * # ~ ( ) [ ] < > + ' " , » « · ° ® `
+and en/em dash) from both its ends:
 
-Then: whitespace is collapsed, control characters are stripped, and the
-result is capped at 60 characters.
+- it has a run of 3+ letters (the Latin-1 accented range counts too, so
+  `Größe` reads as one word rather than breaking at `ö`);
+- letters and digits are a clear supermajority (at least 3x) of everything
+  else in the line that isn't whitespace;
+- it is not a copyright/credit line (contains `©` or `(c)`);
+- it is not a single space-free token dense with digits (a serial number
+  or hash, e.g. `JU6V13GOZY2WB4LCSE85` -- seen for real in this corpus as a
+  `name` field with no usable DIZ);
+- it is not a run of one repeated character (`XXXX....` trims to `XXXX`,
+  which is not a word even though it trivially clears every ratio check);
+- trimming did not throw away more than half the original line -- this is
+  what stops a lone incidental real word surviving out of an otherwise
+  solid wall of decoration (`\/\/\/\/[for]\/\/\/\/` trims down to the bare
+  word `for`, which the other checks alone would accept).
 
-Real example of the fallback actually firing (archive `AE_DOORS.LHA`, whose
-entire FILE_ID.DIZ and catalog `name` are both the literal string
-`XXXX....`, which fails the classifier at both step 1 and step 2 -- four
-letters, four punctuation characters, not a majority):
+**A banner line is skipped, not returned.** When a qualifying line matches
+`presents?|brings?|proudly|releases?` (case-insensitive), the classifier
+does not use it as-is -- that is the group naming itself, not the door.
+Instead it tries, in order: (a) the remainder of that same line after the
+LAST matched word if that remainder itself qualifies, then (b) the next
+qualifying line, looking ahead at most 3 lines. If neither works, the
+banner line contributes nothing and scanning continues normally from the
+next line.
+
+**Step 2 -- compose with `binary_name`.** The catalog's `binary_name`
+column (the door's actual program -- `Children`, `Statusbbs`, `offliner`;
+populated for 2398 of 3301 rows) is preferred over a DIZ-mined line for
+saying what the door IS. The two are composed as `<binary_name> -
+<descriptive line>`; when no descriptive line survived step 1, the
+`Description` is `binary_name` alone; when the descriptive line already
+contains `binary_name` (case-insensitive -- e.g. a DIZ line reading
+`Snes-Tool v1.10` for a door whose `binary_name` is `Snes-Tool`), the
+prefix is skipped so the name isn't repeated. With no `binary_name` at
+all, the descriptive line is used alone.
+
+**Step 3 -- final fallback.** If nothing above produced a result, the
+archive's own base name with its extension stripped (e.g. `ACC-V103`) is
+used unconditionally -- it is guaranteed short, ASCII and non-empty.
+
+Then, regardless of which step produced it: whitespace is collapsed,
+control characters are stripped, and the result is capped at 60
+characters.
+
+Real example of the step-3 fallback actually firing (archive `AE_DOORS.LHA`,
+whose entire FILE_ID.DIZ and catalog `name` are both the literal string
+`XXXX....` -- a repeated-character placeholder, rejected by the
+repeated-character check above even after `....` trims off the end):
 
 ```
 AE_DOORS.LHA	AmiExpress	10K	AmiExpress	AE_DOORS
@@ -454,17 +507,22 @@ live 3301-door catalog:
 
 ```
 Filename	Path	Size	System	Description
-!ALSTER.LHA	AmiExpress	39K	AmiExpress	-*- iNDEPENDENT cONNECTION pRESENTS -*-
-$CP-BUß1.LZX	AmiExpress	15K	AmiExpress	| | | | | | released today !
-$CP-PS12.LZX	AmiExpress	17K	AmiExpress	: Status V1.2 for the great /X-Press :
-$CP-ST13.LZX	AmiExpress	21K	AmiExpress	: Status Door V1.3 minor Update :
-$CP-ST14.LZX	AmiExpress	25K	AmiExpress	| Status Door V1.4 © by C/XD |
+!ALSTER.LHA	AmiExpress	39K	AmiExpress	Children - This tool starts only for NEWUSERS /X
+$CP-BUß1.LZX	AmiExpress	15K	AmiExpress	! | ! | Bulletin Viewer V1.0 ß ¡
+$CP-PS12.LZX	AmiExpress	17K	AmiExpress	Statusbbs - Status V1.2 for the great /X-Press
+$CP-ST13.LZX	AmiExpress	21K	AmiExpress	Status Door V1.3 minor Update
+$CP-ST14.LZX	AmiExpress	25K	AmiExpress	made by Piwi / $ceptic '94 / C/XD
 -D-CALC.LHA	AmiExpress	10K	AmiExpress	CALCULATOR V1.0 by VASCAL/DLT
 -D-DOR11.LHA	AmiExpress	7K	AmiExpress	dOOR-mENU v.1.1 by vASCAL/dLT
--D-INF21.LHA	AmiExpress	70K	AmiExpress	| sYSTEM iNFO v.2.1 by vASCAL/dLT fOR /X |
--J-LCV30.LHA	AmiExpress	91K	AmiExpress	-LASTCALLER- V3.0 · WRITTEN BY iRoNCoDE!
--L-OFFL.LHA	AmiExpress	34K	AmiExpress	»» oFFLiner V1.1 New /X UtiL by Crew-One ««
+-D-INF21.LHA	AmiExpress	70K	AmiExpress	Avail - sYSTEM iNFO v.2.1 by vASCAL/dLT fOR /X
+-J-LCV30.LHA	AmiExpress	91K	AmiExpress	stripp - LASTCALLER- V3.0 · WRITTEN BY iRoNCoDE!
+-L-OFFL.LHA	AmiExpress	34K	AmiExpress	oFFLiner V1.1 New /X UtiL by Crew-One
 ```
+
+(`!ALSTER.LHA` and `-D-INF21.LHA` show the banner-skip in action -- both
+DIZs open with a "<group> presents" line that is skipped in favor of the
+door's own description; `$CP-ST14.LZX`'s first candidate line contained
+`©` and was skipped for the same copyright reason.)
 
 `X-Door-Repo-Revision` is present on this response too, same as every other
 endpoint in this API.

@@ -36,6 +36,23 @@ describe('door-repo CORS', () => {
     expect(res.headers['access-control-allow-credentials']).toBeUndefined();
   });
 
+  // Load-bearing, not decorative: without this a browser page running
+  // under Cross-Origin-Embedder-Policy cannot load this catalog (or an
+  // archive download) as a subresource. The BBS-hosted API sends this via
+  // helmet; this server has no helmet, so cors.ts must set it explicitly.
+  it('sends Cross-Origin-Resource-Policy: cross-origin on a normal GET', async () => {
+    const res = await request(app).get('/api/door-repo/health');
+    expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
+  });
+
+  // Deliberately absent: COOP governs top-level browsing-context isolation
+  // and does nothing for a JSON/text API response. Sending it would be
+  // cargo-culting a header with no effect here.
+  it('never sends Cross-Origin-Opener-Policy', async () => {
+    const res = await request(app).get('/api/door-repo/health');
+    expect(res.headers['cross-origin-opener-policy']).toBeUndefined();
+  });
+
   it('answers an OPTIONS preflight with 204, an empty body, and the documented headers', async () => {
     const res = await request(app).options('/api/door-repo/health');
     expect(res.status).toBe(204);
