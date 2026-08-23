@@ -12,9 +12,9 @@
  *                              so a liveness poll never re-hashes the
  *                              whole archive corpus.
  *
- * All four thin-wrap Task 1/2 building blocks (door-repo-manifest.ts,
- * door-repo-checksums.ts) and door-catalog.service.ts — no new DB access
- * or business logic lives here.
+ * All four thin-wrap Task 1/2 building blocks (./manifest.ts,
+ * ./checksums.ts) and ./catalog.ts — no new DB access or business logic
+ * lives here.
  *
  * Security: the archive endpoint resolves the requested file ONLY through
  * getCatalogEntryByArchive() (a parameterized `WHERE archive_name = ?`

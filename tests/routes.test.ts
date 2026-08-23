@@ -4,6 +4,8 @@ import * as path from 'path';
 import request from 'supertest';
 import { openDb, applySchema } from '../src/db';
 import { createApp } from '../src/app';
+import { candidateArchiveNames } from '../src/routes';
+import { _clearListCacheForTests } from '../src/manifest';
 import type { ServerConfig } from '../src/config';
 
 let dir: string;
@@ -13,6 +15,7 @@ let app: ReturnType<typeof createApp>;
 const ARCHIVE_BYTES = Buffer.from([0x4c, 0x5a, 0x00, 0xa1, 0xff]);
 
 beforeEach(() => {
+  _clearListCacheForTests();
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-rt-'));
   fs.mkdirSync(path.join(dir, 'Archives'));
   fs.writeFileSync(path.join(dir, 'Archives', 'ACC-V103.LHA'), ARCHIVE_BYTES);
@@ -58,7 +61,8 @@ describe('read API', () => {
     const res = await request(app).get('/api/door-repo/list.txt');
     expect(res.headers['content-type']).toContain('ISO-8859-1');
     expect(res.text).toContain('DOORREPO|1|c1-t1700000000|1');
-    expect(res.text).toContain('\r\n');
+    expect(res.text.endsWith('\r\n')).toBe(true);
+    expect(res.text).not.toMatch(/[^\r]\n/);
   });
 
   it('serves the files listing in the FILES| format', async () => {
@@ -79,11 +83,19 @@ describe('read API', () => {
   });
 
   it('streams the archive with checksum headers and an exact length', async () => {
-    const res = await request(app).get('/api/door-repo/archive/ACC-V103.LHA').buffer(true);
+    const res = await request(app)
+      .get('/api/door-repo/archive/ACC-V103.LHA')
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (d: Buffer) => chunks.push(d));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
     expect(res.status).toBe(200);
     expect(res.headers['content-length']).toBe(String(ARCHIVE_BYTES.length));
     expect(res.headers['x-archive-md5']).toMatch(/^[0-9a-f]{32}$/);
     expect(res.headers['x-archive-sha256']).toMatch(/^[0-9a-f]{64}$/);
+    expect(Buffer.compare(res.body as Buffer, ARCHIVE_BYTES)).toBe(0);
   });
 
   it('404s an unknown archive with the plain-text body clients parse', async () => {
@@ -95,11 +107,67 @@ describe('read API', () => {
   it('404s a traversal payload instead of reaching the filesystem', async () => {
     const res = await request(app).get('/api/door-repo/archive/..%2F..%2Fetc%2Fpasswd');
     expect(res.status).toBe(404);
+    expect(res.text).toBe('NOT FOUND: ../../etc/passwd\r\n');
   });
 
   it('serves health without hashing the corpus', async () => {
     const res = await request(app).get('/api/door-repo/health');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: 'ok', revision: 'c1-t1700000000', doors: 1 });
+  });
+
+  // The catch-all bails on any method that is not GET, so HEAD 404s on a
+  // path GET serves happily. That asymmetry is pre-existing and the parity
+  // fixtures capture it deliberately - pin it so a later "fix" cannot land
+  // silently.
+  it('does not answer HEAD on a per-archive path, though GET succeeds', async () => {
+    expect((await request(app).head('/api/door-repo/files/ACC-V103.LHA')).status).toBe(404);
+    expect((await request(app).get('/api/door-repo/files/ACC-V103.LHA')).status).toBe(200);
+  });
+
+  // A 304 must never pay for building - and transitively checksumming - a
+  // manifest it is about to throw away.
+  it('does not build the manifest when the client already has the revision', async () => {
+    const manifest = require('../src/manifest') as typeof import('../src/manifest');
+    const spy = jest.spyOn(manifest, 'buildManifest');
+    const res = await request(app)
+      .get('/api/door-repo/manifest')
+      .set('If-None-Match', '"c1-t1700000000"');
+    expect(res.status).toBe(304);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  // 404 (not an empty 200) when the entry EXISTS but carries no art or doc,
+  // so a client can tell "no art for this door" from "art that is empty".
+  it('404s an entry that exists but carries no diz and no doc', async () => {
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES ('id2', 'BARE.LHA', 'BARE.LHA', 'Bare', 'XIM', 1700000000)`
+    ).run();
+    db.close();
+    expect((await request(app).get('/api/door-repo/diz/BARE.LHA')).status).toBe(404);
+    expect((await request(app).get('/api/door-repo/doc/BARE.LHA')).status).toBe(404);
+  });
+});
+
+describe('candidateArchiveNames', () => {
+  it('decodes a normal UTF-8 percent-encoding', () => {
+    expect(candidateArchiveNames('ACC%2DV103.LHA')).toContain('ACC-V103.LHA');
+  });
+
+  // %DF alone is not valid UTF-8, but it is sharp-s in ISO-8859-1. A real
+  // catalog name ($CP-BU<sharp-s>1.LZX) is encoded exactly this way by an
+  // Amiga client, and decodeURIComponent throws on it - which used to be a
+  // 500 rather than a download.
+  it('falls back to Latin-1 for an escape that is not valid UTF-8', () => {
+    expect(candidateArchiveNames('%24CP-BU%DF1.LZX')).toContain('$CP-BUß1.LZX');
+  });
+
+  it('offers the UTF-8 reading first when both readings are valid', () => {
+    const out = candidateArchiveNames('%C3%9F.LHA');
+    expect(out[0]).toBe('ß.LHA');
+    expect(out).toHaveLength(2);
   });
 });

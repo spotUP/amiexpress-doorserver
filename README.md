@@ -19,6 +19,15 @@ deploy schedule or database.
 
 Missing or non-existent paths are a startup failure, never a default.
 
+`express` is pinned to an exact version (`5.1.0`, no `^`) rather than a
+range. The BBS runs 5.1.0 and Express itself owns response bytes a later
+task's parity harness compares byte-for-byte against BBS captures (e.g. the
+HTML 404 page's `Content-Length` on an unmatched route) - a range bump that
+silently picks up a patch release would drift that comparison out from
+under the harness with no code change to point at. Lift the pin
+deliberately (bump the version, re-run the parity harness, note why in the
+commit), not via a routine `npm update`.
+
 ## Commands
 
 | Task | Command |

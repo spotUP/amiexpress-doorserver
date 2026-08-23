@@ -1,9 +1,10 @@
 import { createApp } from './app';
 import { loadConfig, ConfigError } from './config';
+import type { ServerConfig } from './config';
 import { getDoorCount, getCatalogRevision } from './catalog';
 
 function main(): void {
-  let cfg;
+  let cfg: ServerConfig;
   try {
     cfg = loadConfig();
   } catch (err) {
