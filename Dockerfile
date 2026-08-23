@@ -36,6 +36,12 @@ COPY --from=build /app/dist ./dist
 # The built site sits beside the compiled server, where app.ts looks for it.
 COPY --from=web /dist/web ./dist/web
 COPY package.json ./
+# Prove the compiled server actually loads, the same way the native binding
+# is proved above. A plain .js file that lives in src/ (lha.js) is not
+# emitted by tsc and has to be copied by the build script; forgetting that
+# passes every test, builds a clean image, and then crash-loops on the host
+# with MODULE_NOT_FOUND. It has happened once. Now it fails the BUILD.
+RUN node -e "require('./dist/src/app.js'); console.log('[OK] compiled server loads')" 
 ARG GIT_SHA=unknown
 RUN echo "$GIT_SHA" > /app/.git-sha
 EXPOSE 3010
