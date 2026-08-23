@@ -1,0 +1,35 @@
+name: Deploy door server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-doorserver
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Hetzner VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            cd /app/doorserver
+            echo "== git fetch + hard reset =="
+            git fetch --prune origin main
+            git reset --hard origin/main
+            echo "== prune builder cache (host runs near 80% disk) =="
+            docker builder prune -f
+            echo "== build + up =="
+            GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
+            echo "== health =="
+            sleep 10
+            curl -fsS http://localhost:3010/api/door-repo/health

@@ -1,0 +1,25 @@
+services:
+  doorserver:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    restart: unless-stopped
+    ports:
+      - "3010:3010"
+    volumes:
+      - doorserver-data:/data
+    environment:
+      DOORSERVER_DB: /data/doors.db
+      DOOR_ARCHIVES_ROOT: /data/Archives
+      PORT: "3010"
+      DOORSERVER_ADMIN_KEYS: ${DOORSERVER_ADMIN_KEYS:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3010/api/door-repo/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  doorserver-data:
+    name: doorserver-data
