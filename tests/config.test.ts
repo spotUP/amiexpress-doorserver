@@ -60,6 +60,15 @@ describe('loadConfig', () => {
     ]);
   });
 
+  it('trims whitespace around the key after the colon', () => {
+    const cfg = loadConfig({
+      DOORSERVER_DB: path.join(tmp, 'doors.db'),
+      DOOR_ARCHIVES_ROOT: path.join(tmp, 'Archives'),
+      DOORSERVER_ADMIN_KEYS: 'spot: secret',
+    });
+    expect(cfg.adminKeys).toEqual([{ label: 'spot', key: 'secret' }]);
+  });
+
   it('yields no admin keys when the variable is unset', () => {
     const cfg = loadConfig({
       DOORSERVER_DB: path.join(tmp, 'doors.db'),

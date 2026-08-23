@@ -23,13 +23,18 @@ jobs:
           script: |
             set -euo pipefail
             cd /app/doorserver
+            echo "== disk before =="
+            df -h / | tail -1
             echo "== git fetch + hard reset =="
             git fetch --prune origin main
             git reset --hard origin/main
-            echo "== prune builder cache (host runs near 80% disk) =="
+            echo "== prune builder cache + dangling/unused images (host runs at 91% disk, 3.6 GB free) =="
             docker builder prune -f
+            docker image prune -af
             echo "== build + up =="
             GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
             echo "== health =="
             sleep 10
             curl -fsS http://localhost:3010/api/door-repo/health
+            echo "== disk after =="
+            df -h / | tail -1

@@ -5,8 +5,12 @@ services:
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
     restart: unless-stopped
+    # Bound to loopback only - Caddy fronts this on the VPS and reverse
+    # proxies to it. Publishing on 0.0.0.0 would expose it on every
+    # interface, bypassing Caddy; harmless for anonymous reads today, wrong
+    # the moment phase 3 adds /admin/*.
     ports:
-      - "3010:3010"
+      - "127.0.0.1:3010:3010"
     volumes:
       - doorserver-data:/data
     environment:

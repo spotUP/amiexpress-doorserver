@@ -48,4 +48,7 @@ fixtures, but they can be overridden. **The suite SKIPS itself, rather than
 failing, when those two are unset** - which is also true of a plain `npm
 test`/`npm run test:ci`. A skipped parity run is not a passing one; run
 `npm run test:parity` explicitly whenever `src/` changes anything the
-BBS-hosted API also serves.
+BBS-hosted API also serves. **Parity is a required manual step before any
+deploy** - CI does not and cannot run it (byte-parity is defined against the
+BBS's live responses over the real catalog), so a green CI run is not
+sufficient sign-off on its own.

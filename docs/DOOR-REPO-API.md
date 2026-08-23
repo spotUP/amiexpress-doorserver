@@ -739,7 +739,7 @@ parameters, and they compose (both may be given together):
 | Parameter | Behavior                                                                                   |
 |-----------|-----------------------------------------------------------------------------------------------|
 | `?type=`  | Exact, case-sensitive match against `doorType` (e.g. `XIM`, `DD`, `REXX`).                    |
-| `?q=`     | Case-insensitive substring match against `archiveName`, `name`, `author`, `releaseGroup`, `description`, and the catalog's internal install-target field. Matches if the substring appears in *any* of those fields. |
+| `?q=`     | Case-insensitive substring match against `archiveName`, `name`, `author`, `releaseGroup`, and `description`. Matches if the substring appears in *any* of those fields. **Does not** search `installed_as` (the BBS's per-node install-target column) -- this server's schema has no such column, since it describes one node's local installation rather than anything in the shared catalog. |
 
 Real example: `GET /api/door-repo/manifest?type=DD` against the live
 catalog returned 10 doors; one of them (picked here for a clean,

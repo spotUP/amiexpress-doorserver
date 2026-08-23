@@ -3,7 +3,12 @@ import * as path from 'path';
 import { renderMirror } from '../scripts/gen-contract-types';
 import { CONTRACT_VERSION } from '../contract/manifest-types';
 
-describe('contract', () => {
+// Renamed from contract-staleness.test.ts: this file does not compare the
+// mirror against a committed copy (there is none until phase 2 vendors
+// one), it only asserts the generator produces valid, up-to-date-shaped
+// output from the live source. "Staleness" implied drift-detection coverage
+// that does not exist here.
+describe('contract mirror generation', () => {
   it('declares a version', () => {
     expect(CONTRACT_VERSION).toBe('1');
   });

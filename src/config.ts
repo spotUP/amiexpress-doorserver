@@ -50,7 +50,7 @@ function parseAdminKeys(raw: string | undefined): AdminKey[] {
       if (idx <= 0 || idx === pair.length - 1) {
         throw new ConfigError(`DOORSERVER_ADMIN_KEYS entry "${pair}" is not <label>:<key>`);
       }
-      return { label: pair.slice(0, idx), key: pair.slice(idx + 1) };
+      return { label: pair.slice(0, idx), key: pair.slice(idx + 1).trim() };
     });
 }
 

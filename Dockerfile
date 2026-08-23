@@ -17,6 +17,11 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
+# better-sqlite3 has no musl prebuild and is compiled from source in the
+# build stage. A bad binding fails at require time, not build time, so
+# prove it loads here - a broken image then fails to BUILD rather than
+# failing on the host at first start.
+RUN node -e "require('better-sqlite3'); console.log('[OK] native binding loads')"
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 ARG GIT_SHA=unknown

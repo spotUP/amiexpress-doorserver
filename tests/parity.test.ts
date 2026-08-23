@@ -52,7 +52,10 @@ describeOrSkip('parity with the BBS-hosted API', () => {
   // registering something; describe.skip marks it (and everything else in
   // this block) skipped rather than run.
   if (!shouldRun) {
-    it('skipped - no PARITY_DB / tests/fixtures/parity/captures.json', () => {
+    console.warn(
+      '[WARN] parity NOT verified: PARITY_DB is unset. A skipped parity run is not a passing one.'
+    );
+    it('SKIPPED: parity not verified - PARITY_DB unset', () => {
       /* real assertions only run when both are present; see shouldRun above */
     });
     return;
