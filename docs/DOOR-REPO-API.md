@@ -143,6 +143,18 @@ amiexpress-web backend.
   answered with `204` and allows `If-None-Match`, `If-Modified-Since`,
   `Range` and `Content-Type`.
 
+  **This policy is identical on both hosts.** `bbs.uprough.net`
+  (amiexpress-web) and a standalone amiexpress-doorserver deployment send
+  exactly the same CORS headers, verified header-for-header against a live
+  `bbs.uprough.net` response. A browser client should have no reason to
+  prefer one host's CORS behavior over the other's -- pick a host for its
+  other properties (a standalone doorserver deployment does not depend on
+  the BBS process being up), not because one blocks cross-origin `fetch()`
+  and the other doesn't. The wildcard origin is a deliberate, permanent
+  policy on both: this is a public, read-only catalog with no session to
+  protect, and the point is that anyone can build a client against it.
+  There is no allowlist to request an addition to.
+
 ### Endpoints at a glance
 
 | Method | Path                              | Purpose                                   |
