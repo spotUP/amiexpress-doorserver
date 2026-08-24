@@ -416,11 +416,25 @@ export function storeSubmission(
   const sha256 = crypto.createHash('sha256').update(upload.bytes).digest('hex');
   const md5 = crypto.createHash('md5').update(upload.bytes).digest('hex');
 
-  const known = db.prepare('SELECT archive_name FROM door_catalog WHERE sha256 = ?').get(sha256) as
-    | { archive_name: string }
-    | undefined;
+  const known = db
+    .prepare(
+      `SELECT c.archive_name AS archiveName, h.catalog_id IS NOT NULL AS isHidden
+         FROM door_catalog c
+         LEFT JOIN door_hidden h ON h.catalog_id = c.id
+        WHERE c.sha256 = ?`
+    )
+    .get(sha256) as { archiveName: string; isHidden: number } | undefined;
   if (known) {
-    throw new UploadError(`the repository already has that archive, as ${known.archive_name}`, 409);
+    // Hiding is deliberately non-destructive (a corpus re-scan would
+    // otherwise resurrect a "deleted" row), so the catalog row - and its
+    // sha256 - never actually goes away. A curator hitting this after
+    // hiding the archive needs to be told restoring is the one click that
+    // fixes it, not left staring at a message that reads like the upload
+    // vanished for no reason.
+    const hint = known.isHidden
+      ? `it is hidden, not gone - restore it from the Removed panel instead of re-uploading`
+      : `as ${known.archiveName}`;
+    throw new UploadError(`the repository already has that archive, ${hint}`, 409);
   }
   const queued = db
     .prepare("SELECT archive_name FROM door_submissions WHERE sha256 = ? AND status = 'pending'")

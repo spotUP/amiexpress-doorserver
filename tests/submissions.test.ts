@@ -8,6 +8,7 @@
  * that nothing published itself - a pending submission is invisible until a
  * curator says otherwise.
  */
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -178,6 +179,43 @@ describe('what a submission may be', () => {
     const again = await submit(lhaBytes('unique-one'), 'DIFFERENT-NAME.LHA');
     expect(again.status).toBe(409);
     expect(again.body.error).toContain('already waiting');
+  });
+
+  it('points at the Removed panel when the matching catalog archive is hidden, not gone', async () => {
+    // Hiding is deliberately non-destructive (a corpus re-scan would
+    // resurrect a "deleted" row), so a hidden archive's sha256 still
+    // matches on re-upload - the message has to say why, or a curator who
+    // hid something and tries again reads a generic refusal as if the
+    // upload vanished for no reason.
+    const bytes = lhaBytes('already-published-then-hidden');
+    const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, sha256, indexed_at)
+       VALUES ('hidden-one', 'HIDDEN.LHA', 'AmiExpress/HIDDEN.LHA', 'Hidden', 'XIM', ?, 1700000000)`
+    ).run(sha256);
+    db.prepare(`INSERT INTO door_hidden (catalog_id, reason, hidden_by) VALUES ('hidden-one', '', 1)`).run();
+    db.close();
+
+    const res = await submit(bytes, 'REUPLOAD.LHA');
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain('hidden, not gone');
+    expect(res.body.error).toContain('Removed panel');
+  });
+
+  it('names the archive plainly when the catalog match is not hidden', async () => {
+    const bytes = lhaBytes('published-and-visible');
+    const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, sha256, indexed_at)
+       VALUES ('visible-one', 'VISIBLE.LHA', 'AmiExpress/VISIBLE.LHA', 'Visible', 'XIM', ?, 1700000000)`
+    ).run(sha256);
+    db.close();
+
+    const res = await submit(bytes, 'REUPLOAD.LHA');
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('the repository already has that archive, as VISIBLE.LHA');
   });
 
   it('counts what an address has already sent today', async () => {
