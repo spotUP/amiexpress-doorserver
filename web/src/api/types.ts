@@ -122,6 +122,11 @@ export interface DerivedMetadata {
   docFilename: string | null;
   doc: string | null;
   files: { path: string; size: number }[];
+  /** True when the submitter typed at least one field themselves rather
+   *  than every field being guessed from the archive - absent (undefined)
+   *  on a submission stored before this field existed, which reads the
+   *  same as false. */
+  submitterProvided?: boolean;
 }
 
 export interface Submission {

@@ -114,16 +114,41 @@ export class UploadError extends Error {
   }
 }
 
+/**
+ * What the submitter typed, as opposed to what the archive says about
+ * itself. Every field is optional and trimmed; an empty one means "let the
+ * classifier's guess stand" (see mergeOverrides below), not "publish an
+ * empty string" - a submitter leaving a field blank is not the same claim
+ * as a submitter typing nothing on purpose.
+ */
+export interface SubmitterOverrides {
+  name: string | null;
+  description: string | null;
+  version: string | null;
+  author: string | null;
+  requiresBbs: string | null;
+}
+
 export interface ReceivedUpload {
   submittedName: string;
   note: string | null;
+  overrides: SubmitterOverrides;
   bytes: Buffer;
 }
 
+const FIELD_CAPS: Record<keyof SubmitterOverrides, number> = {
+  name: 100,
+  description: 500,
+  version: 40,
+  author: 100,
+  requiresBbs: 200,
+};
+
 /**
- * Read one multipart file plus an optional note, refusing anything over the
- * limit WHILE it arrives. Kept in memory: the cap is 8 MB, and holding it
- * means a rejected upload never touches the disk at all.
+ * Read one multipart file plus the optional note and metadata-override
+ * fields, refusing anything over the limit WHILE it arrives. Kept in
+ * memory: the cap is 8 MB, and holding it means a rejected upload never
+ * touches the disk at all.
  */
 export function receiveUpload(req: Request): Promise<ReceivedUpload> {
   return new Promise((resolve, reject) => {
@@ -144,6 +169,13 @@ export function receiveUpload(req: Request): Promise<ReceivedUpload> {
     const chunks: Buffer[] = [];
     let submittedName: string | null = null;
     let note: string | null = null;
+    const overrides: SubmitterOverrides = {
+      name: null,
+      description: null,
+      version: null,
+      author: null,
+      requiresBbs: null,
+    };
     let failed = false;
 
     const fail = (error: UploadError) => {
@@ -154,7 +186,20 @@ export function receiveUpload(req: Request): Promise<ReceivedUpload> {
     };
 
     busboy.on('field', (name, value) => {
-      if (name === 'note') note = value.slice(0, 500);
+      if (name === 'note') {
+        note = value.slice(0, 500);
+        return;
+      }
+      if (name === 'needs') {
+        // "needs" on the wire (the form label a submitter sees), requiresBbs internally (matches DerivedMetadata's own field name).
+        const trimmed = value.trim();
+        overrides.requiresBbs = trimmed ? trimmed.slice(0, FIELD_CAPS.requiresBbs) : null;
+        return;
+      }
+      if (name === 'name' || name === 'description' || name === 'version' || name === 'author') {
+        const trimmed = value.trim();
+        overrides[name] = trimmed ? trimmed.slice(0, FIELD_CAPS[name]) : null;
+      }
     });
 
     busboy.on('file', (_name, stream, info) => {
@@ -170,7 +215,7 @@ export function receiveUpload(req: Request): Promise<ReceivedUpload> {
         reject(new UploadError('no file was attached', 400));
         return;
       }
-      resolve({ submittedName, note, bytes: Buffer.concat(chunks) });
+      resolve({ submittedName, note, overrides, bytes: Buffer.concat(chunks) });
     });
 
     req.pipe(busboy);
@@ -246,6 +291,31 @@ export interface DerivedMetadata {
   docFilename: string | null;
   doc: string | null;
   files: { path: string; size: number }[];
+  /** True when the submitter typed at least one of name/description/
+   *  version/author/requiresBbs themselves, rather than every field being
+   *  the classifier's guess. The admin console's "no FILE_ID.DIZ, these
+   *  are guesses" warning is misleading when a human filled fields in by
+   *  hand with no DIZ present - this is what lets it say something true
+   *  instead. */
+  submitterProvided: boolean;
+}
+
+/**
+ * Overlays what a submitter typed onto what the classifier guessed. A
+ * blank/whitespace-only override is treated as "no opinion" - see
+ * SubmitterOverrides' own doc comment for why an empty string is not a
+ * request to publish an empty field.
+ */
+export function mergeOverrides(derived: DerivedMetadata, overrides: SubmitterOverrides): DerivedMetadata {
+  const merged = { ...derived };
+  let any = false;
+  if (overrides.name) { merged.name = overrides.name; any = true; }
+  if (overrides.description) { merged.description = overrides.description; any = true; }
+  if (overrides.version) { merged.version = overrides.version; any = true; }
+  if (overrides.author) { merged.author = overrides.author; any = true; }
+  if (overrides.requiresBbs) { merged.requiresBbs = overrides.requiresBbs; any = true; }
+  merged.submitterProvided = any;
+  return merged;
 }
 
 /**
@@ -295,6 +365,7 @@ export function deriveMetadata(bytes: Buffer, archiveName: string, groupTags: Re
     docFilename: contents.docFilename,
     doc: contents.doc,
     files: contents.files,
+    submitterProvided: false,
   };
 }
 
@@ -366,7 +437,7 @@ export function storeSubmission(
       (r) => r.archive_name
     )
   );
-  const derived = deriveMetadata(upload.bytes, archiveName, groupTags);
+  const derived = mergeOverrides(deriveMetadata(upload.bytes, archiveName, groupTags), upload.overrides);
 
   const id = crypto.randomUUID();
   const dir = ensureQuarantine(cfg);

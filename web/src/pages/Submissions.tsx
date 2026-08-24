@@ -70,9 +70,14 @@ export function SubmissionsPanel({
                     ))}
                   </dl>
                 )}
-                {row.derived && !row.derived.fileIdDiz && (
+                {row.derived && !row.derived.fileIdDiz && !row.derived.submitterProvided && (
                   <p className="mt-1 text-xs text-warn">
                     No FILE_ID.DIZ could be read from this archive - the fields above are guesses from its name.
+                  </p>
+                )}
+                {row.derived && !row.derived.fileIdDiz && row.derived.submitterProvided && (
+                  <p className="mt-1 text-xs text-muted">
+                    No FILE_ID.DIZ could be read from this archive - the fields above are what the submitter typed in.
                   </p>
                 )}
                 {row.note && <p className="mt-1 text-muted">{row.note}</p>}

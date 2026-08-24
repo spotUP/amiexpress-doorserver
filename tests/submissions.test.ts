@@ -48,6 +48,16 @@ function submit(bytes: Buffer, filename: string, note?: string) {
   return note ? req.field('note', note) : req;
 }
 
+type Overrides = Partial<Record<'name' | 'description' | 'version' | 'author' | 'needs', string>>;
+
+function submitWithFields(bytes: Buffer, filename: string, overrides: Overrides) {
+  let req = request(app()).post('/api/door-repo/submissions').attach('file', bytes, filename);
+  for (const [field, value] of Object.entries(overrides)) {
+    req = req.field(field, value as string);
+  }
+  return req;
+}
+
 beforeEach(async () => {
   _clearLoginFailuresForTests();
   _clearIndexTsvCacheForTests();
@@ -261,6 +271,58 @@ describe('what the archive says about itself', () => {
     expect(queue.body.rows[0].derived.fileIdDiz).toBeNull();
     // Still a usable row: the name falls back to the archive's own.
     expect(queue.body.rows[0].derived.name).toBe('Broken');
+  });
+});
+
+describe('what the submitter typed, overlaid on what the archive says', () => {
+  it('uses the submitter\'s fields instead of the guess, when the archive has no DIZ to guess from', async () => {
+    await submitWithFields(lhaBytes('nothing readable inside'), 'BROKEN.LHA', {
+      name: 'My Real Door Name',
+      description: 'What it actually does',
+      version: '3.1',
+      author: 'A Real Person',
+      needs: 'AmiExpress 5.x',
+    });
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    const derived = queue.body.rows[0].derived;
+    expect(derived.name).toBe('My Real Door Name');
+    expect(derived.description).toBe('What it actually does');
+    expect(derived.version).toBe('3.1');
+    expect(derived.author).toBe('A Real Person');
+    expect(derived.requiresBbs).toBe('AmiExpress 5.x');
+    expect(derived.submitterProvided).toBe(true);
+    // The archive genuinely has no DIZ - that fact is preserved, not
+    // overwritten, alongside the submitter's fields.
+    expect(derived.fileIdDiz).toBeNull();
+  });
+
+  it('leaves the guess in place for a field the submitter left blank', async () => {
+    await submitWithFields(lhaBytes('nothing readable inside'), 'BROKEN.LHA', {
+      name: 'Only The Name',
+    });
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    const derived = queue.body.rows[0].derived;
+    expect(derived.name).toBe('Only The Name');
+    // Untouched fields keep the classifier's own (empty-string) guess,
+    // not the submitter's field - version was never sent.
+    expect(derived.version).toBe('');
+    expect(derived.submitterProvided).toBe(true);
+  });
+
+  it('is false when nothing was submitted, matching the pre-existing guessed-only path', async () => {
+    await submit(lhaBytes('nothing readable inside'), 'BROKEN.LHA');
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    expect(queue.body.rows[0].derived.submitterProvided).toBe(false);
+  });
+
+  it('treats whitespace-only fields the same as blank, not as a real override', async () => {
+    await submitWithFields(lhaBytes('nothing readable inside'), 'BROKEN.LHA', {
+      name: '   ',
+    });
+    const queue = await request(app()).get('/api/door-repo/admin/submissions').set(auth());
+    const derived = queue.body.rows[0].derived;
+    expect(derived.name).toBe('Broken'); // the guessed fallback, not "   "
+    expect(derived.submitterProvided).toBe(false);
   });
 });
 

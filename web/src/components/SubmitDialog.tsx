@@ -20,6 +20,11 @@ const MAX_BYTES = 8 * 1024 * 1024;
 export function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [version, setVersion] = useState('');
+  const [author, setAuthor] = useState('');
+  const [needs, setNeeds] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -28,6 +33,11 @@ export function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   function reset() {
     setFile(null);
     setNote('');
+    setName('');
+    setDescription('');
+    setVersion('');
+    setAuthor('');
+    setNeeds('');
     setError(null);
     setDone(null);
   }
@@ -45,6 +55,11 @@ export function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       const body = new FormData();
       body.append('file', file);
       if (note.trim()) body.append('note', note.trim());
+      if (name.trim()) body.append('name', name.trim());
+      if (description.trim()) body.append('description', description.trim());
+      if (version.trim()) body.append('version', version.trim());
+      if (author.trim()) body.append('author', author.trim());
+      if (needs.trim()) body.append('needs', needs.trim());
       // Not through api/client.ts: this is multipart, and the client sets a
       // JSON content type.
       const res = await fetch('/api/door-repo/submissions', { method: 'POST', body });
@@ -105,12 +120,51 @@ export function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                   className="text-sm text-muted file:mr-3 file:rounded-md file:border file:border-line file:bg-raised file:px-3 file:py-1.5 file:text-sm file:text-ink"
                 />
               </label>
+              <p className="text-xs text-muted">
+                The fields below are optional. Left blank, they're guessed from the archive's own
+                FILE_ID.DIZ if it has one - not every archive does, so filling these in yourself is
+                the only way to be sure they're right.
+              </p>
               <label className="grid gap-1 text-sm">
-                <span className="text-muted">Anything worth knowing (optional)</span>
+                <span className="text-muted">Name</span>
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="the door's name" />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-muted">Description</span>
+                <Input
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="what it does"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="grid gap-1 text-sm">
+                  <span className="text-muted">Version</span>
+                  <Input value={version} onChange={(event) => setVersion(event.target.value)} placeholder="1.0" />
+                </label>
+                <label className="grid gap-1 text-sm">
+                  <span className="text-muted">Author</span>
+                  <Input
+                    value={author}
+                    onChange={(event) => setAuthor(event.target.value)}
+                    placeholder="who made it"
+                  />
+                </label>
+              </div>
+              <label className="grid gap-1 text-sm">
+                <span className="text-muted">Needs</span>
+                <Input
+                  value={needs}
+                  onChange={(event) => setNeeds(event.target.value)}
+                  placeholder="which BBS software or version it needs, if any"
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-muted">Note to the curator (optional)</span>
                 <Input
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
-                  placeholder="where it came from, what it does, which BBS it needs"
+                  placeholder="where it came from, anything else worth knowing"
                 />
               </label>
               {error && <p className="text-sm text-danger">{error}</p>}
