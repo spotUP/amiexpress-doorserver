@@ -13,6 +13,9 @@ services:
       - "127.0.0.1:3010:3010"
     volumes:
       - doorserver-data:/data
+    networks:
+      - default
+      - doorserver-net
     environment:
       DOORSERVER_DB: /data/doors.db
       DOOR_ARCHIVES_ROOT: /data/Archives
@@ -29,6 +32,17 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+networks:
+  # Shared with the amiexpress-web (bbs) stack so the bbs container can
+  # reach this container by service DNS as "doorserver". Created once on
+  # the host via `docker network create doorserver-net` - not managed by
+  # this compose file (external: true), since it's shared across two
+  # independent compose projects. The loopback-only host port publish
+  # above is unaffected - this only adds a second, container-to-container
+  # path in.
+  doorserver-net:
+    external: true
 
 volumes:
   doorserver-data:
