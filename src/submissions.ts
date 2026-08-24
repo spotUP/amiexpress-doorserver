@@ -29,7 +29,7 @@ import * as path from 'path';
 import type { Request } from 'express';
 import Busboy from 'busboy';
 import type Database from 'better-sqlite3';
-import { readLhaContents } from './archive-reader';
+import { readLhaContents, readZipContents } from './archive-reader';
 import {
   analyseDoor,
   buildGroupTags,
@@ -254,12 +254,13 @@ export interface DerivedMetadata {
  * Author already filled in rather than as an empty row waiting for the next
  * corpus scan.
  *
- * Only LHA can be read here (see ./archive-reader). For anything else the
- * fields come back empty and a curator fills them in.
+ * LHA and ZIP can be read here (see ./archive-reader). For anything else
+ * the fields come back empty and a curator fills them in.
  */
 export function deriveMetadata(bytes: Buffer, archiveName: string, groupTags: ReadonlySet<string>): DerivedMetadata {
-  const contents = sniffArchive(bytes.subarray(0, 16)) === 'lha'
-    ? readLhaContents(bytes)
+  const kind = sniffArchive(bytes.subarray(0, 16));
+  const contents = kind === 'lha' ? readLhaContents(bytes)
+    : kind === 'zip' ? readZipContents(bytes)
     : { files: [], fileIdDiz: null, docFilename: null, doc: null };
 
   const binaryName = pickProgram(contents.files, contents.fileIdDiz);
