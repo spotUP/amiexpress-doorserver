@@ -11,7 +11,9 @@
  * the server. Older rows may carry an absolute path; both forms resolve.
  */
 import * as path from 'path';
+import type Database from 'better-sqlite3';
 import { openDb } from './db';
+import { buildGroupTags } from './describe';
 import { applyOverrides, hiddenExclusion, isHidden, loadOverrides, overridesStamp, hiddenStamp } from './effective';
 import type { ServerConfig } from './config';
 
@@ -94,6 +96,34 @@ export function getArchiveFiles(cfg: ServerConfig, catalogId: string): ArchiveFi
  * re-indexed, and needs no file that only exists inside a container. A
  * catalog we cannot read has no revision we can honestly assert.
  */
+/**
+ * The release-group tags of the WHOLE corpus.
+ *
+ * A prefix counts as a release tag only when three or more archives carry
+ * it, so this statistic is a property of the corpus and not of whatever
+ * subset a caller happens to be rendering. Deriving it from a filtered or
+ * paged result instead makes the same door describe itself differently
+ * depending on how it was reached: a 30-row recent index recognises almost
+ * no tags, so "MB-MAKER" renders as "Maker" there and "Mb Maker" in the
+ * full index.
+ */
+export function corpusGroupTags(db: Database.Database): ReadonlySet<string> {
+  const names = (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
+    (r) => r.archive_name
+  );
+  return buildGroupTags(names);
+}
+
+/** corpusGroupTags for a caller that has no database open of its own. */
+export function loadCorpusGroupTags(cfg: ServerConfig): ReadonlySet<string> {
+  const db = openDb(cfg, { readonly: true });
+  try {
+    return corpusGroupTags(db);
+  } finally {
+    db.close();
+  }
+}
+
 export function getCatalogRevision(cfg: ServerConfig): string {
   try {
     const db = openDb(cfg, { readonly: true });

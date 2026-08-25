@@ -28,9 +28,9 @@
  */
 import Database from 'better-sqlite3';
 import { getArchiveChecksums } from './checksums';
-import { analyseDoor, buildGroupTags } from './describe';
+import { analyseDoor } from './describe';
 import { applyOverrides, hiddenExclusion, isOverridden, loadOverrides } from './effective';
-import { resolveArchivePath, getCatalogRevision } from './catalog';
+import { resolveArchivePath, getCatalogRevision, loadCorpusGroupTags } from './catalog';
 import { openDb } from './db';
 import type { ServerConfig } from './config';
 import type { ManifestDoor, DoorRepoManifest } from '../contract/manifest-types';
@@ -141,7 +141,19 @@ export const LAZY_CHECKSUM_FALLBACK_LIMIT = 25;
  * expose it, so adding it here does not change a single byte of
  * /manifest's response — verified by parity, which digests that JSON body.
  */
-export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: string }): DoorCatalogRow[] {
+/**
+ * What a rendered index asks the catalog for. `recent` is a row count, not
+ * a cutoff date: "the newest N" is answerable against any catalog, while
+ * "added since <date>" reports nothing at all on a repository that has been
+ * quiet for a month.
+ */
+export interface CatalogQuery {
+  type?: string;
+  q?: string;
+  recent?: number;
+}
+
+export function fetchCatalogRows(cfg: ServerConfig, opts?: CatalogQuery): DoorCatalogRow[] {
   const db = openDb(cfg, { readonly: true });
   try {
     const conditions: string[] = [];
@@ -171,6 +183,16 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: 
     // selecting it to compute a boolean would pull several MB per manifest
     // build. The emptiness test runs in SQL and only the flag comes back.
     const filesTable = hasFilesTable(db);
+    // Newest first for a recent index, and by name for every other render.
+    // A bulk import stamps hundreds of rows with the same indexed_at second,
+    // so the name is the tie-break - without it SQLite is free to return
+    // those rows in a different order on each render and the cached bytes
+    // would churn against an unchanged catalog.
+    const orderBy = opts?.recent
+      ? 'ORDER BY indexed_at DESC, archive_name COLLATE NOCASE ASC'
+      : 'ORDER BY archive_name COLLATE NOCASE ASC';
+    const limit = opts?.recent ? 'LIMIT ?' : '';
+    if (opts?.recent) params.push(opts.recent);
     const sql = `
       SELECT id, archive_name, archive_path, binary_name, door_type, name, author, release_group,
              category, description, file_id_diz, archive_size, md5, sha256,
@@ -179,7 +201,8 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: { type?: string; q?: 
       FROM door_catalog
       ${filesTable ? JUNK_JOIN : ''}
       ${where}
-      ORDER BY archive_name COLLATE NOCASE ASC
+      ${orderBy}
+      ${limit}
     `;
     // One query for every human correction in the catalog, then applied in
     // memory: a per-row lookup would be 3300 extra statements per render.
@@ -214,14 +237,13 @@ export function describeRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>)
   ).description;
 }
 
-export function buildManifest(cfg: ServerConfig, opts?: { type?: string; q?: string }): DoorRepoManifest {
+export function buildManifest(cfg: ServerConfig, opts?: CatalogQuery): DoorRepoManifest {
   const rows = fetchCatalogRows(cfg, opts);
-  // Release-group tags are derived from the corpus itself (a prefix counts
-  // only when three or more archives carry it), so they are built from the
-  // WHOLE result set before any row is described - a filtered manifest
-  // (?q=) would otherwise see too few archives to recognise a tag and would
-  // describe the same door differently from an unfiltered one.
-  const groupTags = buildGroupTags(rows.map((r) => r.archive_name));
+  // Tags come from the whole corpus, never from these rows - see
+  // corpusGroupTags. A filtered manifest (?q=) sees too few archives to
+  // recognise a tag, and would describe the same door differently from an
+  // unfiltered one.
+  const groupTags = loadCorpusGroupTags(cfg);
 
   let lazyFallbacksUsed = 0;
 
@@ -362,7 +384,7 @@ export function toLatin1Safe(s: string): string {
 const LIST_CACHE_MAX = 8;
 const listCache = new Map<string, Buffer>();
 
-export function renderListTxtCached(cfg: ServerConfig, opts?: { type?: string; q?: string }): Buffer {
+export function renderListTxtCached(cfg: ServerConfig, opts?: CatalogQuery): Buffer {
   const key = `${getCatalogRevision(cfg)}|${opts?.type ?? ''}|${opts?.q ?? ''}`;
   const hit = listCache.get(key);
   if (hit) {

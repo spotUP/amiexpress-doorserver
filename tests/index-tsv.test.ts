@@ -2,7 +2,14 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { openDb, applySchema } from '../src/db';
-import { renderIndexTsv, renderIndexTsvCached, _clearIndexTsvCacheForTests } from '../src/index-tsv';
+import {
+  RECENT_DEFAULT,
+  RECENT_MAX,
+  clampRecent,
+  renderIndexTsv,
+  renderIndexTsvCached,
+  _clearIndexTsvCacheForTests,
+} from '../src/index-tsv';
 import type { ServerConfig } from '../src/config';
 
 // What a Description SAYS is decided in src/describe.ts and tested in
@@ -45,7 +52,16 @@ describe('renderIndexTsv', () => {
   it('emits the header row with Filename and Path first', () => {
     const body = renderIndexTsv(cfg).toString('latin1');
     const [header] = body.split('\n');
-    expect(header).toBe('Filename\tPath\tSize\tSystem\tDescription');
+    expect(header).toBe('Filename\tPath\tSize\tDescription');
+  });
+
+  // uhcsearch asked for the System column to go: it repeated Path on every
+  // row, and Path already reads as what it is.
+  it('has no System column', () => {
+    const body = renderIndexTsv(cfg).toString('latin1');
+    const [header, ...rows] = body.trimEnd().split('\n');
+    expect(header).not.toContain('System');
+    for (const row of rows) expect(row.split('\t')).toHaveLength(4);
   });
 
   it('uses LF line endings, not CRLF', () => {
@@ -54,25 +70,25 @@ describe('renderIndexTsv', () => {
     expect(body.endsWith('\n')).toBe(true);
   });
 
-  it('derives Path and System from the first archive_path segment', () => {
+  it('derives Path from the first archive_path segment', () => {
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('ACC-V103.LHA'));
     // "v1.0" is the door's own version and now leaves the description for
     // its own field (src/describe.ts), so the Description column carries the
     // name alone.
-    expect(row).toBe('ACC-V103.LHA\tAmiExpress\t671K\tAmiExpress\tAccount Editor');
+    expect(row).toBe('ACC-V103.LHA\tAmiExpress\t671K\tAccount Editor');
   });
 
   it('falls back to Unsorted when archive_path has no directory segment', () => {
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('LOOSE.LHA'));
-    expect(row).toBe('LOOSE.LHA\tUnsorted\t2K\tUnsorted\tLoose');
+    expect(row).toBe('LOOSE.LHA\tUnsorted\t2K\tLoose');
   });
 
   it('formats sizes under 1024 bytes as NNNB with no K suffix', () => {
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('TINY.LHA'));
-    expect(row).toBe('TINY.LHA\tAmiExpress\t512B\tAmiExpress\tTiny');
+    expect(row).toBe('TINY.LHA\tAmiExpress\t512B\tTiny');
   });
 
   it('is ISO-8859-1 encoded: high-bit metadata becomes a single Latin-1 byte, not UTF-8', () => {
@@ -101,7 +117,7 @@ describe('renderIndexTsv', () => {
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('TAB.LHA'));
     expect(row).toBeDefined();
-    expect(row?.split('\t')).toHaveLength(5);
+    expect(row?.split('\t')).toHaveLength(4);
   });
 
   it('honours ?type= and ?q= the same way the manifest does', () => {
@@ -128,10 +144,10 @@ describe('renderIndexTsv', () => {
     const row = body.split('\n').find((l: string) => l.startsWith('FULLCHAT.LHA'));
     // binary_name is a FILENAME: "FullChat" is split into words before it
     // is composed with the DIZ line.
-    expect(row).toBe('FULLCHAT.LHA	AmiExpress	1K	AmiExpress	Full Chat - Split Chat Door For /X +4.x, S!X and FAME');
+    expect(row).toBe('FULLCHAT.LHA	AmiExpress	1K	Full Chat - Split Chat Door For /X +4.x, S!X and FAME');
   });
 
-  // Finding 4: Filename/Path/System get the same control-character strip
+  // Finding 4: Filename and Path get the same control-character strip
   // Description already gets, not just a tab/CR/LF replace.
   it('strips a raw control byte from Filename the same way Description does', () => {
     const db = openDb(cfg);
@@ -142,7 +158,7 @@ describe('renderIndexTsv', () => {
     db.close();
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('CTRL.LHA'));
-    expect(row).toBe('CTRL.LHA	Ami Express	0B	Ami Express	Ctrl');
+    expect(row).toBe('CTRL.LHA	Ami Express	0B	Ctrl');
   });
 
   // Encoding note: the DIZ text is UTF-8 in the database; the TSV is
@@ -181,6 +197,119 @@ describe('renderIndexTsv', () => {
     const withName = renderIndexTsv(cfg);
     expect(withName.toString('latin1')).toContain('CUR?LY.LHA');
     expect(withName.includes(Buffer.from([0xe2, 0x80, 0x99]))).toBe(false);
+  });
+});
+
+describe('the recent index', () => {
+  /** n rows, each stamped a second later than the last. */
+  function seedByAge(count: number): void {
+    const db = openDb(cfg);
+    const insert = db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES (?, ?, ?, ?, 'XIM', ?)`
+    );
+    for (let i = 0; i < count; i++) {
+      const n = String(i).padStart(3, '0');
+      insert.run(`age${n}`, `AGE${n}.LHA`, `AmiExpress/AGE${n}.LHA`, `Age ${n}`, 1800000000 + i);
+    }
+    db.close();
+    _clearIndexTsvCacheForTests();
+  }
+
+  function rowsOf(body: string): string[] {
+    return body.trimEnd().split('\n').slice(1);
+  }
+
+  it('serves the newest rows first', () => {
+    seedByAge(5);
+    const rows = rowsOf(renderIndexTsv(cfg, { recent: 3 }).toString('latin1'));
+    expect(rows.map((r) => r.split('\t')[0])).toEqual(['AGE004.LHA', 'AGE003.LHA', 'AGE002.LHA']);
+  });
+
+  it('carries no more rows than asked for', () => {
+    seedByAge(50);
+    expect(rowsOf(renderIndexTsv(cfg, { recent: 10 }).toString('latin1'))).toHaveLength(10);
+  });
+
+  it('serves the same header and column count as the full index', () => {
+    seedByAge(5);
+    const full = renderIndexTsv(cfg).toString('latin1').split('\n')[0];
+    const recent = renderIndexTsv(cfg, { recent: 3 }).toString('latin1');
+    expect(recent.split('\n')[0]).toBe(full);
+    for (const row of rowsOf(recent)) expect(row.split('\t')).toHaveLength(4);
+  });
+
+  // A recent index that recognised no release tags would describe the same
+  // door differently from the full index - see catalog.ts's corpusGroupTags.
+  it('describes a door exactly as the full index describes it', () => {
+    const db = openDb(cfg);
+    const insert = db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, binary_name, name, door_type, indexed_at)
+       VALUES (?, ?, ?, ?, ?, 'XIM', ?)`
+    );
+    // Four archives carry the "MB" prefix, so it counts as a release tag -
+    // but only when the whole corpus is in view. A 1-row render sees one.
+    for (let i = 1; i <= 3; i++) {
+      insert.run(`mb${i}`, `MB-OTHER${i}.LHA`, `AmiExpress/MB-OTHER${i}.LHA`, `MB-Other${i}`, `Other ${i}`, 1700000000);
+    }
+    insert.run('mbmaker', 'MB-MAKER.LHA', 'AmiExpress/MB-MAKER.LHA', 'MB-Maker', 'Maker', 1900000000);
+    db.close();
+    _clearIndexTsvCacheForTests();
+
+    const fromFull = renderIndexTsv(cfg)
+      .toString('latin1')
+      .split('\n')
+      .find((l) => l.startsWith('MB-MAKER.LHA'));
+    const fromRecent = renderIndexTsv(cfg, { recent: 1 })
+      .toString('latin1')
+      .split('\n')
+      .find((l) => l.startsWith('MB-MAKER.LHA'));
+    expect(fromRecent).toBe(fromFull);
+  });
+
+  it('orders rows sharing one indexed_at second by name, so the bytes are stable', () => {
+    const db = openDb(cfg);
+    const insert = db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES (?, ?, ?, ?, 'XIM', 1900000000)`
+    );
+    // A bulk import stamps every row with the same second.
+    for (const n of ['CCC', 'AAA', 'BBB']) {
+      insert.run(n.toLowerCase(), `${n}.LHA`, `AmiExpress/${n}.LHA`, n);
+    }
+    db.close();
+    _clearIndexTsvCacheForTests();
+    const rows = rowsOf(renderIndexTsv(cfg, { recent: 3 }).toString('latin1'));
+    expect(rows.map((r) => r.split('\t')[0])).toEqual(['AAA.LHA', 'BBB.LHA', 'CCC.LHA']);
+  });
+
+  it('caches the recent index apart from the full one', () => {
+    seedByAge(5);
+    const recent = renderIndexTsvCached(cfg, { recent: 2 }).toString('latin1');
+    const full = renderIndexTsvCached(cfg).toString('latin1');
+    expect(rowsOf(recent)).toHaveLength(2);
+    expect(rowsOf(full).length).toBeGreaterThan(2);
+    expect(renderIndexTsvCached(cfg, { recent: 2 }).toString('latin1')).toBe(recent);
+  });
+});
+
+describe('clampRecent', () => {
+  it('defaults when the caller names no number', () => {
+    expect(clampRecent(undefined)).toBe(RECENT_DEFAULT);
+    expect(clampRecent(Number.NaN)).toBe(RECENT_DEFAULT);
+  });
+
+  it('refuses to render more than the maximum', () => {
+    expect(clampRecent(100000)).toBe(RECENT_MAX);
+  });
+
+  it('never renders fewer than one row', () => {
+    expect(clampRecent(0)).toBe(1);
+    expect(clampRecent(-5)).toBe(1);
+  });
+
+  it('takes a whole number of rows', () => {
+    expect(clampRecent(7.9)).toBe(7);
   });
 });
 

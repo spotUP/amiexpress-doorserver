@@ -13,10 +13,13 @@
  * What each row SAYS about a door is decided in ./describe.ts, which reads
  * the door's FILE_ID.DIZ. This module only renders; it holds no rules about
  * what a description is.
+ *
+ * It renders two indexes off one row format: the whole catalog, and the
+ * newest N rows for a client that polls for what has just arrived rather
+ * than re-reading four thousand lines to find out.
  */
-import { describeRow, fetchCatalogRows, toLatin1Safe, type DoorCatalogRow } from './manifest';
-import { getCatalogRevision } from './catalog';
-import { buildGroupTags } from './describe';
+import { describeRow, fetchCatalogRows, toLatin1Safe, type CatalogQuery, type DoorCatalogRow } from './manifest';
+import { getCatalogRevision, loadCorpusGroupTags } from './catalog';
 import type { ServerConfig } from './config';
 
 /** Collapse whitespace, strip control characters. No length cap. */
@@ -48,8 +51,8 @@ function formatSize(bytes: number): string {
 /**
  * A tab or newline inside any field would break the format, so every
  * field gets the same control-character strip Description already got
- * (review round 1, finding 4 - Filename/Path/System previously stripped
- * only tab/CR/LF, which was inconsistent with Description's fuller strip).
+ * (review round 1, finding 4 - Filename and Path previously stripped only
+ * tab/CR/LF, which was inconsistent with Description's fuller strip).
  */
 function tsvSafe(s: string): string {
   return stripControlAndCollapse(s);
@@ -60,21 +63,32 @@ function tsvField(s: string): string {
 }
 
 function renderRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string {
-  const system = firstPathSegment(row.archive_path);
   const filename = tsvField(row.archive_name);
-  const pathCol = tsvField(system);
+  const pathCol = tsvField(firstPathSegment(row.archive_path));
   const size = formatSize(row.archive_size ?? 0);
-  return `${filename}\t${pathCol}\t${size}\t${pathCol}\t${tsvField(describeRow(row, groupTags))}`;
+  return `${filename}\t${pathCol}\t${size}\t${tsvField(describeRow(row, groupTags))}`;
 }
 
-export function renderIndexTsv(cfg: ServerConfig, opts?: { type?: string; q?: string }): Buffer {
+export const TSV_HEADER = 'Filename\tPath\tSize\tDescription';
+
+/** How many rows the recent index carries when the caller names no number. */
+export const RECENT_DEFAULT = 30;
+/** The most it will carry. Past this, ask for the full index instead. */
+export const RECENT_MAX = 200;
+
+export function clampRecent(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested)) return RECENT_DEFAULT;
+  return Math.min(RECENT_MAX, Math.max(1, Math.floor(requested)));
+}
+
+export function renderIndexTsv(cfg: ServerConfig, opts?: CatalogQuery): Buffer {
   const rows = fetchCatalogRows(cfg, opts);
-  // Group tags are derived from the corpus itself - a prefix is a release
-  // group only if it appears on three or more archives - so they are built
-  // from the WHOLE result set before any row is described. A filtered
-  // render (?q=) would otherwise see too few archives to recognise a tag.
-  const groupTags = buildGroupTags(rows.map((r) => r.archive_name));
-  const lines = ['Filename\tPath\tSize\tSystem\tDescription', ...rows.map((r) => renderRow(r, groupTags))];
+  // Tags come from the whole corpus, never from these rows - see
+  // catalog.ts's corpusGroupTags. A 30-row recent index recognises almost
+  // no tags on its own, and would describe a door differently from the way
+  // the full index describes the same door.
+  const groupTags = loadCorpusGroupTags(cfg);
+  const lines = [TSV_HEADER, ...rows.map((r) => renderRow(r, groupTags))];
   return Buffer.from(lines.join('\n') + '\n', 'latin1');
 }
 
@@ -87,8 +101,8 @@ export function renderIndexTsv(cfg: ServerConfig, opts?: { type?: string; q?: st
 const CACHE_MAX = 8;
 const cache = new Map<string, Buffer>();
 
-export function renderIndexTsvCached(cfg: ServerConfig, opts?: { type?: string; q?: string }): Buffer {
-  const key = `${getCatalogRevision(cfg)}|${opts?.type ?? ''}|${opts?.q ?? ''}`;
+export function renderIndexTsvCached(cfg: ServerConfig, opts?: CatalogQuery): Buffer {
+  const key = `${getCatalogRevision(cfg)}|${opts?.type ?? ''}|${opts?.q ?? ''}|${opts?.recent ?? ''}`;
   const hit = cache.get(key);
   if (hit) {
     return hit;

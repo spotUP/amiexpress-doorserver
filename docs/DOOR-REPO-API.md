@@ -176,6 +176,7 @@ amiexpress-web backend.
 | GET    | `/api/door-repo/manifest`          | JSON manifest of the catalog (filterable)  |
 | GET    | `/api/door-repo/list.txt`          | Plain-text, byte-exact index (filterable)  |
 | GET    | `/api/door-repo/index.tsv`         | Tab-separated index for UHC Tools' `uhcsearch` (filterable) |
+| GET    | `/api/door-repo/recent.tsv`        | The newest 30 rows, same format (`?n=` to change the count) |
 | GET    | `/api/door-repo/archive/:name`     | Download one archive by its archive name   |
 | GET    | `/api/door-repo/archive/:basename.diz` | `FILE_ID.DIZ` by archive basename, no download needed |
 | GET    | `/api/door-repo/diz/:name`         | Raw `FILE_ID.DIZ`, newlines intact         |
@@ -402,12 +403,19 @@ third field appended to `list.txt`:
 Encoding is otherwise the same as every other plain-text endpoint in this
 API: **ISO-8859-1**, `Content-Type: text/plain; charset=ISO-8859-1`.
 
+**This one is fetched over HTTPS, not plain HTTP.** The permanent plain-HTTP
+path (section 1) exists for Amiga clients that cannot do TLS. The index is
+not fetched by an Amiga: `uhcsearch`'s own server pulls it and serves it on,
+and that server has TLS. So register it as
+`https://doors.uprough.net/api/door-repo/index.tsv`. Plain HTTP still answers
+here, and still matters for the archive downloads an Amiga does make itself.
+
 ### Columns
 
 Header line (always first, literal column names, not data):
 
 ```
-Filename	Path	Size	System	Description
+Filename	Path	Size	Description
 ```
 
 `Filename` and `Path` are the first two columns, in that order, because
@@ -420,8 +428,15 @@ Filename	Path	Size	System	Description
 | `Filename`    | The archive's filename, e.g. `ACC-V103.LHA`.                            |
 | `Path`        | The corpus system directory: the first path segment of the catalog's internal `archive_path` (`AmiExpress/ACC-V103.LHA` -> `AmiExpress`), or `Unsorted` when `archive_path` has no directory segment. Structural -- this is the piece `uhcsearch` concatenates into its download URL. |
 | `Size`        | Integer KiB with a `K` suffix (`671K`), or `NNNB` for anything under 1024 bytes (`512B`). No padding. |
-| `System`      | The same corpus system directory as `Path`, and always the same value on any given row. Kept as its own column deliberately: `Path` is structural (URL construction breaks if a client repurposes it), `System` is descriptive (safe to relabel, drop, or replace with something else later without touching how downloads resolve). |
 | `Description` | A short, human-readable one-liner. See below.                           |
+
+**There was a fifth column, `System`, and it is gone.** It repeated `Path`
+verbatim on every row. It was kept separate so `Path` could stay structural
+(uhcsearch concatenates it into a download URL) while `System` stayed free to
+be relabelled or repointed later. In practice nothing ever needed that, and
+`Path` reads as what it is without a second column saying so, so it was
+dropped at uhcsearch's request. Anything reading the index by column INDEX
+rather than by header name must move `Description` from field 5 to field 4.
 
 **Field safety:** a tab or newline embedded in any field would break the
 column structure, so tab/CR/LF runs in every field are replaced with a
@@ -429,6 +444,27 @@ single space before the row is assembled -- the same field-safety principle
 `list.txt` applies with its own pipe-escaping and newline-collapsing rules
 (section 3), adapted to TSV's own delimiter. Bytes outside ISO-8859-1 are
 replaced with `?`, identically to `list.txt`.
+
+### `recent.tsv`: the newest rows only
+
+`GET /api/door-repo/recent.tsv` -- the same columns, header line, encoding and
+line endings as `index.tsv`, so anything that reads one reads the other. Two
+things differ: rows come newest-first instead of by name, and there are 30 of
+them.
+
+`?n=` changes the count, clamped to 1..200. Past 200, fetch `index.tsv`.
+`?type=` and `?q=` work here too, applied before the newest-N cut.
+
+This exists so a client watching for new arrivals does not have to pull four
+thousand lines to discover that none of them are new. "Newest" is
+`door_catalog.indexed_at`, which is when the row was indexed rather than when
+the door was released -- a 1994 door that arrived in the corpus this morning
+is a recent row.
+
+Rows sharing one `indexed_at` second are ordered by name. A bulk import
+stamps hundreds of rows with the same second, and without the tie-break
+SQLite is free to return them in a different order on each render, which
+would churn the cached bytes against a catalog that has not changed.
 
 ### Where descriptions come from (all three endpoints)
 
@@ -501,23 +537,28 @@ capped at 60 characters ON A WORD BOUNDARY -- a cut that severs a bracket
 group (`[RELEASE 2]` -> `[RELEASE 2`) reads as corruption, so a group left
 hanging open is dropped rather than shown.
 
+60 is a house rule, not a format requirement: `uhcsearch` imposes no length
+limit on this column. It stays because the column is read in a shell, where a
+very long line wraps and turns the listing into a wall -- shorter is better,
+and 60 is the point past which the extra words stopped earning their width.
+
 ### Real example
 
 Header plus the first 10 rows in `archive_name` order, captured against the
-live 3301-door catalog:
+live catalog:
 
 ```
-Filename	Path	Size	System	Description
-!ALSTER.LHA	AmiExpress	39K	AmiExpress	Children - This tool starts only for NEWUSERS /X
-$CP-BUß1.LZX	AmiExpress	15K	AmiExpress	Bulletin Viewer
-$CP-PS12.LZX	AmiExpress	17K	AmiExpress	Statusbbs - Status for the great /Press
-$CP-ST13.LZX	AmiExpress	21K	AmiExpress	Status Door minor Update
-$CP-ST14.LZX	AmiExpress	25K	AmiExpress	Coconut /Dee Sign released today
--D-CALC.LHA	AmiExpress	10K	AmiExpress	Today Calculator
--D-DOR11.LHA	AmiExpress	7K	AmiExpress	Today Door-Menu
--D-INF21.LHA	AmiExpress	70K	AmiExpress	Avail - Today System Info
--J-LCV30.LHA	AmiExpress	91K	AmiExpress	Stripp - Lastcaller
--L-OFFL.LHA	AmiExpress	34K	AmiExpress	Offliner New /X Util
+Filename	Path	Size	Description
+!ALSTER.LHA	AmiExpress	39K	Children - This tool starts only for NEWUSERS /X
+$CP-BUß1.LZX	AmiExpress	15K	Bulletin Viewer
+$CP-PS12.LZX	AmiExpress	17K	Statusbbs - Status for the great /Press
+$CP-ST13.LZX	AmiExpress	21K	Status Door minor Update
+$CP-ST14.LZX	AmiExpress	25K	Coconut /Dee Sign released today
+-D-CALC.LHA	AmiExpress	10K	Today Calculator
+-D-DOR11.LHA	AmiExpress	7K	Today Door-Menu
+-D-INF21.LHA	AmiExpress	70K	Avail - Today System Info
+-J-LCV30.LHA	AmiExpress	91K	Stripp - Lastcaller
+-L-OFFL.LHA	AmiExpress	34K	Offliner New /X Util
 ```
 
 (`!ALSTER.LHA` and `-D-INF21.LHA` show the banner-skip in action -- both

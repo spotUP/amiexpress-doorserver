@@ -158,19 +158,46 @@ describe('index.tsv', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('ISO-8859-1');
     expect(res.headers['x-door-repo-revision']).toBe('c1-t1700000000');
-    expect(res.text.split('\n')[0]).toBe('Filename\tPath\tSize\tSystem\tDescription');
+    expect(res.text.split('\n')[0]).toBe('Filename\tPath\tSize\tDescription');
     expect(res.text).not.toContain('\r');
   });
 
   it('carries a row for the seeded archive with a description derived from its DIZ', async () => {
     const res = await request(app).get('/api/door-repo/index.tsv');
     const row = res.text.split('\n').find((l: string) => l.startsWith('ACC-V103.LHA'));
-    expect(row).toBe('ACC-V103.LHA\tUnsorted\t5B\tUnsorted\tDIZ line');
+    expect(row).toBe('ACC-V103.LHA\tUnsorted\t5B\tDIZ line');
   });
 
   it('honours ?type=', async () => {
     const res = await request(app).get('/api/door-repo/index.tsv?type=DD');
     expect(res.text.split('\n').filter((l: string) => l.startsWith('ACC-V103.LHA'))).toHaveLength(0);
+  });
+});
+
+describe('recent.tsv', () => {
+  it('serves the same header, encoding and revision header as index.tsv', async () => {
+    const res = await request(app).get('/api/door-repo/recent.tsv');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('ISO-8859-1');
+    expect(res.headers['x-door-repo-revision']).toBe('c1-t1700000000');
+    expect(res.text.split('\n')[0]).toBe('Filename\tPath\tSize\tDescription');
+    expect(res.text).not.toContain('\r');
+  });
+
+  it('carries the catalog rows, newest first', async () => {
+    const res = await request(app).get('/api/door-repo/recent.tsv');
+    expect(res.text.split('\n').find((l: string) => l.startsWith('ACC-V103.LHA'))).toBeDefined();
+  });
+
+  it('honours ?n=', async () => {
+    const res = await request(app).get('/api/door-repo/recent.tsv?n=1');
+    expect(res.text.trimEnd().split('\n')).toHaveLength(2);
+  });
+
+  it('ignores an ?n= that is not a number rather than failing', async () => {
+    const res = await request(app).get('/api/door-repo/recent.tsv?n=lots');
+    expect(res.status).toBe(200);
+    expect(res.text.split('\n')[0]).toBe('Filename\tPath\tSize\tDescription');
   });
 });
 

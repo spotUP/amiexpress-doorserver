@@ -28,7 +28,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import * as fs from 'fs';
 import { pipeline } from 'stream';
 import { buildManifest, renderListTxt, renderListTxtCached } from './manifest';
-import { renderIndexTsvCached } from './index-tsv';
+import { clampRecent, renderIndexTsvCached } from './index-tsv';
 import { getArchiveChecksums } from './checksums';
 import {
   findArchiveNameForDizBasename,
@@ -195,6 +195,22 @@ export function createRouter(cfg: ServerConfig): express.Router {
   // (renderIndexTsvCached mirrors renderListTxtCached) — see index-tsv.ts.
   doorRepoRouter.get('/index.tsv', (req: Request, res: Response) => {
     const query = parseManifestQuery(req);
+    const body = renderIndexTsvCached(cfg, query);
+
+    res.set('X-Door-Repo-Revision', getCatalogRevision(cfg));
+    res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
+    res.send(body);
+  });
+
+  // GET /recent.tsv — the newest RECENT_DEFAULT rows in the same format.
+  //
+  // A client watching for new arrivals should not have to fetch four
+  // thousand lines to learn that none of them are new. Same columns, same
+  // encoding, same header line as /index.tsv, so anything that can read one
+  // can read the other; only the row order and the row count differ.
+  doorRepoRouter.get('/recent.tsv', (req: Request, res: Response) => {
+    const asked = typeof req.query.n === 'string' ? Number.parseInt(req.query.n, 10) : undefined;
+    const query = { ...parseManifestQuery(req), recent: clampRecent(Number.isNaN(asked) ? undefined : asked) };
     const body = renderIndexTsvCached(cfg, query);
 
     res.set('X-Door-Repo-Revision', getCatalogRevision(cfg));
