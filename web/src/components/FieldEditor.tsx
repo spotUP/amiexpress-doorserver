@@ -2,11 +2,22 @@
  * One editable field, with its provenance visible: what the scan holds, what
  * the classifier read out of the DIZ, and what a human has written. Reverting
  * removes the correction and puts the scanned value back - it never guesses.
+ *
+ * Corrections save themselves: a short pause in typing, or leaving the field,
+ * writes the value. A curator fixing twenty fields should never hunt for a
+ * button. The field says what it is doing rather than asking to be told.
  */
-import { useEffect, useState } from 'react';
-import { RotateCcw, Save } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import type { FieldState } from '../api/types';
 import { Badge, Button, Input, Textarea, cx } from './ui';
+
+/** Long enough to type a word without a write per keystroke. */
+const AUTOSAVE_IDLE_MS = 800;
+/** How long "saved" stays up before the row goes quiet again. */
+const SAVED_NOTICE_MS = 2000;
+
+type Status = 'idle' | 'saving' | 'saved' | 'error';
 
 export function FieldEditor({
   field,
@@ -14,19 +25,82 @@ export function FieldEditor({
   multiline,
   onSave,
   onRevert,
-  busy,
+  reverting,
 }: {
   field: string;
   state: FieldState;
   multiline?: boolean;
-  onSave: (value: string | null) => void;
+  onSave: (value: string | null) => Promise<unknown>;
   onRevert: () => void;
-  busy: boolean;
+  reverting: boolean;
 }) {
   const effective = state.isEdited ? (state.edited ?? '') : (state.derived ?? state.scanned ?? '');
   const [draft, setDraft] = useState(effective);
-  // A value changed elsewhere (another admin, a revert) must show up here.
-  useEffect(() => setDraft(effective), [effective]);
+  const [status, setStatus] = useState<Status>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  // The autosave paths (a timer, a blur, an unmount) all run outside the
+  // render that scheduled them, so they read the draft through a ref rather
+  // than closing over a value that has since moved on.
+  const latest = useRef({ draft, effective, status });
+  latest.current = { draft, effective, status };
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const sent = useRef<string | null>(null);
+  const mounted = useRef(true);
+
+  const flush = useCallback(() => {
+    clearTimeout(timer.current);
+    const { draft: value, effective: server, status: current } = latest.current;
+    if (value === server) return;
+    // A blur landing right behind the idle timer must not write twice.
+    if (sent.current === value && current !== 'error') return;
+    sent.current = value;
+    setStatus('saving');
+    setError(null);
+    void onSaveRef.current(value.trim() === '' ? null : value).then(
+      () => mounted.current && setStatus('saved'),
+      (cause: unknown) => {
+        if (!mounted.current) return;
+        setStatus('error');
+        setError(cause instanceof Error ? cause.message : 'could not save');
+      }
+    );
+  }, []);
+
+  // A value changed elsewhere (another admin, a revert, the classifier) shows
+  // up here - but only when this field holds no unsaved edit of its own. The
+  // person typing outranks the refetch.
+  const synced = useRef(effective);
+  useEffect(() => {
+    if (effective === synced.current) return;
+    if (draft === synced.current) setDraft(effective);
+    synced.current = effective;
+  }, [effective, draft]);
+
+  // Leaving the dialog mid-edit still writes what was typed.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      flush();
+      mounted.current = false;
+      clearTimeout(timer.current);
+    };
+  }, [flush]);
+
+  useEffect(() => {
+    if (status !== 'saved') return;
+    const id = setTimeout(() => setStatus('idle'), SAVED_NOTICE_MS);
+    return () => clearTimeout(id);
+  }, [status]);
+
+  function change(value: string) {
+    setDraft(value);
+    if (status === 'error') setStatus('idle');
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, AUTOSAVE_IDLE_MS);
+  }
 
   const dirty = draft !== effective;
   const Field = multiline ? Textarea : Input;
@@ -45,8 +119,9 @@ export function FieldEditor({
           value={draft}
           rows={multiline ? 3 : undefined}
           onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-            setDraft(event.target.value)
+            change(event.target.value)
           }
+          onBlur={flush}
           className={cx('font-mono text-[13px]', dirty && 'border-accent-dim')}
         />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -56,19 +131,18 @@ export function FieldEditor({
               scanned: <span className="font-mono">{state.scanned.slice(0, 80)}</span>
             </span>
           )}
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex items-center gap-2">
+            <span aria-live="polite" className={cx(status === 'error' && 'text-danger')}>
+              {status === 'saving' && 'Saving...'}
+              {status === 'saved' && 'Saved'}
+              {status === 'error' && (error ?? 'Could not save')}
+              {status === 'idle' && dirty && 'Unsaved'}
+            </span>
             {state.isEdited && (
-              <Button variant="ghost" onClick={onRevert} disabled={busy} title="Drop this correction">
+              <Button variant="ghost" onClick={onRevert} disabled={reverting} title="Drop this correction">
                 <RotateCcw size={13} /> Revert
               </Button>
             )}
-            <Button
-              variant="primary"
-              onClick={() => onSave(draft.trim() === '' ? null : draft)}
-              disabled={!dirty || busy}
-            >
-              <Save size={13} /> Save
-            </Button>
           </div>
         </div>
       </div>

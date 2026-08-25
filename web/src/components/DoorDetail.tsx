@@ -165,12 +165,11 @@ export function DoorDetailDialog({
                         field={field}
                         state={state}
                         multiline={MULTILINE_FIELDS.has(field)}
-                        busy={save.isPending || revert.isPending}
-                        onSave={(value) => save.mutate({ [field]: value })}
+                        reverting={revert.isPending}
+                        onSave={(value) => save.mutateAsync({ [field]: value })}
                         onRevert={() => revert.mutate(field)}
                       />
                     ))}
-                  {save.isError && <p className="text-sm text-danger">{(save.error as Error).message}</p>}
                 </Tabs.Content>
               )}
             </div>
