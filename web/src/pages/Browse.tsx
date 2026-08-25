@@ -97,7 +97,7 @@ export function Browse() {
             alt="Up Rough Door Repository - doors.uprough.net"
             width={1248}
             height={396}
-            className="w-full max-w-[46rem] [image-rendering:pixelated]"
+            className="mx-auto w-full max-w-[46rem] [image-rendering:pixelated]"
           />
         </h1>
         <div className="flex flex-wrap items-end justify-between gap-4">
