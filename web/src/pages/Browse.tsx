@@ -88,40 +88,52 @@ export function Browse() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[86rem] flex-col gap-4 px-4 py-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Up Rough Door Repository</h1>
-          <p className="text-sm text-muted">
-            {data ? `${data.total.toLocaleString()} AmiExpress doors` : 'Reading the catalog...'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={() => setSubmitOpen(true)}>
-            <Upload size={14} /> Send in a door
-          </Button>
-          {admin ? (
-            <>
-              <span className="text-xs text-muted">
-                signed in as <span className="text-ink">{admin.username}</span>
-              </span>
-              <Button variant="ghost" onClick={() => setQueueOpen(true)}>
-                <Inbox size={14} /> Submitted
-              </Button>
-              <Button variant="ghost" onClick={() => setHiddenOpen(true)}>
-                <Trash2 size={14} /> Removed
-              </Button>
-              <Button variant="ghost" onClick={() => setAuditOpen(true)}>
-                <Shield size={14} /> Audit
-              </Button>
-              <Button variant="ghost" onClick={signOut}>
-                <LogOut size={14} /> Sign out
-              </Button>
-            </>
-          ) : (
-            <Button variant="ghost" onClick={() => setLoginOpen(true)}>
-              <LogIn size={14} /> Curator sign-in
+      <header className="flex flex-col gap-4">
+        {/* The scene logo the repository was given: ANSI art, so it only stays
+            legible with nearest-neighbour scaling. */}
+        <h1 className="m-0">
+          <img
+            src="/logo.png"
+            alt="Up Rough Door Repository - doors.uprough.net"
+            width={1248}
+            height={396}
+            className="w-full max-w-[46rem] [image-rendering:pixelated]"
+          />
+        </h1>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted">
+              {data ? `${data.total.toLocaleString()} AmiExpress doors` : 'Reading the catalog...'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => setSubmitOpen(true)}>
+              <Upload size={14} /> Send in a door
             </Button>
-          )}
+            {admin ? (
+              <>
+                <span className="text-xs text-muted">
+                  signed in as <span className="text-ink">{admin.username}</span>
+                </span>
+                <Button variant="ghost" onClick={() => setQueueOpen(true)}>
+                  <Inbox size={14} /> Submitted
+                </Button>
+                <Button variant="ghost" onClick={() => setHiddenOpen(true)}>
+                  <Trash2 size={14} /> Removed
+                </Button>
+                <Button variant="ghost" onClick={() => setAuditOpen(true)}>
+                  <Shield size={14} /> Audit
+                </Button>
+                <Button variant="ghost" onClick={signOut}>
+                  <LogOut size={14} /> Sign out
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" onClick={() => setLoginOpen(true)}>
+                <LogIn size={14} /> Curator sign-in
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
