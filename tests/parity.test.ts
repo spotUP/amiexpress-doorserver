@@ -233,9 +233,10 @@ describeOrSkip('parity with the BBS-hosted API', () => {
       expect(res.status).toBe(200);
       const door = res.body.doors.find((d: { archiveName: string }) => d.archiveName === '!ALSTER.LHA');
       // The catalog's own column for this row is box art; the served
-      // description is the door's own line, read out of the DIZ.
+      // description is the door's own line, read out of the DIZ. NEWUSERS
+      // arrives shouted in the DIZ and is de-shouted by the classifier.
       expect(raw.get('!ALSTER.LHA')).toMatch(/[_\\/]{3,}/);
-      expect(door.description).toBe('Children - This tool starts only for NEWUSERS /X');
+      expect(door.description).toBe('Children - This tool starts only for Newusers /X');
     });
   });
 

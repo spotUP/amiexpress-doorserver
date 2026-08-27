@@ -632,7 +632,7 @@ export function toPlain(s: string): string {
 const ACRONYMS = new Set([
   'XIM', 'AIM', 'SIM', 'TIM', 'IIM', 'FIM', 'BBS', 'QWK', 'LZX', 'LHA', 'DMS', 'CRC', 'ZIP',
   'ANSI', 'ASCII', 'MSG', 'OLM', 'ID', 'FTP', 'IRC', 'CPU', 'RAM', 'ROM', 'GUI', 'MUI', 'OS',
-  'PC', 'DD', 'ACP', 'UD', 'NUP', 'AGA', 'ECS', 'SX', 'X', 'II', 'III', 'IV',
+  'PC', 'DD', 'ACP', 'UD', 'NUP', 'AGA', 'ECS', 'SX', 'X', 'II', 'III', 'IV', 'FAME', 'DIZ',
 ]);
 const MESSY_RE = /[a-zà-ÿ].*[A-ZÀ-Þ]/;
 
@@ -669,6 +669,14 @@ function tidyWord(w: string, handles: boolean): string {
     if (acr.length >= 3 && core.toUpperCase().endsWith(acr) && core.length > acr.length) {
       return w; // AmiQWK, LZXstrip: acronym inside the name
     }
+  }
+  // A word shouted in ALL CAPS inside otherwise mixed text is shouting, not
+  // a product name: "The BEST & FASTEST door" -> "The Best & Fastest door".
+  // The whole-string de-shout below only fires when MOST of the text is
+  // caps, so shouted words used to hide in mixed-case strings. Single
+  // letters are exempt ("4 U"); known acronyms never reach here.
+  if (core.length >= 2 && core === core.toUpperCase() && core !== core.toLowerCase()) {
+    return capitalise(w);
   }
   if (MESSY_RE.test(w) || (w[0] === w[0].toLowerCase() && /[A-ZÀ-Þ]/.test(w))) {
     return capitalise(w);

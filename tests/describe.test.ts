@@ -150,7 +150,7 @@ describe('a box row is read as cells, not as a sentence', () => {
 
   it('describes MST-JC40 by what the door does', () => {
     const { description } = read(JC40, 'JoinCnf', 'JoinCnf', 'MST-JC40.LHA');
-    expect(description).toBe('Join Cnf - Totally NEW Lay-Out Manages up to 256 Cnfs');
+    expect(description).toBe('Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs');
   });
 
   it('keeps a single word trapped in border art out of the description', () => {
@@ -175,7 +175,7 @@ describe('metadata is not description', () => {
 
   it("keeps the door's real line instead", () => {
     const { description } = read(MT20, 'MultiTop', 'MultiTop', 'MST-MT20.LHA');
-    expect(description).toBe('Multitop The BEST Top Utility ever written for /X');
+    expect(description).toBe('Multitop The Best Top Utility ever written for /X');
   });
 
   it('caps on a word boundary, never mid-bracket', () => {
@@ -419,5 +419,22 @@ describe('elite-cased acronyms are canonicalised, not preserved', () => {
   it('does not touch a word merely carrying an acronym inside it', () => {
     // AmiQWK keeps its deliberate casing: only whole-word acronyms are rewritten.
     expect(tidyCase('AmiQWK - tHE qWK rEADER')).toBe('AmiQWK - The QWK Reader');
+  });
+});
+
+describe('shouted words are normalised even in mixed text', () => {
+  it('de-shouts a word that is ALL CAPS while the rest is not', () => {
+    expect(tidyCase('The BEST & FASTEST door on AMIGA')).toBe('The Best & Fastest door on Amiga');
+  });
+
+  it('keeps product names that are legitimately all-caps', () => {
+    // FAME is a BBS package like /X and S!X; the "!" already shields S!X.
+    expect(tidyCase('Split Chat Door For /X +4.x, S!X and FAME')).toBe(
+      'Split Chat Door For /X +4.x, S!X and FAME'
+    );
+  });
+
+  it('still de-shouts a whole shouted string', () => {
+    expect(tidyCase('THE ALL CAPS DESCRIPTION HERE')).toBe('The All Caps Description Here');
   });
 });
