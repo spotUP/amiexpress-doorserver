@@ -38,6 +38,7 @@ export interface CatalogEntry {
   category: string | null;
   archive_size: number;
   junk_count: number;
+  ads_stripped: number;
   corpus_id: string | null;
   source: string | null;
   md5: string | null;
@@ -276,7 +277,7 @@ export function stripArchiveOnServer(
     db.prepare(
       `UPDATE door_catalog SET
         archive_size = ?, md5 = ?, sha256 = ?,
-        junk_count = ?, indexed_at = strftime('%s','now')
+        junk_count = ?, ads_stripped = 1, indexed_at = strftime('%s','now')
        WHERE id = ?`
     ).run(stat.size, checksums.md5, checksums.sha256, newJunkCount, row.id);
 

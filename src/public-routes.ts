@@ -58,6 +58,7 @@ interface DoorRow {
   md5: string | null;
   sha256: string | null;
   junk_count: number;
+  ads_stripped: number;
   indexed_at: number;
   has_doc: number;
 }
@@ -105,6 +106,7 @@ interface DoorJson {
   md5: string | null;
   sha256: string | null;
   junkCount: number;
+  adsStripped: boolean;
   hasDoc: boolean;
   downloadUrl: string;
 }
@@ -149,6 +151,7 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     md5: corrected.md5,
     sha256: corrected.sha256,
     junkCount: corrected.junk_count ?? 0,
+    adsStripped: corrected.ads_stripped === 1,
     hasDoc: corrected.has_doc === 1,
     downloadUrl: `/api/door-repo/archive/${encodeURIComponent(corrected.archive_name)}`,
   };
@@ -257,7 +260,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       const SELECT_ROW = `SELECT id, archive_name, archive_path, binary_name, door_type, name, version, author,
                   d.release_group, ${releaseGroupsTable ? 'rg.full_name' : 'NULL'} AS release_group_full_name,
                   category, description, requires_bbs, file_id_diz, archive_size,
-                  md5, sha256, junk_count, indexed_at,
+                  md5, sha256, junk_count, ads_stripped, indexed_at,
                   (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc
              FROM door_catalog d
              ${releaseGroupsTable ? 'LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group' : ''}

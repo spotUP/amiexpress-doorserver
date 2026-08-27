@@ -22,6 +22,7 @@ export interface Door {
   md5: string | null;
   sha256: string | null;
   junkCount: number;
+  adsStripped: boolean;
   hasDoc: boolean;
   downloadUrl: string;
 }

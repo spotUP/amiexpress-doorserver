@@ -159,6 +159,15 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_door_tags_tag ON door_tags(tag)');
     },
   },
+  {
+    version: 6,
+    name: 'door_catalog.ads_stripped',
+    up: (db) => {
+      if (!hasColumn(db, 'door_catalog', 'ads_stripped')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN ads_stripped INTEGER DEFAULT 0');
+      }
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

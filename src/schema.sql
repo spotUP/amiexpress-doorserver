@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS door_catalog (
   category            TEXT,
   archive_size        INTEGER DEFAULT 0,
   junk_count          INTEGER DEFAULT 0,
+  ads_stripped        INTEGER DEFAULT 0,
   corpus_id           TEXT,
   source              TEXT DEFAULT 'scan',
   indexed_at          INTEGER DEFAULT (strftime('%s','now')),

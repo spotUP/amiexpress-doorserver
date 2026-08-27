@@ -104,6 +104,9 @@ export function DoorTable({
                   {door.descriptionSource === 'edited' && (
                     <span className="ml-2 align-middle"><Badge tone="ok">edited</Badge></span>
                   )}
+                  {door.adsStripped && (
+                    <span className="ml-2 align-middle"><Badge tone="warn">stripped</Badge></span>
+                  )}
                 </td>
                 <td className="px-3 py-2 font-mono text-[12px] text-muted">{door.requiresBbs ?? '-'}</td>
                 <td className="px-3 py-2 text-muted">{door.author ?? '-'}</td>
