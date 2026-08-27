@@ -218,13 +218,13 @@ describe('POST /admin/doors/:archiveName/redescribe', () => {
 });
 
 describe('POST /admin/tidy-case', () => {
-  it('normalises eLi7e casing the way the classifier does', async () => {
+  it('normalises eLi7e casing to sentence case', async () => {
     const res = await request(app())
       .post(admin('/tidy-case'))
       .set(auth())
       .send({ text: 'tHE pHINX dOOR 4 dAYDREAM' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ text: 'The Phinx Door 4 Daydream' });
+    expect(res.body).toEqual({ text: 'The phinx door 4 daydream' });
   });
 
   it('de-shouts ALL-CAPS prose but keeps acronyms', async () => {
@@ -232,7 +232,7 @@ describe('POST /admin/tidy-case', () => {
       .post(admin('/tidy-case'))
       .set(auth())
       .send({ text: 'THE QWK MAIL DOOR FOR EVERY BBS' });
-    expect(res.body.text).toBe('The QWK Mail Door For Every BBS');
+    expect(res.body.text).toBe('The QWK mail door for every BBS');
   });
 
   it('leaves normal casing alone', async () => {

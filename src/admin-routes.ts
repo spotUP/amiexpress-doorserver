@@ -18,7 +18,7 @@ import {
   verifyToken,
   type AuthedRequest,
 } from './auth';
-import { analyseDoor, buildGroupTags, tidyCase } from './describe';
+import { analyseDoor, buildGroupTags, fixCasing, tidyCase } from './describe';
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides } from './effective';
 import { UploadError, approveSubmission, rejectSubmission } from './submissions';
 import type { ServerConfig } from './config';
@@ -315,7 +315,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       res.status(400).json({ error: 'text must be a string' });
       return;
     }
-    res.json({ text: tidyCase(text) });
+    res.json({ text: fixCasing(text) });
   });
 
   /**

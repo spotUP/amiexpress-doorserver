@@ -698,6 +698,52 @@ export function tidyCase(text: string, handles = false): string {
   return out;
 }
 
+/** Normalise casing for the "fix casing" button: sentence case with whitespace cleanup. */
+export function fixCasing(text: string): string {
+  if (!text) return text;
+
+  // Collapse multiple lines to single line, strip leading/trailing whitespace
+  let out = text.replace(/\s+/g, ' ').trim();
+
+  // Remove space before ! and !! (and other punctuation)
+  out = out.replace(/\s+([!?])/g, '$1');
+
+  // De-shout ALL-CAPS text first - but preserve words containing acronyms
+  const letters = out.match(/[A-Za-zÀ-ÿ]/g) ?? [];
+  const upper = letters.filter((c) => c === c.toUpperCase() && c !== c.toLowerCase()).length;
+  if (letters.length && upper / letters.length > 0.7) {
+    out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => {
+      const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '').toUpperCase();
+      if (ACRONYMS.has(core)) return w;
+      for (const acr of ACRONYMS) {
+        if (acr.length >= 3 && core.endsWith(acr) && core.length > acr.length) return w;
+      }
+      return w.toLowerCase();
+    });
+  }
+
+  // Fix individual words: canonicalise acronyms, lowercase everything else
+  out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => {
+    const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '');
+    if (!core) return w;
+    if (core.length < 2) return w;
+    if (ACRONYMS.has(core.toUpperCase())) {
+      return core === core.toUpperCase() ? w : core.toUpperCase();
+    }
+    for (const acr of ACRONYMS) {
+      if (acr.length >= 3 && core.toUpperCase().endsWith(acr) && core.length > acr.length) return w;
+    }
+    return w.toLowerCase();
+  });
+
+  // Apply sentence case: capitalise first letter, and first letter after sentence-ending punctuation
+  out = out.replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (match, sep, letter) => {
+    return sep + letter.toUpperCase();
+  });
+
+  return out;
+}
+
 // ─── composing name and body ───────────────────────────────────────────
 
 const FILLER = new Set([
