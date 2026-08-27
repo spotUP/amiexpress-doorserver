@@ -10,6 +10,7 @@
  * of the site.
  */
 import express, { type Request, type Response, type Router } from 'express';
+import type Database from 'better-sqlite3';
 import { openDb } from './db';
 import { getCatalogRevision, getArchiveFiles, getCatalogEntryByArchive } from './catalog';
 import { analyseDoor, buildGroupTags, readName, type NameSource } from './describe';
@@ -48,6 +49,7 @@ interface DoorRow {
   version: string | null;
   author: string | null;
   release_group: string | null;
+  release_group_full_name: string | null;
   category: string | null;
   description: string | null;
   requires_bbs: string | null;
@@ -63,6 +65,12 @@ interface DoorRow {
 function firstPathSegment(archivePath: string): string {
   const slash = archivePath.indexOf('/');
   return slash === -1 ? 'Unsorted' : archivePath.slice(0, slash);
+}
+
+function hasReleaseGroupsTable(db: Database.Database): boolean {
+  return !!db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'release_groups'")
+    .get();
 }
 
 function intParam(value: unknown, fallback: number, min: number, max: number): number {
@@ -89,6 +97,7 @@ interface DoorJson {
   version: string | null;
   author: string | null;
   releaseGroup: string | null;
+  releaseGroupFullName: string | null;
   category: string | null;
   doorType: string;
   requiresBbs: string | null;
@@ -132,6 +141,7 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     version: corrected.version ?? facts.version ?? null,
     author: corrected.author ?? (facts.author || null),
     releaseGroup: corrected.release_group,
+    releaseGroupFullName: corrected.release_group_full_name,
     category: corrected.category,
     doorType: corrected.door_type,
     requiresBbs: corrected.requires_bbs ?? (facts.requiresBbs || null),
@@ -238,11 +248,14 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       const hidden = hiddenExclusion(db);
       if (hidden) where.push(hidden);
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+      const releaseGroupsTable = hasReleaseGroupsTable(db);
       const SELECT_ROW = `SELECT id, archive_name, archive_path, binary_name, door_type, name, version, author,
-                  release_group, category, description, requires_bbs, file_id_diz, archive_size,
+                  d.release_group, ${releaseGroupsTable ? 'rg.full_name' : 'NULL'} AS release_group_full_name,
+                  category, description, requires_bbs, file_id_diz, archive_size,
                   md5, sha256, junk_count, indexed_at,
                   (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc
-             FROM door_catalog
+             FROM door_catalog d
+             ${releaseGroupsTable ? 'LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group' : ''}
              ${whereSql}
              ORDER BY ${sort} ${dir}, archive_name COLLATE NOCASE ASC`;
 
@@ -304,6 +317,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     const db = openDb(cfg, { readonly: true });
     let groupTags: ReadonlySet<string>;
     let overrides: OverrideMap;
+    let releaseGroupFullName: string | null = null;
     try {
       groupTags = buildGroupTags(
         (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
@@ -311,12 +325,19 @@ export function createPublicRouter(cfg: ServerConfig): Router {
         )
       );
       overrides = loadOverrides(db);
+      if (entry.release_group) {
+        const rgRow = db
+          .prepare('SELECT full_name FROM release_groups WHERE abbreviation = ?')
+          .get(entry.release_group) as { full_name: string } | undefined;
+        releaseGroupFullName = rgRow?.full_name ?? null;
+      }
     } finally {
       db.close();
     }
 
     const row: DoorRow = {
       ...entry,
+      release_group_full_name: releaseGroupFullName,
       archive_size: entry.archive_size,
       requires_bbs: (entry as unknown as { requires_bbs?: string | null }).requires_bbs ?? null,
       indexed_at: 0,

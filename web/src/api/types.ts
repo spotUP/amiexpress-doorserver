@@ -14,6 +14,7 @@ export interface Door {
   version: string | null;
   author: string | null;
   releaseGroup: string | null;
+  releaseGroupFullName: string | null;
   category: string | null;
   doorType: string;
   requiresBbs: string | null;
@@ -172,6 +173,7 @@ export const EDITABLE_FIELDS = [
   'requires_bbs',
   'binary_name',
   'suggested_tooltypes',
+  'file_id_diz',
 ] as const;
 
 export type EditableField = (typeof EDITABLE_FIELDS)[number];

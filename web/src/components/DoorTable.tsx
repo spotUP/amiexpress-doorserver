@@ -18,6 +18,7 @@ const COLUMNS: { key: string; label: string; sortable: boolean; className?: stri
   { key: 'description', label: 'Description', sortable: false },
   { key: 'requires', label: 'Needs', sortable: true, className: 'w-28' },
   { key: 'author', label: 'Author', sortable: true, className: 'w-40' },
+  { key: 'group', label: 'Group', sortable: true, className: 'w-44' },
   { key: 'size', label: 'Size', sortable: true, className: 'w-20 text-right' },
 ];
 
@@ -34,7 +35,7 @@ export function DoorTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
-      <table className="w-full min-w-[56rem] border-collapse text-sm">
+      <table className="w-full min-w-[60rem] border-collapse text-sm">
         <thead className="bg-surface text-left text-xs uppercase tracking-wide text-muted">
           <tr>
             {COLUMNS.map((column) => (
@@ -79,6 +80,9 @@ export function DoorTable({
               </td>
               <td className="px-3 py-2 font-mono text-[12px] text-muted">{door.requiresBbs ?? '-'}</td>
               <td className="px-3 py-2 text-muted">{door.author ?? '-'}</td>
+              <td className="px-3 py-2 text-muted" title={door.releaseGroup ?? undefined}>
+                {door.releaseGroupFullName ?? door.releaseGroup ?? '-'}
+              </td>
               <td className="px-3 py-2 text-right font-mono text-[12px] text-muted">{formatSize(door.size)}</td>
               <td className="px-3 py-2">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>

@@ -36,6 +36,7 @@ export const OVERRIDABLE_FIELDS = [
   'requires_bbs',
   'binary_name',
   'suggested_tooltypes',
+  'file_id_diz',
 ] as const;
 
 export type OverridableField = (typeof OVERRIDABLE_FIELDS)[number];

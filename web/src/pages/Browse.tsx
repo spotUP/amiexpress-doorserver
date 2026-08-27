@@ -14,6 +14,7 @@ import { LoginDialog } from '../components/LoginDialog';
 import { AuditPanel } from './Audit';
 import { HiddenPanel } from './Hidden';
 import { SubmissionsPanel } from './Submissions';
+import { ReleaseGroupsPanel } from './ReleaseGroups';
 import { SubmitDialog } from '../components/SubmitDialog';
 import { Button, Input, Select } from '../components/ui';
 
@@ -35,6 +36,7 @@ export function Browse() {
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
 
   useLiveRevision();
 
@@ -120,6 +122,9 @@ export function Browse() {
                 </Button>
                 <Button variant="ghost" onClick={() => setHiddenOpen(true)}>
                   <Trash2 size={14} /> Removed
+                </Button>
+                <Button variant="ghost" onClick={() => setGroupsOpen(true)}>
+                  Groups
                 </Button>
                 <Button variant="ghost" onClick={() => setAuditOpen(true)}>
                   <Shield size={14} /> Audit
@@ -221,6 +226,7 @@ export function Browse() {
       <AuditPanel open={auditOpen} onOpenChange={setAuditOpen} enabled={Boolean(admin)} />
       <HiddenPanel open={hiddenOpen} onOpenChange={setHiddenOpen} enabled={Boolean(admin)} />
       <SubmissionsPanel open={queueOpen} onOpenChange={setQueueOpen} enabled={Boolean(admin)} />
+      <ReleaseGroupsPanel open={groupsOpen} onOpenChange={setGroupsOpen} enabled={Boolean(admin)} />
       <SubmitDialog open={submitOpen} onOpenChange={setSubmitOpen} />
     </div>
   );

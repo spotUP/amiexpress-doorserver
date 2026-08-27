@@ -223,3 +223,35 @@ export function useLiveRevision(): void {
     return () => source.close();
   }, [client]);
 }
+
+// ─── release groups ─────────────────────────────────────────────────────
+
+export interface ReleaseGroup {
+  abbreviation: string;
+  full_name: string;
+  updated_at?: number;
+}
+
+const releaseGroupKeys = {
+  all: ['release-groups'] as const,
+};
+
+export function useReleaseGroups(enabled: boolean) {
+  return useQuery({
+    queryKey: releaseGroupKeys.all,
+    queryFn: () => api.get<{ groups: ReleaseGroup[] }>('/admin/release-groups'),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useUpdateReleaseGroup() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (updates: Record<string, string | null>) =>
+      api.patch<{ ok: boolean; groups: string[] }>('/admin/release-groups', updates),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: releaseGroupKeys.all });
+    },
+  });
+}

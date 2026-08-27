@@ -53,6 +53,7 @@ export interface DoorCatalogRow {
   name: string | null;
   author: string | null;
   release_group: string | null;
+  release_group_full_name: string | null;
   category: string | null;
   description: string | null;
   file_id_diz: string | null;
@@ -91,6 +92,12 @@ function hasFilesTable(db: Database.Database): boolean {
     .get();
 }
 
+function hasReleaseGroupsTable(db: Database.Database): boolean {
+  return !!db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'release_groups'")
+    .get();
+}
+
 /**
  * Junk counts as a single grouped pass, joined once - NOT a correlated
  * subquery per catalog row.
@@ -113,7 +120,7 @@ const JUNK_JOIN = `
     FROM door_catalog_files
     WHERE is_junk = 1
     GROUP BY catalog_id
-  ) j ON j.catalog_id = door_catalog.id
+  ) j ON j.catalog_id = d.id
 `;
 
 // Upper bound on how many rows buildManifest() will lazily hash (NULL
@@ -183,6 +190,7 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: CatalogQuery): DoorCa
     // selecting it to compute a boolean would pull several MB per manifest
     // build. The emptiness test runs in SQL and only the flag comes back.
     const filesTable = hasFilesTable(db);
+    const releaseGroupsTable = hasReleaseGroupsTable(db);
     // Newest first for a recent index, and by name for every other render.
     // A bulk import stamps hundreds of rows with the same indexed_at second,
     // so the name is the tie-break - without it SQLite is free to return
@@ -194,11 +202,13 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: CatalogQuery): DoorCa
     const limit = opts?.recent ? 'LIMIT ?' : '';
     if (opts?.recent) params.push(opts.recent);
     const sql = `
-      SELECT id, archive_name, archive_path, binary_name, door_type, name, author, release_group,
-             category, description, file_id_diz, archive_size, md5, sha256,
+      SELECT d.id, d.archive_name, d.archive_path, d.binary_name, d.door_type, d.name, d.author, d.release_group,
+             ${releaseGroupsTable ? 'rg.full_name AS release_group_full_name' : 'NULL AS release_group_full_name'},
+             d.category, d.description, d.file_id_diz, d.archive_size, d.md5, d.sha256,
              ${filesTable ? 'COALESCE(j.n, 0)' : 'junk_count'} AS junk_live,
              (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc
-      FROM door_catalog
+      FROM door_catalog d
+      ${releaseGroupsTable ? 'LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group' : ''}
       ${filesTable ? JUNK_JOIN : ''}
       ${where}
       ${orderBy}

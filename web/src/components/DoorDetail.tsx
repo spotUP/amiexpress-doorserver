@@ -15,7 +15,7 @@ import { FieldEditor } from './FieldEditor';
 import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
 
-const MULTILINE_FIELDS = new Set(['description', 'suggested_tooltypes']);
+const MULTILINE_FIELDS = new Set(['description', 'suggested_tooltypes', 'file_id_diz']);
 /** Fields whose scene casing the server can normalise for the curator. */
 const TIDY_FIELDS = new Set(['name', 'description']);
 
@@ -103,7 +103,7 @@ export function DoorDetailDialog({
                   {[
                     ['Version', door?.version],
                     ['Author', door?.author],
-                    ['Group', door?.releaseGroup],
+                    ['Group', door?.releaseGroupFullName ?? door?.releaseGroup],
                     ['Category', door?.category],
                     ['Needs', door?.requiresBbs],
                     ['Type', door?.doorType],
