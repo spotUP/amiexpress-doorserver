@@ -138,18 +138,14 @@ describe('analyzeArchive', () => {
     expect(result.stripped.map(e => e.path)).toContain('!call_diz_now!');
   });
 
-  it('returns empty results for a non-existent file', () => {
-    const result = analyzeArchive(path.join(tmpDir, 'nope.zip'));
-    expect(result.kept).toEqual([]);
-    expect(result.stripped).toEqual([]);
+  it('throws for a non-existent file', () => {
+    expect(() => analyzeArchive(path.join(tmpDir, 'nope.zip'))).toThrow();
   });
 
-  it('returns empty results for an unsupported format', () => {
+  it('throws for an unsupported format', () => {
     const lzxPath = path.join(tmpDir, 'test.lzx');
     fs.writeFileSync(lzxPath, Buffer.from('not really LZX'));
-    const result = analyzeArchive(lzxPath);
-    expect(result.kept).toEqual([]);
-    expect(result.stripped).toEqual([]);
+    expect(() => analyzeArchive(lzxPath)).toThrow(/unsupported/i);
   });
 });
 

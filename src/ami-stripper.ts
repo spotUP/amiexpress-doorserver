@@ -175,14 +175,21 @@ function readArchiveContents(archivePath: string): ArchiveContents {
   const bytes = fs.readFileSync(archivePath);
 
   if (ext === '.lha' || ext === '.lzh') {
-    return readLhaContents(bytes);
+    const contents = readLhaContents(bytes);
+    if (contents.files.length === 0 && bytes.length > 0) {
+      throw new Error(`LHA reader returned 0 files from ${bytes.length}-byte archive — the file may be corrupt or an unsupported LHA variant`);
+    }
+    return contents;
   }
   if (ext === '.zip') {
-    return readZipContents(bytes);
+    const contents = readZipContents(bytes);
+    if (contents.files.length === 0 && bytes.length > 0) {
+      throw new Error(`ZIP reader returned 0 files from ${bytes.length}-byte archive — the file may be corrupt`);
+    }
+    return contents;
   }
 
-  // LZX, DMS, ARC, ZOO — unsupported for reading; return empty.
-  return { files: [], fileIdDiz: null, docFilename: null, doc: null };
+  throw new Error(`Unsupported archive format: ${ext || '(none)'}`);
 }
 
 /**
@@ -306,12 +313,8 @@ function extractZipMember(bytes: Buffer, targetPath: string): Buffer | null {
 export function analyzeArchive(archivePath: string): StripResult {
   const patterns = loadPatterns();
   const fingerprints = loadFingerprints();
-  try {
-    const files = readArchiveFiles(archivePath);
-    return deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
-  } catch {
-    return { kept: [], stripped: [], reason: {} };
-  }
+  const files = readArchiveFiles(archivePath);
+  return deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
 }
 
 /**

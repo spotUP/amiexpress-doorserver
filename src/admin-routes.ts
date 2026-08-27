@@ -648,9 +648,23 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         return;
       }
 
-      const result = analyzeArchive(absPath);
+      let result;
+      try {
+        result = analyzeArchive(absPath);
+      } catch (e: any) {
+        res.status(400).json({ error: `cannot read archive: ${e?.message ?? String(e)}` });
+        return;
+      }
+      if (result.kept.length === 0 && result.stripped.length === 0) {
+        const ext = require('path').extname(absPath).toLowerCase();
+        if (ext === '.lzx') {
+          res.status(400).json({ error: 'LZX archives cannot be read by this server' });
+          return;
+        }
+      }
       res.json({
         archiveName,
+        archivePath: absPath,
         kept: result.kept,
         stripped: result.stripped,
         reason: result.reason,
@@ -751,6 +765,122 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       });
       write();
       res.json({ ok: true, groups: Object.keys(body) });
+    } finally {
+      db.close();
+    }
+  });
+
+  // ─── duplicate detection ────────────────────────────────────────────
+
+  /** Find doors with duplicate MD5, SHA256, or name+author+version. */
+  router.get('/duplicates', requireAdmin(cfg), (_req: AuthedRequest, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const byMd5 = db
+        .prepare(
+          `SELECT md5, COUNT(*) AS n, GROUP_CONCAT(archive_name) AS archives
+             FROM door_catalog
+            WHERE md5 IS NOT NULL AND md5 <> ''
+            GROUP BY md5 HAVING n > 1
+            ORDER BY n DESC`
+        )
+        .all() as { md5: string; n: number; archives: string }[];
+
+      const bySha256 = db
+        .prepare(
+          `SELECT sha256, COUNT(*) AS n, GROUP_CONCAT(archive_name) AS archives
+             FROM door_catalog
+            WHERE sha256 IS NOT NULL AND sha256 <> ''
+            GROUP BY sha256 HAVING n > 1
+            ORDER BY n DESC`
+        )
+        .all() as { sha256: string; n: number; archives: string }[];
+
+      const byContent = db
+        .prepare(
+          `SELECT name, author, version, COUNT(*) AS n, GROUP_CONCAT(archive_name) AS archives
+             FROM door_catalog
+            WHERE name IS NOT NULL AND name <> ''
+              AND author IS NOT NULL AND author <> ''
+            GROUP BY name, author, version HAVING n > 1
+            ORDER BY n DESC
+            LIMIT 50`
+        )
+        .all() as { name: string; author: string; version: string | null; n: number; archives: string }[];
+
+      res.json({ byMd5, bySha256, byContent });
+    } finally {
+      db.close();
+    }
+  });
+
+  // ─── tags / labels ──────────────────────────────────────────────────
+
+  /** List all unique tags in use. */
+  router.get('/tags', requireAdmin(cfg), (_req: AuthedRequest, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const rows = db
+        .prepare('SELECT tag, COUNT(*) AS n FROM door_tags GROUP BY tag ORDER BY n DESC')
+        .all() as { tag: string; n: number }[];
+      res.json({ tags: rows });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Get tags for a specific door. */
+  router.get('/doors/:archiveName/tags', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'no such door' });
+        return;
+      }
+      const tags = db
+        .prepare('SELECT tag FROM door_tags WHERE catalog_id = ? ORDER BY tag')
+        .all(row.id) as { tag: string }[];
+      res.json({ tags: tags.map((t) => t.tag) });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Set tags for a door (replaces all tags). */
+  router.put('/doors/:archiveName/tags', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const body = (req.body ?? {}) as { tags?: unknown };
+    if (!Array.isArray(body.tags)) {
+      res.status(400).json({ error: 'tags must be an array of strings' });
+      return;
+    }
+    const tags = body.tags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+    const db = openDb(cfg);
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'no such door' });
+        return;
+      }
+      const del = db.prepare('DELETE FROM door_tags WHERE catalog_id = ?');
+      const ins = db.prepare(
+        'INSERT INTO door_tags (catalog_id, tag, added_by) VALUES (?, ?, ?)'
+      );
+      const write = db.transaction(() => {
+        del.run(row.id);
+        for (const tag of tags) {
+          ins.run(row.id, tag.trim().toLowerCase(), req.admin?.id ?? null);
+        }
+        recordAudit(db, req.admin?.id ?? null, 'edit-tags', row.id, { archiveName, tags });
+      });
+      write();
+      res.json({ ok: true, tags });
     } finally {
       db.close();
     }
