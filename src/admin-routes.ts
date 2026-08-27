@@ -814,6 +814,40 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  // ─── per-door audit history ────────────────────────────────────────
+
+  router.get('/doors/:archiveName/audit', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'no such door' });
+        return;
+      }
+      const entries = db
+        .prepare(
+          `SELECT a.id, a.action, a.target, a.detail, a.at, COALESCE(u.username, 'system') AS by
+             FROM admin_audit a
+             LEFT JOIN admin_users u ON u.id = a.admin_id
+            WHERE a.target = ?
+            ORDER BY a.at DESC
+            LIMIT 100`
+        )
+        .all(row.id) as { id: number; action: string; target: string; detail: string | null; at: number; by: string }[];
+      res.json({
+        entries: entries.map((e) => ({
+          ...e,
+          detail: e.detail ? JSON.parse(e.detail) as Record<string, unknown> : null,
+        })),
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   // ─── tags / labels ──────────────────────────────────────────────────
 
   /** List all unique tags in use. */

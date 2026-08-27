@@ -6,14 +6,71 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Download, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useAdminDoor, useDoor, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
 import type { AdminUser, DoorFacts, StripPreview } from '../api/types';
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
 import { FieldEditor } from './FieldEditor';
 import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
+
+function DoorHistory({ archiveName }: { archiveName: string }) {
+  const [entries, setEntries] = useState<{ id: number; action: string; target: string; detail: Record<string, unknown> | null; at: number; by: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!archiveName) return;
+    setLoading(true);
+    fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/audit`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d: { entries: typeof entries }) => { setEntries(d.entries ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [archiveName]);
+
+  if (loading) return <p className="text-sm text-muted">Loading history...</p>;
+  if (entries.length === 0) return <p className="text-sm text-muted">No edits recorded yet.</p>;
+
+  function timeAgo(ts: number): string {
+    const diff = Math.floor(Date.now() / 1000) - ts;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  return (
+    <ul className="space-y-2">
+      {entries.map((e) => (
+        <li key={e.id} className="rounded border border-line px-3 py-2 text-xs">
+          <div className="flex items-baseline justify-between gap-2">
+            <Badge>{e.action}</Badge>
+            <span className="text-muted">{timeAgo(e.at)}</span>
+          </div>
+          <p className="mt-1 text-muted">by {e.by}</p>
+          {e.detail && e.action === 'edit' && (
+            <p className="mt-1 font-mono text-ink">
+              <span className="text-muted">{(e.detail as { field: string }).field}:</span>{' '}
+              <span className="line-through text-muted">{String((e.detail as { from: unknown }).from ?? '')}</span>
+              {' → '}
+              <span>{String((e.detail as { to: unknown }).to ?? '')}</span>
+            </p>
+          )}
+          {e.detail && e.action === 'edit-tags' && (
+            <p className="mt-1 font-mono text-ink">
+              tags: {JSON.stringify((e.detail as { tags: string[] }).tags)}
+            </p>
+          )}
+          {e.detail && e.action === 'strip' && (
+            <p className="mt-1 text-ink">
+              stripped {Array.isArray((e.detail as { removed: unknown[] }).removed) ? (e.detail as { removed: unknown[] }).removed.length : 0} files
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function StripAds({
   archiveName,
@@ -140,8 +197,29 @@ export function DoorDetailDialog({
   const revert = useRevertField(archiveName ?? '');
   const redescribe = useRedescribe(archiveName ?? '');
   const tidy = useTidyCase();
+  const { data: doorTags } = useDoorTags(archiveName ?? '', Boolean(admin));
+  const { data: allTagData } = useAllTags(Boolean(admin));
+  const setTags = useSetDoorTags(archiveName ?? '');
+  const [newTag, setNewTag] = useState('');
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<DoorFacts | null>(null);
   const [stripPreview, setStripPreview] = useState<StripPreview | null>(null);
+  const currentTags = doorTags?.tags ?? [];
+
+  const addTag = useCallback(() => {
+    const t = newTag.trim().toLowerCase();
+    if (!t || currentTags.includes(t)) { setNewTag(''); return; }
+    setTags.mutateAsync([...currentTags, t]).then(() => setNewTag(''));
+  }, [newTag, currentTags, setTags]);
+
+  const removeTag = useCallback((tag: string) => {
+    setTags.mutateAsync(currentTags.filter((t) => t !== tag));
+  }, [currentTags, setTags]);
+
+  const suggestions = (allTagData?.tags ?? [])
+    .map((t) => t.tag)
+    .filter((t) => !currentTags.includes(t))
+    .slice(0, 8);
 
   // Reset previews when switching to a different archive.
   useEffect(() => {
@@ -196,6 +274,7 @@ export function DoorDetailDialog({
                   ? [['doc', door.docFormat === 'amigaguide' ? 'Guide' : 'Documentation'] as const]
                   : []),
                 ...(admin ? [['edit', 'Edit'] as const] : []),
+                ...(admin ? [['history', 'History'] as const] : []),
               ].map(([value, label]) => (
                 <Tabs.Trigger
                   key={value}
@@ -295,6 +374,45 @@ export function DoorDetailDialog({
                         onRevert={() => revert.mutate(field)}
                       />
                     ))}
+                  <div className="border-t border-line pt-3">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Tags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {currentTags.map((tag) => (
+                        <span key={tag} className="inline-flex items-center gap-1 rounded-full border border-line bg-raised px-2.5 py-0.5 text-xs text-ink">
+                          {tag}
+                          <button onClick={() => removeTag(tag)} className="ml-0.5 text-muted hover:text-ink"><X size={10} /></button>
+                        </span>
+                      ))}
+                      <input
+                        ref={tagInputRef}
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                        placeholder={currentTags.length === 0 ? 'Add tags...' : '+'}
+                        className="min-w-[6rem] flex-1 border-0 bg-transparent py-0.5 text-xs text-ink outline-none placeholder:text-muted"
+                      />
+                    </div>
+                    {setTags.isPending && <p className="mt-1 text-[10px] text-muted">Saving...</p>}
+                    {suggestions.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {suggestions.map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => setTags.mutateAsync([...currentTags, s])}
+                            className="rounded-full border border-dashed border-line px-2 py-0.5 text-[10px] text-muted hover:border-accent hover:text-accent"
+                          >
+                            +{s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Tabs.Content>
+              )}
+
+              {admin && (
+                <Tabs.Content value="history" className="space-y-3">
+                  <DoorHistory archiveName={archiveName ?? ''} />
                 </Tabs.Content>
               )}
             </div>

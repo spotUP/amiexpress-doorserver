@@ -134,84 +134,115 @@ export function Browse() {
               {data ? `${data.total.toLocaleString()} AmiExpress doors` : 'Reading the catalog...'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" onClick={() => setSubmitOpen(true)}>
-              <Upload size={14} /> Send in a door
+              <Upload size={14} /> <span className="hidden sm:inline">Send in a door</span><span className="sm:hidden">Send</span>
             </Button>
             {admin ? (
               <>
-                <span className="text-xs text-muted">
+                <span className="hidden text-xs text-muted sm:inline">
                   signed in as <span className="text-ink">{admin.username}</span>
                 </span>
                 <Button variant="ghost" onClick={() => setQueueOpen(true)}>
-                  <Inbox size={14} /> Submitted
+                  <Inbox size={14} /> <span className="hidden sm:inline">Submitted</span>
                 </Button>
                 <Button variant="ghost" onClick={() => setHiddenOpen(true)}>
-                  <Trash2 size={14} /> Removed
+                  <Trash2 size={14} /> <span className="hidden sm:inline">Removed</span>
                 </Button>
-                <Button variant="ghost" onClick={() => setGroupsOpen(true)}>
+                <Button variant="ghost" onClick={() => setGroupsOpen(true)} className="hidden sm:inline-flex">
                   Groups
                 </Button>
                 <Button variant="ghost" onClick={() => setStatsOpen(true)}>
-                  <BarChart3 size={14} /> Stats
+                  <BarChart3 size={14} /> <span className="hidden sm:inline">Stats</span>
                 </Button>
-                <Button variant="ghost" onClick={() => setAuditOpen(true)}>
+                <Button variant="ghost" onClick={() => setAuditOpen(true)} className="hidden sm:inline-flex">
                   <Shield size={14} /> Audit
                 </Button>
-                <Button variant="ghost" onClick={signOut}>
+                <Button variant="ghost" onClick={signOut} className="hidden sm:inline-flex">
                   <LogOut size={14} /> Sign out
                 </Button>
+                {/* Mobile overflow menu */}
+                <details className="relative sm:hidden">
+                  <summary className="cursor-pointer list-none rounded border border-line px-2 py-1 text-xs text-muted">More</summary>
+                  <div className="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-line bg-surface shadow-lg">
+                    <button onClick={() => { setGroupsOpen(true); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-raised">Groups</button>
+                    <button onClick={() => { setAuditOpen(true); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-raised">Audit</button>
+                    <button onClick={signOut} className="block w-full px-3 py-2 text-left text-sm hover:bg-raised">Sign out</button>
+                  </div>
+                </details>
               </>
             ) : (
               <Button variant="ghost" onClick={() => setLoginOpen(true)}>
-                <LogIn size={14} /> Curator sign-in
+                <LogIn size={14} /> <span className="hidden sm:inline">Curator sign-in</span><span className="sm:hidden">Sign in</span>
               </Button>
             )}
           </div>
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[16rem] flex-1">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search names, authors, groups, and the DIZ text"
-            aria-label="Search doors"
-            className="pl-9"
-          />
-        </div>
-        <Select
-          ariaLabel="Filter by system"
-          placeholder="Any system"
-          value={system}
-          onChange={(value) => {
-            setSystem(value);
-            setPage(1);
-          }}
-          options={(facets?.systems ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
-        />
-        <Select
-          ariaLabel="Filter by door type"
-          placeholder="Any type"
-          value={type}
-          onChange={(value) => {
-            setType(value);
-            setPage(1);
-          }}
-          options={(facets?.types ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
-        />
-        <Select
-          ariaLabel="Filter by required BBS version"
-          placeholder="Any BBS version"
-          value={requires}
-          onChange={(value) => {
-            setRequires(value);
-            setPage(1);
-          }}
-          options={(facets?.requires ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
-        />
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[16rem] flex-1">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search names, authors, groups, and the DIZ text"
+              aria-label="Search doors"
+              className="pl-9"
+            />
+          </div>
+          <details className="relative md:hidden">
+            <summary className="cursor-pointer list-none rounded border border-line px-3 py-1.5 text-xs text-muted hover:bg-raised">
+              Filters{(system || type || requires) ? ' *' : ''}
+            </summary>
+            <div className="absolute right-0 z-30 mt-1 flex flex-wrap gap-2 rounded-lg border border-line bg-surface p-2 shadow-lg">
+              <Select
+                ariaLabel="Filter by system"
+                placeholder="Any system"
+                value={system}
+                onChange={(v) => { setSystem(v); setPage(1); }}
+                options={(facets?.systems ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
+              />
+              <Select
+                ariaLabel="Filter by door type"
+                placeholder="Any type"
+                value={type}
+                onChange={(v) => { setType(v); setPage(1); }}
+                options={(facets?.types ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
+              />
+              <Select
+                ariaLabel="Filter by required BBS version"
+                placeholder="Any BBS version"
+                value={requires}
+                onChange={(v) => { setRequires(v); setPage(1); }}
+                options={(facets?.requires ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
+              />
+            </div>
+          </details>
+          <div className="hidden items-center gap-2 md:flex">
+            <Select
+              ariaLabel="Filter by system"
+              placeholder="Any system"
+              value={system}
+              onChange={(value) => { setSystem(value); setPage(1); }}
+              options={(facets?.systems ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
+            />
+            <Select
+              ariaLabel="Filter by door type"
+              placeholder="Any type"
+              value={type}
+              onChange={(value) => { setType(value); setPage(1); }}
+              options={(facets?.types ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
+            />
+            <Select
+              ariaLabel="Filter by required BBS version"
+              placeholder="Any BBS version"
+              value={requires}
+              onChange={(value) => { setRequires(value); setPage(1); }}
+              options={(facets?.requires ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
+            />
+          </div>
         {admin && (
           <Button
             variant={guessedOnly ? 'primary' : 'ghost'}
@@ -238,6 +269,7 @@ export function Browse() {
             setPage(1);
           }}
         />
+      </div>
       </div>
 
       {admin && selected.size > 0 && (
