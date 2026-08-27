@@ -6,7 +6,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Download, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAdminDoor, useDoor, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
 import type { AdminUser, DoorFacts, StripPreview } from '../api/types';
 import { DizView } from './DizView';
@@ -142,6 +142,12 @@ export function DoorDetailDialog({
   const tidy = useTidyCase();
   const [preview, setPreview] = useState<DoorFacts | null>(null);
   const [stripPreview, setStripPreview] = useState<StripPreview | null>(null);
+
+  // Reset previews when switching to a different archive.
+  useEffect(() => {
+    setPreview(null);
+    setStripPreview(null);
+  }, [archiveName]);
 
   return (
     <Dialog.Root open={Boolean(archiveName)} onOpenChange={(open) => !open && onClose()}>
