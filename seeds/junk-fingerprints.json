@@ -1,0 +1,3835 @@
+{
+  "d41d8cd98f00b204e9800998ecf8427e": {
+    "filename": "iff_examples",
+    "md5": "d41d8cd98f00b204e9800998ecf8427e",
+    "archiveCount": 679,
+    "archives": [
+      "!ALSTER.LHA",
+      "-J-LCV30.LHA",
+      "-L-OFFL.LHA",
+      "-L-OFFL1.LHA",
+      "187-KB1.LZH",
+      "5D!DM002.LHA",
+      "5D!ZS008.LHA",
+      "5D-DC007.LZH",
+      "5D-ED110.LHA",
+      "5D-ED121.LHA",
+      "5D-EM009.LZH",
+      "5D-JC074.LZH",
+      "5D-JC16.LHA",
+      "5D-LG112.LZH",
+      "5D-LO014.LZH",
+      "5D-NF022.LHA",
+      "5D-OL001.LZH",
+      "5D-PAG29.LHA",
+      "5D-RSRV1.LHA",
+      "5D-SE001.LZH"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "32cd2203a3bfc29a28b0c5c791ec0217": {
+    "filename": "TWO",
+    "md5": "32cd2203a3bfc29a28b0c5c791ec0217",
+    "archiveCount": 96,
+    "archives": [
+      "!ALSTER.LHA",
+      "23-FFC09.LHA",
+      "ADN-C120.LHA",
+      "AEDOC4G.LHA",
+      "AFL-S10.LHA",
+      "BULLVIEW.LHA",
+      "CHECKNU.LHA",
+      "COMMENT.LHA",
+      "D!-GTSAB.LHA",
+      "DCT-BS02.LHA",
+      "DIVE-BOA.LHA",
+      "DIVE-SNA.LHA",
+      "DONATSND.LHA",
+      "DOWNMANI.LHA",
+      "DVS-LCNA.LHA",
+      "EMP-DD20.LHA",
+      "FIFOLIB3.LHA",
+      "GENGUI21.LHA",
+      "GFFT203.LHA",
+      "GNT-AC11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "75e15e90a66b953758c90bd96708da20": {
+    "filename": "fILE^pASSED^tHIZ",
+    "md5": "75e15e90a66b953758c90bd96708da20",
+    "archiveCount": 96,
+    "archives": [
+      "!ALSTER.LHA",
+      "23-FFC09.LHA",
+      "ADN-C120.LHA",
+      "AEDOC4G.LHA",
+      "AFL-S10.LHA",
+      "BULLVIEW.LHA",
+      "CHECKNU.LHA",
+      "COMMENT.LHA",
+      "D!-GTSAB.LHA",
+      "DCT-BS02.LHA",
+      "DIVE-BOA.LHA",
+      "DIVE-SNA.LHA",
+      "DONATSND.LHA",
+      "DOWNMANI.LHA",
+      "DVS-LCNA.LHA",
+      "EMP-DD20.LHA",
+      "FIFOLIB3.LHA",
+      "GENGUI21.LHA",
+      "GFFT203.LHA",
+      "GNT-AC11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "28ab2fa923d98119690ee918474b66f3": {
+    "filename": "7hE-EdGE",
+    "md5": "28ab2fa923d98119690ee918474b66f3",
+    "archiveCount": 72,
+    "archives": [
+      "-D-CALC.LHA",
+      "-D-DOR11.LHA",
+      "-L-OFFL1.LHA",
+      "5150-B10.LHA",
+      "5D-AMBER.LHA",
+      "ACP-SR10.LHA",
+      "AFL-HSC2.LHA",
+      "AFL-P21.LHA",
+      "BRS-PI10.LHA",
+      "CARDS1.LHA",
+      "CK-UI107.LHA",
+      "CUTLOG11.LHA",
+      "DNTSEND.LHA",
+      "DWMANIA.LHA",
+      "FILE_ID2.LHA",
+      "HBT-TC10.LHA",
+      "HBT-TL10.LHA",
+      "HBT-TP10.LHA",
+      "HBT-TW10.LHA",
+      "HCD-CS10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "67f09e72117cd5eea4613f9d28f24614": {
+    "filename": "rexxplslib.library",
+    "md5": "67f09e72117cd5eea4613f9d28f24614",
+    "archiveCount": 58,
+    "archives": [
+      "-D-INF21.LHA",
+      "-J-LCV30.LHA",
+      "DLT-WALL.LHA",
+      "DLT-WHO.LHA",
+      "FTH-FDD.LHA",
+      "FTH-MW1O.LHA",
+      "GOD-TF02.LHA",
+      "J-LCV30.LHA",
+      "LAC-V120.LHA",
+      "LSDNW145.LHA",
+      "LSD_VDRQ.LHA",
+      "MTD-AP07.LHA",
+      "NE-LOG10.LHA",
+      "NTR-CL10.LHA",
+      "NTR-DI.LHA",
+      "NTR-DIR.LHA",
+      "NTR-FD2.LHA",
+      "NTR-FD21.LHA",
+      "NTR-FR10.LHA",
+      "NTR-MCHK.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "27237403790d4638d8544f09f079d7f7": {
+    "filename": "rexxsupport.library",
+    "md5": "27237403790d4638d8544f09f079d7f7",
+    "archiveCount": 63,
+    "archives": [
+      "-D-INF21.LHA",
+      "-J-LCV30.LHA",
+      "5D-CS3_.LHA",
+      "5D-DG1.LZH",
+      "5D-DSGB1.LHA",
+      "5D-MBS2.LHA",
+      "5D-MBS2.LZH",
+      "AE_MSC10.LHA",
+      "AE_SLOT.LHA",
+      "AKA_FRON.LZH",
+      "AKA_MSG.LZH",
+      "DLT-WALL.LHA",
+      "DLT-WHO.LHA",
+      "FILE_ID2.LHA",
+      "FILE_ID3.LHA",
+      "FTH-FDD.LHA",
+      "FTH-MW1O.LHA",
+      "IA-LOG1O.LHA",
+      "J-LCV30.LHA",
+      "KDZ!SD11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "844ad77779f5793702c49b637acefedb": {
+    "filename": "rexxsyslib.library",
+    "md5": "844ad77779f5793702c49b637acefedb",
+    "archiveCount": 36,
+    "archives": [
+      "-D-INF21.LHA",
+      "-J-LCV30.LHA",
+      "5D-CS3_.LHA",
+      "5D-DG1.LZH",
+      "5D-DSGB1.LHA",
+      "5D-MBS2.LHA",
+      "5D-MBS2.LZH",
+      "AKA_FRON.LZH",
+      "DLT-WALL.LHA",
+      "DLT-WHO.LHA",
+      "FILE_ID2.LHA",
+      "FILE_ID3.LHA",
+      "FTH-FDD.LHA",
+      "FTH-MW1O.LHA",
+      "IA-LOG1O.LHA",
+      "J&D-INF.LHA",
+      "J-LCV30.LHA",
+      "MTD-AP07.LHA",
+      "NE-LOG10.LHA",
+      "ORS-ID10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3afcb37431d29f07f0ce2beae271e39c": {
+    "filename": "pRESIDENT.nf0",
+    "md5": "3afcb37431d29f07f0ce2beae271e39c",
+    "archiveCount": 107,
+    "archives": [
+      "-D-INF21.LHA",
+      "-J-LCV30.LHA",
+      "187-KB1.LZH",
+      "4AM-FONT.LHA",
+      "5D-AVL01.LZH",
+      "5D-CK001.LHA",
+      "5D-JC074.LHA",
+      "5D-LC022.LHA",
+      "5D-LG112.LZH",
+      "5D-MBS2.LZH",
+      "5D-TOPFA.LHA",
+      "5D5ESA10.LHA",
+      "5DPAGE28.LHA",
+      "ACS-LH3.LHA",
+      "ADNVAL20.LHA",
+      "AED138.LHA",
+      "AEED300.LHA",
+      "AEICON17.LHA",
+      "AFLQUES2.LHA",
+      "AKA_FRON.LZH"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "85903697d39e850fb0bace99a73de2d4": {
+    "filename": "rprexxplsextnd.library",
+    "md5": "85903697d39e850fb0bace99a73de2d4",
+    "archiveCount": 13,
+    "archives": [
+      "-J-LCV30.LHA",
+      "J-LCV30.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "6f5789ee7f7337c982f611682e91f298": {
+    "filename": "rprexxsupport.library",
+    "md5": "6f5789ee7f7337c982f611682e91f298",
+    "archiveCount": 15,
+    "archives": [
+      "-J-LCV30.LHA",
+      "J-LCV30.LHA",
+      "LGC-UL40.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "47f328554080b35c0e2269ce47cbfddb": {
+    "filename": "rprx_intui.library",
+    "md5": "47f328554080b35c0e2269ce47cbfddb",
+    "archiveCount": 14,
+    "archives": [
+      "-J-LCV30.LHA",
+      "J-LCV30.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bdfe7d98a5236ce721d9cf39f1afed22": {
+    "filename": "rprx_tools.library",
+    "md5": "bdfe7d98a5236ce721d9cf39f1afed22",
+    "archiveCount": 14,
+    "archives": [
+      "-J-LCV30.LHA",
+      "J-LCV30.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bb92692d0dd486fd159a81653904a804": {
+    "filename": "rexxplsextnd.library",
+    "md5": "bb92692d0dd486fd159a81653904a804",
+    "archiveCount": 34,
+    "archives": [
+      "-J-LCV30.LHA",
+      "FTH-FDD.LHA",
+      "FTH-MW1O.LHA",
+      "J-LCV30.LHA",
+      "NE-LOG10.LHA",
+      "NTR-CL10.LHA",
+      "NTR-DI.LHA",
+      "NTR-DIR.LHA",
+      "NTR-FD2.LHA",
+      "NTR-FD21.LHA",
+      "NTR-FR10.LHA",
+      "NTR-MCHK.LHA",
+      "NTR-NEW2.LHA",
+      "NTR-ST11.LHA",
+      "PGS-SM38.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3b73806cd8e34de04d84259a95d84004": {
+    "filename": "rpamigalibhost.library",
+    "md5": "3b73806cd8e34de04d84259a95d84004",
+    "archiveCount": 14,
+    "archives": [
+      "-J-LCV30.LHA",
+      "J-LCV30.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "1b251a9c4e3d12e9792a66b022e23044": {
+    "filename": "rpquicksortport.library",
+    "md5": "1b251a9c4e3d12e9792a66b022e23044",
+    "archiveCount": 14,
+    "archives": [
+      "-J-LCV30.LHA",
+      "J-LCV30.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3ac2405c24cd62df7e0a7e7f1d2c13ee": {
+    "filename": "rprexxmathlib.library",
+    "md5": "3ac2405c24cd62df7e0a7e7f1d2c13ee",
+    "archiveCount": 15,
+    "archives": [
+      "-J-LCV30.LHA",
+      "J-LCV30.LHA",
+      "LGC-UL40.LHA",
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "81858407fede6db96e3a8d62c2f5d1d4": {
+    "filename": "UZi.DiSPLAYME",
+    "md5": "81858407fede6db96e3a8d62c2f5d1d4",
+    "archiveCount": 162,
+    "archives": [
+      "-J-LCV30.LHA",
+      "AMIX510.LHA",
+      "AX^MOD^S.LHA",
+      "GOD-PM12.LHA",
+      "H&V-E001.LHA",
+      "H&V-QL10.LHA",
+      "H&V-WC11.LHA",
+      "HCD-PL10.LHA",
+      "HELLPSWD.LHA",
+      "HF-DGNCM.LHA",
+      "HF-MCDB.LHA",
+      "HMS-CL10.LHA",
+      "HNY-LB02.LHA",
+      "HNY-LO12.LHA",
+      "HNY-TC21.LHA",
+      "HNY-TL21.LHA",
+      "HNY-TP21.LHA",
+      "I!A-Y10.LHA",
+      "IFN-AMI9.LHA",
+      "IHS-UC11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "63dd7c64b497a7ad5744964f78de4865": {
+    "filename": "uzi.txt",
+    "md5": "63dd7c64b497a7ad5744964f78de4865",
+    "archiveCount": 185,
+    "archives": [
+      "-J-LCV30.LHA",
+      "AMIX510.LHA",
+      "AX^MOD^S.LHA",
+      "DPH-CONQ.LHA",
+      "GOD-PM12.LHA",
+      "H&V-E001.LHA",
+      "H&V-QL10.LHA",
+      "H&V-WC11.LHA",
+      "HCD-PL10.LHA",
+      "HELLPSWD.LHA",
+      "HF-DGNCM.LHA",
+      "HF-MCDB.LHA",
+      "HMS-CL10.LHA",
+      "HNY-LB02.LHA",
+      "HNY-LO12.LHA",
+      "HNY-TC21.LHA",
+      "HNY-TL21.LHA",
+      "HNY-TP21.LHA",
+      "HWC11.LHA",
+      "I!A-Y10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "66a9440555906c91db547fb52904c7f5": {
+    "filename": "UZi.VERT",
+    "md5": "66a9440555906c91db547fb52904c7f5",
+    "archiveCount": 185,
+    "archives": [
+      "-J-LCV30.LHA",
+      "AMIX510.LHA",
+      "AX^MOD^S.LHA",
+      "DPH-CONQ.LHA",
+      "GOD-PM12.LHA",
+      "H&V-E001.LHA",
+      "H&V-QL10.LHA",
+      "H&V-WC11.LHA",
+      "HCD-PL10.LHA",
+      "HELLPSWD.LHA",
+      "HF-DGNCM.LHA",
+      "HF-MCDB.LHA",
+      "HMS-CL10.LHA",
+      "HNY-LB02.LHA",
+      "HNY-LO12.LHA",
+      "HNY-TC21.LHA",
+      "HNY-TL21.LHA",
+      "HNY-TP21.LHA",
+      "HWC11.LHA",
+      "I!A-Y10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "c253886635958fac74c81b0cedccc0df": {
+    "filename": "rEALtHiNG.CoNFLiCT!",
+    "md5": "c253886635958fac74c81b0cedccc0df",
+    "archiveCount": 16,
+    "archives": [
+      "187-KB1.LZH",
+      "5D-MBS2.LZH",
+      "AKA_LAST.LZH",
+      "ATX-TT15.LHA",
+      "AX5ED5ES.LHA",
+      "CHTMET20.LHA",
+      "CRZ-BT11.LHA",
+      "CRZ-FW11.LHA",
+      "CRZ-UL10.LHA",
+      "DLM-HL11.LHA",
+      "DLT-F101.LHA",
+      "DPL-AO11.LHA",
+      "EMP-BL22.LHA",
+      "EMP-UC20.LHA",
+      "FAFCST20.LHA",
+      "FILEID.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "87f0e737cd40fb4871a0b28be2dba028": {
+    "filename": "TBRAD.TXT.DISPLAYME",
+    "md5": "87f0e737cd40fb4871a0b28be2dba028",
+    "archiveCount": 13,
+    "archives": [
+      "1I_LOG12.LHA",
+      "5D_JC072.LZH",
+      "CA_BETA.LHA",
+      "DPL_FA10.LHA",
+      "FSH_AD10.LHA",
+      "FSH_MS10.LHA",
+      "GMS1D.LHA",
+      "HBT_SB20.LHA",
+      "MAN_DJ01.LHA",
+      "SLCTP2_2.LHA",
+      "TRSI_MSC.LHA",
+      "TRY_WT11.LHA",
+      "XNETXIM.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b99d0780f5b561f5059787f7093470f4": {
+    "filename": "TSLAD.TXT.DISPLAYME",
+    "md5": "b99d0780f5b561f5059787f7093470f4",
+    "archiveCount": 12,
+    "archives": [
+      "1I_LOG12.LHA",
+      "5D_JC072.LZH",
+      "CA_BETA.LHA",
+      "DPL_FA10.LHA",
+      "GMS1D.LHA",
+      "HBT_SB20.LHA",
+      "MAN_DJ01.LHA",
+      "PSI_FO10.LHA",
+      "SLCTP2_2.LHA",
+      "TRSI_MSC.LHA",
+      "TRY_WT11.LHA",
+      "XNETXIM.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "ade6abef60db3722399603683791cf3e": {
+    "filename": "aLPHA-tRINOMIC-sTATION",
+    "md5": "ade6abef60db3722399603683791cf3e",
+    "archiveCount": 242,
+    "archives": [
+      "24STDCAL.LHA",
+      "5D-CS3_.LHA",
+      "5D-DC010.LZH",
+      "5D-JC072.LZH",
+      "5D-LCS.LHA",
+      "AE-TRADE.LHA",
+      "AEED400.LHA",
+      "AMI-XST.LHA",
+      "AMIEX.LHA",
+      "AMIOPEN.LHA",
+      "ARCDOOR.LHA",
+      "AS.LHA",
+      "ASKIIREQ.LHA",
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TCON.LHA",
+      "AXO-SW10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "d68b200242a0e0140f650f7b1cf3687e": {
+    "filename": "lOSeNDOS.guide",
+    "md5": "d68b200242a0e0140f650f7b1cf3687e",
+    "archiveCount": 242,
+    "archives": [
+      "24STDCAL.LHA",
+      "5D-CS3_.LHA",
+      "5D-DC010.LZH",
+      "5D-JC072.LZH",
+      "5D-LCS.LHA",
+      "AE-TRADE.LHA",
+      "AEED400.LHA",
+      "AMI-XST.LHA",
+      "AMIEX.LHA",
+      "AMIOPEN.LHA",
+      "ARCDOOR.LHA",
+      "AS.LHA",
+      "ASKIIREQ.LHA",
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TCON.LHA",
+      "AXO-SW10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "591e2ef896e94180a60679d83a632fed": {
+    "filename": "History.guid",
+    "md5": "591e2ef896e94180a60679d83a632fed",
+    "archiveCount": 23,
+    "archives": [
+      "5D!DM002.LHA",
+      "5D^SE010.LHA",
+      "5D^WHO12.LHA",
+      "CLE-DIZP.LHA",
+      "DLT-AF12.LHA",
+      "DLT-FA11.LHA",
+      "DLT-UL11.LHA",
+      "FLD-POLM.LHA",
+      "MTH-BB10.LHA",
+      "MTH-FA1.LHA",
+      "MTH-FL11.LHA",
+      "MTH-ZSCH.LHA",
+      "NJY-PL10.LHA",
+      "NS!-SS10.LHA",
+      "OD-BS15.LHA",
+      "P0T-SEL1.LHA",
+      "PGS-WHO2.LHA",
+      "RLG-AE12.LHA",
+      "TDS_A21.LHA",
+      "TRS-BK22.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "4701e84976758ba45c952a5bde6a1918": {
+    "filename": "pierced7.jpg",
+    "md5": "4701e84976758ba45c952a5bde6a1918",
+    "archiveCount": 23,
+    "archives": [
+      "5D!DM002.LHA",
+      "5D^SE010.LHA",
+      "5D^WHO12.LHA",
+      "CLE-DIZP.LHA",
+      "DLT-AF12.LHA",
+      "DLT-FA11.LHA",
+      "DLT-UL11.LHA",
+      "FLD-POLM.LHA",
+      "MTH-BB10.LHA",
+      "MTH-FA1.LHA",
+      "MTH-FL11.LHA",
+      "MTH-ZSCH.LHA",
+      "NJY-PL10.LHA",
+      "NS!-SS10.LHA",
+      "OD-BS15.LHA",
+      "P0T-SEL1.LHA",
+      "PGS-WHO2.LHA",
+      "RLG-AE12.LHA",
+      "TDS_A21.LHA",
+      "TRS-BK22.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "abab175db75e0fd5760913927096639f": {
+    "filename": "pRESIDENT.nf0",
+    "md5": "abab175db75e0fd5760913927096639f",
+    "archiveCount": 183,
+    "archives": [
+      "5D!DP001.LHA",
+      "5D!ZS001.LHA",
+      "5D!ZS002.LHA",
+      "AE.LHA",
+      "AECON2.LHA",
+      "AEG4.LHA",
+      "AEKIT101.LHA",
+      "AE_DOORS.LHA",
+      "ATM-GR10.LHA",
+      "ATX-SAL5.LHA",
+      "AWAIT.LHA",
+      "BLC-L111.LHA",
+      "BLC-LS11.LHA",
+      "CHTMET20.LHA",
+      "CLI-L2OF.LHA",
+      "CLI-PG3R.LHA",
+      "CLI-QUIK.LHA",
+      "CRD-NU12.LHA",
+      "CRX-DL13.LHA",
+      "CRZ-BT11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "c77c9da5c05184b94a6b81c1188c71df": {
+    "filename": "amigaguide.library",
+    "md5": "c77c9da5c05184b94a6b81c1188c71df",
+    "archiveCount": 19,
+    "archives": [
+      "5D-ADD12.LHA",
+      "5D-CS3_.LHA",
+      "5D-MBS2.LHA",
+      "5D-MBS2.LZH",
+      "A!AQWK24.LHA",
+      "ADDBBSTO.LHA",
+      "AQWK24CR.LHA",
+      "FILE_ID2.LHA",
+      "FILE_ID3.LHA",
+      "FTH-FDD.LHA",
+      "FTH-MW1O.LHA",
+      "HBT_SB20.LHA",
+      "IA-LOG1O.LHA",
+      "L&T-AE47.LZH",
+      "LGN-TRIV.LHA",
+      "PTL-SS10.LHA",
+      "PTL-ST21.LHA",
+      "ULA-FS10.LHA",
+      "ULA-US10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "c71448f24701cbeb8e2c057ae667f2d9": {
+    "filename": "ClASS.info",
+    "md5": "c71448f24701cbeb8e2c057ae667f2d9",
+    "archiveCount": 37,
+    "archives": [
+      "5D-ADD12.LHA",
+      "5D-AF001.LHA",
+      "5D-CK001.LZH",
+      "5D-CS3.LHA",
+      "5D-ED110.LHA",
+      "5D-GVS.LHA",
+      "5D-LG112.LHA",
+      "5D-MS001.LHA",
+      "5D-QA001.LHA",
+      "5D-QA005.LHA",
+      "5D-SRT02.LZH",
+      "5D-UL001.LZH",
+      "5D-WHO12.LHA",
+      "5D^AMN10.LHA",
+      "5D^SA001.LZH",
+      "5D^VB001.LZH",
+      "A!-FRON.LHA",
+      "CDS-CL10.LHA",
+      "DP!-TP12.LHA",
+      "FG-FC26.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b4161bc168dc62e54f0f14c2fea49e6e": {
+    "filename": "CLASS.README",
+    "md5": "b4161bc168dc62e54f0f14c2fea49e6e",
+    "archiveCount": 37,
+    "archives": [
+      "5D-ADD12.LHA",
+      "5D-AF001.LHA",
+      "5D-CK001.LZH",
+      "5D-CS3.LHA",
+      "5D-ED110.LHA",
+      "5D-GVS.LHA",
+      "5D-LG112.LHA",
+      "5D-MS001.LHA",
+      "5D-QA001.LHA",
+      "5D-QA005.LHA",
+      "5D-SRT02.LZH",
+      "5D-UL001.LZH",
+      "5D-WHO12.LHA",
+      "5D^AMN10.LHA",
+      "5D^SA001.LZH",
+      "5D^VB001.LZH",
+      "A!-FRON.LHA",
+      "CDS-CL10.LHA",
+      "DP!-TP12.LHA",
+      "FG-FC26.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "c19cc47a879217177888216bf1fa1e08": {
+    "filename": "LOSENDOS.CLASS",
+    "md5": "c19cc47a879217177888216bf1fa1e08",
+    "archiveCount": 37,
+    "archives": [
+      "5D-ADD12.LHA",
+      "5D-AF001.LHA",
+      "5D-CK001.LZH",
+      "5D-CS3.LHA",
+      "5D-ED110.LHA",
+      "5D-GVS.LHA",
+      "5D-LG112.LHA",
+      "5D-MS001.LHA",
+      "5D-QA001.LHA",
+      "5D-QA005.LHA",
+      "5D-SRT02.LZH",
+      "5D-UL001.LZH",
+      "5D-WHO12.LHA",
+      "5D^AMN10.LHA",
+      "5D^SA001.LZH",
+      "5D^VB001.LZH",
+      "A!-FRON.LHA",
+      "CDS-CL10.LHA",
+      "DP!-TP12.LHA",
+      "FG-FC26.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "69f2e7c067221a52083542c8775c7319": {
+    "filename": ".Exe",
+    "md5": "69f2e7c067221a52083542c8775c7319",
+    "archiveCount": 18,
+    "archives": [
+      "5D-AF001.LHA",
+      "5D-ED110.LHA",
+      "5D-LG112.LHA",
+      "5D-SRT02.LZH",
+      "AKA_MFIX.LZH",
+      "ATX-CHAT.LHA",
+      "LATER.LHA",
+      "MST-COM2.LHA",
+      "MST-CSF2.LHA",
+      "MST-STSH.LHA",
+      "NE-BS01.LHA",
+      "RG-CHECK.LHA",
+      "SX-BS-01.LHA",
+      "TRSI-OM2.LHA",
+      "TSK-AL01.LHA",
+      "TSN-OECK.LHA",
+      "VTL-SC21.LHA",
+      "VTY-CS11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "dd5662be9b4eff75295777f493a7b928": {
+    "filename": "pamfuk48.jpg",
+    "md5": "dd5662be9b4eff75295777f493a7b928",
+    "archiveCount": 14,
+    "archives": [
+      "5D-BCHCK.LHA",
+      "5D-DSGB1.LHA",
+      "BK-BOSSP.LHA",
+      "SDM!CT1O.LHA",
+      "SDM!GN1O.LHA",
+      "SDM!LC11.LHA",
+      "SDM!LC1O.LHA",
+      "SDM!LT1F.LHA",
+      "SDM!LT1O.LHA",
+      "SDM!TD1O.LHA",
+      "SDM!W11.LHA",
+      "SDM!W1O.LHA",
+      "SDM!WH10.LHA",
+      "SDM!WH11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "f2a99cf01220b067c83e1f79c2b07528": {
+    "filename": "DMSDescript",
+    "md5": "f2a99cf01220b067c83e1f79c2b07528",
+    "archiveCount": 33,
+    "archives": [
+      "5D-CS3_.LHA",
+      "ACS_DIZ.LHA",
+      "CB4!SA50.LHA",
+      "CB4!SA63.LHA",
+      "CB4!ST13.LHA",
+      "CRZ-DZ10.LHA",
+      "DCN!F-X2.LHA",
+      "EMP-AO11.LHA",
+      "EMP-AO12.LHA",
+      "EMP_AO12.LHA",
+      "FID15CR.LHA",
+      "FILEID13.LHA",
+      "FILEID14.LHA",
+      "FILEID15.LHA",
+      "FILE_ID3.LHA",
+      "HF-IS1O.LHA",
+      "HF-IS1O1.LHA",
+      "JSO-ID10.LHA",
+      "MDB-CU15.LHA",
+      "MDB-CU18.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "eaeaf4b724f27aef38fd33fa9ca52945": {
+    "filename": "EXEDescript",
+    "md5": "eaeaf4b724f27aef38fd33fa9ca52945",
+    "archiveCount": 32,
+    "archives": [
+      "5D-CS3_.LHA",
+      "ACS_DIZ.LHA",
+      "CRZ-DZ10.LHA",
+      "DC-X107I.LHA",
+      "DCN!F-X2.LHA",
+      "EMP-AO11.LHA",
+      "EMP-AO12.LHA",
+      "EMP_AO12.LHA",
+      "FCHECLAM.LHA",
+      "FID15CR.LHA",
+      "FILEID13.LHA",
+      "FILEID14.LHA",
+      "FILEID15.LHA",
+      "FILE_ID3.LHA",
+      "HF-IS1O.LHA",
+      "HF-IS1O1.LHA",
+      "JSO-ID10.LHA",
+      "MDB-CU15.LHA",
+      "MDB-CU18.LHA",
+      "MDB-CU19.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0ecc651dbf2f538b6167240d9717dc35": {
+    "filename": "RexxMast",
+    "md5": "0ecc651dbf2f538b6167240d9717dc35",
+    "archiveCount": 18,
+    "archives": [
+      "5D-CS3_.LHA",
+      "5D-DG1.LZH",
+      "5D-DSGB1.LHA",
+      "5D-MBS2.LHA",
+      "5D-MBS2.LZH",
+      "AKA_FRON.LZH",
+      "AMI-FLT.LHA",
+      "FILE_ID2.LHA",
+      "FILE_ID3.LHA",
+      "IA-LOG1O.LHA",
+      "ORS-GO19.LHA",
+      "ORS-ID10.LHA",
+      "ORS-ID12.LHA",
+      "ORS-SD01.LHA",
+      "PGS-SM38.LHA",
+      "PIW-ST05.LHA",
+      "SYC-SCST.LHA",
+      "TRS_UDC.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b9bea73063b8244fc793d7140d7f7a70": {
+    "filename": "RPStart",
+    "md5": "b9bea73063b8244fc793d7140d7f7a70",
+    "archiveCount": 58,
+    "archives": [
+      "5D-CS3_.LHA",
+      "5D-DG1.LZH",
+      "5D-DSGB1.LHA",
+      "5D-MBS2.LHA",
+      "5D-MBS2.LZH",
+      "AKA_FRON.LZH",
+      "FILE_ID2.LHA",
+      "FILE_ID3.LHA",
+      "FTH-FDD.LHA",
+      "FTH-MW1O.LHA",
+      "GOD-TF02.LHA",
+      "HUMUSS11.LHA",
+      "IA-LOG1O.LHA",
+      "IA-OPA10.LHA",
+      "IA-SPD10.LHA",
+      "IA-SYSPW.LHA",
+      "IA-WSE10.LHA",
+      "IMPST231.LHA",
+      "LGC-UL40.LHA",
+      "LSDNW145.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "46f08e087cad45049965232a3527385f": {
+    "filename": "TxtExtract",
+    "md5": "46f08e087cad45049965232a3527385f",
+    "archiveCount": 26,
+    "archives": [
+      "5D-CS3_.LHA",
+      "ACS_DIZ.LHA",
+      "CRZ-DZ10.LHA",
+      "EMP-AO11.LHA",
+      "EMP-AO12.LHA",
+      "EMP_AO12.LHA",
+      "FILEID14.LHA",
+      "FILEID15.LHA",
+      "FILE_ID3.LHA",
+      "JSO-ID10.LHA",
+      "MDB-CU15.LHA",
+      "MDB-CU18.LHA",
+      "MDB-CU19.LHA",
+      "MDBCU113.LHA",
+      "MDBCU116.LHA",
+      "MDBCU117.LHA",
+      "MDBCU118.LHA",
+      "MDBCU19C.LHA",
+      "MED-F111.LHA",
+      "MXM-FC13.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "133df43aabe9f3a2933d0635ff012150": {
+    "filename": "5D-DC007.run",
+    "md5": "133df43aabe9f3a2933d0635ff012150",
+    "archiveCount": 18,
+    "archives": [
+      "5D-DC007.LZH",
+      "5D-LO014.LZH",
+      "5D^QA005.LZH",
+      "DS9.V1.2.LHA",
+      "EMP-JC34.LHA",
+      "H&V-CL20.LHA",
+      "MST-WHO.LHA",
+      "MST-WT10.LHA",
+      "NOC-CP10.LHA",
+      "NOC-SD10.LHA",
+      "NOC-WH15.LHA",
+      "ORS-SA10.LHA",
+      "PEB-CH01.LZH",
+      "PI-ST10A.LHA",
+      "QHELP.LHA",
+      "S8-XMWB.LHA",
+      "TN1Q.LHA",
+      "TRY-OP20.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3f558bcc140e0411dd1f333d64561310": {
+    "filename": "nO_vIRUS_jUST_a_ADD!.run",
+    "md5": "3f558bcc140e0411dd1f333d64561310",
+    "archiveCount": 18,
+    "archives": [
+      "5D-EM009.LZH",
+      "5D^DL001.LZH",
+      "AEG4_9.LHA",
+      "CDS-CS15.LHA",
+      "FIDED391.LHA",
+      "LSD-AE49.LHA",
+      "MTH-BB10.LHA",
+      "MTH-BB12.LHA",
+      "MTH-ZSCH.LHA",
+      "OTL-RQ20.LHA",
+      "PSN-CW10.LHA",
+      "REBOOT10.LHA",
+      "RG-CHECK.LHA",
+      "SR-SFM10.LHA",
+      "SUP-DIZ3.LHA",
+      "TPG-AE48.LHA",
+      "WOT-AD22.LHA",
+      "XMASH11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "db243d5744b7b7e9eaf211ee746c9d52": {
+    "filename": "*ProTech+",
+    "md5": "db243d5744b7b7e9eaf211ee746c9d52",
+    "archiveCount": 10,
+    "archives": [
+      "5D-JC074.LZH",
+      "AD-GDM10.LHA",
+      "CHECK200.LHA",
+      "D&B-FD10.LHA",
+      "ICE_WANT.LHA",
+      "LEP_PP15.LHA",
+      "MED-TAG.LHA",
+      "OTL-LS20.LHA",
+      "TDS_AD31.LHA",
+      "TDS_C100.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "72b27cb8f426b7da50ccb578ee551170": {
+    "filename": "ZENLANDIA.ADD",
+    "md5": "72b27cb8f426b7da50ccb578ee551170",
+    "archiveCount": 11,
+    "archives": [
+      "5D-JC16.LHA",
+      "5D-MBFIX.LHA",
+      "5D-PAG29.LHA",
+      "5D-RSRV1.LHA",
+      "5D-SM001.LHA",
+      "5D-USR11.LHA",
+      "5D-WAL11.LHA",
+      "5D-WALL1.LHA",
+      "5D-WHO20.LHA",
+      "5D_AMN10.LHA",
+      "5D_AMU21.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "4823a293e1e0bb4dc4c3934bbc9d1a0a": {
+    "filename": "UZi.DiSPLAYME",
+    "md5": "4823a293e1e0bb4dc4c3934bbc9d1a0a",
+    "archiveCount": 11,
+    "archives": [
+      "5D-NF033.LZH",
+      "5D^DC008.LZH",
+      "AOPS-TU1.LHA",
+      "EXC_WAL1.LHA",
+      "FD!CFG.LHA",
+      "FD!CHECK.LHA",
+      "FD!FRONT.LHA",
+      "FD!MS.LHA",
+      "POTTYSRC.LHA",
+      "THRSHTOP.LHA",
+      "TRSI-D!S.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "38062d626c4db12ad36741fdb86d4268": {
+    "filename": "uzi.txt",
+    "md5": "38062d626c4db12ad36741fdb86d4268",
+    "archiveCount": 11,
+    "archives": [
+      "5D-NF033.LZH",
+      "5D^DC008.LZH",
+      "AOPS-TU1.LHA",
+      "EXC_WAL1.LHA",
+      "FD!CFG.LHA",
+      "FD!CHECK.LHA",
+      "FD!FRONT.LHA",
+      "FD!MS.LHA",
+      "POTTYSRC.LHA",
+      "THRSHTOP.LHA",
+      "TRSI-D!S.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "daf2a44a122c51b1cf11e66ff1decbf9": {
+    "filename": "UZi.VERT",
+    "md5": "daf2a44a122c51b1cf11e66ff1decbf9",
+    "archiveCount": 11,
+    "archives": [
+      "5D-NF033.LZH",
+      "5D^DC008.LZH",
+      "AOPS-TU1.LHA",
+      "EXC_WAL1.LHA",
+      "FD!CFG.LHA",
+      "FD!CHECK.LHA",
+      "FD!FRONT.LHA",
+      "FD!MS.LHA",
+      "POTTYSRC.LHA",
+      "THRSHTOP.LHA",
+      "TRSI-D!S.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "f6147e66aa94c57171905c148c0692a8": {
+    "filename": "5D-SE010.5D-",
+    "md5": "f6147e66aa94c57171905c148c0692a8",
+    "archiveCount": 73,
+    "archives": [
+      "5D-SE010.LHA",
+      "5D^SE010.LHA",
+      "ACS-BR40.LHA",
+      "AEEDPROB.LHA",
+      "AKA_MSG.LZH",
+      "AUTOVAL1.LHA",
+      "AVT-SS10.LHA",
+      "C&N-CS13.LHA",
+      "CLE-LS1O.LHA",
+      "CRZ-DS11.LHA",
+      "CRZ-EC11.LHA",
+      "CRZ-FA10.LHA",
+      "CTX-CC2.LHA",
+      "CTX-FA5.LHA",
+      "DCS-AX15.LHA",
+      "DRE_CRAK.LHA",
+      "EXC-AF91.LHA",
+      "GSD_BL1A.LHA",
+      "GUS-CCF2.LHA",
+      "GUS-DMS1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "f6aa6db569dc7372dbe257981e10c488": {
+    "filename": "GIANTS",
+    "md5": "f6aa6db569dc7372dbe257981e10c488",
+    "archiveCount": 19,
+    "archives": [
+      "5D-SE010.LHA",
+      "5D-ZS003.LZH",
+      "5D^SE010.LHA",
+      "ACS-LHA3.LHA",
+      "ATX-SRQ.LHA",
+      "BBL-LT02.LHA",
+      "CLE-IDF.LHA",
+      "CLI-NML3.LHA",
+      "CLI-NUL1.LHA",
+      "DMSCHK11.LHA",
+      "DNT-WH10.LHA",
+      "M!BBFE03.LHA",
+      "NTR-AMF.LHA",
+      "PROT192.LHA",
+      "RG-FRONT.LHA",
+      "RJ_GPAGE.LHA",
+      "VOTE3_0.LHA",
+      "X-HORS10.LHA",
+      "YDL-MENS.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0e236f00a832ff5875c44ac565c94c5a": {
+    "filename": "MULTIFRAME",
+    "md5": "0e236f00a832ff5875c44ac565c94c5a",
+    "archiveCount": 18,
+    "archives": [
+      "5D-SE010.LHA",
+      "5D-ZS003.LZH",
+      "5D^SE010.LHA",
+      "ACS-LHA3.LHA",
+      "ATX-SRQ.LHA",
+      "BBL-LT02.LHA",
+      "CLE-IDF.LHA",
+      "CLI-NML3.LHA",
+      "CLI-NUL1.LHA",
+      "DMSCHK11.LHA",
+      "DNT-WH10.LHA",
+      "M!BBFE03.LHA",
+      "NTR-AMF.LHA",
+      "RG-FRONT.LHA",
+      "RJ_GPAGE.LHA",
+      "VOTE3_0.LHA",
+      "X-HORS10.LHA",
+      "YDL-MENS.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "22289293a725a50e2bc40aeac083be8b": {
+    "filename": "WORKING.info",
+    "md5": "22289293a725a50e2bc40aeac083be8b",
+    "archiveCount": 19,
+    "archives": [
+      "5D-SE010.LHA",
+      "5D-ZS003.LZH",
+      "5D^SE010.LHA",
+      "ACS-LHA3.LHA",
+      "ATX-SRQ.LHA",
+      "BBL-LT02.LHA",
+      "CLE-IDF.LHA",
+      "CLI-NML3.LHA",
+      "CLI-NUL1.LHA",
+      "DMSCHK11.LHA",
+      "DNT-WH10.LHA",
+      "M!BBFE03.LHA",
+      "NTR-AMF.LHA",
+      "PROT192.LHA",
+      "RG-FRONT.LHA",
+      "RJ_GPAGE.LHA",
+      "VOTE3_0.LHA",
+      "X-HORS10.LHA",
+      "YDL-MENS.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9bc36e798a61b0dd08dd69c9b9218226": {
+    "filename": ".losendos.",
+    "md5": "9bc36e798a61b0dd08dd69c9b9218226",
+    "archiveCount": 97,
+    "archives": [
+      "5D-TC002.LZH",
+      "5D-ZS001.LZH",
+      "5D^DC007.LZH",
+      "5D^DC010.LZH",
+      "5D^QA001.LZH",
+      "ACP-ST10.LHA",
+      "ACS-XIM2.LHA",
+      "AD-D12A.LHA",
+      "AEH3381B.LHA",
+      "AEICON16.LHA",
+      "AFL-MSG2.LHA",
+      "ANNO12.LHA",
+      "ATX-T101.LHA",
+      "AWAIT_2.LHA",
+      "A^D-SUP3.LHA",
+      "BAUD14.LHA",
+      "BB_H1O.LHA",
+      "BK-CRASH.LHA",
+      "BK-SIN10.LHA",
+      "BK-UP112.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "1d495a30fb645e9d42da49a4e3546027": {
+    "filename": "Schnabeltasse.doc",
+    "md5": "1d495a30fb645e9d42da49a4e3546027",
+    "archiveCount": 97,
+    "archives": [
+      "5D-TC002.LZH",
+      "5D-ZS001.LZH",
+      "5D^DC007.LZH",
+      "5D^DC010.LZH",
+      "5D^QA001.LZH",
+      "ACP-ST10.LHA",
+      "ACS-XIM2.LHA",
+      "AD-D12A.LHA",
+      "AEH3381B.LHA",
+      "AEICON16.LHA",
+      "AFL-MSG2.LHA",
+      "ANNO12.LHA",
+      "ATX-T101.LHA",
+      "AWAIT_2.LHA",
+      "A^D-SUP3.LHA",
+      "BAUD14.LHA",
+      "BB_H1O.LHA",
+      "BK-CRASH.LHA",
+      "BK-SIN10.LHA",
+      "BK-UP112.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0afc29f41baeb6a9d3f444088c280282": {
+    "filename": "formaldehyde.txt",
+    "md5": "0afc29f41baeb6a9d3f444088c280282",
+    "archiveCount": 97,
+    "archives": [
+      "5D-TC002.LZH",
+      "5D-ZS001.LZH",
+      "5D^DC007.LZH",
+      "5D^DC010.LZH",
+      "5D^QA001.LZH",
+      "ACP-ST10.LHA",
+      "ACS-XIM2.LHA",
+      "AD-D12A.LHA",
+      "AEH3381B.LHA",
+      "AEICON16.LHA",
+      "AFL-MSG2.LHA",
+      "ANNO12.LHA",
+      "ATX-T101.LHA",
+      "AWAIT_2.LHA",
+      "A^D-SUP3.LHA",
+      "BAUD14.LHA",
+      "BB_H1O.LHA",
+      "BK-CRASH.LHA",
+      "BK-SIN10.LHA",
+      "BK-UP112.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bf785f1691d4635783cf75d5de5ad6f8": {
+    "filename": "DELIGHT",
+    "md5": "bf785f1691d4635783cf75d5de5ad6f8",
+    "archiveCount": 18,
+    "archives": [
+      "5D-TO001.LZH",
+      "5D-USER1.LHA",
+      "MDB-CU15.LHA",
+      "MDBCU19C.LHA",
+      "MDBFE100.LHA",
+      "NMESS1C.LHA",
+      "OTT_DMS.LHA",
+      "OTT_LHA.LHA",
+      "PDMS_CHK.LHA",
+      "PLHA_CHK.LHA",
+      "PTL-SI07.LHA",
+      "RMS05A2.LHA",
+      "SNE_WHO.LHA",
+      "SRH-TL30.LHA",
+      "SR_CRA10.LHA",
+      "SYSACT10.LHA",
+      "VTY-LI13.LHA",
+      "VTY-SM10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "f2d02296b6f896cde7915623d77cab7c": {
+    "filename": "Read_Me_Please!",
+    "md5": "f2d02296b6f896cde7915623d77cab7c",
+    "archiveCount": 13,
+    "archives": [
+      "5D-USER1.LHA",
+      "CAL-BCON.LHA",
+      "COP-PW.LHA",
+      "COP-UP.LHA",
+      "MED-TAG.LHA",
+      "NOC-FR13.LHA",
+      "OTL-AA10.LHA",
+      "RMS05A.LHA",
+      "TDS_SA33.LHA",
+      "TDS_SC12.LHA",
+      "TDS_SW3B.LHA",
+      "VTL-DW10.LHA",
+      "VTY-CM11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "71c16dc3a2daaed7a3100da28b4ab7a8": {
+    "filename": "AintItCrazy",
+    "md5": "71c16dc3a2daaed7a3100da28b4ab7a8",
+    "archiveCount": 15,
+    "archives": [
+      "5D^AMU21.LHA",
+      "AFL-BM1.LHA",
+      "AFL-BOOT.LHA",
+      "AFL-DC01.LHA",
+      "AFL-SW16.LHA",
+      "AFL-UD10.LHA",
+      "AFLFRO11.LHA",
+      "ALCMAIL1.LHA",
+      "ATC_SR10.LHA",
+      "ATX-SRQ2.LHA",
+      "ATX-SYNT.LHA",
+      "AVT-UD01.LHA",
+      "AVT-UD13.LHA",
+      "TELNETD.LHA",
+      "TELSER12.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bd87c5082c924e5ed625b25407844001": {
+    "filename": "OnTimeAintEnough",
+    "md5": "bd87c5082c924e5ed625b25407844001",
+    "archiveCount": 15,
+    "archives": [
+      "5D^AMU21.LHA",
+      "AFL-BM1.LHA",
+      "AFL-BOOT.LHA",
+      "AFL-DC01.LHA",
+      "AFL-SW16.LHA",
+      "AFL-UD10.LHA",
+      "AFLFRO11.LHA",
+      "ALCMAIL1.LHA",
+      "ATC_SR10.LHA",
+      "ATX-SRQ2.LHA",
+      "ATX-SYNT.LHA",
+      "AVT-UD01.LHA",
+      "AVT-UD13.LHA",
+      "TELNETD.LHA",
+      "TELSER12.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "e62acb2e54f9dfd4e3c55e0310682633": {
+    "filename": "pRESIDENT.nF0",
+    "md5": "e62acb2e54f9dfd4e3c55e0310682633",
+    "archiveCount": 17,
+    "archives": [
+      "976RS13.LHA",
+      "ADDBBS.LHA",
+      "INS-CC11.LHA",
+      "OGN-RV12.LHA",
+      "OTL-AQ10.LHA",
+      "OTL-AQ11.LHA",
+      "OTL-LS21.LHA",
+      "OTL-PW10.LHA",
+      "OTL-RQ10.LHA",
+      "OTL-SA10.LHA",
+      "OTL-TC10.LHA",
+      "SAD^CS10.LHA",
+      "SAD^TT2R.LHA",
+      "SAD^TT96.LHA",
+      "SAD^UL2R.LHA",
+      "SBS-STA4.LHA",
+      "THR-REQ.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b631601d877f39637b52214f456aa62f": {
+    "filename": "2Nodez.TXT",
+    "md5": "b631601d877f39637b52214f456aa62f",
+    "archiveCount": 117,
+    "archives": [
+      "A!AQWK24.LHA",
+      "AC092.LHA",
+      "ACC-V100.LHA",
+      "ACC-V103.LHA",
+      "ACC-V105.LHA",
+      "ACC.LHA",
+      "ACCT10.LHA",
+      "ACD-ACDE.LHA",
+      "ACLEA15.LHA",
+      "ACPAGE20.LHA",
+      "ACS-HACK.LHA",
+      "ACS_HACK.LHA",
+      "AD-FREE.LHA",
+      "AD-GDM05.LHA",
+      "AD-KMHH1.LHA",
+      "AD-LAST.LHA",
+      "AD-TOP10.LHA",
+      "AD-UI12B.LHA",
+      "ADC_EA10.LHA",
+      "ADD395.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9dd499d8c9e0346bac0b36252089769b": {
+    "filename": "Dream-Machine-team.TXT",
+    "md5": "9dd499d8c9e0346bac0b36252089769b",
+    "archiveCount": 117,
+    "archives": [
+      "A!AQWK24.LHA",
+      "AC092.LHA",
+      "ACC-V100.LHA",
+      "ACC-V103.LHA",
+      "ACC-V105.LHA",
+      "ACC.LHA",
+      "ACCT10.LHA",
+      "ACD-ACDE.LHA",
+      "ACLEA15.LHA",
+      "ACPAGE20.LHA",
+      "ACS-HACK.LHA",
+      "ACS_HACK.LHA",
+      "AD-FREE.LHA",
+      "AD-GDM05.LHA",
+      "AD-KMHH1.LHA",
+      "AD-LAST.LHA",
+      "AD-TOP10.LHA",
+      "AD-UI12B.LHA",
+      "ADC_EA10.LHA",
+      "ADD395.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "ef7a4fd48d0519a559b06306c1dea084": {
+    "filename": "FREEDL.txt",
+    "md5": "ef7a4fd48d0519a559b06306c1dea084",
+    "archiveCount": 117,
+    "archives": [
+      "A!AQWK24.LHA",
+      "AC092.LHA",
+      "ACC-V100.LHA",
+      "ACC-V103.LHA",
+      "ACC-V105.LHA",
+      "ACC.LHA",
+      "ACCT10.LHA",
+      "ACD-ACDE.LHA",
+      "ACLEA15.LHA",
+      "ACPAGE20.LHA",
+      "ACS-HACK.LHA",
+      "ACS_HACK.LHA",
+      "AD-FREE.LHA",
+      "AD-GDM05.LHA",
+      "AD-KMHH1.LHA",
+      "AD-LAST.LHA",
+      "AD-TOP10.LHA",
+      "AD-UI12B.LHA",
+      "ADC_EA10.LHA",
+      "ADD395.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "007629b662682678b8d87f7187a26a7c": {
+    "filename": "pRESIDENT.nF0",
+    "md5": "007629b662682678b8d87f7187a26a7c",
+    "archiveCount": 40,
+    "archives": [
+      "AC!-BS1O.LHA",
+      "ACSBAD41.LHA",
+      "BK-BULL.LHA",
+      "BONDOSV9.LZH",
+      "BRS-MV01.LHA",
+      "CDC-FW13.LHA",
+      "CDC-US1O.LHA",
+      "CLOTT135.LHA",
+      "CRZ-DZ10.LHA",
+      "DIZED101.LHA",
+      "ENHANCER.LHA",
+      "EZY-WH11.LHA",
+      "FLD-SW10.LHA",
+      "GUS_WHO1.LHA",
+      "H26VL.LHA",
+      "H6V-QL10.LHA",
+      "HBT-SB20.LHA",
+      "OGN-RV20.LHA",
+      "OGN-TS10.LHA",
+      "OTL-MF10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b865dd43da5a419faa5e08eca0a38c84": {
+    "filename": "SkYlInE",
+    "md5": "b865dd43da5a419faa5e08eca0a38c84",
+    "archiveCount": 10,
+    "archives": [
+      "ACC-V100.LHA",
+      "AD-LAST.LHA",
+      "AD-TOP10.LHA",
+      "AD-UI12B.LHA",
+      "AE_CUTV1.LHA",
+      "AE_MSC10.LHA",
+      "AFKR202.LHA",
+      "AMI-FLT.LHA",
+      "ASWITCH.LHA",
+      "ATA_V20.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "55c30b1688fa0b0c4c2ffe0890ccfd48": {
+    "filename": "bOONDOCKS!.dISPLAYME",
+    "md5": "55c30b1688fa0b0c4c2ffe0890ccfd48",
+    "archiveCount": 28,
+    "archives": [
+      "ACP-STRI.LHA",
+      "AMI-FIDO.LHA",
+      "CDTRAN01.LHA",
+      "CHAT34.LHA",
+      "COP-DOOR.LHA",
+      "DSV-LS10.LHA",
+      "FID15CR.LHA",
+      "HCD-NP21.LHA",
+      "LGC-BJ07.LHA",
+      "LGC-BL06.LHA",
+      "LGC-BO16.LHA",
+      "MGS!-C11.LHA",
+      "MGS-NDES.LHA",
+      "MST-BK14.LHA",
+      "NB-VIEW1.LHA",
+      "NTR-FD21.LHA",
+      "OMN-D02B.LHA",
+      "RST-DP.LHA",
+      "SHD-BBS2.LHA",
+      "SHK-FPRO.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "c158469d8ecd14f71390f1553ff4320c": {
+    "filename": "tRSI&lSD&oGN.eHQ!tRSI&gCS.wHQ!",
+    "md5": "c158469d8ecd14f71390f1553ff4320c",
+    "archiveCount": 15,
+    "archives": [
+      "ACP-STRI.LHA",
+      "CDTRAN01.LHA",
+      "CHAT34.LHA",
+      "DSV-LS10.LHA",
+      "HCD-NP21.LHA",
+      "MST-BK14.LHA",
+      "MTH-FLH3.LHA",
+      "NB-VIEW1.LHA",
+      "SHD-BBS2.LHA",
+      "SHK-FPRO.LHA",
+      "SLCTP2.LHA",
+      "TRB-FD.LHA",
+      "TRB-STAT.LHA",
+      "TRS-BK23.LHA",
+      "TRSI-TL2.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "683f1ee95ce52d138a57d7d6a5a7468a": {
+    "filename": "aedoor.library",
+    "md5": "683f1ee95ce52d138a57d7d6a5a7468a",
+    "archiveCount": 109,
+    "archives": [
+      "ACS-FRT.LHA",
+      "AVT-SS10.LHA",
+      "BK-SS153.LHA",
+      "BTD-MC10.LHA",
+      "CAL-BCON.LHA",
+      "CAL-PW13.LHA",
+      "CAL-WEEK.LHA",
+      "CDTRAN01.LHA",
+      "CDTRAN1A.LHA",
+      "CRZ-AF11.LHA",
+      "CRZ-FW11.LHA",
+      "CRZ-FW12.LHA",
+      "CRZ-UL10.LHA",
+      "CTX-CC2.LHA",
+      "DCSXC100.LHA",
+      "DCSXM100.LHA",
+      "DC_V32.LHA",
+      "DFC-MLAT.LHA",
+      "DIVE-BOA.LHA",
+      "DIVE-BOC.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9d9d74eb18121a06ff6320c79479c998": {
+    "filename": "illumination.txt",
+    "md5": "9d9d74eb18121a06ff6320c79479c998",
+    "archiveCount": 10,
+    "archives": [
+      "ADC_EA10.LHA",
+      "AE_HANG.LHA",
+      "AMIPASS1.LHA",
+      "ASMPAGE.LHA",
+      "ATX-STC1.LHA",
+      "ATX-STC3.LHA",
+      "ATX-T104.LHA",
+      "ATX-TBAR.LHA",
+      "EMP-UC10.LHA",
+      "TDIAL165.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "4e5fc5779f75bc0be50506ccaf0aaf95": {
+    "filename": "?#?LastDesire?#?",
+    "md5": "4e5fc5779f75bc0be50506ccaf0aaf95",
+    "archiveCount": 13,
+    "archives": [
+      "AE18_36.LHA",
+      "AFL_BOOT.LHA",
+      "DD_TR112.LHA",
+      "EX2_3_18.LHA",
+      "EX3_3_18.LHA",
+      "ICE_SC10.LHA",
+      "MDBOA002.LHA",
+      "NS_LB10.LHA",
+      "NS_SC10.LHA",
+      "PTL_UL02.LHA",
+      "STN_A335.LHA",
+      "THR_LHAP.LHA",
+      "TRY_WT10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "a3f3859faf90cf7c94b53c4ad7b6eece": {
+    "filename": "ext.rade.txt",
+    "md5": "a3f3859faf90cf7c94b53c4ad7b6eece",
+    "archiveCount": 11,
+    "archives": [
+      "AECLEAN3.LHA",
+      "AFL_BOOT.LHA",
+      "ICE_WHO_.LHA",
+      "ISTRIP05.LHA",
+      "MDBLC004.LHA",
+      "MSY_LR1.LHA",
+      "NETCON16.LHA",
+      "NETCON17.LHA",
+      "SLKSHELL.LHA",
+      "SRH_DM14.LHA",
+      "WOT_AD22.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bcb99d6eb56d4dacf947d3b1cedc5360": {
+    "filename": "Modules.info",
+    "md5": "bcb99d6eb56d4dacf947d3b1cedc5360",
+    "archiveCount": 10,
+    "archives": [
+      "AEDOOR.LHA",
+      "AEDOOR28.LHA",
+      "AEDOORS.LHA",
+      "AMIBR176.LHA",
+      "AMIX.LHA",
+      "AMIX_E.LHA",
+      "WOT-AD14.LHA",
+      "WOT-AD22.LHA",
+      "WOT-AED.LHA",
+      "WOT_AD22.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3d82b405de549688253a4c89e666e196": {
+    "filename": "Sources.info",
+    "md5": "3d82b405de549688253a4c89e666e196",
+    "archiveCount": 10,
+    "archives": [
+      "AEDOOR.LHA",
+      "AEDOOR28.LHA",
+      "AEDOORS.LHA",
+      "AMIBR176.LHA",
+      "AMIX.LHA",
+      "AMIX_E.LHA",
+      "WOT-AD14.LHA",
+      "WOT-AD22.LHA",
+      "WOT-AED.LHA",
+      "WOT_AD22.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "564bc00ae8c2a4d1eb744f762a0df023": {
+    "filename": "AEDoor.library",
+    "md5": "564bc00ae8c2a4d1eb744f762a0df023",
+    "archiveCount": 39,
+    "archives": [
+      "AEDOOR.LHA",
+      "ILT-MD01.LHA",
+      "ILT-MD02.LHA",
+      "ILT-PW1.LHA",
+      "ILT-PWF.LHA",
+      "ILT-SS13.LHA",
+      "ILT-SS14.LHA",
+      "IVN-N05.LHA",
+      "LGB-BO16.LHA",
+      "LGC-BJ07.LHA",
+      "LGC-BJ09.LHA",
+      "LGC-BL06.LHA",
+      "LGC-BO16.LHA",
+      "LGC-BV13.LHA",
+      "LGC-NT05.LHA",
+      "LGC-RB10.LHA",
+      "LGC-SI10.LHA",
+      "LGC-ST20.LHA",
+      "LSD-PFC1.LHA",
+      "MMH-GS13.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "4f4e8edac498a7c968c502ac39e3719b": {
+    "filename": ";_bIG_bANG_mULTI_mIX_.lHA",
+    "md5": "4f4e8edac498a7c968c502ac39e3719b",
+    "archiveCount": 123,
+    "archives": [
+      "AEDOOR.LHA",
+      "AMI-XPR1.LHA",
+      "AMI-XPR2.LHA",
+      "BK-UP10.LHA",
+      "BOSSNUKE.LHA",
+      "CAX-SIGN.LHA",
+      "CSCAN26B.LHA",
+      "H&V-E001.LHA",
+      "H26E01.LHA",
+      "H6V-E001.LHA",
+      "HCD-CS11.LHA",
+      "HMS-CL10.LHA",
+      "I!A-Y10.LHA",
+      "INS-RQ10.LHA",
+      "INS-S4S1.LHA",
+      "INS-SB27.LHA",
+      "INS-SD13.LHA",
+      "ISC-FC10.LHA",
+      "IVN-N05.LHA",
+      "JACKV2_1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "c7f0d0b2534068117367476341a60b6f": {
+    "filename": "pRESIDENT.nf0",
+    "md5": "c7f0d0b2534068117367476341a60b6f",
+    "archiveCount": 72,
+    "archives": [
+      "AEDOOR.LHA",
+      "AMI-XPR1.LHA",
+      "AMI-XPR2.LHA",
+      "CSCAN26B.LHA",
+      "H26E01.LHA",
+      "H6V-E001.LHA",
+      "HCD-CS11.LHA",
+      "NE-KICK.LHA",
+      "NTR-ST11.LHA",
+      "ODIR130.LHA",
+      "OGN-NC12.LHA",
+      "OGN-RV13.LHA",
+      "OPWINV19.LHA",
+      "OR-CT04.LHA",
+      "OTL-AW20.LHA",
+      "OTL-JC13.LHA",
+      "OTL-US10.LHA",
+      "PLCHK13.LHA",
+      "POD-BBSB.LHA",
+      "PS!-SPG1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3f8bf8bd5f997c375a405031e0230b4c": {
+    "filename": "At&T.text",
+    "md5": "3f8bf8bd5f997c375a405031e0230b4c",
+    "archiveCount": 13,
+    "archives": [
+      "AEG4.LHA",
+      "ATX-SAL5.LHA",
+      "DD-XIM.LHA",
+      "DPL-AO11.LHA",
+      "DPL-N44F.LHA",
+      "LED-CB10.LHA",
+      "LNS-TT2A.LHA",
+      "MST-MT11.LHA",
+      "OMN-DG12.LHA",
+      "PGS-SM38.LHA",
+      "PGS-SS10.LHA",
+      "TRSI-BK2.LHA",
+      "TRSI-DW2.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "488c859c0137f74e58608c01215fc966": {
+    "filename": "Phreak.txt",
+    "md5": "488c859c0137f74e58608c01215fc966",
+    "archiveCount": 11,
+    "archives": [
+      "AEG4.LHA",
+      "ATX-SAL5.LHA",
+      "DD-XIM.LHA",
+      "DPL-AO11.LHA",
+      "DPL-N44F.LHA",
+      "LED-CB10.LHA",
+      "LNS-TT2A.LHA",
+      "OMN-DG12.LHA",
+      "PGS-SM38.LHA",
+      "TRSI-BK2.LHA",
+      "TRSI-DW2.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "42e616ab4551252ea96d3da1852867e3": {
+    "filename": "change.txt",
+    "md5": "42e616ab4551252ea96d3da1852867e3",
+    "archiveCount": 13,
+    "archives": [
+      "AETOP22.LHA",
+      "AFL_BOOT.LHA",
+      "DPL_UN10.LHA",
+      "LAMEQWKR.LHA",
+      "MED-TAG.LHA",
+      "MST-EDIT.LHA",
+      "MST-STAT.LHA",
+      "NS_LB10.LHA",
+      "NS_SC10.LHA",
+      "ORS_CP10.LHA",
+      "TCN-MC01.LHA",
+      "TFA-EXP.LHA",
+      "WOT-DP11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0f24ee299fd54ae68f4c016bade70721": {
+    "filename": "textobj",
+    "md5": "0f24ee299fd54ae68f4c016bade70721",
+    "archiveCount": 12,
+    "archives": [
+      "AEXSETU.LHA",
+      "AMI-XPR1.LHA",
+      "AMIX500.LHA",
+      "AMIX510.LHA",
+      "AMIX520.LHA",
+      "AMIX530.LHA",
+      "DC-AX420.LHA",
+      "OGN-V48.LHA",
+      "RMC-WHO3.LHA",
+      "RMWHO3.LHA",
+      "STN_A335.LHA",
+      "TAI-FIRM.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b94b6dd458e5e3c60afeda885cf3a45a": {
+    "filename": "objtext",
+    "md5": "b94b6dd458e5e3c60afeda885cf3a45a",
+    "archiveCount": 15,
+    "archives": [
+      "AEXSETU.LHA",
+      "ALARM.LHA",
+      "AMI-XPR1.LHA",
+      "AMIX500.LHA",
+      "AMIX510.LHA",
+      "AMIX520.LHA",
+      "AMIX530.LHA",
+      "DC-AX420.LHA",
+      "OGN-V48.LHA",
+      "ORS-HB10.LHA",
+      "ORS-SA10.LHA",
+      "RMC-WHO3.LHA",
+      "RMWHO3.LHA",
+      "STN_A335.LHA",
+      "TAI-FIRM.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "692c3501b89bb09452d61470051c040b": {
+    "filename": "rexxport",
+    "md5": "692c3501b89bb09452d61470051c040b",
+    "archiveCount": 20,
+    "archives": [
+      "AEXSETU.LHA",
+      "AKA_MFIX.LHA",
+      "AKA_MFIX.LZH",
+      "AKA_MSG.LZH",
+      "AKA_TSEN.LHA",
+      "IA-OPA10.LHA",
+      "IA-SPD10.LHA",
+      "IA-WSE10.LHA",
+      "NE-LOG10.LHA",
+      "NJY-FC10.LHA",
+      "NJY-PC10.LHA",
+      "NJY-PL10.LHA",
+      "NJY-TS10.LHA",
+      "NVX-REM2.LHA",
+      "NVX-REM5.LHA",
+      "PIW-ST05.LHA",
+      "TRB_KI14.LHA",
+      "TRB_KI16.LHA",
+      "TRB_KWTF.LHA",
+      "TRB_WF11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b1ca979c4e47c7c99c1229ae8f527263": {
+    "filename": "rexxdoor",
+    "md5": "b1ca979c4e47c7c99c1229ae8f527263",
+    "archiveCount": 19,
+    "archives": [
+      "AEXSETU.LHA",
+      "IA-OPA10.LHA",
+      "IA-SPD10.LHA",
+      "IA-WSE10.LHA",
+      "NE-LOG10.LHA",
+      "PIW-ST05.LHA",
+      "TRB_KI14.LHA",
+      "TRB_KI16.LHA",
+      "TRB_KWTF.LHA",
+      "TRB_WF11.LHA",
+      "TRSI-BA.LHA",
+      "TRSI-CA.LHA",
+      "TRSI-DLS.LHA",
+      "TRSI-FUS.LHA",
+      "TRSI-MUC.LHA",
+      "TRSI-MW.LHA",
+      "TRSI-NUS.LHA",
+      "TRSI.CAF.LHA",
+      "TRS_UDC.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b29114f0375dc6a52a883cc119fb69c8": {
+    "filename": "2Nodez.TXT",
+    "md5": "b29114f0375dc6a52a883cc119fb69c8",
+    "archiveCount": 67,
+    "archives": [
+      "AFL-SW15.LHA",
+      "AFLCOM2.LHA",
+      "AFLWHO10.LHA",
+      "AFL_BULL.LHA",
+      "AFL_COM1.LHA",
+      "AFL_FILE.LHA",
+      "AFL_NEW.LHA",
+      "AFL_NEW1.LHA",
+      "AFS.LHA",
+      "AF_HI11.LHA",
+      "AF_SES10.LHA",
+      "AIRADD30.LHA",
+      "AIRADD31.LHA",
+      "ALCMAIL1.LHA",
+      "AMI-FLT.LHA",
+      "AMIHACK.LHA",
+      "AMIP10.LHA",
+      "AMIPASS1.LHA",
+      "AMIREXX.LHA",
+      "AMITOOL7.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3b38876da8302ca2bac1cc0792093273": {
+    "filename": "Dream-Machine-team.TXT",
+    "md5": "3b38876da8302ca2bac1cc0792093273",
+    "archiveCount": 74,
+    "archives": [
+      "AFL-SW15.LHA",
+      "AFLCOM2.LHA",
+      "AFLWHO10.LHA",
+      "AFL_BULL.LHA",
+      "AFL_COM1.LHA",
+      "AFL_FILE.LHA",
+      "AFL_NEW.LHA",
+      "AFL_NEW1.LHA",
+      "AFS.LHA",
+      "AF_HI11.LHA",
+      "AF_SES10.LHA",
+      "AIRADD30.LHA",
+      "AIRADD31.LHA",
+      "ALCMAIL1.LHA",
+      "AMI-FLT.LHA",
+      "AMIHACK.LHA",
+      "AMIP10.LHA",
+      "AMIPASS1.LHA",
+      "AMIREXX.LHA",
+      "AMITOOL7.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "8ff1bb14400ac88bc71dd7ee39d4a93e": {
+    "filename": "FREEDL.txt",
+    "md5": "8ff1bb14400ac88bc71dd7ee39d4a93e",
+    "archiveCount": 74,
+    "archives": [
+      "AFL-SW15.LHA",
+      "AFLCOM2.LHA",
+      "AFLWHO10.LHA",
+      "AFL_BULL.LHA",
+      "AFL_COM1.LHA",
+      "AFL_FILE.LHA",
+      "AFL_NEW.LHA",
+      "AFL_NEW1.LHA",
+      "AFS.LHA",
+      "AF_HI11.LHA",
+      "AF_SES10.LHA",
+      "AIRADD30.LHA",
+      "AIRADD31.LHA",
+      "ALCMAIL1.LHA",
+      "AMI-FLT.LHA",
+      "AMIHACK.LHA",
+      "AMIP10.LHA",
+      "AMIPASS1.LHA",
+      "AMIREXX.LHA",
+      "AMITOOL7.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9c28109c451dc6941e86d441f96dd01d": {
+    "filename": "Nirvana.txt",
+    "md5": "9c28109c451dc6941e86d441f96dd01d",
+    "archiveCount": 72,
+    "archives": [
+      "AFL-SW15.LHA",
+      "AFLCOM2.LHA",
+      "AFLWHO10.LHA",
+      "AFL_BULL.LHA",
+      "AFL_COM1.LHA",
+      "AFL_FILE.LHA",
+      "AFL_NEW.LHA",
+      "AFL_NEW1.LHA",
+      "AFS.LHA",
+      "AF_HI11.LHA",
+      "AF_SES10.LHA",
+      "AIRADD30.LHA",
+      "AIRADD31.LHA",
+      "ALCMAIL1.LHA",
+      "AMI-FLT.LHA",
+      "AMIHACK.LHA",
+      "AMIP10.LHA",
+      "AMIPASS1.LHA",
+      "AMIREXX.LHA",
+      "AMITOOL7.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "4115c0ff2ac971d2c261ab778f7ba788": {
+    "filename": "PH!.DISPLAYME",
+    "md5": "4115c0ff2ac971d2c261ab778f7ba788",
+    "archiveCount": 15,
+    "archives": [
+      "AFL_BM1.LHA",
+      "DPL_GB10.LHA",
+      "DPL_MA13.LHA",
+      "DPL_MV10.LHA",
+      "DPL_TL10.LHA",
+      "EMP_UA10.LHA",
+      "ISTRIP04.LHA",
+      "ISTRIP06.LHA",
+      "LGC_BEST.LHA",
+      "MSCANV10.LHA",
+      "MST-LT12.LHA",
+      "ORS_GO10.LHA",
+      "OTM_CU13.LHA",
+      "SLK_V1_0.LHA",
+      "SR_EX2_3.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "58ecf064324e8c478f437a302865915f": {
+    "filename": "rexxdoor",
+    "md5": "58ecf064324e8c478f437a302865915f",
+    "archiveCount": 18,
+    "archives": [
+      "AKA_FRON.LZH",
+      "AKA_MFIX.LHA",
+      "AKA_MFIX.LZH",
+      "AKA_MSG.LZH",
+      "AKA_TSEN.LHA",
+      "AMI-XPR1.LHA",
+      "AMIX500.LHA",
+      "AMIX510.LHA",
+      "AMIX520.LHA",
+      "AMIX530.LHA",
+      "J&D-INF.LHA",
+      "NJY-FC10.LHA",
+      "NJY-PC10.LHA",
+      "NJY-PL10.LHA",
+      "NJY-TS10.LHA",
+      "TRSI-X2F.LHA",
+      "TRSI_X2F.LHA",
+      "VES-FAC1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "31e40a73c6297f15a766c4f4a9cd880f": {
+    "filename": "info",
+    "md5": "31e40a73c6297f15a766c4f4a9cd880f",
+    "archiveCount": 11,
+    "archives": [
+      "AKA_MFIX.LHA",
+      "ELT-SD27.LHA",
+      "IA-SPD10.LHA",
+      "ML-CBD12.LHA",
+      "MST-MT21.LHA",
+      "OTL-RQ20.LHA",
+      "PTL-FRD4.LHA",
+      "RYL-CS16.LHA",
+      "STAKE.LHA",
+      "TRSICD1P.LHA",
+      "VTY-WA10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "76ea5ccae41f5c536e1ce63f448f89d6": {
+    "filename": "HuntVirus",
+    "md5": "76ea5ccae41f5c536e1ce63f448f89d6",
+    "archiveCount": 14,
+    "archives": [
+      "AKA_MFIX.LHA",
+      "ELT-SD27.LHA",
+      "IA-SPD10.LHA",
+      "I^C.LHA",
+      "ML-CBD12.LHA",
+      "MST-MT21.LHA",
+      "MSY-LR10.LHA",
+      "OTL-RQ20.LHA",
+      "PTL-FRD4.LHA",
+      "RYL-CS16.LHA",
+      "SAD-FE16.LHA",
+      "STAKE.LHA",
+      "TRSICD1P.LHA",
+      "VTY-WA10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "29db8d9b15c1dd3db7b63b9ce49b8d48": {
+    "filename": "KillCommandVirus",
+    "md5": "29db8d9b15c1dd3db7b63b9ce49b8d48",
+    "archiveCount": 15,
+    "archives": [
+      "AKA_MFIX.LHA",
+      "ELT-SD27.LHA",
+      "IA-SPD10.LHA",
+      "I^C.LHA",
+      "ML-CBD12.LHA",
+      "MST-MT21.LHA",
+      "MSY-LR10.LHA",
+      "OTL-RQ20.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-SX10.LHA",
+      "RYL-CS16.LHA",
+      "SAD-FE16.LHA",
+      "STAKE.LHA",
+      "TRSICD1P.LHA",
+      "VTY-WA10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "833f9f4c894bf49a0404858b8e2cdabc": {
+    "filename": "neuk_me",
+    "md5": "833f9f4c894bf49a0404858b8e2cdabc",
+    "archiveCount": 25,
+    "archives": [
+      "AKA_MFIX.LZH",
+      "ATX-CHAT.LHA",
+      "AVT-TD01.LHA",
+      "BB28NRM.LZH",
+      "BREAD13.LZH",
+      "COP-PW.LHA",
+      "COP-UP.LHA",
+      "EMP-BL21.LHA",
+      "FID15CR.LHA",
+      "LATER.LHA",
+      "MST-COM2.LHA",
+      "MST-CSF2.LHA",
+      "MST-KB14.LHA",
+      "MST-STSH.LHA",
+      "NE-BS01.LHA",
+      "RG-CHECK.LHA",
+      "S!X039D.LHA",
+      "STM-SIN1.LHA",
+      "TRSI-C21.LHA",
+      "TRSI-OM2.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "b7a42e315e273cbb94e796cdc6f43bff": {
+    "filename": "AmigaGuide",
+    "md5": "b7a42e315e273cbb94e796cdc6f43bff",
+    "archiveCount": 15,
+    "archives": [
+      "ALARM.LHA",
+      "HP4LV095.LHA",
+      "ORS-CP11.LHA",
+      "ORS-GO19.LHA",
+      "ORS-HB10.LHA",
+      "ORS-ID10.LHA",
+      "ORS-ID12.LHA",
+      "ORS-KM21.LHA",
+      "ORS-SA10.LHA",
+      "ORS-SD01.LHA",
+      "ORS_AX10.LHA",
+      "ORS_CP10.LHA",
+      "ORS_CP11.LHA",
+      "ORS_GO10.LHA",
+      "ORS_GO15.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "2f73041403135a857042916f80bf9b92": {
+    "filename": "MM_TOOLS.info",
+    "md5": "2f73041403135a857042916f80bf9b92",
+    "archiveCount": 12,
+    "archives": [
+      "ALARM.LHA",
+      "HP4LV095.LHA",
+      "ORS-GO19.LHA",
+      "ORS-HB10.LHA",
+      "ORS-ID10.LHA",
+      "ORS-ID12.LHA",
+      "ORS-KM21.LHA",
+      "ORS-SA10.LHA",
+      "ORS-SA11.LHA",
+      "ORS_AX10.LHA",
+      "ORS_GO10.LHA",
+      "ORS_GO15.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "4478890479078acfc448c1fb4d0685ea": {
+    "filename": "Delete",
+    "md5": "4478890479078acfc448c1fb4d0685ea",
+    "archiveCount": 14,
+    "archives": [
+      "ALARM.LHA",
+      "BBSSCAN.LHA",
+      "IMPST231.LHA",
+      "LSD_VDRQ.LHA",
+      "MOMAIL15.LHA",
+      "MOMAIL17.LHA",
+      "ORS-GO19.LHA",
+      "ORS-HB10.LHA",
+      "ORS-ID10.LHA",
+      "ORS-ID12.LHA",
+      "ORS-SA10.LHA",
+      "S8_VS15.LHA",
+      "TRB_VDT3.LHA",
+      "TRB_VDTP.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "07c58b1488e8ccb817730682d48e8cf2": {
+    "filename": "amigaguide.library",
+    "md5": "07c58b1488e8ccb817730682d48e8cf2",
+    "archiveCount": 23,
+    "archives": [
+      "ALARM.LHA",
+      "HBT-PW21.LHA",
+      "HNY-TC21.LHA",
+      "HNY-TC22.LHA",
+      "HNY-TL21.LHA",
+      "HNY-TL22.LHA",
+      "HNY-TM21.LHA",
+      "HNY-TM22.LHA",
+      "HNY-TP22.LHA",
+      "HP4LV095.LHA",
+      "LOBSTER1.LHA",
+      "ORS-GO19.LHA",
+      "ORS-HB10.LHA",
+      "ORS-ID10.LHA",
+      "ORS-ID12.LHA",
+      "ORS-KM21.LHA",
+      "ORS-SA10.LHA",
+      "ORS-SD01.LHA",
+      "ORS_AX10.LHA",
+      "ORS_CP10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "22e2be100e4c469907490ce53a0ae1bf": {
+    "filename": "AJAX^",
+    "md5": "22e2be100e4c469907490ce53a0ae1bf",
+    "archiveCount": 14,
+    "archives": [
+      "ALYNX131.LHA",
+      "AMIBULLS.LHA",
+      "AMIX_E.LHA",
+      "CAX-TAL.LHA",
+      "DTC-SR10.LHA",
+      "DXSF504.LHA",
+      "ILT-CO10.LHA",
+      "ILT-SC10.LHA",
+      "OPS-DW21.LHA",
+      "SAD-FD11.LHA",
+      "SAD-JC11.LHA",
+      "SAD-LC20.LHA",
+      "TRB-DV10.LHA",
+      "TRB-II10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "91fd55945dc75fcdb42e5a14a0d8bdbd": {
+    "filename": "dVS&sXI.dHQ!tRSI&gCS.wHQ!",
+    "md5": "91fd55945dc75fcdb42e5a14a0d8bdbd",
+    "archiveCount": 18,
+    "archives": [
+      "AMI-FIDO.LHA",
+      "BBL-LT02.LHA",
+      "BTH-PA01.LHA",
+      "BTH-ST05.LHA",
+      "BTH-WA02.LHA",
+      "COP-DOOR.LHA",
+      "DLW-LR10.LHA",
+      "LGC-BJ07.LHA",
+      "LGC-BL06.LHA",
+      "LGC-BO16.LHA",
+      "MGS!-C11.LHA",
+      "MGS-NDES.LHA",
+      "NTR-FD21.LHA",
+      "RST-DP.LHA",
+      "RST-SL9.LHA",
+      "STA.LHA",
+      "SX-BS-01.LHA",
+      "TRSI-PM1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0f77df1bb51316ba97d1d4f7ae09f32f": {
+    "filename": "neuk_me",
+    "md5": "0f77df1bb51316ba97d1d4f7ae09f32f",
+    "archiveCount": 16,
+    "archives": [
+      "AMIFAK24.LHA",
+      "CONF.LHA",
+      "D&B-FD10.LHA",
+      "DCS_AX14.LHA",
+      "ECL_EX13.LHA",
+      "GOD-QN21.LZH",
+      "M22-LC10.LHA",
+      "MDBLC005.LHA",
+      "SAD-CO11.LHA",
+      "SAD-CO15.LHA",
+      "SAD-FE10.LHA",
+      "TRSI-ADD.LHA",
+      "TRSI-SV3.LHA",
+      "TTN-FRG1.LHA",
+      "XCALL100.LHA",
+      "ZIPLHA.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "6632174762bdb6be639ded7ac957e7f5": {
+    "filename": "Ringelblume4.txt",
+    "md5": "6632174762bdb6be639ded7ac957e7f5",
+    "archiveCount": 42,
+    "archives": [
+      "AMIX.LHA",
+      "BB28NRM.LHA",
+      "BK-APPRD.LHA",
+      "BK-FILEC.LHA",
+      "BK-RL01.LHA",
+      "BK-SI11.LHA",
+      "BK-SIZEC.LHA",
+      "BONDOSV9.LHA",
+      "BREAD13.LHA",
+      "CRD!SX.LHA",
+      "CRX-NTA.LHA",
+      "CRX-NU12.LHA",
+      "DCD!XPRT.LHA",
+      "DCN_FID3.LHA",
+      "EXC_WAL2.LHA",
+      "F123_DOC.LHA",
+      "F123_INS.LHA",
+      "F123_MAI.LHA",
+      "FAMERC11.LHA",
+      "FCHECK.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "1d7b8cfdd2e5ecafacd8156c9cdd2aa3": {
+    "filename": "UNZIP",
+    "md5": "1d7b8cfdd2e5ecafacd8156c9cdd2aa3",
+    "archiveCount": 10,
+    "archives": [
+      "ARCDOOR.LHA",
+      "NB-BV1.LHA",
+      "SHT-SD22.LHA",
+      "SHT-SD23.LHA",
+      "SNATCHDZ.LHA",
+      "SNDIZ2$3.LHA",
+      "SNDIZ2.LHA",
+      "SNDIZ23.LHA",
+      "SPR-SDIZ.LHA",
+      "TRSI-MV2.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "a7f6ed62a513a74c011bbb5f8dac9208": {
+    "filename": "DIGITAL-X.iff",
+    "md5": "a7f6ed62a513a74c011bbb5f8dac9208",
+    "archiveCount": 19,
+    "archives": [
+      "ARRANGE.LHA",
+      "ARTM210.LHA",
+      "ASCEOL.LHA",
+      "ASEND10.LHA",
+      "ASH_STAT.LHA",
+      "ASMPAGE.LHA",
+      "ASWITCH.LHA",
+      "AT20.LHA",
+      "ATA30.LHA",
+      "ATA_V20.LHA",
+      "ATX-DMSA.LHA",
+      "ATX-STAT.LHA",
+      "ATX-STC1.LHA",
+      "ATX-TOP2.LHA",
+      "ATX-TSTA.LHA",
+      "ATX-TTOP.LHA",
+      "ATXTBAR1.LHA",
+      "AUSER.LHA",
+      "AUTOAXX.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "3b4f3423a2e059cac218b3d839456c81": {
+    "filename": "CheapCDs",
+    "md5": "3b4f3423a2e059cac218b3d839456c81",
+    "archiveCount": 14,
+    "archives": [
+      "ATM-GR10.LHA",
+      "AWAIT.LHA",
+      "CYSHOW52.LHA",
+      "DFC-AS11.LHA",
+      "DSV2_00.LHA",
+      "RSTDP13.LHA",
+      "RSTSL11.LHA",
+      "SAD-DE10.LHA",
+      "SAD-STRP.LHA",
+      "SAD-UL10.LHA",
+      "TRSI-SDL.LHA",
+      "WNUKE06.LHA",
+      "WW-YO.LHA",
+      "XPSTR102.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "6f972a759114067b765aaf25b30615f5": {
+    "filename": "Needed.txt",
+    "md5": "6f972a759114067b765aaf25b30615f5",
+    "archiveCount": 15,
+    "archives": [
+      "ATM-GR10.LHA",
+      "AWAIT.LHA",
+      "CYSHOW52.LHA",
+      "DFC-AS11.LHA",
+      "DSV2_00.LHA",
+      "REA-BC10.LHA",
+      "RSTDP13.LHA",
+      "RSTSL11.LHA",
+      "SAD-DE10.LHA",
+      "SAD-STRP.LHA",
+      "SAD-UL10.LHA",
+      "TRSI-SDL.LHA",
+      "WNUKE06.LHA",
+      "WW-YO.LHA",
+      "XPSTR102.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "ba82777f4b47649a6f6973bab394f78b": {
+    "filename": "You're.next!",
+    "md5": "ba82777f4b47649a6f6973bab394f78b",
+    "archiveCount": 15,
+    "archives": [
+      "ATM-GR10.LHA",
+      "AWAIT.LHA",
+      "CYSHOW52.LHA",
+      "DFC-AS11.LHA",
+      "DSV2_00.LHA",
+      "REA-BC10.LHA",
+      "RSTDP13.LHA",
+      "RSTSL11.LHA",
+      "SAD-DE10.LHA",
+      "SAD-STRP.LHA",
+      "SAD-UL10.LHA",
+      "TRSI-SDL.LHA",
+      "WNUKE06.LHA",
+      "WW-YO.LHA",
+      "XPSTR102.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "8cf1f5b99eba4a431fc96aca838d5b7b": {
+    "filename": "BLA1.TXT",
+    "md5": "8cf1f5b99eba4a431fc96aca838d5b7b",
+    "archiveCount": 10,
+    "archives": [
+      "ATX-MESS.LHA",
+      "ATX-STAT.LZH",
+      "CPSTHING.LHA",
+      "CRZ-HP10.LHA",
+      "DCS_TZ1P.LHA",
+      "KCTUP11J.LHA",
+      "MST-STSH.LHA",
+      "TSN-OECK.LHA",
+      "VTL-SC21.LHA",
+      "ZIPLHA.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bfd296efa2993a6d180de724feca4102": {
+    "filename": "PISUP.TXT",
+    "md5": "bfd296efa2993a6d180de724feca4102",
+    "archiveCount": 10,
+    "archives": [
+      "ATX-MESS.LHA",
+      "ATX-STAT.LZH",
+      "CPSTHING.LHA",
+      "CRZ-HP10.LHA",
+      "DCS_TZ1P.LHA",
+      "KCTUP11J.LHA",
+      "MST-STSH.LHA",
+      "TSN-OECK.LHA",
+      "VTL-SC21.LHA",
+      "ZIPLHA.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "ce37294b95f84f3ec2ba7a82fe96a63d": {
+    "filename": "DirDate",
+    "md5": "ce37294b95f84f3ec2ba7a82fe96a63d",
+    "archiveCount": 16,
+    "archives": [
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-SAL4.LHA",
+      "ATX-SAL5.LHA",
+      "ATX-STAT.LHA",
+      "ATX-STC1.LHA",
+      "ATX-STC3.LHA",
+      "ATX-T104.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TC2.LHA",
+      "ATX-TC22.LHA",
+      "ATX-TCOM.LHA",
+      "ATX-TCON.LHA",
+      "ATX-TT15.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "09f16aff23772443612b33b9e4dcb2a6": {
+    "filename": "SAmiLog",
+    "md5": "09f16aff23772443612b33b9e4dcb2a6",
+    "archiveCount": 11,
+    "archives": [
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-SAL4.LHA",
+      "ATX-STAT.LHA",
+      "ATX-STC1.LHA",
+      "ATX-T104.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TT15.LHA",
+      "ATXTBAR1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9cef1f6824ebd6fcf81432692eda62f5": {
+    "filename": "SOON_Clock-door",
+    "md5": "9cef1f6824ebd6fcf81432692eda62f5",
+    "archiveCount": 15,
+    "archives": [
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-SAL4.LHA",
+      "ATX-SAL5.LHA",
+      "ATX-STAT.LHA",
+      "ATX-STC1.LHA",
+      "ATX-STC3.LHA",
+      "ATX-T104.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TCON.LHA",
+      "ATX-TSTA.LHA",
+      "ATX-TT15.LHA",
+      "ATXTBAR1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9af0286a0ec72b6e9537c46056a90c1a": {
+    "filename": "ThrashConf",
+    "md5": "9af0286a0ec72b6e9537c46056a90c1a",
+    "archiveCount": 15,
+    "archives": [
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-SAL4.LHA",
+      "ATX-SAL5.LHA",
+      "ATX-STAT.LHA",
+      "ATX-STC1.LHA",
+      "ATX-STC3.LHA",
+      "ATX-T104.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TC2.LHA",
+      "ATX-TC22.LHA",
+      "ATX-TCOM.LHA",
+      "ATX-TCON.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0ba42f29fa7c749dabbee3dc453717b6": {
+    "filename": "UserInfo-Door",
+    "md5": "0ba42f29fa7c749dabbee3dc453717b6",
+    "archiveCount": 15,
+    "archives": [
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-SAL4.LHA",
+      "ATX-SAL5.LHA",
+      "ATX-STAT.LHA",
+      "ATX-STC1.LHA",
+      "ATX-T104.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TC2.LHA",
+      "ATX-TC22.LHA",
+      "ATX-TCOM.LHA",
+      "ATX-TCON.LHA",
+      "ATX-TT15.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "22c9d90a0ef167070b6c7bc0ca836c35": {
+    "filename": "UserMsg-Door",
+    "md5": "22c9d90a0ef167070b6c7bc0ca836c35",
+    "archiveCount": 16,
+    "archives": [
+      "ATX-NEWL.LHA",
+      "ATX-SAL1.LHA",
+      "ATX-SAL2.LHA",
+      "ATX-SAL3.LHA",
+      "ATX-SAL4.LHA",
+      "ATX-SAL5.LHA",
+      "ATX-STAT.LHA",
+      "ATX-STC1.LHA",
+      "ATX-STC3.LHA",
+      "ATX-T104.LHA",
+      "ATX-TBAR.LHA",
+      "ATX-TC2.LHA",
+      "ATX-TC22.LHA",
+      "ATX-TCOM.LHA",
+      "ATX-TCON.LHA",
+      "ATX-TT15.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "493a58ac64a75f63d480e28d7a816e61": {
+    "filename": "anime.doc",
+    "md5": "493a58ac64a75f63d480e28d7a816e61",
+    "archiveCount": 14,
+    "archives": [
+      "ATX-SRQ.LHA",
+      "ATX-SRQ2.LHA",
+      "FRODOV1.LHA",
+      "GW218.LHA",
+      "LGC-NT05.LHA",
+      "LGC-RB10.LHA",
+      "LGC-SI10.LHA",
+      "LGC-ST20.LHA",
+      "LGC-USER.LHA",
+      "NB-VIEW1.LHA",
+      "R^D-LCNA.LHA",
+      "TRSI-W18.LHA",
+      "WOA-FR10.LHA",
+      "WOA-TC11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "7aa53849181ba90164c9721976b814cd": {
+    "filename": "AEDoor.library",
+    "md5": "7aa53849181ba90164c9721976b814cd",
+    "archiveCount": 14,
+    "archives": [
+      "AXP_EALL.LHA",
+      "GOD-BS15.LHA",
+      "GOD-CCOM.LHA",
+      "GOD-FRON.LHA",
+      "GOD-SCAN.LHA",
+      "GOD-WA14.LHA",
+      "GOD-WEEK.LHA",
+      "GOD_WALL.LHA",
+      "LGC_BEST.LHA",
+      "OD-BS15.LHA",
+      "TRY-LB30.LHA",
+      "WOT-AD14.LHA",
+      "WOT-ATAG.LHA",
+      "WOT-DP11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "38c2dab72b47580ddaa13e835b0168c1": {
+    "filename": "SHIT_EY",
+    "md5": "38c2dab72b47580ddaa13e835b0168c1",
+    "archiveCount": 12,
+    "archives": [
+      "AYS-SP10.LHA",
+      "DS9.V1.4.LHA",
+      "LAMEQWKR.LHA",
+      "MAN_DJ01.LHA",
+      "MDB-LC16.LHA",
+      "ORS_GO10.LHA",
+      "OTL-CR10.LHA",
+      "OTM_CU13.LHA",
+      "TRSI-FUS.LHA",
+      "TRSI_C13.LHA",
+      "TRSI_CAD.LHA",
+      "TRY_STC1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "6b9d7b9cb6ba0cfa8700fb5d4aef4c10": {
+    "filename": "zip",
+    "md5": "6b9d7b9cb6ba0cfa8700fb5d4aef4c10",
+    "archiveCount": 18,
+    "archives": [
+      "BBZC0410.LHA",
+      "BFG_FLDL.LHA",
+      "CHECK.LHA",
+      "DC-X107I.LHA",
+      "DCN!F-X2.LHA",
+      "FCHECLAM.LHA",
+      "LGC-ZIP.LHA",
+      "LSD-FLD.LHA",
+      "MCHECK.LHA",
+      "MCHECK15.LHA",
+      "MTLCHK.LHA",
+      "SLKVIW20.LHA",
+      "SLK_V1_0.LHA",
+      "TRSI-M12.LHA",
+      "TRSI-MC5.LHA",
+      "TRSI-MCK.LHA",
+      "TRSI-TL2.LHA",
+      "X!-ZS110.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "a2d4eebba55e9dec933724af051bb0d7": {
+    "filename": "pRESIDENT.nf0",
+    "md5": "a2d4eebba55e9dec933724af051bb0d7",
+    "archiveCount": 10,
+    "archives": [
+      "BK-PB10.LHA",
+      "BK-UP10.LHA",
+      "BOSSNUKE.LHA",
+      "CAX-SIGN.LHA",
+      "NTR-FR10.LHA",
+      "RLX-MOVE.LHA",
+      "SALVUSER.LHA",
+      "SBS-QR.LHA",
+      "STEGA.LHA",
+      "TZZ-WA96.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "d026e79ebe2b7c0b8840e639dba62c82": {
+    "filename": "marmion.srg",
+    "md5": "d026e79ebe2b7c0b8840e639dba62c82",
+    "archiveCount": 11,
+    "archives": [
+      "BSTRIP.LHA",
+      "DATATYPE.LHA",
+      "ORS-FC11.LHA",
+      "ORS-HB10.LHA",
+      "ORS-ID10.LHA",
+      "SAD^FI20.LHA",
+      "SAD^LIBS.LHA",
+      "STRACKER.LHA",
+      "TFP-TD62.LHA",
+      "THX-WH16.LHA",
+      "TRSI-CAD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "e6b45f8edde4907dc2a3bc5252230f47": {
+    "filename": "vorlrnkx",
+    "md5": "e6b45f8edde4907dc2a3bc5252230f47",
+    "archiveCount": 11,
+    "archives": [
+      "BTH-PA01.LHA",
+      "BTH-ST05.LHA",
+      "BTH-WA02.LHA",
+      "CLI-NML3.LHA",
+      "CLI-NUL1.LHA",
+      "COP-DOOR.LHA",
+      "MSTGD121.LHA",
+      "NE-KICK.LHA",
+      "SAD-FE10.LHA",
+      "TRSI-SV3.LHA",
+      "TRSICD1P.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "842f7e752d290bd1075e697794e0ff58": {
+    "filename": "AmiExpress-Support",
+    "md5": "842f7e752d290bd1075e697794e0ff58",
+    "archiveCount": 25,
+    "archives": [
+      "BULLS.LHA",
+      "LOGSHRIN.LHA",
+      "MGS!-B15.LHA",
+      "MGS-DIRX.LHA",
+      "MGS-LOG.LHA",
+      "MGS-LOGS.LHA",
+      "MGS-MAG.LHA",
+      "MGS-MAGL.LHA",
+      "MGS-MAGZ.LHA",
+      "MGS-MDIR.LHA",
+      "MGS-MGZD.LHA",
+      "MGS-NMSG.LHA",
+      "MGS-USRS.LHA",
+      "MGS-USTA.LHA",
+      "MGS-WALL.LHA",
+      "MGS-WHAL.LHA",
+      "MGS-ZSEA.LHA",
+      "MGSMAGLI.LHA",
+      "MGSMGZ.LHA",
+      "MGSNODEM.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0dc5ebb6ce4423ac39fe3c8034e0f9ce": {
+    "filename": "Compofile.CFG",
+    "md5": "0dc5ebb6ce4423ac39fe3c8034e0f9ce",
+    "archiveCount": 30,
+    "archives": [
+      "BULLS.LHA",
+      "LOGSHRIN.LHA",
+      "MGS!-B15.LHA",
+      "MGS!-C05.LHA",
+      "MGS!-LM1.LHA",
+      "MGS!-LS1.LHA",
+      "MGS!-MDX.LHA",
+      "MGS!-US1.LHA",
+      "MGS!-WH1.LHA",
+      "MGS!-ZS1.LHA",
+      "MGS-DIRX.LHA",
+      "MGS-LOG.LHA",
+      "MGS-LOGS.LHA",
+      "MGS-MAG.LHA",
+      "MGS-MAGL.LHA",
+      "MGS-MAGZ.LHA",
+      "MGS-MDIR.LHA",
+      "MGS-MGZD.LHA",
+      "MGS-USRS.LHA",
+      "MGS-USTA.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "33921c7b1ddbd7413b3ce26b0192af86": {
+    "filename": "+KICK<>THIZ+",
+    "md5": "33921c7b1ddbd7413b3ce26b0192af86",
+    "archiveCount": 26,
+    "archives": [
+      "BULLS.LHA",
+      "LOGSHRIN.LHA",
+      "MGS!-C11.LHA",
+      "MGS-CHAT.LHA",
+      "MGS-DIRX.LHA",
+      "MGS-GDUP.LHA",
+      "MGS-LOG.LHA",
+      "MGS-LOGS.LHA",
+      "MGS-MAG.LHA",
+      "MGS-MAGL.LHA",
+      "MGS-MAGZ.LHA",
+      "MGS-MCHA.LHA",
+      "MGS-MDIR.LHA",
+      "MGS-MGZD.LHA",
+      "MGS-USRS.LHA",
+      "MGS-USTA.LHA",
+      "MGS-WALL.LHA",
+      "MGS-WHAL.LHA",
+      "MGS-ZSEA.LHA",
+      "MGSMAGLI.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "832303ff1f3c8ea9896e1f3df5f08ddd": {
+    "filename": "Gulrotsaft",
+    "md5": "832303ff1f3c8ea9896e1f3df5f08ddd",
+    "archiveCount": 31,
+    "archives": [
+      "BULLS.LHA",
+      "LOGSHRIN.LHA",
+      "MGS-AREW.LHA",
+      "MGS-ATRW.LHA",
+      "MGS-AWRD.LHA",
+      "MGS-CHAT.LHA",
+      "MGS-DIRX.LHA",
+      "MGS-GDUP.LHA",
+      "MGS-LOG.LHA",
+      "MGS-LOGS.LHA",
+      "MGS-MAG.LHA",
+      "MGS-MAGL.LHA",
+      "MGS-MAGZ.LHA",
+      "MGS-MCHA.LHA",
+      "MGS-MDIR.LHA",
+      "MGS-MGZD.LHA",
+      "MGS-NOST.LHA",
+      "MGS-NST.LHA",
+      "MGS-STAT.LHA",
+      "MGS-USRS.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "62b8ca4d4fef038ed1eb9d7627dc8719": {
+    "filename": "Reklame.asc",
+    "md5": "62b8ca4d4fef038ed1eb9d7627dc8719",
+    "archiveCount": 25,
+    "archives": [
+      "BULLS.LHA",
+      "LOGSHRIN.LHA",
+      "MGS!-C11.LHA",
+      "MGS-CHAT.LHA",
+      "MGS-DIRX.LHA",
+      "MGS-GDUP.LHA",
+      "MGS-LOG.LHA",
+      "MGS-LOGS.LHA",
+      "MGS-MAG.LHA",
+      "MGS-MAGL.LHA",
+      "MGS-MAGZ.LHA",
+      "MGS-MCHA.LHA",
+      "MGS-MDIR.LHA",
+      "MGS-MGZD.LHA",
+      "MGS-USRS.LHA",
+      "MGS-USTA.LHA",
+      "MGS-WALL.LHA",
+      "MGS-WHAL.LHA",
+      "MGS-ZSEA.LHA",
+      "MGSMAGLI.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "71d6a5e9dc6985d0ccceb44294c23a58": {
+    "filename": "rexxtricks.library",
+    "md5": "71d6a5e9dc6985d0ccceb44294c23a58",
+    "archiveCount": 13,
+    "archives": [
+      "CB4!SA50.LHA",
+      "CB4!SA63.LHA",
+      "CB4!ST13.LHA",
+      "FCHECLAM.LHA",
+      "MO-OVER.LHA",
+      "MO-ST10.LHA",
+      "SDM!LC11.LHA",
+      "SDM!LC1O.LHA",
+      "SDM!TD1O.LHA",
+      "TEL-TP02.LHA",
+      "TON!-II1.LHA",
+      "TON!-T11.LHA",
+      "TON-VCV1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "68adb36432f7ef67f7edd779038c674c": {
+    "filename": "COMMANDS.info",
+    "md5": "68adb36432f7ef67f7edd779038c674c",
+    "archiveCount": 12,
+    "archives": [
+      "CD-SE103.LHA",
+      "CD-SRV13.LHA",
+      "CD-SV103.LHA",
+      "CDSER103.LHA",
+      "CDSERV.LHA",
+      "CDSERVER.LHA",
+      "CD_SE103.LHA",
+      "TRSI-CD1.LHA",
+      "TRSI-CDS.LHA",
+      "TRSIC103.LHA",
+      "TRSICD13.LHA",
+      "TRSICD1P.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "802baad8f158b47904fbca297fbe050b": {
+    "filename": "BBSCMD.info",
+    "md5": "802baad8f158b47904fbca297fbe050b",
+    "archiveCount": 12,
+    "archives": [
+      "CD-SE103.LHA",
+      "CD-SRV13.LHA",
+      "CD-SV103.LHA",
+      "CDSER103.LHA",
+      "CDSERV.LHA",
+      "CDSERVER.LHA",
+      "CD_SE103.LHA",
+      "TRSI-CD1.LHA",
+      "TRSI-CDS.LHA",
+      "TRSIC103.LHA",
+      "TRSICD13.LHA",
+      "TRSICD1P.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "d42c1dbb06fdfc730db45cb8ad26920d": {
+    "filename": "CD.INFO",
+    "md5": "d42c1dbb06fdfc730db45cb8ad26920d",
+    "archiveCount": 12,
+    "archives": [
+      "CD-SE103.LHA",
+      "CD-SRV13.LHA",
+      "CD-SV103.LHA",
+      "CDSER103.LHA",
+      "CDSERV.LHA",
+      "CDSERVER.LHA",
+      "CD_SE103.LHA",
+      "TRSI-CD1.LHA",
+      "TRSI-CDS.LHA",
+      "TRSIC103.LHA",
+      "TRSICD13.LHA",
+      "TRSICD1P.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "66f51b09759378a8d728b17106818515": {
+    "filename": "DOORS.info",
+    "md5": "66f51b09759378a8d728b17106818515",
+    "archiveCount": 12,
+    "archives": [
+      "CD-SE103.LHA",
+      "CD-SRV13.LHA",
+      "CD-SV103.LHA",
+      "CDSER103.LHA",
+      "CDSERV.LHA",
+      "CDSERVER.LHA",
+      "CD_SE103.LHA",
+      "TRSI-CD1.LHA",
+      "TRSI-CDS.LHA",
+      "TRSIC103.LHA",
+      "TRSICD13.LHA",
+      "TRSICD1P.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "4e67248f39ffacd4a1adc9e268efbe5d": {
+    "filename": "guide2docprof",
+    "md5": "4e67248f39ffacd4a1adc9e268efbe5d",
+    "archiveCount": 15,
+    "archives": [
+      "CD-SE103.LHA",
+      "CD-SRV13.LHA",
+      "CD-SV103.LHA",
+      "CDSER103.LHA",
+      "CDSERV.LHA",
+      "CDSERVER.LHA",
+      "CD_SE103.LHA",
+      "TRSI-CD1.LHA",
+      "TRSI-CDS.LHA",
+      "TRSI-M21.LHA",
+      "TRSI-M25.LHA",
+      "TRSIC103.LHA",
+      "TRSICD13.LHA",
+      "TRSICD1P.LHA",
+      "TRSIM215.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "f610505b260be959c496e3750ec553b0": {
+    "filename": "CD",
+    "md5": "f610505b260be959c496e3750ec553b0",
+    "archiveCount": 11,
+    "archives": [
+      "CD-SE103.LHA",
+      "CD-SRV13.LHA",
+      "CD-SV103.LHA",
+      "CDSER103.LHA",
+      "CDSERV.LHA",
+      "CDSERVER.LHA",
+      "TRSI-CD1.LHA",
+      "TRSI-CDS.LHA",
+      "TRSIC103.LHA",
+      "TRSICD13.LHA",
+      "TRSICD1P.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "1ad883f0a9ea3a85025deeef19b1c436": {
+    "filename": "Fileid.Library",
+    "md5": "1ad883f0a9ea3a85025deeef19b1c436",
+    "archiveCount": 10,
+    "archives": [
+      "CDC-A101.LHA",
+      "DCN!F-X2.LHA",
+      "FAMEDEMO.LHA",
+      "FG_AXO4.LHA",
+      "HF-IS1O.LHA",
+      "HF-IS1O1.LHA",
+      "HF-LS21.LHA",
+      "HF-LS2O3.LHA",
+      "I!LZS2O2.LHA",
+      "INT-IDC.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "cdd1fbd06b40fce55fa9e8ab78f37da0": {
+    "filename": "Chat_Start.info",
+    "md5": "cdd1fbd06b40fce55fa9e8ab78f37da0",
+    "archiveCount": 11,
+    "archives": [
+      "CHATM20.LHA",
+      "CHATME20.LHA",
+      "CHATMTR2.LHA",
+      "CHATSRC.LHA",
+      "CHTMET20.LHA",
+      "CHTMTR20.LHA",
+      "KLR-CHAT.LHA",
+      "KLR-CHSR.LHA",
+      "KLRCHATS.LHA",
+      "MST-CM20.LHA",
+      "MST-COM2.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bf0460f478873ffb559103635d4a876c": {
+    "filename": "LZX",
+    "md5": "bf0460f478873ffb559103635d4a876c",
+    "archiveCount": 15,
+    "archives": [
+      "CHECK.LHA",
+      "HF-LS2O3.LHA",
+      "I!LZS20.LHA",
+      "I!LZS2O2.LHA",
+      "INT-LZS.LHA",
+      "MCHECK.LHA",
+      "MCHECK15.LHA",
+      "MTLCHK.LHA",
+      "TRSI-M12.LHA",
+      "TRSI-M16.LHA",
+      "TRSI-MC5.LHA",
+      "TRSI-MCK.LHA",
+      "X!LS104B.LHA",
+      "X!LS105B.LHA",
+      "X!LZS103.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0cb23872c774b0aea4e12646807deeb6": {
+    "filename": "AmigaGuide",
+    "md5": "0cb23872c774b0aea4e12646807deeb6",
+    "archiveCount": 19,
+    "archives": [
+      "CNFSCN26.LHA",
+      "CONFSC26.LHA",
+      "CSCAN26B.LHA",
+      "DC-X107I.LHA",
+      "FTH-FDD.LHA",
+      "HBT-PW21.LHA",
+      "HBT_SB20.LHA",
+      "HNY-TC21.LHA",
+      "HNY-TC22.LHA",
+      "HNY-TL21.LHA",
+      "HNY-TL22.LHA",
+      "HNY-TM21.LHA",
+      "HNY-TM22.LHA",
+      "HNY-TP21.LHA",
+      "HNY-TP22.LHA",
+      "LGN-TRIV.LHA",
+      "LOBSTER1.LHA",
+      "MST-CS25.LHA",
+      "MST-CS26.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "5a4c07769e4937b8050af60a50f04432": {
+    "filename": "U6V.where.13G",
+    "md5": "5a4c07769e4937b8050af60a50f04432",
+    "archiveCount": 10,
+    "archives": [
+      "CRX-BC02.LHA",
+      "DFC-MLAT.LHA",
+      "I^C.LHA",
+      "LGC-BV16.LHA",
+      "LNS-WORK.LHA",
+      "PZE-FWH1.LHA",
+      "SAD-FE16.LHA",
+      "SAD-SH10.LHA",
+      "SAD^FI20.LHA",
+      "SX-BS-01.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "ee56682e80784082dd3c3d568e774e84": {
+    "filename": "popel.exe",
+    "md5": "ee56682e80784082dd3c3d568e774e84",
+    "archiveCount": 10,
+    "archives": [
+      "CY8EREAL.LHA",
+      "CY8ERSV1.LHA",
+      "DFC-HF11.LHA",
+      "DFC-MLAT.LHA",
+      "GNT-Z-AC.LHA",
+      "ML!RCHAT.LHA",
+      "SAD-BU15.LHA",
+      "SAD-CMDS.LHA",
+      "SAD_AC10.LHA",
+      "SAD_AC11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "7321b65fa160c3ba766e7880f1435b19": {
+    "filename": "DMSDescript",
+    "md5": "7321b65fa160c3ba766e7880f1435b19",
+    "archiveCount": 10,
+    "archives": [
+      "DC-X107I.LHA",
+      "FATEDZ11.LHA",
+      "FCHECLAM.LHA",
+      "FIDS12.LHA",
+      "FIDSAV20.LHA",
+      "F^IDSV20.LHA",
+      "MST-DMEX.LHA",
+      "REA-RU11.LHA",
+      "TAI-ADD4.LHA",
+      "TEL-TP01.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "64e06c235e537d0427b7e7f9965633e8": {
+    "filename": "MagicWB.info",
+    "md5": "64e06c235e537d0427b7e7f9965633e8",
+    "archiveCount": 20,
+    "archives": [
+      "DPL-AC10.LHA",
+      "DPL-AN10.LHA",
+      "DPL-AO10.LHA",
+      "DPL-AO11.LHA",
+      "DPL-AO12.LHA",
+      "DPL-AX10.LHA",
+      "DPL-GB11.LHA",
+      "DPL-MA10.LHA",
+      "DPL-MC11.LHA",
+      "DPL-PC10.LHA",
+      "DPL-SP10.LHA",
+      "DPL_GB10.LHA",
+      "DPL_GB11.LHA",
+      "DPL_MA10.LHA",
+      "DPL_MA13.LHA",
+      "DPL_MC10.LHA",
+      "DPL_MV10.LHA",
+      "DPL_TL10.LHA",
+      "DPL_UN10.LHA",
+      "DPL_UN11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9e75c0334341c094775702c977cbdff1": {
+    "filename": "FASTRAX",
+    "md5": "9e75c0334341c094775702c977cbdff1",
+    "archiveCount": 16,
+    "archives": [
+      "DPL_ST10.LHA",
+      "EX2_3_18.LHA",
+      "EX3_3_18.LHA",
+      "HCD_NP21.LHA",
+      "HCD_UA10.LHA",
+      "HCD_WH10.LHA",
+      "HP4LV095.LHA",
+      "ICE_SC10.LHA",
+      "KD_CS13U.LHA",
+      "ORS_AX10.LHA",
+      "ORS_CP11.LHA",
+      "ORS_GO15.LHA",
+      "OTM_CU11.LHA",
+      "STN_A335.LHA",
+      "TRSI_GSD.LHA",
+      "TRY_WT10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "884cb4ed5cfbda66fd7206a2ac150a52": {
+    "filename": "Install.exe",
+    "md5": "884cb4ed5cfbda66fd7206a2ac150a52",
+    "archiveCount": 42,
+    "archives": [
+      "ETP-R10.LHA",
+      "ORS-MU02.LHA",
+      "ORS-SA11.LHA",
+      "OTL-AC14.LHA",
+      "OTL-DY15.LHA",
+      "OTL-FC10.LHA",
+      "OTL-FC11.LHA",
+      "OTL-FLC.LHA",
+      "OTL-JC12.LHA",
+      "OTL-SC21.LHA",
+      "OTL-UL10.LHA",
+      "PGS-SSTA.LHA",
+      "RINK101.LHA",
+      "SR-MES10.LHA",
+      "SR-RST10.LHA",
+      "SR-RST11.LHA",
+      "SRH-TL20.LHA",
+      "SRS-HSTA.LHA",
+      "TAU-GZ01.LHA",
+      "TAU-WN05.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "c71df76291cb653e5d29eaab7dcc194a": {
+    "filename": "FileDescription.Logos",
+    "md5": "c71df76291cb653e5d29eaab7dcc194a",
+    "archiveCount": 10,
+    "archives": [
+      "FDESCR11.LHA",
+      "FDSCRI11.LHA",
+      "FIDESC11.LHA",
+      "FIDSCR11.LHA",
+      "FILEDE11.LHA",
+      "FILEDESC.LHA",
+      "FILEDISC.LHA",
+      "LZX_IDFX.LHA",
+      "MST-FD10.LHA",
+      "MST-FD11.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "36e4252d025a3fa665a3cd70b2711abf": {
+    "filename": "RexxPlus.lib",
+    "md5": "36e4252d025a3fa665a3cd70b2711abf",
+    "archiveCount": 12,
+    "archives": [
+      "IA-OPA10.LHA",
+      "IA-SPD10.LHA",
+      "IA-SYSPW.LHA",
+      "TRB_KI14.LHA",
+      "TRB_KI16.LHA",
+      "TRB_KWTF.LHA",
+      "TRB_WF11.LHA",
+      "TRS_UDC.LHA",
+      "VDCOLORD.LHA",
+      "VDPAGE.LHA",
+      "VDSTAT11.LHA",
+      "VES-FAC1.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "0198cb5e23ca2f4ad94d26884c63782d": {
+    "filename": "COOL",
+    "md5": "0198cb5e23ca2f4ad94d26884c63782d",
+    "archiveCount": 14,
+    "archives": [
+      "MDBCU19C.LHA",
+      "MDBFE100.LHA",
+      "NMESS1C.LHA",
+      "OTT_DMS.LHA",
+      "OTT_LHA.LHA",
+      "PDMS_CHK.LHA",
+      "PLHA_CHK.LHA",
+      "PTL-SI07.LHA",
+      "RMS05A2.LHA",
+      "SNE_WHO.LHA",
+      "SRH-TL30.LHA",
+      "SR_CRA10.LHA",
+      "VTY-LI13.LHA",
+      "VTY-SM10.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "bd352d49aab703fdced186dec8828ffd": {
+    "filename": "Mo-Email.Guide.info",
+    "md5": "bd352d49aab703fdced186dec8828ffd",
+    "archiveCount": 11,
+    "archives": [
+      "MMAIL201.LHA",
+      "MO-AI11.LHA",
+      "MO-DN10.LHA",
+      "MO-EM26.LHA",
+      "MO-HA12.LHA",
+      "MO-MS11.LHA",
+      "MO-OP12.LHA",
+      "MO-ST10.LHA",
+      "MO-ST13.LHA",
+      "MO-WA11.LHA",
+      "MOMAIL20.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "9766da18e3bbfeb39f0a21a0d83a93b0": {
+    "filename": "rprexxarplib.library",
+    "md5": "9766da18e3bbfeb39f0a21a0d83a93b0",
+    "archiveCount": 12,
+    "archives": [
+      "PTL-BD10.LHA",
+      "PTL-BD11.LHA",
+      "PTL-FRD4.LHA",
+      "PTL-FRDC.LHA",
+      "PTL-RT11.LHA",
+      "PTL-SI12.LHA",
+      "PTL-SW12.LHA",
+      "PTL-SW13.LHA",
+      "PTL_RT11.LHA",
+      "PTL_SI12.LHA",
+      "PTL_SW12.LHA",
+      "TMH-AXBD.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "d2586511ba149adc7a4015ed682a2e0f": {
+    "filename": "Harvest.Inn",
+    "md5": "d2586511ba149adc7a4015ed682a2e0f",
+    "archiveCount": 15,
+    "archives": [
+      "SN_AUL11.LHA",
+      "SN_AUM21.LHA",
+      "SN_CLV11.LHA",
+      "SN_CPS10.LHA",
+      "SN_LFG33.LHA",
+      "SN_LIN11.LHA",
+      "SN_LUN11.LHA",
+      "SN_MEM10.LHA",
+      "SN_MMO10.LHA",
+      "SN_MWH11.LHA",
+      "SN_PCH11.LHA",
+      "SN_QWK10.LHA",
+      "SN_SLG10.LHA",
+      "SN_TCH21.LHA",
+      "SN_UOM13.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "a8918c2d2f20038773abbfb423243f2a": {
+    "filename": "SN_Files.TXT.info",
+    "md5": "a8918c2d2f20038773abbfb423243f2a",
+    "archiveCount": 11,
+    "archives": [
+      "SN_AUL11.LHA",
+      "SN_LFG33.LHA",
+      "SN_MEM10.LHA",
+      "SN_MMO10.LHA",
+      "SN_MWH11.LHA",
+      "SN_PCH11.LHA",
+      "SN_QWK10.LHA",
+      "SN_SLG10.LHA",
+      "SN_TPC12.LHA",
+      "SN_UOM13.LHA",
+      "SN_XFT12.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  },
+  "adecdecad7f7b0c425b9fdf33c385421": {
+    "filename": "LastChanges.Notes",
+    "md5": "adecdecad7f7b0c425b9fdf33c385421",
+    "archiveCount": 12,
+    "archives": [
+      "SN_AUM21.LHA",
+      "SN_CLV11.LHA",
+      "SN_LUN11.LHA",
+      "SN_MEM10.LHA",
+      "SN_MMO10.LHA",
+      "SN_MWH11.LHA",
+      "SN_PCH11.LHA",
+      "SN_QWK10.LHA",
+      "SN_SLG10.LHA",
+      "SN_TCH21.LHA",
+      "SN_UOM13.LHA",
+      "SN_UOMSS.LHA"
+    ],
+    "methods": [
+      "md5"
+    ]
+  }
+}

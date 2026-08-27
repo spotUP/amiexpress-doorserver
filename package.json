@@ -4,7 +4,7 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp src/schema.sql dist/src/schema.sql && cp src/lha.js dist/src/lha.js",
+    "build": "tsc -p tsconfig.json && cp src/schema.sql dist/src/schema.sql && cp src/lha.js dist/src/lha.js && mkdir -p dist/seeds && cp seeds/*.json dist/seeds/",
     "start": "node dist/src/index.js",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
@@ -18,12 +18,14 @@
   "dependencies": {
     "@types/busboy": "^1.5.4",
     "@types/jsonwebtoken": "^9.0.10",
+    "adm-zip": "^0.6.0",
     "better-sqlite3": "^11.10.0",
     "busboy": "^1.6.0",
     "express": "5.1.0",
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/better-sqlite3": "^7.6.11",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.12",

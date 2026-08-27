@@ -14,6 +14,8 @@ import type {
   DoorPage,
   Facets,
   HiddenDoor,
+  StripPreview,
+  StripResult,
   Submission,
 } from './types';
 
@@ -82,7 +84,7 @@ export function useAdminDoor(archiveName: string | null, enabled: boolean) {
   return useQuery({
     queryKey: doorKeys.admin(archiveName ?? ''),
     queryFn: () => api.get<AdminDoor>(`/admin/doors/${encodeURIComponent(archiveName as string)}`),
-    enabled: Boolean(archiveName) && enabled,
+    enabled: enabled && Boolean(archiveName),
   });
 }
 
@@ -131,6 +133,48 @@ function invalidateEverything(client: ReturnType<typeof useQueryClient>): void {
   void client.invalidateQueries({ queryKey: doorKeys.hidden });
   void client.invalidateQueries({ queryKey: doorKeys.audit });
   void client.invalidateQueries({ queryKey: doorKeys.submissions });
+}
+
+// ─── batch operations ──────────────────────────────────────────────────
+
+export interface BatchResult {
+  archiveName: string;
+  ok: boolean;
+  error?: string;
+  restored?: boolean;
+}
+
+export function useBatchHide() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (doors: { archiveName: string; reason?: string }[]) =>
+      api.post<{ ok: boolean; results: BatchResult[] }>('/admin/doors/batch-hide', { doors }),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
+export function useBatchRestore() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (archiveNames: string[]) =>
+      api.post<{ ok: boolean; results: BatchResult[] }>('/admin/doors/batch-restore', { archiveNames }),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
+export function useBatchPatch() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { archiveNames: string[]; fields: Record<string, string | null> }) =>
+      api.post<{ ok: boolean; edited: number; fields: number; changes: number }>(
+        '/admin/doors/batch-patch',
+        args,
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: doorKeys.all });
+      void client.invalidateQueries({ queryKey: doorKeys.audit });
+    },
+  });
 }
 
 export function useSubmissions(status: string, enabled: boolean) {
@@ -222,6 +266,24 @@ export function useLiveRevision(): void {
     // EventSource reconnects on its own; nothing to do on error but let it.
     return () => source.close();
   }, [client]);
+}
+
+// ─── archive stripping ─────────────────────────────────────────────────
+
+export function useStripPreview(archiveName: string) {
+  return useMutation({
+    mutationFn: () =>
+      api.post<StripPreview>(`/admin/doors/${encodeURIComponent(archiveName)}/strip-preview`),
+  });
+}
+
+export function useStripArchive(archiveName: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (members: string[]) =>
+      api.post<StripResult>(`/admin/doors/${encodeURIComponent(archiveName)}/strip`, { members }),
+    onSuccess: () => invalidateEverything(client),
+  });
 }
 
 // ─── release groups ─────────────────────────────────────────────────────

@@ -10,12 +10,15 @@
  * "FAME/5D!STC01.LHA") so the same database works on a dev machine and on
  * the server. Older rows may carry an absolute path; both forms resolve.
  */
+import * as fs from 'fs';
 import * as path from 'path';
 import type Database from 'better-sqlite3';
 import { openDb } from './db';
 import { buildGroupTags } from './describe';
 import { applyOverrides, hiddenExclusion, isHidden, loadOverrides, overridesStamp, hiddenStamp } from './effective';
 import type { ServerConfig } from './config';
+import { deleteMembers, findLhaBinary } from './lha-member-delete';
+import { getArchiveChecksums } from './checksums';
 
 export interface CatalogEntry {
   id: string;
@@ -200,6 +203,89 @@ export function stripArchiveExtension(archiveName: string): string {
  *
  * Returns the resolved archive_name, 'ambiguous', or null (no match).
  */
+// ─── Archive stripping ────────────────────────────────────────────────────────
+
+export interface StripOnServerResult {
+  ok: boolean;
+  removed?: number;
+  newJunkCount?: number;
+  reason?: string;
+}
+
+/**
+ * Strip junk members from a catalog archive in place. The archive must be
+ * LHA/LZH (LZX cannot be rewritten). After deletion the row is
+ * re-described: size, digests, junk_count, and indexed_at are refreshed.
+ */
+export function stripArchiveOnServer(
+  cfg: ServerConfig,
+  archiveName: string,
+  members: string[],
+  adminId: number | null
+): StripOnServerResult {
+  const db = openDb(cfg);
+  try {
+    const row = db
+      .prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+      .get(archiveName) as { id: string; archive_path: string } | undefined;
+    if (!row) {
+      return { ok: false, reason: 'no such door' };
+    }
+
+    const absPath = resolveArchivePath(cfg, row.archive_path);
+    if (!fs.existsSync(absPath)) {
+      return { ok: false, reason: `archive file not found on disk: ${path.basename(absPath)}` };
+    }
+
+    const binary = findLhaBinary();
+    const ext = path.extname(absPath).toLowerCase();
+    if (ext !== '.lha' && ext !== '.lzh') {
+      return {
+        ok: false,
+        reason: ext === '.lzx'
+          ? 'LZX archives cannot be rewritten: no LZX writer exists.'
+          : `Unsupported archive format: ${ext || '(none)'}`,
+      };
+    }
+    if (!binary) {
+      return { ok: false, reason: 'No lha binary available on this server.' };
+    }
+
+    const deleteResult = deleteMembers(absPath, members, { binary });
+    if (!deleteResult.ok) {
+      return { ok: false, reason: deleteResult.reason };
+    }
+
+    // Re-describe the archive after modification
+    const checksums = getArchiveChecksums(absPath);
+    const stat = fs.statSync(absPath);
+
+    // Delete catalog file rows for removed members
+    const deleteFiles = db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ? AND path = ?');
+    for (const member of members) {
+      deleteFiles.run(row.id, member);
+    }
+
+    // Count remaining junk files
+    const junkRow = db
+      .prepare('SELECT COUNT(*) AS n FROM door_catalog_files WHERE catalog_id = ? AND is_junk = 1')
+      .get(row.id) as { n: number };
+    const newJunkCount = junkRow.n;
+
+    // Update the catalog row
+    db.prepare(
+      `UPDATE door_catalog SET
+        archive_size = ?, md5 = ?, sha256 = ?,
+        junk_count = ?, indexed_at = strftime('%s','now')
+       WHERE id = ?`
+    ).run(stat.size, checksums.md5, checksums.sha256, newJunkCount, row.id);
+
+    return { ok: true, removed: members.length, newJunkCount };
+  } finally {
+    db.close();
+  }
+}
+
 export function findArchiveNameForDizBasename(cfg: ServerConfig, basename: string): string | 'ambiguous' | null {
   const db = openDb(cfg, { readonly: true });
   try {

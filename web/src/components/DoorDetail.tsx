@@ -7,13 +7,117 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Download, X } from 'lucide-react';
 import { useState } from 'react';
-import { useAdminDoor, useDoor, useRedescribe, useRevertField, useSaveField, useTidyCase } from '../api/queries';
-import type { AdminUser, DoorFacts } from '../api/types';
+import { useAdminDoor, useDoor, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
+import type { AdminUser, DoorFacts, StripPreview } from '../api/types';
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
 import { FieldEditor } from './FieldEditor';
 import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
+
+function StripAds({
+  archiveName,
+  preview,
+  setPreview,
+}: {
+  archiveName: string;
+  preview: StripPreview | null;
+  setPreview: (p: StripPreview | null) => void;
+}) {
+  const stripPreview = useStripPreview(archiveName);
+  const stripArchive = useStripArchive(archiveName);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [result, setResult] = useState<{ removed: number; newJunkCount: number } | null>(null);
+
+  async function loadPreview() {
+    const p = await stripPreview.mutateAsync();
+    setPreview(p);
+    setSelected(new Set(p.stripped.map((f) => f.path)));
+    setResult(null);
+  }
+
+  function toggle(path: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    if (preview) setSelected(new Set(preview.stripped.map((f) => f.path)));
+  }
+
+  function selectNone() {
+    setSelected(new Set());
+  }
+
+  async function doStrip() {
+    const members = [...selected];
+    if (members.length === 0) return;
+    const res = await stripArchive.mutateAsync(members);
+    if (res.ok && res.removed != null && res.newJunkCount != null) {
+      setResult({ removed: res.removed, newJunkCount: res.newJunkCount });
+      setPreview(null);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="rounded-md border border-ok/30 bg-ok/5 px-3 py-2 text-sm text-ok">
+        Stripped {result.removed} file{result.removed !== 1 ? 's' : ''} — {result.newJunkCount} junk remaining
+      </div>
+    );
+  }
+
+  if (preview) {
+    return (
+      <div className="space-y-2 rounded-md border border-line px-3 py-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium text-ink">
+            {preview.stripped.length} ad file{preview.stripped.length !== 1 ? 's' : ''} found
+          </span>
+          <div className="flex gap-1">
+            <Button variant="ghost" onClick={selectAll}>All</Button>
+            <Button variant="ghost" onClick={selectNone}>None</Button>
+            <Button variant="ghost" onClick={() => setPreview(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={doStrip}
+              disabled={selected.size === 0 || stripArchive.isPending}
+            >
+              Strip {selected.size}
+            </Button>
+          </div>
+        </div>
+        <ul className="max-h-48 space-y-0.5 overflow-y-auto">
+          {preview.stripped.map((f) => (
+            <li key={f.path} className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={selected.has(f.path)}
+                onChange={() => toggle(f.path)}
+                className="accent-accent"
+              />
+              <span className="flex-1 truncate font-mono">{f.path}</span>
+              <span className="text-muted">{preview.reason[f.path]}</span>
+            </li>
+          ))}
+        </ul>
+        {preview.kept.length > 0 && (
+          <p className="text-xs text-muted">{preview.kept.length} file{preview.kept.length !== 1 ? 's' : ''} kept</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Button onClick={loadPreview} disabled={stripPreview.isPending}>
+      {stripPreview.isPending ? 'Analyzing...' : 'Strip Ads'}
+    </Button>
+  );
+}
 
 const MULTILINE_FIELDS = new Set(['description', 'suggested_tooltypes', 'file_id_diz']);
 /** Fields whose scene casing the server can normalise for the curator. */
@@ -35,6 +139,7 @@ export function DoorDetailDialog({
   const redescribe = useRedescribe(archiveName ?? '');
   const tidy = useTidyCase();
   const [preview, setPreview] = useState<DoorFacts | null>(null);
+  const [stripPreview, setStripPreview] = useState<StripPreview | null>(null);
 
   return (
     <Dialog.Root open={Boolean(archiveName)} onOpenChange={(open) => !open && onClose()}>
@@ -161,6 +266,9 @@ export function DoorDetailDialog({
                       </p>
                     )}
                   </div>
+                  {archiveName && (
+                    <StripAds archiveName={archiveName} preview={stripPreview} setPreview={setStripPreview} />
+                  )}
                   {adminDoor &&
                     Object.entries(adminDoor.fields).map(([field, state]) => (
                       <FieldEditor

@@ -22,6 +22,8 @@ import { analyseDoor, buildGroupTags, fixCasing, tidyCase } from './describe';
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides } from './effective';
 import { UploadError, approveSubmission, rejectSubmission } from './submissions';
 import type { ServerConfig } from './config';
+import { analyzeArchive } from './ami-stripper';
+import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 
 /**
  * A failed login costs a scrypt hash (~50 ms), which already makes online
@@ -397,6 +399,127 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  // ─── batch operations ────────────────────────────────────────────────
+
+  /** Hide multiple doors at once. */
+  router.post('/doors/batch-hide', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { doors?: { archiveName: string; reason?: string }[] };
+    if (!Array.isArray(body.doors) || body.doors.length === 0) {
+      res.status(400).json({ error: 'doors array required' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const lookup = db.prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE');
+      const hide = db.prepare(
+        `INSERT INTO door_hidden (catalog_id, reason, hidden_by, hidden_at)
+         VALUES (?, ?, ?, strftime('%s','now'))
+         ON CONFLICT(catalog_id) DO UPDATE SET
+           reason = excluded.reason, hidden_by = excluded.hidden_by, hidden_at = excluded.hidden_at`
+      );
+      const results: { archiveName: string; ok: boolean; error?: string }[] = [];
+      const write = db.transaction(() => {
+        for (const { archiveName, reason } of body.doors!) {
+          const row = lookup.get(archiveName) as { id: string } | undefined;
+          if (!row) {
+            results.push({ archiveName, ok: false, error: 'not found' });
+            continue;
+          }
+          hide.run(row.id, (reason ?? '').slice(0, 500) || null, req.admin?.id ?? null);
+          recordAudit(db, req.admin?.id ?? null, 'hide', row.id, { archiveName, reason: reason ?? null });
+          results.push({ archiveName, ok: true });
+        }
+      });
+      write();
+      res.json({ ok: true, results });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Restore multiple doors at once. */
+  router.post('/doors/batch-restore', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[] };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const lookup = db.prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE');
+      const del = db.prepare('DELETE FROM door_hidden WHERE catalog_id = ?');
+      const results: { archiveName: string; ok: boolean; restored: boolean }[] = [];
+      const write = db.transaction(() => {
+        for (const archiveName of body.archiveNames!) {
+          const row = lookup.get(archiveName) as { id: string } | undefined;
+          if (!row) {
+            results.push({ archiveName, ok: false, restored: false });
+            continue;
+          }
+          const result = del.run(row.id);
+          if (result.changes > 0) {
+            recordAudit(db, req.admin?.id ?? null, 'restore', row.id, { archiveName });
+          }
+          results.push({ archiveName, ok: true, restored: result.changes > 0 });
+        }
+      });
+      write();
+      res.json({ ok: true, results });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Edit fields on multiple doors at once. */
+  router.post('/doors/batch-patch', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[]; fields?: Record<string, unknown> };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const fieldEntries = Object.entries(body.fields ?? {});
+    if (fieldEntries.length === 0) {
+      res.status(400).json({ error: 'fields object required' });
+      return;
+    }
+    const unknown = fieldEntries.filter(([f]) => !isOverridableField(f)).map(([f]) => f);
+    if (unknown.length) {
+      res.status(400).json({ error: `not an editable field: ${unknown.join(', ')}` });
+      return;
+    }
+    const badType = fieldEntries.find(([, v]) => v !== null && typeof v !== 'string');
+    if (badType) {
+      res.status(400).json({ error: 'every value must be a string or null' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const lookup = db.prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE');
+      const upsert = db.prepare(
+        `INSERT INTO door_catalog_overrides (catalog_id, field, value, edited_by, edited_at)
+         VALUES (?, ?, ?, ?, strftime('%s','now'))
+         ON CONFLICT(catalog_id, field) DO UPDATE SET
+           value = excluded.value, edited_by = excluded.edited_by, edited_at = excluded.edited_at`
+      );
+      let count = 0;
+      const write = db.transaction(() => {
+        for (const archiveName of body.archiveNames!) {
+          const row = lookup.get(archiveName) as { id: string } | undefined;
+          if (!row) continue;
+          for (const [field, value] of fieldEntries) {
+            upsert.run(row.id, field, value as string | null, req.admin?.id ?? null);
+            recordAudit(db, req.admin?.id ?? null, 'edit', row.id, { field, to: value, archiveName });
+            count++;
+          }
+        }
+      });
+      write();
+      res.json({ ok: true, edited: body.archiveNames!.length, fields: fieldEntries.length, changes: count });
+    } finally {
+      db.close();
+    }
+  });
+
   /** The submission queue. Pending first unless asked otherwise. */
   router.get('/submissions', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const status = typeof req.query.status === 'string' ? req.query.status : 'pending';
@@ -498,6 +621,79 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     } finally {
       db.close();
     }
+  });
+
+  // ─── archive stripping ───────────────────────────────────────────
+
+  /**
+   * Preview what the ad stripper would flag in this archive, without
+   * modifying anything. The response includes every file with its
+   * classification verdict so the UI can show a checklist.
+   */
+  router.post('/doors/:archiveName/strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const row = db
+        .prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { archive_path: string } | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'no such door' });
+        return;
+      }
+      const absPath = resolveArchivePath(cfg, row.archive_path);
+      const fs = require('fs');
+      if (!fs.existsSync(absPath)) {
+        res.status(404).json({ error: 'archive file not found on disk' });
+        return;
+      }
+
+      const result = analyzeArchive(absPath);
+      res.json({
+        archiveName,
+        kept: result.kept,
+        stripped: result.stripped,
+        reason: result.reason,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  /**
+   * Strip junk members from a catalog archive in place. The archive must
+   * be LHA/LZH (LZX cannot be rewritten). After deletion the catalog row
+   * is re-described: size, digests, junk_count, and indexed_at are
+   * refreshed.
+   */
+  router.post('/doors/:archiveName/strip', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const body = (req.body ?? {}) as { members?: unknown };
+    if (!Array.isArray(body.members) || body.members.length === 0) {
+      res.status(400).json({ error: 'members must be a non-empty array of file paths' });
+      return;
+    }
+    const members = body.members.filter((m): m is string => typeof m === 'string');
+    if (members.length === 0) {
+      res.status(400).json({ error: 'members must be non-empty strings' });
+      return;
+    }
+
+    const result = stripArchiveOnServer(cfg, archiveName, members, req.admin?.id ?? null);
+    if (!result.ok) {
+      res.status(400).json({ error: result.reason });
+      return;
+    }
+    const auditDb = openDb(cfg);
+    try {
+      recordAudit(auditDb, req.admin?.id ?? null, 'strip', archiveName, {
+        members,
+        removed: result.removed,
+      });
+    } finally {
+      auditDb.close();
+    }
+    res.json({ ok: true, removed: result.removed, newJunkCount: result.newJunkCount });
   });
 
   // ─── release groups ────────────────────────────────────────────────

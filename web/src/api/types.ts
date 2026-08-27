@@ -162,6 +162,26 @@ export interface DoorFacts {
   requiresBbs: string;
 }
 
+export interface StripPreviewFile {
+  path: string;
+  size: number;
+  md5: string;
+}
+
+export interface StripPreview {
+  archiveName: string;
+  kept: StripPreviewFile[];
+  stripped: StripPreviewFile[];
+  reason: Record<string, 'pattern' | 'md5' | 'content-scan'>;
+}
+
+export interface StripResult {
+  ok: boolean;
+  removed?: number;
+  newJunkCount?: number;
+  reason?: string;
+}
+
 export const EDITABLE_FIELDS = [
   'name',
   'description',
