@@ -2,7 +2,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useCallback, useState } from 'react';
 import { useReleaseGroups, useUpdateReleaseGroup } from '../api/queries';
-import { Button } from './ui';
+import { Button } from '../components/ui';
 
 export function ReleaseGroupsPanel({
   open,
