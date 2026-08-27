@@ -18,6 +18,7 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY contract ./contract
 COPY scripts ./scripts
+COPY seeds ./seeds
 RUN npm run build
 # Prune to production deps in the SAME stage, so the rebuilt native binding
 # is compiled by this toolchain rather than needing one at runtime.
@@ -44,5 +45,6 @@ COPY package.json ./
 RUN node -e "require('./dist/src/app.js'); console.log('[OK] compiled server loads')" 
 ARG GIT_SHA=unknown
 RUN echo "$GIT_SHA" > /app/.git-sha
+COPY --from=amiexpress-bbs /usr/local/bin/lha /usr/local/bin/lha
 EXPOSE 3010
 CMD ["node", "dist/src/index.js"]
