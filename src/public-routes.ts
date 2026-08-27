@@ -480,6 +480,47 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /** Export catalog as CSV for offline use. */
+  router.get('/export.csv', (_req: Request, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const hidden = hiddenExclusion(db);
+      const visible = hidden ? `WHERE ${hidden}` : '';
+      const rows = db
+        .prepare(
+          `SELECT d.archive_name, d.archive_path, d.door_type, d.name, d.version, d.author,
+                  d.release_group, ${hasReleaseGroupsTable(db) ? 'rg.full_name' : 'NULL'} AS release_group_full_name,
+                  d.category, d.description, d.requires_bbs, d.archive_size, d.md5, d.sha256
+             FROM door_catalog d
+             ${hasReleaseGroupsTable(db) ? 'LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group' : ''}
+             ${visible}
+             ORDER BY d.archive_name COLLATE NOCASE ASC`
+        )
+        .all() as Record<string, unknown>[];
+
+      const headers = [
+        'archive_name', 'archive_path', 'door_type', 'name', 'version', 'author',
+        'release_group', 'release_group_full_name', 'category', 'description',
+        'requires_bbs', 'archive_size', 'md5', 'sha256',
+      ];
+
+      const escape = (v: unknown): string => {
+        const s = v == null ? '' : String(v);
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+
+      const csv = [headers.join(','), ...rows.map((r) => headers.map((h) => escape(r[h])).join(','))].join('\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="door-catalog.csv"');
+      res.send(csv);
+    } finally {
+      db.close();
+    }
+  });
+
   /**
    * Send in a door. Anyone may; nobody publishes. The file waits in
    * quarantine until a curator approves it - see src/submissions.ts for what

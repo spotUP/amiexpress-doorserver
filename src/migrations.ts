@@ -144,6 +144,21 @@ export const MIGRATIONS: Migration[] = [
         )`);
     },
   },
+  {
+    version: 5,
+    name: 'door_tags',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS door_tags (
+          catalog_id TEXT NOT NULL,
+          tag        TEXT NOT NULL,
+          added_by   INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+          added_at   INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+          PRIMARY KEY (catalog_id, tag)
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_door_tags_tag ON door_tags(tag)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

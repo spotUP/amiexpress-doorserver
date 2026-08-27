@@ -317,3 +317,69 @@ export function useUpdateReleaseGroup() {
     },
   });
 }
+
+// ─── duplicates ────────────────────────────────────────────────────────
+
+export interface DuplicateGroup {
+  n: number;
+  archives: string;
+  md5?: string;
+  sha256?: string;
+  name?: string;
+  author?: string;
+  version?: string | null;
+}
+
+export interface Duplicates {
+  byMd5: DuplicateGroup[];
+  bySha256: DuplicateGroup[];
+  byContent: DuplicateGroup[];
+}
+
+export function useDuplicates(enabled: boolean) {
+  return useQuery({
+    queryKey: ['duplicates'],
+    queryFn: () => api.get<Duplicates>('/admin/duplicates'),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
+}
+
+// ─── tags ──────────────────────────────────────────────────────────────
+
+const tagKeys = {
+  all: ['tags'] as const,
+  door: (name: string) => ['tags', name] as const,
+};
+
+export function useAllTags(enabled: boolean) {
+  return useQuery({
+    queryKey: tagKeys.all,
+    queryFn: () => api.get<{ tags: { tag: string; n: number }[] }>('/admin/tags'),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useDoorTags(archiveName: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: tagKeys.door(archiveName ?? ''),
+    queryFn: () => api.get<{ tags: string[] }>(`/admin/doors/${encodeURIComponent(archiveName as string)}/tags`),
+    enabled: enabled && Boolean(archiveName),
+  });
+}
+
+export function useSetDoorTags(archiveName: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (tags: string[]) =>
+      api.patch<{ ok: boolean; tags: string[] }>(
+        `/admin/doors/${encodeURIComponent(archiveName)}/tags`,
+        { tags },
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: tagKeys.all });
+      void client.invalidateQueries({ queryKey: tagKeys.door(archiveName) });
+    },
+  });
+}

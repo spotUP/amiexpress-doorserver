@@ -851,7 +851,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   });
 
   /** Set tags for a door (replaces all tags). */
-  router.put('/doors/:archiveName/tags', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+  router.patch('/doors/:archiveName/tags', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
     const body = (req.body ?? {}) as { tags?: unknown };
     if (!Array.isArray(body.tags)) {
