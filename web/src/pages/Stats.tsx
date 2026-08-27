@@ -2,7 +2,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { Button } from '../components/ui';
 
 interface Stats {
   total: number;
