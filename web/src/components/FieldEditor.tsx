@@ -143,16 +143,11 @@ export function FieldEditor({
             change(event.target.value)
           }
           onBlur={flush}
-          className={cx('font-mono text-[13px]', dirty && 'border-accent-dim')}
-          style={field === 'file_id_diz' ? { width: '45ch' } : undefined}
+          className={cx(field === 'file_id_diz' ? 'font-amiga text-[15px] leading-[1.2]' : 'font-mono text-[13px]', dirty && 'border-accent-dim')}
+          style={field === 'file_id_diz' ? { width: '45ch', whiteSpace: 'pre' } : undefined}
         />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           {state.derived && !state.isEdited && <span>read from the DIZ</span>}
-          {state.scanned !== null && state.scanned !== '' && (
-            <span className="truncate">
-              scanned: <span className="font-mono">{state.scanned.slice(0, 80)}</span>
-            </span>
-          )}
           <div className="ml-auto flex items-center gap-2">
             <span aria-live="polite" className={cx(status === 'error' && 'text-danger')}>
               {status === 'saving' && 'Saving...'}
