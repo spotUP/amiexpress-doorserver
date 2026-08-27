@@ -264,3 +264,51 @@ export function readZipContents(bytes: Buffer): ArchiveContents {
 
   return { files, fileIdDiz, docFilename, doc };
 }
+
+/**
+ * Extract a single file from an LHA or ZIP archive. Returns the decompressed
+ * bytes, or null if the member is not found or cannot be decoded.
+ */
+export function extractFile(bytes: Buffer, memberPath: string): Uint8Array | null {
+  const target = memberPath.toLowerCase();
+
+  // Try LHA
+  let entries: LhaEntry[];
+  try {
+    entries = LHA.read(new Uint8Array(bytes));
+  } catch {
+    entries = [];
+  }
+  for (const entry of entries) {
+    const path = relativeName(entry.name || '').toLowerCase();
+    if (path === target) {
+      try {
+        return LHA.unpack(entry);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  // Try ZIP
+  let zipEntries: ZipCentralEntry[] | null;
+  try {
+    zipEntries = readZipCentralDirectory(bytes);
+  } catch {
+    zipEntries = null;
+  }
+  if (zipEntries) {
+    for (const entry of zipEntries) {
+      const path = relativeName(entry.name).toLowerCase();
+      if (path === target) {
+        try {
+          return readZipMember(bytes, entry);
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+
+  return null;
+}

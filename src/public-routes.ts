@@ -201,6 +201,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     const system = strParam(req.query.system);
     const requires = strParam(req.query.requires);
     const category = strParam(req.query.category);
+    const latest = strParam(req.query.latest) === '1';
     const page = intParam(req.query.page, 1, 1, 100000);
     const perPage = intParam(req.query.per_page, DEFAULT_PER_PAGE, 1, MAX_PER_PAGE);
     const sortKey = strParam(req.query.sort) ?? 'archive';
@@ -247,8 +248,12 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     try {
       const hidden = hiddenExclusion(db);
       if (hidden) where.push(hidden);
-      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
       const releaseGroupsTable = hasReleaseGroupsTable(db);
+      // When latest=1, only show the most recently indexed door per unique name+author.
+      if (latest) {
+        where.push(`d.indexed_at = (SELECT MAX(d2.indexed_at) FROM door_catalog d2 WHERE d2.name = d.name AND COALESCE(d2.author, '') = COALESCE(d.author, ''))`);
+      }
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
       const SELECT_ROW = `SELECT id, archive_name, archive_path, binary_name, door_type, name, version, author,
                   d.release_group, ${releaseGroupsTable ? 'rg.full_name' : 'NULL'} AS release_group_full_name,
                   category, description, requires_bbs, file_id_diz, archive_size,
@@ -285,7 +290,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
         rows = matching.slice((page - 1) * perPage, page * perPage);
       } else {
         total = (
-          db.prepare(`SELECT COUNT(*) AS n FROM door_catalog ${whereSql}`).get(...params) as { n: number }
+          db.prepare(`SELECT COUNT(*) AS n FROM door_catalog d ${whereSql}`).get(...params) as { n: number }
         ).n;
         rows = db.prepare(`${SELECT_ROW} LIMIT ? OFFSET ?`).all(...params, perPage, (page - 1) * perPage) as DoorRow[];
       }

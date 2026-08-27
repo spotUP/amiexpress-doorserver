@@ -25,6 +25,7 @@ export interface DoorQuery {
   type?: string;
   category?: string;
   requires?: string;
+  latest?: boolean;
   /** 'archive' finds the doors whose name is a guess from the filename. */
   nameSource?: string;
   sort?: string;
@@ -40,6 +41,7 @@ function toSearch(query: DoorQuery): string {
   if (query.type) params.set('type', query.type);
   if (query.category) params.set('category', query.category);
   if (query.requires) params.set('requires', query.requires);
+  if (query.latest) params.set('latest', '1');
   if (query.nameSource) params.set('name_source', query.nameSource);
   if (query.sort) params.set('sort', query.sort);
   if (query.dir) params.set('dir', query.dir);

@@ -30,6 +30,7 @@ export function Browse() {
   const [type, setType] = useState('');
   const [requires, setRequires] = useState('');
   const [guessedOnly, setGuessedOnly] = useState(false);
+  const [latestOnly, setLatestOnly] = useState(false);
   const [sortState, setSortState] = useState<SortState>({ sort: 'archive', dir: 'asc' });
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export function Browse() {
       system,
       type,
       requires,
+      latest: latestOnly || undefined,
       nameSource: guessedOnly ? 'archive' : undefined,
       sort: sortState.sort,
       dir: sortState.dir,
@@ -255,6 +257,16 @@ export function Browse() {
             <Wand2 size={14} /> Needs a name
           </Button>
         )}
+        <Button
+          variant={latestOnly ? 'primary' : 'ghost'}
+          onClick={() => {
+            setLatestOnly((on) => !on);
+            setPage(1);
+          }}
+          title="Show only the newest version of each door"
+        >
+          Latest only
+        </Button>
         <SavedSearches
           query={q}
           system={system}

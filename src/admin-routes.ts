@@ -24,6 +24,9 @@ import { UploadError, approveSubmission, rejectSubmission } from './submissions'
 import type { ServerConfig } from './config';
 import { analyzeArchive } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
+import { extractFile } from './archive-reader';
+import { deleteMembers, findLhaBinary } from './lha-member-delete';
+import * as fs from 'fs';
 
 /**
  * A failed login costs a scrypt hash (~50 ms), which already makes online
@@ -708,6 +711,66 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       auditDb.close();
     }
     res.json({ ok: true, removed: result.removed, newJunkCount: result.newJunkCount });
+  });
+
+  // ─── file extraction and deletion ──────────────────────────────────
+
+  /** Extract a single file from an archive and return its content. */
+  router.get('/doors/:archiveName/file', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const memberPath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!memberPath) {
+      res.status(400).json({ error: 'path query parameter required' });
+      return;
+    }
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const row = db
+        .prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { archive_path: string } | undefined;
+      if (!row) { res.status(404).json({ error: 'no such door' }); return; }
+      const absPath = resolveArchivePath(cfg, row.archive_path);
+      const bytes = fs.readFileSync(absPath);
+      const unpacked = extractFile(bytes, memberPath);
+      if (!unpacked) { res.status(404).json({ error: 'member not found or cannot be decoded' }); return; }
+      res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
+      res.send(Buffer.from(unpacked));
+    } catch {
+      res.status(500).json({ error: 'failed to read archive' });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Delete one or more members from an LHA archive in place. */
+  router.post('/doors/:archiveName/delete-files', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const body = (req.body ?? {}) as { members?: unknown };
+    if (!Array.isArray(body.members) || body.members.length === 0) {
+      res.status(400).json({ error: 'members must be a non-empty array of paths' });
+      return;
+    }
+    const members = body.members.filter((m): m is string => typeof m === 'string' && m.length > 0);
+    if (members.length === 0) {
+      res.status(400).json({ error: 'members must be non-empty strings' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const row = db
+        .prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { archive_path: string } | undefined;
+      if (!row) { res.status(404).json({ error: 'no such door' }); return; }
+      const absPath = resolveArchivePath(cfg, row.archive_path);
+      const binary = findLhaBinary();
+      if (!binary) { res.status(400).json({ error: 'no lha binary available' }); return; }
+      const result = deleteMembers(absPath, members, { binary });
+      if (!result.ok) { res.status(400).json({ error: result.reason }); return; }
+      recordAudit(db, req.admin?.id ?? null, 'delete-files', archiveName, { members, removed: result.removed });
+      res.json({ ok: true, removed: result.removed });
+    } finally {
+      db.close();
+    }
   });
 
   // ─── release groups ────────────────────────────────────────────────
