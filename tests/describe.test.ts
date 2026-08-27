@@ -18,6 +18,7 @@ import {
   clean,
   finalise,
   normaliseRequirement,
+  tidyCase,
   toPlain,
 } from '../src/describe';
 
@@ -398,5 +399,25 @@ describe('falling back', () => {
   it('never returns more than 60 characters', () => {
     const long = 'Account Editor supports every field of the AmiExpress config file format';
     expect(read(long, null, null, 'ACC-V103.LHA').description.length).toBeLessThanOrEqual(60);
+  });
+});
+
+describe('elite-cased acronyms are canonicalised, not preserved', () => {
+  it('rewrites a scene-cased acronym to its canonical form', () => {
+    // The reported case: bBS is BBS wearing a lowercase hat.
+    expect(tidyCase('uLTIMATE bBS dOOR - sYSOP tOOL v2.10')).toBe('Ultimate BBS Door - Sysop Tool v2.10');
+  });
+
+  it('keeps a canonical acronym exactly as it is', () => {
+    expect(tidyCase('The QWK mail door for every BBS')).toBe('The QWK mail door for every BBS');
+  });
+
+  it('canonicalises an acronym even with punctuation attached', () => {
+    expect(tidyCase('fOR yOUR bBS!')).toBe('For Your BBS!');
+  });
+
+  it('does not touch a word merely carrying an acronym inside it', () => {
+    // AmiQWK keeps its deliberate casing: only whole-word acronyms are rewritten.
+    expect(tidyCase('AmiQWK - tHE qWK rEADER')).toBe('AmiQWK - The QWK Reader');
   });
 });

@@ -8,7 +8,7 @@
  * button. The field says what it is doing rather than asking to be told.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { CaseSensitive, RotateCcw } from 'lucide-react';
 import type { FieldState } from '../api/types';
 import { Badge, Button, Input, Textarea, cx } from './ui';
 
@@ -23,6 +23,7 @@ export function FieldEditor({
   field,
   state,
   multiline,
+  onTidy,
   onSave,
   onRevert,
   reverting,
@@ -30,6 +31,8 @@ export function FieldEditor({
   field: string;
   state: FieldState;
   multiline?: boolean;
+  /** Given when the field can have its casing normalised server-side. */
+  onTidy?: (text: string) => Promise<string>;
   onSave: (value: string | null) => Promise<unknown>;
   onRevert: () => void;
   reverting: boolean;
@@ -38,6 +41,7 @@ export function FieldEditor({
   const [draft, setDraft] = useState(effective);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [tidying, setTidying] = useState(false);
 
   // The autosave paths (a timer, a blur, an unmount) all run outside the
   // render that scheduled them, so they read the draft through a ref rather
@@ -102,6 +106,21 @@ export function FieldEditor({
     timer.current = setTimeout(flush, AUTOSAVE_IDLE_MS);
   }
 
+  // The tidied text goes through change(), not setDraft(): it is an edit like
+  // any other, so it autosaves (and stays editable) the same way.
+  async function tidyCasing() {
+    if (!onTidy) return;
+    setTidying(true);
+    try {
+      change(await onTidy(latest.current.draft));
+    } catch (cause: unknown) {
+      setStatus('error');
+      setError(cause instanceof Error ? cause.message : 'could not tidy the casing');
+    } finally {
+      setTidying(false);
+    }
+  }
+
   const dirty = draft !== effective;
   const Field = multiline ? Textarea : Input;
 
@@ -138,6 +157,16 @@ export function FieldEditor({
               {status === 'error' && (error ?? 'Could not save')}
               {status === 'idle' && dirty && 'Unsaved'}
             </span>
+            {onTidy && (
+              <Button
+                variant="ghost"
+                onClick={() => void tidyCasing()}
+                disabled={tidying}
+                title="Rewrite eLi7e casing as normal words"
+              >
+                <CaseSensitive size={13} /> Fix casing
+              </Button>
+            )}
             {state.isEdited && (
               <Button variant="ghost" onClick={onRevert} disabled={reverting} title="Drop this correction">
                 <RotateCcw size={13} /> Revert

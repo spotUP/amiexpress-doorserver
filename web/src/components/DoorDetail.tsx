@@ -7,7 +7,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Download, X } from 'lucide-react';
 import { useState } from 'react';
-import { useAdminDoor, useDoor, useRedescribe, useRevertField, useSaveField } from '../api/queries';
+import { useAdminDoor, useDoor, useRedescribe, useRevertField, useSaveField, useTidyCase } from '../api/queries';
 import type { AdminUser, DoorFacts } from '../api/types';
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
@@ -16,6 +16,8 @@ import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
 
 const MULTILINE_FIELDS = new Set(['description', 'suggested_tooltypes']);
+/** Fields whose scene casing the server can normalise for the curator. */
+const TIDY_FIELDS = new Set(['name', 'description']);
 
 export function DoorDetailDialog({
   archiveName,
@@ -31,6 +33,7 @@ export function DoorDetailDialog({
   const save = useSaveField(archiveName ?? '');
   const revert = useRevertField(archiveName ?? '');
   const redescribe = useRedescribe(archiveName ?? '');
+  const tidy = useTidyCase();
   const [preview, setPreview] = useState<DoorFacts | null>(null);
 
   return (
@@ -165,6 +168,11 @@ export function DoorDetailDialog({
                         field={field}
                         state={state}
                         multiline={MULTILINE_FIELDS.has(field)}
+                        onTidy={
+                          TIDY_FIELDS.has(field)
+                            ? (text) => tidy.mutateAsync(text).then((res) => res.text)
+                            : undefined
+                        }
                         reverting={revert.isPending}
                         onSave={(value) => save.mutateAsync({ [field]: value })}
                         onRevert={() => revert.mutate(field)}

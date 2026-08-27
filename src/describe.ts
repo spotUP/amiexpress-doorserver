@@ -644,7 +644,16 @@ function capitalise(w: string): string {
 
 function tidyWord(w: string, handles: boolean): string {
   const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '');
-  if (!core || ACRONYMS.has(core.toUpperCase())) return w;
+  if (!core) return w;
+  if (ACRONYMS.has(core.toUpperCase())) {
+    // An acronym survives normalisation in its canonical form: "BBS" stays
+    // "BBS", and scene-cased "bBS" is rewritten "BBS" - never left half-shouted.
+    // Single letters are exempt: lowercase "x" in "v4.x" is a placeholder, not
+    // the /X BBS software wearing a hat.
+    return core === core.toUpperCase() || core.length < 2
+      ? w
+      : w.replace(/[A-Za-zÀ-ÿ]/g, (c) => c.toUpperCase());
+  }
   if (
     handles &&
     core.length >= 2 &&

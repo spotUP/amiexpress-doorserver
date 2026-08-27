@@ -191,6 +191,17 @@ export function useRedescribe(archiveName: string) {
 }
 
 /**
+ * The server's casing normaliser, behind the editor's fix-casing button: it
+ * is the same tidyCase() the classifier runs, so a tidied edit and a
+ * re-derived field read the same way.
+ */
+export function useTidyCase() {
+  return useMutation({
+    mutationFn: (text: string) => api.post<{ text: string }>('/admin/tidy-case', { text }),
+  });
+}
+
+/**
  * The catalog announces its own revision over SSE. When it changes - someone
  * else edited a door, a submission was approved, a re-scan landed - every
  * door query is invalidated and the open page refreshes itself in place.

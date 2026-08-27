@@ -69,6 +69,7 @@ describe('every admin route needs a token', () => {
     expect((await request(app()).patch(admin('/doors/ACC-V103.LHA')).send({ name: 'x' })).status).toBe(401);
     expect((await request(app()).delete(admin('/doors/ACC-V103.LHA/overrides/name'))).status).toBe(401);
     expect((await request(app()).post(admin('/doors/ACC-V103.LHA/redescribe'))).status).toBe(401);
+    expect((await request(app()).post(admin('/tidy-case'))).status).toBe(401);
     expect((await request(app()).get(admin('/audit'))).status).toBe(401);
   });
 });
@@ -213,5 +214,34 @@ describe('POST /admin/doors/:archiveName/redescribe', () => {
     expect(res.body.requiresBbs).toBe('/X 3.38+');
     // The human's text is still what the public API serves.
     expect((await request(app()).get('/api/door-repo/doors?q=ACC')).body.rows[0].description).toBe('mine');
+  });
+});
+
+describe('POST /admin/tidy-case', () => {
+  it('normalises eLi7e casing the way the classifier does', async () => {
+    const res = await request(app())
+      .post(admin('/tidy-case'))
+      .set(auth())
+      .send({ text: 'tHE pHINX dOOR 4 dAYDREAM' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ text: 'The Phinx Door 4 Daydream' });
+  });
+
+  it('de-shouts ALL-CAPS prose but keeps acronyms', async () => {
+    const res = await request(app())
+      .post(admin('/tidy-case'))
+      .set(auth())
+      .send({ text: 'THE QWK MAIL DOOR FOR EVERY BBS' });
+    expect(res.body.text).toBe('The QWK Mail Door For Every BBS');
+  });
+
+  it('leaves normal casing alone', async () => {
+    const res = await request(app()).post(admin('/tidy-case')).set(auth()).send({ text: 'Normal text stays put' });
+    expect(res.body.text).toBe('Normal text stays put');
+  });
+
+  it('refuses a body without a string to tidy', async () => {
+    expect((await request(app()).post(admin('/tidy-case')).set(auth()).send({})).status).toBe(400);
+    expect((await request(app()).post(admin('/tidy-case')).set(auth()).send({ text: 4 })).status).toBe(400);
   });
 });

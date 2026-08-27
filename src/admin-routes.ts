@@ -18,7 +18,7 @@ import {
   verifyToken,
   type AuthedRequest,
 } from './auth';
-import { analyseDoor, buildGroupTags } from './describe';
+import { analyseDoor, buildGroupTags, tidyCase } from './describe';
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides } from './effective';
 import { UploadError, approveSubmission, rejectSubmission } from './submissions';
 import type { ServerConfig } from './config';
@@ -301,6 +301,21 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     } finally {
       db.close();
     }
+  });
+
+  /**
+   * The classifier's own casing normaliser, on tap: what tidyCase() would do
+   * to a value, without writing anything. This is the "fix casing" button in
+   * the field editor - one implementation, so the button and the classifier
+   * can never disagree about what normal casing looks like.
+   */
+  router.post('/tidy-case', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const { text } = (req.body ?? {}) as { text?: unknown };
+    if (typeof text !== 'string') {
+      res.status(400).json({ error: 'text must be a string' });
+      return;
+    }
+    res.json({ text: tidyCase(text) });
   });
 
   /**
