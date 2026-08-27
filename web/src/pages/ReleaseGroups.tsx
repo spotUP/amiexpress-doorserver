@@ -1,5 +1,6 @@
 /** Release group abbreviation → full name editor. Admin only. */
 import * as Dialog from '@radix-ui/react-dialog';
+import { Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useReleaseGroups, useUpdateReleaseGroup } from '../api/queries';
 import { Button } from '../components/ui';
@@ -59,6 +60,13 @@ export function ReleaseGroupsPanel({
     });
   }, [draft, update]);
 
+  const handleDelete = useCallback(
+    (abbr: string) => {
+      update.mutate({ [abbr]: null });
+    },
+    [update],
+  );
+
   const dirtyCount = Object.keys(draft).length;
 
   return (
@@ -106,7 +114,7 @@ export function ReleaseGroupsPanel({
                       isDirty ? 'border-accent' : 'border-line'
                     }`}
                   />
-                  {isDirty && (
+                  {isDirty ? (
                     <Button
                       variant="ghost"
                       onClick={() => handleSave(group.abbreviation)}
@@ -114,6 +122,15 @@ export function ReleaseGroupsPanel({
                     >
                       Save
                     </Button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(group.abbreviation)}
+                      className="rounded p-1 text-muted hover:bg-raised hover:text-red"
+                      title="Remove this group"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   )}
                 </li>
               );
