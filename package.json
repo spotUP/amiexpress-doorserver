@@ -4,7 +4,7 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp src/schema.sql dist/src/schema.sql && cp src/lha.js dist/src/lha.js && mkdir -p dist/seeds && cp seeds/*.json dist/seeds/",
+    "build": "tsc -p tsconfig.json && cp src/schema.sql dist/src/schema.sql && cp src/lha.js dist/src/lha.js && mkdir -p dist/seeds && (cp seeds/*.json dist/seeds/ 2>/dev/null || true)",
     "start": "node dist/src/index.js",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
