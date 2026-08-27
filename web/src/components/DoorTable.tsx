@@ -10,9 +10,6 @@ export interface SortState {
 
 const COLUMNS: { key: string; label: string; sortable: boolean; className?: string }[] = [
   { key: 'archive', label: 'Archive', sortable: true, className: 'w-56' },
-  // The catalog's `name` field is the DIZ's first line for 1031 of 3301
-  // rows - border art. What this column shows is the cleaned reading of it
-  // (src/describe.ts, displayName), never the raw value.
   { key: 'name', label: 'Name', sortable: true, className: 'w-48' },
   { key: 'version', label: 'Version', sortable: true, className: 'w-20' },
   { key: 'description', label: 'Description', sortable: false },
@@ -27,17 +24,36 @@ export function DoorTable({
   sortState,
   onSort,
   onOpen,
+  selected,
+  onToggle,
+  onToggleAll,
 }: {
   rows: Door[];
   sortState: SortState;
   onSort: (key: string) => void;
   onOpen: (door: Door) => void;
+  selected?: Set<string>;
+  onToggle?: (name: string) => void;
+  onToggleAll?: () => void;
 }) {
+  const hasSelection = selected && onToggle && onToggleAll;
+  const allSelected = hasSelection && rows.length > 0 && rows.every((d) => selected!.has(d.archiveName));
+
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
       <table className="w-full min-w-[60rem] border-collapse text-sm">
         <thead className="bg-surface text-left text-xs uppercase tracking-wide text-muted">
           <tr>
+            {hasSelection && (
+              <th scope="col" className="w-10 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={onToggleAll}
+                  className="h-3.5 w-3.5 rounded border-line accent-accent"
+                />
+              </th>
+            )}
             {COLUMNS.map((column) => (
               <th key={column.key} scope="col" className={cx('px-3 py-2 font-medium', column.className)}>
                 {column.sortable ? (
@@ -62,9 +78,25 @@ export function DoorTable({
           {rows.map((door) => (
             <tr
               key={door.archiveName}
-              className="cursor-pointer border-t border-line hover:bg-surface"
+              className={cx(
+                'cursor-pointer border-t border-line hover:bg-surface',
+                hasSelection && selected!.has(door.archiveName) && 'bg-accent/5',
+              )}
               onClick={() => onOpen(door)}
             >
+              {hasSelection && (
+                <td
+                  className="px-3 py-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected!.has(door.archiveName)}
+                    onChange={() => onToggle!(door.archiveName)}
+                    className="h-3.5 w-3.5 rounded border-line accent-accent"
+                  />
+                </td>
+              )}
               <td className="px-3 py-2 font-mono text-[12px] text-accent">{door.archiveName}</td>
               <td className="px-3 py-2">
                 <span className={door.nameSource === 'archive' ? 'text-muted' : undefined}>{door.name}</span>

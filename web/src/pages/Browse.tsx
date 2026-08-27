@@ -2,9 +2,9 @@
  * The site: search, filter, sort, open a door, download it. No login is ever
  * asked for on this path - the corpus is public, and reading it is the point.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2 } from 'lucide-react';
-import { useDoors, useFacets, useLiveRevision } from '../api/queries';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
+import { useBatchHide, useBatchPatch, useBatchRestore, useDoors, useFacets, useLiveRevision } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
 import type { AdminUser, Door } from '../api/types';
@@ -15,7 +15,10 @@ import { AuditPanel } from './Audit';
 import { HiddenPanel } from './Hidden';
 import { SubmissionsPanel } from './Submissions';
 import { ReleaseGroupsPanel } from './ReleaseGroups';
+import { StatsPanel } from './Stats';
 import { SubmitDialog } from '../components/SubmitDialog';
+import { BatchToolbar } from '../components/BatchToolbar';
+import { SavedSearches } from '../components/SavedSearches';
 import { Button, Input, Select } from '../components/ui';
 
 const PER_PAGE = 50;
@@ -37,6 +40,8 @@ export function Browse() {
   const [submitOpen, setSubmitOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useLiveRevision();
 
@@ -76,6 +81,10 @@ export function Browse() {
   const { data, isLoading } = useDoors(query);
   const { data: facets } = useFacets();
 
+  const batchHide = useBatchHide();
+  const batchRestore = useBatchRestore();
+  const batchPatch = useBatchPatch();
+
   const pages = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1;
 
   function sortBy(key: string) {
@@ -88,11 +97,28 @@ export function Browse() {
     setAdmin(null);
   }
 
+  const toggle = useCallback((name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => {
+      const rows = data?.rows ?? [];
+      if (rows.every((d) => prev.has(d.archiveName))) return new Set();
+      return new Set(rows.map((d) => d.archiveName));
+    });
+  }, [data]);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[86rem] flex-col gap-4 px-4 py-6">
       <header className="flex flex-col gap-4">
-        {/* The scene logo the repository was given: ANSI art, so it only stays
-            legible with nearest-neighbour scaling. */}
         <h1 className="m-0">
           <img
             src="/logo.png"
@@ -125,6 +151,9 @@ export function Browse() {
                 </Button>
                 <Button variant="ghost" onClick={() => setGroupsOpen(true)}>
                   Groups
+                </Button>
+                <Button variant="ghost" onClick={() => setStatsOpen(true)}>
+                  <BarChart3 size={14} /> Stats
                 </Button>
                 <Button variant="ghost" onClick={() => setAuditOpen(true)}>
                   <Shield size={14} /> Audit
@@ -184,9 +213,6 @@ export function Browse() {
           options={(facets?.requires ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
         />
         {admin && (
-          // A curator's working view: the doors whose name had to be guessed
-          // from the filename, which are the ones worth typing a real name
-          // into.
           <Button
             variant={guessedOnly ? 'primary' : 'ghost'}
             onClick={() => {
@@ -198,13 +224,61 @@ export function Browse() {
             <Wand2 size={14} /> Needs a name
           </Button>
         )}
+        <SavedSearches
+          query={q}
+          system={system}
+          type={type}
+          requires={requires}
+          onApply={(s) => {
+            setSearch(s.query);
+            setQ(s.query);
+            setSystem(s.system);
+            setType(s.type);
+            setRequires(s.requires);
+            setPage(1);
+          }}
+        />
       </div>
+
+      {admin && selected.size > 0 && (
+        <BatchToolbar
+          count={selected.size}
+          onHide={() => {
+            const names = [...selected];
+            batchHide.mutate(names.map((archiveName) => ({ archiveName, reason: 'batch hide' })), {
+              onSuccess: () => setSelected(new Set()),
+            });
+          }}
+          onRestore={() => {
+            batchRestore.mutate([...selected], {
+              onSuccess: () => setSelected(new Set()),
+            });
+          }}
+          onRecategorize={(category) => {
+            batchPatch.mutate(
+              { archiveNames: [...selected], fields: { category } },
+              { onSuccess: () => setSelected(new Set()) },
+            );
+          }}
+          onFixCasing={() => {
+            batchPatch.mutate(
+              { archiveNames: [...selected], fields: { description: '__FIX_CASING__' } },
+              { onSuccess: () => setSelected(new Set()) },
+            );
+          }}
+          onClear={clearSelection}
+          isPending={batchHide.isPending || batchRestore.isPending || batchPatch.isPending}
+        />
+      )}
 
       <DoorTable
         rows={data?.rows ?? []}
         sortState={sortState}
         onSort={sortBy}
         onOpen={(door: Door) => setOpen(door.archiveName)}
+        selected={admin ? selected : undefined}
+        onToggle={admin ? toggle : undefined}
+        onToggleAll={admin ? toggleAll : undefined}
       />
 
       <footer className="flex items-center justify-between gap-4 text-sm text-muted">
@@ -227,6 +301,7 @@ export function Browse() {
       <HiddenPanel open={hiddenOpen} onOpenChange={setHiddenOpen} enabled={Boolean(admin)} />
       <SubmissionsPanel open={queueOpen} onOpenChange={setQueueOpen} enabled={Boolean(admin)} />
       <ReleaseGroupsPanel open={groupsOpen} onOpenChange={setGroupsOpen} enabled={Boolean(admin)} />
+      <StatsPanel open={statsOpen} onOpenChange={setStatsOpen} />
       <SubmitDialog open={submitOpen} onOpenChange={setSubmitOpen} />
     </div>
   );

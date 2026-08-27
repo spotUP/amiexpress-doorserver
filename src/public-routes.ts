@@ -398,6 +398,88 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /** Aggregated statistics for the dashboard. */
+  router.get('/stats', (_req: Request, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const hidden = hiddenExclusion(db);
+      const visible = hidden ? `WHERE ${hidden}` : '';
+      const andVisible = hidden ? `AND ${hidden}` : '';
+      const one = (sql: string, ...params: unknown[]): number =>
+        (db.prepare(sql).get(...params) as { n: number }).n;
+      const all = (sql: string, ...params: unknown[]): { value: string | null; n: number }[] =>
+        db.prepare(sql).all(...params) as { value: string | null; n: number }[];
+
+      const total = one(`SELECT COUNT(*) AS n FROM door_catalog ${visible}`);
+      const hiddenCount = one('SELECT COUNT(*) AS n FROM door_hidden');
+      const withDoc = one(
+        `SELECT COUNT(*) AS n FROM door_catalog ${visible ? `WHERE doc_raw IS NOT NULL AND doc_raw <> '' ${andVisible}` : `WHERE doc_raw IS NOT NULL AND doc_raw <> ''`}`
+      );
+
+      const bySystem = all(
+        `SELECT CASE WHEN instr(archive_path, '/') > 0
+                     THEN substr(archive_path, 1, instr(archive_path, '/') - 1)
+                     ELSE 'Unsorted' END AS value,
+                COUNT(*) AS n
+           FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
+      );
+
+      const byGroup = all(
+        `SELECT COALESCE(d.release_group, 'None') AS value, COUNT(*) AS n
+           FROM door_catalog d ${visible ? `WHERE ${hidden.replace('id', 'd.id')}` : ''}
+           GROUP BY value ORDER BY n DESC LIMIT 20`
+      );
+
+      const byCategory = all(
+        `SELECT COALESCE(category, 'None') AS value, COUNT(*) AS n
+           FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
+      );
+
+      const byType = all(
+        `SELECT door_type AS value, COUNT(*) AS n
+           FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
+      );
+
+      const byAuthor = all(
+        `SELECT COALESCE(author, 'Unknown') AS value, COUNT(*) AS n
+           FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC LIMIT 20`
+      );
+
+      const sizeDistribution = all(
+        `SELECT
+           CASE
+             WHEN archive_size < 10240 THEN '< 10 KB'
+             WHEN archive_size < 102400 THEN '10-100 KB'
+             WHEN archive_size < 1048576 THEN '100 KB - 1 MB'
+             WHEN archive_size < 10485760 THEN '1-10 MB'
+             ELSE '10+ MB'
+           END AS value,
+           COUNT(*) AS n
+         FROM door_catalog ${visible} GROUP BY value ORDER BY MIN(archive_size)`
+      );
+
+      const indexedOverTime = all(
+        `SELECT strftime('%Y-%m', indexed_at, 'unixepoch') AS value, COUNT(*) AS n
+           FROM door_catalog ${visible} GROUP BY value ORDER BY value`
+      );
+
+      res.json({
+        total,
+        hiddenCount,
+        withDoc,
+        bySystem,
+        byGroup,
+        byCategory,
+        byType,
+        byAuthor,
+        sizeDistribution,
+        indexedOverTime,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   /**
    * Send in a door. Anyone may; nobody publishes. The file waits in
    * quarantine until a curator approves it - see src/submissions.ts for what
