@@ -5,15 +5,89 @@
  */
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Download, X } from 'lucide-react';
+import { Download, Eye, Trash2, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
-import type { AdminUser, DoorFacts, StripPreview } from '../api/types';
+import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types';
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
 import { FieldEditor } from './FieldEditor';
 import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
+
+const TEXT_EXTS = /\.(txt|me|guide|doc|diz|ans|asc|nfo|rip|info|readme)$/i;
+
+function FileList({ archiveName, files }: { archiveName: string; files: DoorFile[] }) {
+  const [viewing, setViewing] = useState<string | null>(null);
+  const [content, setContent] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [fileList, setFileList] = useState<DoorFile[]>(files);
+
+  async function viewFile(path: string) {
+    setViewing(path);
+    setContent(null);
+    try {
+      const r = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/file?path=${encodeURIComponent(path)}`, { credentials: 'include' });
+      if (r.ok) setContent(await r.text());
+      else setContent(`[could not read: ${r.status}]`);
+    } catch { setContent('[read error]'); }
+  }
+
+  async function deleteFile(path: string) {
+    if (!confirm(`Delete ${path} from the archive?`)) return;
+    setDeleting((prev) => new Set(prev).add(path));
+    try {
+      const r = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/delete-files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ members: [path] }),
+      });
+      if (r.ok) {
+        setFileList((prev) => prev.filter((f) => f.path !== path));
+      }
+    } finally {
+      setDeleting((prev) => { const next = new Set(prev); next.delete(path); return next; });
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <ul className="divide-y divide-line rounded-md border border-line">
+        {fileList.map((file) => (
+          <li key={file.path} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+            <span className="flex-1 truncate font-mono text-[12px]">{file.path}</span>
+            {file.isJunk ? <Badge tone="warn">stripped</Badge> : null}
+            <span className="font-mono text-[12px] text-muted">{formatSize(file.size)}</span>
+            {TEXT_EXTS.test(file.path) && (
+              <button onClick={() => viewFile(file.path)} className="rounded p-1 text-muted hover:bg-raised hover:text-accent" title="View contents">
+                <Eye size={13} />
+              </button>
+            )}
+            <button
+              onClick={() => deleteFile(file.path)}
+              disabled={deleting.has(file.path)}
+              className="rounded p-1 text-muted hover:bg-danger/10 hover:text-danger"
+              title="Delete from archive"
+            >
+              <Trash2 size={13} />
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {viewing && (
+        <div className="rounded-md border border-line bg-bg p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-mono text-xs text-accent">{viewing}</span>
+            <button onClick={() => setViewing(null)} className="text-muted hover:text-ink"><X size={14} /></button>
+          </div>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] text-ink">{content ?? 'Loading...'}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DoorHistory({ archiveName }: { archiveName: string }) {
   const [entries, setEntries] = useState<{ id: number; action: string; target: string; detail: Record<string, unknown> | null; at: number; by: string }[]>([]);
@@ -314,17 +388,7 @@ export function DoorDetailDialog({
               </Tabs.Content>
 
               <Tabs.Content value="files">
-                <ul className="divide-y divide-line rounded-md border border-line">
-                  {door?.files.map((file) => (
-                    <li key={file.path} className="flex items-center gap-3 px-3 py-1.5 text-sm">
-                      <span className="flex-1 truncate font-mono text-[12px]">{file.path}</span>
-                      {file.isJunk && <Badge tone="warn">{file.junkReason ?? 'junk'}</Badge>}
-                      <span className="w-16 text-right font-mono text-[12px] text-muted">
-                        {formatSize(file.size)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <FileList archiveName={archiveName ?? ''} files={door?.files ?? []} />
               </Tabs.Content>
 
               {door?.doc && (
