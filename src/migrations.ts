@@ -128,6 +128,22 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_hidden_at ON door_hidden(hidden_at)');
     },
   },
+  {
+    version: 4,
+    name: 'release_groups',
+    up: (db) => {
+      // Abbreviation-to-full-name mapping for release groups.  The catalog
+      // stores the short tag (e.g. "SAD"); this table lets admins add the
+      // human-readable name ("Sceptic Anti Design") that the UI can show
+      // alongside it.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS release_groups (
+          abbreviation TEXT PRIMARY KEY,
+          full_name    TEXT NOT NULL,
+          updated_at   INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        )`);
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

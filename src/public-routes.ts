@@ -413,6 +413,25 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     })();
   });
 
+  router.get('/release-groups', (_req: Request, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const hasTable = db
+        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='release_groups'")
+        .get();
+      if (!hasTable) {
+        res.json({ groups: [] });
+        return;
+      }
+      const rows = db
+        .prepare('SELECT abbreviation, full_name FROM release_groups ORDER BY abbreviation')
+        .all() as { abbreviation: string; full_name: string }[];
+      res.json({ groups: rows });
+    } finally {
+      db.close();
+    }
+  });
+
   router.get('/events', (req: Request, res: Response) => subscribe(cfg, req, res));
 
   return router;

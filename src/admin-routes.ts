@@ -500,5 +500,65 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  // ─── release groups ────────────────────────────────────────────────
+
+  /** List all release group abbreviations with their full names. */
+  router.get('/release-groups', requireAdmin(cfg), (_req: AuthedRequest, res: Response) => {
+    const db = openDb(cfg);
+    try {
+      const rows = db
+        .prepare('SELECT abbreviation, full_name, updated_at FROM release_groups ORDER BY abbreviation')
+        .all() as { abbreviation: string; full_name: string; updated_at: number }[];
+      res.json({ groups: rows });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Set the full name for one or more release groups. */
+  router.patch('/release-groups', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const entries = Object.entries(body);
+    if (entries.length === 0) {
+      res.status(400).json({ error: 'no groups given' });
+      return;
+    }
+    for (const [abbr, name] of entries) {
+      if (typeof abbr !== 'string' || abbr.length === 0) {
+        res.status(400).json({ error: 'every key must be a non-empty abbreviation' });
+        return;
+      }
+      if (name !== null && typeof name !== 'string') {
+        res.status(400).json({ error: 'every value must be a string or null' });
+        return;
+      }
+    }
+
+    const db = openDb(cfg);
+    try {
+      const upsert = db.prepare(
+        `INSERT INTO release_groups (abbreviation, full_name, updated_at)
+         VALUES (?, ?, strftime('%s','now'))
+         ON CONFLICT(abbreviation) DO UPDATE SET
+           full_name = excluded.full_name, updated_at = excluded.updated_at`
+      );
+      const del = db.prepare('DELETE FROM release_groups WHERE abbreviation = ?');
+      const write = db.transaction(() => {
+        for (const [abbr, name] of entries) {
+          if (name === null || name === '') {
+            del.run(abbr);
+          } else {
+            upsert.run(abbr, name);
+          }
+          recordAudit(db, req.admin?.id ?? null, 'edit-release-group', abbr, { full_name: name });
+        }
+      });
+      write();
+      res.json({ ok: true, groups: Object.keys(body) });
+    } finally {
+      db.close();
+    }
+  });
+
   return router;
 }
