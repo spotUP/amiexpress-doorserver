@@ -23,6 +23,7 @@ export function FieldEditor({
   field,
   state,
   multiline,
+  rows,
   onTidy,
   onSave,
   onRevert,
@@ -31,6 +32,7 @@ export function FieldEditor({
   field: string;
   state: FieldState;
   multiline?: boolean;
+  rows?: number;
   /** Given when the field can have its casing normalised server-side. */
   onTidy?: (text: string) => Promise<string>;
   onSave: (value: string | null) => Promise<unknown>;
@@ -136,12 +138,13 @@ export function FieldEditor({
         <Field
           id={`field-${field}`}
           value={draft}
-          rows={multiline ? 3 : undefined}
+          rows={multiline ? (rows ?? 3) : undefined}
           onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
             change(event.target.value)
           }
           onBlur={flush}
           className={cx('font-mono text-[13px]', dirty && 'border-accent-dim')}
+          style={field === 'file_id_diz' ? { width: '45ch' } : undefined}
         />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           {state.derived && !state.isEdited && <span>read from the DIZ</span>}
