@@ -3,7 +3,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Trash2 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useReleaseGroups, useUpdateReleaseGroup } from '../api/queries';
-import { Button } from '../components/ui';
 
 export function ReleaseGroupsPanel({
   open,
