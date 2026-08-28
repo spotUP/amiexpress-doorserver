@@ -586,6 +586,8 @@ export function createPublicRouter(cfg: ServerConfig): Router {
 
   router.get('/events', (req: Request, res: Response) => subscribe(cfg, req, res));
 
+  mountLearnRoute(router, cfg);
+
   return router;
 }
 
@@ -665,4 +667,50 @@ export function _closeEventStreamsForTests(): void {
     poller = null;
     lastRevision = null;
   }
+}
+
+// ─── Public learn endpoint (DOORMAN / external clients) ────────────────
+
+/**
+ * POST /api/learn — teach the classifier a new junk pattern.
+ * Authenticated via X-Learn-Key header matching DOORREPO_LEARN_KEY env var.
+ * This lets DOORMAN and other external clients contribute patterns without
+ * needing a full admin JWT session.
+ */
+export function mountLearnRoute(router: Router, cfg: ServerConfig): void {
+  router.post('/learn', express.json({ limit: '16kb' }), (req: Request, res: Response) => {
+    if (!cfg.learnKey) {
+      res.status(503).json({ error: 'learn API disabled: DOORREPO_LEARN_KEY is not set' });
+      return;
+    }
+    const providedKey = req.headers['x-learn-key'];
+    if (typeof providedKey !== 'string' || providedKey !== cfg.learnKey) {
+      res.status(401).json({ error: 'invalid or missing X-Learn-Key header' });
+      return;
+    }
+    const body = (req.body ?? {}) as { pattern?: unknown; archiveName?: unknown; filePath?: unknown };
+    const pattern = typeof body.pattern === 'string' ? body.pattern.trim() : '';
+    if (!pattern) {
+      res.status(400).json({ error: 'pattern is required' });
+      return;
+    }
+    const archiveName = typeof body.archiveName === 'string' ? body.archiveName : null;
+    const filePath = typeof body.filePath === 'string' ? body.filePath : null;
+    const db = openDb(cfg);
+    try {
+      const existing = db
+        .prepare('SELECT id FROM learned_junk_patterns WHERE pattern = ? COLLATE NOCASE')
+        .get(pattern) as { id: number } | undefined;
+      if (existing) {
+        res.json({ ok: true, id: existing.id, duplicate: true });
+        return;
+      }
+      const info = db
+        .prepare('INSERT INTO learned_junk_patterns (pattern, archive_name, file_path, learned_by) VALUES (?, ?, ?, ?)')
+        .run(pattern, archiveName, filePath, 'doorman');
+      res.json({ ok: true, id: Number(info.lastInsertRowid), duplicate: false });
+    } finally {
+      db.close();
+    }
+  });
 }

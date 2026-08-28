@@ -26,7 +26,7 @@ beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-pub-'));
   const dbPath = path.join(dir, 'doors.db');
   fs.writeFileSync(dbPath, '');
-  cfg = { dbPath, archivesRoot: dir, port: 3010, adminKeys: [], jwtSecret: null };
+  cfg = { dbPath, archivesRoot: dir, port: 3010, adminKeys: [], jwtSecret: null, learnKey: null };
   const db = openDb(cfg);
   applySchema(db);
   runMigrations(db);
