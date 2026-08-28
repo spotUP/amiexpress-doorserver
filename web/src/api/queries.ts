@@ -60,6 +60,7 @@ export const doorKeys = {
   audit: ['audit'] as const,
   hidden: ['hidden'] as const,
   submissions: ['submissions'] as const,
+  doorHistory: (archive: string) => ['doors', 'history', archive] as const,
 };
 
 export function useDoors(query: DoorQuery) {
@@ -95,6 +96,15 @@ export function useAudit(enabled: boolean) {
     queryKey: doorKeys.audit,
     queryFn: () => api.get<{ rows: AuditEntry[] }>('/admin/audit?limit=100'),
     enabled,
+  });
+}
+
+export function useDoorAudit(archiveName: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: doorKeys.doorHistory(archiveName ?? ''),
+    queryFn: () =>
+      api.get<{ entries: AuditEntry[] }>(`/admin/doors/${encodeURIComponent(archiveName as string)}/audit`),
+    enabled: enabled && Boolean(archiveName),
   });
 }
 
