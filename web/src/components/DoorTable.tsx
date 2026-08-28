@@ -12,6 +12,7 @@ const COLUMNS: { key: string; label: string; sortable: boolean; className?: stri
   { key: 'indexed', label: 'Date', sortable: true, className: 'w-24' },
   { key: 'archive', label: 'Archive', sortable: true, className: 'w-56' },
   { key: 'name', label: 'Name', sortable: true, className: 'w-48' },
+  { key: 'type', label: 'Type', sortable: true, className: 'w-20' },
   { key: 'version', label: 'Version', sortable: true, className: 'w-20' },
   { key: 'description', label: 'Description', sortable: false },
   { key: 'requires', label: 'Needs', sortable: true, className: 'w-28' },
@@ -57,7 +58,7 @@ export function DoorTable({
       {/* Desktop table */}
       <div className="hidden overflow-x-auto rounded-lg border border-line md:block">
         <table className="w-full min-w-[60rem] border-collapse text-sm">
-          <thead className="bg-surface text-left text-xs uppercase tracking-wide text-muted">
+          <thead className="bg-surface text-left text-xs tracking-wide text-muted">
             <tr>
               {hasSelection && (
                 <th scope="col" className="w-10 px-3 py-2">
@@ -104,6 +105,7 @@ export function DoorTable({
                 <td className="px-3 py-2">
                   <span className={door.nameSource === 'archive' ? 'text-muted' : undefined}>{door.name}</span>
                 </td>
+                <td className="px-3 py-2 font-mono text-[12px] text-muted">{door.doorType || '-'}</td>
                 <td className="px-3 py-2 font-mono text-[12px] text-muted">{door.version || '-'}</td>
                 <td className="px-3 py-2 text-muted">
                   {door.description}
