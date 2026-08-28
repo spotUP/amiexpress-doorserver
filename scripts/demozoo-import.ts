@@ -25,7 +25,6 @@ import * as path from 'path';
 import { loadConfig } from '../src/config';
 import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
-import { approveSubmission } from '../src/submissions';
 import { recordAudit } from '../src/auth';
 
 const TAGS = ['amiex', 'daydream-amiga', 'fame'];
@@ -381,13 +380,6 @@ async function main() {
       }
     }
   }
-
-  // ── New doors: enumerate from demozoo, find IDs not in archiveNameSet ──────
-  // This is a second pass: collect all demozoo archive_names, diff with local set.
-  // For now, skip new imports (Q5 answer was to import all, but download+submit
-  // requires interactive approval unless we use approveSubmission directly).
-  // The backfill path above handles existing doors.
-  // New doors need: download → quarantine → door_submissions → approveSubmission → demozoo_imported
 
   process.stderr.write(`\n[demozoo] Done. stats=${JSON.stringify(stats)}\n`);
   if (errorLog.length > 0) {
