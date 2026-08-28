@@ -788,15 +788,14 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   router.post('/doors/:archiveName/strip', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
     const body = (req.body ?? {}) as { members?: unknown };
-    if (!Array.isArray(body.members) || body.members.length === 0) {
-      res.status(400).json({ error: 'members must be a non-empty array of file paths' });
+    // An empty members array is allowed: it marks the door as reviewed
+    // (sets ads_stripped=1) without removing anything - useful when the
+    // stripper finds 0 ads and the operator wants to record the review.
+    if (!Array.isArray(body.members)) {
+      res.status(400).json({ error: 'members must be an array of file paths (may be empty)' });
       return;
     }
     const members = body.members.filter((m): m is string => typeof m === 'string');
-    if (members.length === 0) {
-      res.status(400).json({ error: 'members must be non-empty strings' });
-      return;
-    }
 
     const result = stripArchiveOnServer(cfg, archiveName, members, req.admin?.id ?? null);
     if (!result.ok) {

@@ -269,7 +269,8 @@ function StripAds({
 
   async function doStrip() {
     const members = [...selected];
-    if (members.length === 0) return;
+    // Empty list is allowed: marks the door as reviewed (server sets
+    // ads_stripped=1) when the stripper found 0 ads to strip.
     const res = await stripArchive.mutateAsync(members);
     if (res.ok && res.removed != null && res.newJunkCount != null) {
       setResult({ removed: res.removed, newJunkCount: res.newJunkCount });
@@ -301,9 +302,9 @@ function StripAds({
             <Button
               variant="primary"
               onClick={doStrip}
-              disabled={selected.size === 0 || stripArchive.isPending}
+              disabled={stripArchive.isPending}
             >
-              Strip {selected.size}
+              {selected.size > 0 ? `Strip ${selected.size}` : 'Mark reviewed'}
             </Button>
           </div>
         </div>

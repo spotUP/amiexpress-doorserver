@@ -98,7 +98,20 @@ export function deleteMembers(
   // be parsed by lha as options (exit 2 + usage message); prefix with `./`
   // to force positional interpretation.
   const safeMembers = members.map((m) => (m.startsWith('-') ? `./${m}` : m));
-  const result = runner(binary as string, ['d', archivePath, ...safeMembers]);
+  const useLha = binary!.endsWith('lha') || binary!.includes('/lha');
+  // First try: explicit latin1/utf8 encoding flags (correct for Amiga archives).
+  // Fallback: 'cap' encoding which doesn't need iconv - works on filenames
+  // whose bytes aren't valid in any standard 8-bit encoding.
+  const primaryArgs = useLha
+    ? ['dq', '--archive-kanji-code=latin1', '--system-kanji-code=utf8', archivePath, ...safeMembers]
+    : ['d', archivePath, ...safeMembers];
+  const fallbackArgs = useLha
+    ? ['dq', '--archive-kanji-code=cap', '--system-kanji-code=utf8', archivePath, ...safeMembers]
+    : primaryArgs;
+  let result = runner(binary as string, primaryArgs);
+  if (result.status !== 0 && /iconv/.test(result.stderr || '')) {
+    result = runner(binary as string, fallbackArgs);
+  }
   if (result.status !== 0) {
     const output = (result.stderr || result.stdout || '').trim().slice(0, 300);
     return {

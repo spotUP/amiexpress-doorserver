@@ -258,6 +258,15 @@ export function stripArchiveOnServer(
       return { ok: false, reason: 'No lha binary available on this server.' };
     }
 
+    // Empty members list: the stripper found 0 ads. Mark the door as reviewed
+    // (ads_stripped=1) without touching the archive on disk.
+    if (members.length === 0) {
+      db.prepare(
+        `UPDATE door_catalog SET ads_stripped = 1, indexed_at = strftime('%s','now') WHERE id = ?`
+      ).run(row.id);
+      return { ok: true, removed: 0, newJunkCount: 0 };
+    }
+
     const deleteResult = deleteMembers(absPath, members, { binary });
     if (!deleteResult.ok) {
       return { ok: false, reason: deleteResult.reason };

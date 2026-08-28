@@ -299,8 +299,10 @@ describe('lha-member-delete', () => {
   it('deleteMembers invokes lha d with all members', () => {
     const mockRunner: ArchiveRunner = (bin, args) => {
       expect(bin).toBe('/usr/bin/lha');
-      expect(args[0]).toBe('d');
-      expect(args[1]).toBe('/tmp/test.lha');
+      expect(args[0]).toBe('dq');
+      expect(args).toContain('--archive-kanji-code=latin1');
+      expect(args).toContain('--system-kanji-code=utf8');
+      expect(args).toContain('/tmp/test.lha');
       expect(args).toContain('file1.nfo');
       expect(args).toContain('file2.txt');
       return { status: 0, stdout: '', stderr: '' };
@@ -310,6 +312,25 @@ describe('lha-member-delete', () => {
       runner: mockRunner,
     });
     expect(result).toEqual({ ok: true, removed: 2 });
+  });
+
+  it('falls back to cap encoding when lha fails with iconv error', () => {
+    let attempt = 0;
+    const mockRunner: ArchiveRunner = (bin, args) => {
+      attempt++;
+      if (attempt === 1) {
+        expect(args).toContain('--archive-kanji-code=latin1');
+        return { status: 1, stdout: '', stderr: 'LHa: Error: iconv() failure: Illegal byte sequence' };
+      }
+      expect(args).toContain('--archive-kanji-code=cap');
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const result = deleteMembers('/tmp/test.lha', ['file.nfo'], {
+      binary: '/usr/bin/lha',
+      runner: mockRunner,
+    });
+    expect(result.ok).toBe(true);
+    expect(attempt).toBe(2);
   });
 
   it('deleteMembers reports lha failures', () => {
