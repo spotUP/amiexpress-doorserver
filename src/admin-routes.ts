@@ -341,7 +341,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   });
 
   /** Get the content of a file inside an archive. */
-  router.get('/doors/:archiveName/files/:filePath(.*)', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+  router.get('/doors/:archiveName/files/:filePath+', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[0] : req.params.archiveName;
     const filePath = Array.isArray(req.params.filePath) ? req.params.filePath.join('/') : req.params.filePath;
     const db = openDb(cfg, { readonly: true });
