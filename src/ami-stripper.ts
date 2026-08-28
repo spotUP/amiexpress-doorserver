@@ -92,6 +92,10 @@ function isAmigaGuide(buf: Buffer): boolean {
   return text.includes('@database') || text.includes('@node');
 }
 
+export function isTextFile(buf: Buffer): boolean {
+  return !isBinaryContent(buf);
+}
+
 function isBinaryContent(buf: Buffer): boolean {
   for (let i = 0; i < Math.min(buf.length, 1024); i++) {
     const b = buf[i];
