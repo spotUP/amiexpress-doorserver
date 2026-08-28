@@ -702,8 +702,11 @@ export function tidyCase(text: string, handles = false): string {
 export function fixCasing(text: string): string {
   if (!text) return text;
 
-  // Collapse multiple lines to single line, strip leading/trailing whitespace
-  let out = text.replace(/\s+/g, ' ').trim();
+  // Strip box-art borders: pipes, colons used as borders, leading/trailing dashes
+  let out = text.replace(/[|]/g, ' ');
+
+  // Collapse multiple lines/whitespace to single line
+  out = out.replace(/\s+/g, ' ').trim();
 
   // Remove space before ! and !! (and other punctuation)
   out = out.replace(/\s+([!?])/g, '$1');
