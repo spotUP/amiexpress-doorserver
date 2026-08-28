@@ -462,21 +462,21 @@ async function main() {
         }
 
         const patch: Record<string, unknown> = {};
-        if (detail!.release_date && !match.release_date) patch.release_date = detail!.release_date;
-        if (detail!.platform && !match.platform) patch.platform = detail!.platform;
+        // Demozoo's metadata is the authoritative source for these fields.
+        // Overwrite the row values — curator edits live in door_catalog_overrides
+        // and are layered on at read time, so nothing user-edited is lost.
+        if (detail!.release_date) patch.release_date = detail!.release_date;
         const dl = detail!.download_links?.[0]?.url;
-        if (dl && !match.download_url) patch.download_url = dl;
+        if (dl) patch.download_url = dl;
         const creds = parseCredits(detail!.credits ?? []);
-        if (creds && !match.credits) patch.credits = creds;
+        if (creds) patch.credits = creds;
         const links = parseLinks(detail!.external_links ?? []);
-        if (links && !match.external_links) patch.external_links = links;
+        if (links) patch.external_links = links;
         const shots = parseScreenshots(detail!.screenshots ?? []);
-        if (shots && !match.screenshots) patch.screenshots = shots;
+        if (shots) patch.screenshots = shots;
         const group = extractReleaseGroup(detail!);
-        if (group && !match.release_group) {
+        if (group) {
           patch.release_group = group.abbrev;
-          // Upsert into the release_groups lookup so the UI can show
-          // "Up Rough /X Innovations" alongside the abbreviation.
           db.prepare(
             'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
           ).run(group.abbrev, group.fullName);
