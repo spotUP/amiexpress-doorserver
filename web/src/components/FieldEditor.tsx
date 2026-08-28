@@ -28,6 +28,7 @@ export function FieldEditor({
   onSave,
   onRevert,
   reverting,
+  selectOptions,
 }: {
   field: string;
   state: FieldState;
@@ -38,6 +39,8 @@ export function FieldEditor({
   onSave: (value: string | null) => Promise<unknown>;
   onRevert: () => void;
   reverting: boolean;
+  /** When provided, render a <select> dropdown instead of text input. */
+  selectOptions?: { value: string; label: string }[];
 }) {
   const effective = state.isEdited ? (state.edited ?? '') : (state.derived ?? state.scanned ?? '');
   const [draft, setDraft] = useState(effective);
@@ -135,17 +138,33 @@ export function FieldEditor({
         {state.isEdited && <Badge tone="ok">edited</Badge>}
       </div>
       <div className="grid gap-2">
-        <Field
-          id={`field-${field}`}
-          value={draft}
-          rows={multiline ? (rows ?? 3) : undefined}
-          onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-            change(event.target.value)
-          }
-          onBlur={flush}
-          className={cx(field === 'file_id_diz' ? 'font-amiga text-[15px] leading-[1.2]' : 'font-mono text-[13px]', dirty && 'border-accent-dim')}
-          style={field === 'file_id_diz' ? { width: '45ch', whiteSpace: 'pre' } : undefined}
-        />
+        {selectOptions ? (
+          <select
+            id={`field-${field}`}
+            value={draft}
+            onChange={(event) => {
+              change(event.target.value);
+              void flush();
+            }}
+            className={cx('rounded border border-line bg-bg px-2 py-1.5 font-mono text-[13px] text-ink', dirty && 'border-accent-dim')}
+          >
+            {selectOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <Field
+            id={`field-${field}`}
+            value={draft}
+            rows={multiline ? (rows ?? 3) : undefined}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+              change(event.target.value)
+            }
+            onBlur={flush}
+            className={cx(field === 'file_id_diz' ? 'font-amiga text-[15px] leading-[1.2]' : 'font-mono text-[13px]', dirty && 'border-accent-dim')}
+            style={field === 'file_id_diz' ? { width: '45ch', whiteSpace: 'pre' } : undefined}
+          />
+        )}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           {state.derived && !state.isEdited && <span>read from the DIZ</span>}
           <div className="ml-auto flex items-center gap-2">

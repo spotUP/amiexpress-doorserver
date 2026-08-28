@@ -278,6 +278,14 @@ const MULTILINE_FIELDS = new Set(['description', 'suggested_tooltypes', 'file_id
 const FIELD_ROWS: Record<string, number> = { file_id_diz: 10 };
 /** Fields whose scene casing the server can normalise for the curator. */
 const TIDY_FIELDS = new Set(['name', 'description']);
+/** Known BBS systems for the requires_bbs dropdown. */
+const BBS_OPTIONS = [
+  { value: '', label: '(none)' },
+  { value: '/X', label: '/X (AmiExpress)' },
+  { value: 'S!X', label: 'S!X' },
+  { value: 'FAME', label: 'FAME' },
+  { value: 'DayDream', label: 'DayDream' },
+];
 
 export function DoorDetailDialog({
   archiveName,
@@ -451,6 +459,7 @@ export function DoorDetailDialog({
                         state={state}
                         multiline={MULTILINE_FIELDS.has(field)}
                         rows={FIELD_ROWS[field]}
+                        selectOptions={field === 'requires_bbs' ? BBS_OPTIONS : undefined}
                         onTidy={
                           TIDY_FIELDS.has(field)
                             ? (text) => tidy.mutateAsync({ text, mode: field === 'name' ? 'title' : 'sentence' }).then((res) => res.text)
