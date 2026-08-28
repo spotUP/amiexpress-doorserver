@@ -247,7 +247,7 @@ describe('lha-member-delete', () => {
   });
 
   it('deleteMembers returns early for empty member list', () => {
-    const mockRunner: ArchiveRunner = () => ({ status: 0, stderr: '' });
+    const mockRunner: ArchiveRunner = () => ({ status: 0, stdout: '', stderr: '' });
     const result = deleteMembers('/tmp/test.lha', [], { binary: '/usr/bin/lha', runner: mockRunner });
     expect(result).toEqual({ ok: true, removed: 0 });
   });
@@ -259,7 +259,7 @@ describe('lha-member-delete', () => {
       expect(args[1]).toBe('/tmp/test.lha');
       expect(args).toContain('file1.nfo');
       expect(args).toContain('file2.txt');
-      return { status: 0, stderr: '' };
+      return { status: 0, stdout: '', stderr: '' };
     };
     const result = deleteMembers('/tmp/test.lha', ['file1.nfo', 'file2.txt'], {
       binary: '/usr/bin/lha',
@@ -269,13 +269,14 @@ describe('lha-member-delete', () => {
   });
 
   it('deleteMembers reports lha failures', () => {
-    const mockRunner: ArchiveRunner = () => ({ status: 1, stderr: 'lha: archive not found' });
+    const mockRunner: ArchiveRunner = () => ({ status: 1, stdout: '', stderr: 'lha: archive not found' });
     const result = deleteMembers('/tmp/test.lha', ['file.nfo'], {
       binary: '/usr/bin/lha',
       runner: mockRunner,
     });
     expect(result.ok).toBe(false);
     expect(result.removed).toBe(0);
-    expect(result.reason).toContain('lha exited 1');
+    expect(result.reason).toContain('exited 1');
+    expect(result.reason).toContain('lha: archive not found');
   });
 });

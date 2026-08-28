@@ -17,6 +17,7 @@ import * as path from 'path';
 /** Injectable for tests: runs the archiver and reports how it went. */
 export type ArchiveRunner = (bin: string, args: string[]) => {
   status: number | null;
+  stdout: string;
   stderr: string;
 };
 
@@ -25,10 +26,10 @@ const defaultRunner: ArchiveRunner = (bin, args) => {
   const r: SpawnSyncReturns<string> = spawnSync(bin, args, {
     encoding: 'utf8',
     timeout: 120_000,
-    env: { ...process.env, LC_ALL: 'C' },
+    env: { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' },
   });
-  console.log(`[lha-debug] result status: ${r.status}, stderr: ${r.stderr?.slice(0, 100)}`);
-  return { status: r.status, stderr: r.stderr ?? '' };
+  console.log(`[lha-debug] result status: ${r.status}, signal: ${r.signal}, stderr: ${r.stderr?.slice(0, 200)}`);
+  return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 };
 
 /** The archiver to use, or null when none is installed. */
@@ -96,10 +97,11 @@ export function deleteMembers(
   // 7z uses "d" to delete, just like lha
   const result = runner(binary as string, ['d', archivePath, ...members]);
   if (result.status !== 0) {
+    const output = (result.stderr || result.stdout || '').trim().slice(0, 300);
     return {
       ok: false,
       removed: 0,
-      reason: `archiver (${binary}) exited ${result.status ?? 'null'}: ${(result.stderr || '').trim().slice(0, 200)}`,
+      reason: `archiver (${binary}) exited ${result.status ?? 'null'}${output ? ': ' + output : ''}`,
     };
   }
 
