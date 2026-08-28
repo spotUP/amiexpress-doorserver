@@ -273,6 +273,9 @@ function pickProgram(files: { path: string; size: number }[], diz: string | null
 function firstNameLine(diz: string | null): string | null {
   if (!diz) return null;
   for (const line of diz.replace(/\r/g, '').split('\n')) {
+    // Skip lines that have no alphanumeric content (likely ASCII art)
+    if (!/[A-Za-zÀ-ÿ0-9]/.test(line)) continue;
+    
     for (const cell of line.split(/[|¦]+/)) {
       const candidate = toPlain(clean(cell));
       if (!looksLikeName(candidate) || looksLikeHandle(candidate)) continue;
