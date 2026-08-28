@@ -6,15 +6,13 @@
  * Imports AMIExpress BBS doors from demozoo.org into the local catalog.
  * Tags: amiex, daydream-amiga, fame
  *
- * For each production on Demozoo:
- *   1. Fetch list page (JSON API) to get IDs
- *   2. Fetch detail (JSON API) for metadata
- *   3. Fetch detail HTML to extract the Filename: line
- *   4. Match against local archive_name set (strict lowercase)
- *   5. New door → download from scene.org → quarantine → door_submissions → approveSubmission → enrich
- *   6. Existing door → backfill NULL columns → recordAudit
+ * Two phases:
+ * Phase 1 — Backfill: for each demozoo production whose filename matches a local
+ *   archive_name, backfill NULL columns with demozoo metadata.
+ * Phase 2 — New doors: for demozoo productions with no local match, try to
+ *   download from scene.org and insert directly into door_catalog.
  *
- * Re-runnable: tracks imported IDs in demozoo_imported table.
+ * Re-runnable: tracks imported demozoo IDs in demozoo_imported table.
  * Admin identity for audit: NULL → 'system' via COALESCE fallback in recordAudit.
  */
 
@@ -22,6 +20,7 @@ import Database from 'better-sqlite3';
 import * as https from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { loadConfig } from '../src/config';
 import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
@@ -36,17 +35,6 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 4000, 16000];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface DemozooProduction {
-  id: number;
-  title: string;
-  release_date: string | null;
-  platform: string | null;
-  download_links: { url: string; type: string }[];
-  credits: { person: string; role: string }[];
-  external_links: { url: string; type: string }[];
-  screenshots: string[];
-}
 
 interface DemozooDetail {
   id: number;
@@ -74,14 +62,21 @@ interface ExistingDoor {
   screenshots: string | null;
 }
 
+interface NewDoorCandidate {
+  id: number;
+  detail: DemozooDetail;
+  filename: string;
+}
+
 interface ImporterStats {
   processed: number;
-  new: number;
+  newDoors: number;
   backfilled: number;
   unmatched: number;
   errors: number;
   sceneOrgDownloads: number;
   sceneOrgFails: number;
+  skippedNoDownload: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -132,70 +127,6 @@ function parseFilenameFromHtml(html: string): string | null {
   return match ? match[1] : null;
 }
 
-function sceneOrgDownload(url: string, destPath: string, retries = 0): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const doDownload = (attempt: number) => {
-      https.get(url, { headers: { 'User-Agent': 'AmiExpress-DoorServer/1.0' } }, (res) => {
-        if (res.statusCode === 429 && attempt < MAX_RETRIES) {
-          console.error(`[demozoo] scene.org 429, retry ${attempt + 1}/${MAX_RETRIES} in ${RETRY_DELAYS_MS[attempt]}ms`);
-          setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]);
-          return;
-        }
-        if (res.statusCode !== 302 && res.statusCode !== 301 && res.statusCode !== 200) {
-          if (attempt < MAX_RETRIES) {
-            console.error(`[demozoo] scene.org HTTP ${res.statusCode}, retry ${attempt + 1}/${MAX_RETRIES} in ${RETRY_DELAYS_MS[attempt]}ms`);
-            setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]);
-          } else {
-            reject(new Error(`scene.org HTTP ${res.statusCode}`));
-          }
-          return;
-        }
-        const location = res.headers.location;
-        if (location && (res.statusCode === 302 || res.statusCode === 301)) {
-          https.get(location, { headers: { 'User-Agent': 'AmiExpress-DoorServer/1.0' } }, (res2) => {
-            if (res2.statusCode !== 200) {
-              if (attempt < MAX_RETRIES) {
-                setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]);
-              } else {
-                reject(new Error(`scene.org redirect to ${location} returned ${res2.statusCode}`));
-              }
-              return;
-            }
-            const file = fs.createWriteStream(destPath);
-            res2.pipe(file);
-            file.on('finish', () => { file.close(); resolve(); });
-            file.on('error', reject);
-          }).on('error', (err) => {
-            if (attempt < MAX_RETRIES) {
-              setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]);
-            } else {
-              reject(err);
-            }
-          });
-          return;
-        }
-        const file = fs.createWriteStream(destPath);
-        res.pipe(file);
-        file.on('finish', () => { file.close(); resolve(); });
-        file.on('error', reject);
-      }).on('error', (err) => {
-        if (attempt < MAX_RETRIES) {
-          console.error(`[demozoo] scene.org download error (attempt ${attempt + 1}/${MAX_RETRIES}): ${err.message}`);
-          setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]);
-        } else {
-          reject(err);
-        }
-      });
-    };
-    doDownload(0);
-  });
-}
-
-function jsonOrNull<T>(val: string | null): T | null {
-  if (!val) return null;
-  try { return JSON.parse(val) as T; } catch { return null; }
-}
-
 function parseCredits(credits: { person: string; role: string }[]): string | null {
   if (!credits || credits.length === 0) return null;
   return JSON.stringify(credits);
@@ -209,6 +140,62 @@ function parseLinks(links: { url: string; type: string }[]): string | null {
 function parseScreenshots(screenshots: string[]): string | null {
   if (!screenshots || screenshots.length === 0) return null;
   return JSON.stringify(screenshots);
+}
+
+interface DownloadResult {
+  path: string;
+  size: number;
+  md5: string;
+  sha256: string;
+}
+
+function downloadToFile(url: string, destPath: string, expectedBasename: string, retries = 0): Promise<DownloadResult> {
+  return new Promise((resolve, reject) => {
+    const doDownload = (attempt: number) => {
+      const hashMd5 = crypto.createHash('md5');
+      const hashSha256 = crypto.createHash('sha256');
+      let size = 0;
+
+      const req = https.get(url, { headers: { 'User-Agent': 'AmiExpress-DoorServer/1.0' } }, (res) => {
+        if (res.statusCode === 429 && attempt < MAX_RETRIES) {
+          console.error(`[demozoo] scene.org 429, retry ${attempt + 1}/${MAX_RETRIES} in ${RETRY_DELAYS_MS[attempt]}ms`);
+          setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]);
+          return;
+        }
+        if (res.statusCode === 302 || res.statusCode === 301) {
+          const location = res.headers.location;
+          if (!location) { reject(new Error('redirect without location')); return; }
+          req.destroy();
+          https.get(location, { headers: { 'User-Agent': 'AmiExpress-DoorServer/1.0' } }, (res2) => {
+            if (res2.statusCode !== 200) {
+              if (attempt < MAX_RETRIES) { setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]); return; }
+              reject(new Error(`scene.org redirect returned ${res2.statusCode}`));
+              return;
+            }
+            const file = fs.createWriteStream(destPath);
+            res2.on('data', (chunk) => { hashMd5.update(chunk); hashSha256.update(chunk); size += chunk.length; });
+            res2.pipe(file);
+            file.on('finish', () => { file.close(); resolve({ path: destPath, size, md5: hashMd5.digest('hex'), sha256: hashSha256.digest('hex') }); });
+            file.on('error', reject);
+          }).on('error', (err) => { if (attempt < MAX_RETRIES) { setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]); } else { reject(err); } });
+          return;
+        }
+        if (res.statusCode !== 200) {
+          if (attempt < MAX_RETRIES) { setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]); return; }
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        const file = fs.createWriteStream(destPath);
+        res.on('data', (chunk) => { hashMd5.update(chunk); hashSha256.update(chunk); size += chunk.length; });
+        res.pipe(file);
+        file.on('finish', () => { file.close(); resolve({ path: destPath, size, md5: hashMd5.digest('hex'), sha256: hashSha256.digest('hex') }); });
+        file.on('error', reject);
+      }).on('error', (err) => {
+        if (attempt < MAX_RETRIES) { setTimeout(() => doDownload(attempt + 1), RETRY_DELAYS_MS[attempt]); } else { reject(err); }
+      });
+    };
+    doDownload(0);
+  });
 }
 
 // ─── Core Logic ──────────────────────────────────────────────────────────────
@@ -242,22 +229,6 @@ async function fetchDetailHtml(id: number): Promise<string> {
   return fetch(url);
 }
 
-function backfillNeeded(row: ExistingDoor, detail: DemozooDetail): { patch: Record<string, unknown>; empty: boolean } {
-  const patch: Record<string, unknown> = {};
-  if (detail.release_date && !row.release_date) patch.release_date = detail.release_date;
-  if (detail.platform && !row.platform) patch.platform = detail.platform;
-  const dl = detail.download_links?.[0]?.url;
-  if (dl && !row.download_url) patch.download_url = dl;
-  const creds = parseCredits(detail.credits ?? []);
-  if (creds && !row.credits) patch.credits = creds;
-  const links = parseLinks(detail.external_links ?? []);
-  if (links && !row.external_links) patch.external_links = links;
-  const shots = parseScreenshots(detail.screenshots ?? []);
-  if (shots && !row.screenshots) patch.screenshots = shots;
-
-  return { patch, empty: Object.keys(patch).length === 0 };
-}
-
 async function main() {
   const cfg = loadConfig();
   const db = openSqlite(cfg.dbPath);
@@ -265,30 +236,33 @@ async function main() {
   runMigrations(db);
 
   const archivesRoot = cfg.archivesRoot;
-  const quarantineDir = path.join(archivesRoot, 'Submitted');
-
-  if (!fs.existsSync(quarantineDir)) {
-    fs.mkdirSync(quarantineDir, { recursive: true });
+  const submittedDir = path.join(archivesRoot, 'Submitted');
+  if (!fs.existsSync(submittedDir)) {
+    fs.mkdirSync(submittedDir, { recursive: true });
   }
 
-  const stats: ImporterStats = { processed: 0, new: 0, backfilled: 0, unmatched: 0, errors: 0, sceneOrgDownloads: 0, sceneOrgFails: 0 };
+  const stats: ImporterStats = {
+    processed: 0, newDoors: 0, backfilled: 0, unmatched: 0,
+    errors: 0, sceneOrgDownloads: 0, sceneOrgFails: 0, skippedNoDownload: 0,
+  };
   const errorLog: string[] = [];
 
   const existingDoors = db
     .prepare('SELECT id, archive_name, name, version, author, release_date, platform, download_url, credits, external_links, screenshots FROM door_catalog WHERE archive_name IS NOT NULL')
     .all() as ExistingDoor[];
 
-  const archiveNameSet = new Set(existingDoors.map((d) => d.archive_name.toLowerCase()));
   const archiveNameToDoor = new Map(existingDoors.map((d) => [d.archive_name.toLowerCase(), d]));
 
   const imported = new Set<number>(
     (db.prepare('SELECT id FROM demozoo_imported').all() as { id: number }[]).map((r) => r.id)
   );
 
+  const newDoorCandidates: NewDoorCandidate[] = [];
   let requestCount = 0;
 
+  // ── Phase 1: enumerate and backfill existing doors ──────────────────────────
   for (const tag of TAGS) {
-    process.stderr.write(`[demozoo] Processing tag="${tag}"\n`);
+    process.stderr.write(`[demozoo] Phase 1 tag="${tag}"\n`);
     let ids: number[];
     try {
       ids = await enumerateProductionIds(tag);
@@ -316,14 +290,8 @@ async function main() {
 
       let detail: DemozooDetail;
       let html: string;
-      let filename: string | null = null;
-
       try {
-        [detail, html] = await Promise.all([
-          fetchDetailJson(id),
-          fetchDetailHtml(id),
-        ]);
-        filename = parseFilenameFromHtml(html);
+        [detail, html] = await Promise.all([fetchDetailJson(id), fetchDetailHtml(id)]);
       } catch (e: any) {
         process.stderr.write(`[demozoo] ERROR fetching id=${id}: ${e.message}\n`);
         errorLog.push(`fetch:${id}: ${e.message}`);
@@ -332,6 +300,7 @@ async function main() {
       }
 
       stats.processed++;
+      const filename = parseFilenameFromHtml(html);
 
       if (!filename) {
         process.stderr.write(`[demozoo] id=${id} "${detail.title}" — no filename in HTML, skipping\n`);
@@ -344,12 +313,20 @@ async function main() {
       const match = archiveNameToDoor.get(lookup);
 
       if (!match) {
-        process.stderr.write(`[demozoo] id=${id} "${detail.title}" filename="${filename}" — no local match, skipping\n`);
-        errorLog.push(`unmatched:${id}:${filename}:${detail.title}`);
+        // No local match — might be a new door
+        const sceneOrgUrl = detail.download_links?.[0]?.url ?? null;
+        if (sceneOrgUrl) {
+          newDoorCandidates.push({ id, detail, filename });
+        } else {
+          process.stderr.write(`[demozoo] id=${id} "${detail.title}" filename="${filename}" — no local match and no scene.org URL, skipping\n`);
+          errorLog.push(`nomatch+nodl:${id}:${filename}:${detail.title}`);
+          stats.skippedNoDownload++;
+        }
         stats.unmatched++;
         continue;
       }
 
+      // Existing door — backfill NULL columns
       const patch: Record<string, unknown> = {};
       if (detail.release_date && !match.release_date) patch.release_date = detail.release_date;
       if (detail.platform && !match.platform) patch.platform = detail.platform;
@@ -370,30 +347,131 @@ async function main() {
         process.stderr.write(`[demozoo] backfilled id=${id} "${match.archive_name}" with ${Object.keys(patch).join(', ')}\n`);
         stats.backfilled++;
       } else {
-        process.stderr.write(`[demozoo] id=${id} "${match.archive_name}" already enriched, no updates\n`);
+        process.stderr.write(`[demozoo] id=${id} "${match.archive_name}" already enriched\n`);
       }
 
       try {
         db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
       } catch {
-        // already inserted by a concurrent run, ignore
+        // already imported concurrently
+      }
+    }
+  }
+
+  // ── Phase 2: download new doors from scene.org ──────────────────────────────
+  if (newDoorCandidates.length > 0) {
+    process.stderr.write(`[demozoo] Phase 2: ${newDoorCandidates.length} new door candidates\n`);
+
+    for (const candidate of newDoorCandidates) {
+      const { id, detail, filename } = candidate;
+      const sceneOrgUrl = detail.download_links?.[0]?.url;
+      if (!sceneOrgUrl) {
+        stats.skippedNoDownload++;
+        continue;
+      }
+
+      const destBasename = filename;
+      const destPath = path.join(submittedDir, destBasename);
+
+      if (fs.existsSync(destPath)) {
+        process.stderr.write(`[demozoo] id=${id} "${filename}" already exists in Submitted/, skipping\n`);
+        try {
+          db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
+        } catch { /* ok */ }
+        continue;
+      }
+
+      const tmpPath = path.join(submittedDir, `.tmp.${id}.${destBasename}`);
+      requestCount++;
+      if (requestCount % PAUSE_EVERY_N_REQUESTS === 0) {
+        process.stderr.write(`[demozoo] download request count ${requestCount}, pausing ${PAUSE_DURATION_MS}ms\n`);
+        await sleep(PAUSE_DURATION_MS);
+      } else {
+        await sleep(PAUSE_BETWEEN_REQUESTS_MS);
+      }
+
+      let dlResult: DownloadResult;
+      try {
+        dlResult = await downloadToFile(sceneOrgUrl, tmpPath, destBasename);
+        stats.sceneOrgDownloads++;
+      } catch (e: any) {
+        process.stderr.write(`[demozoo] download failed id=${id} "${filename}": ${e.message}\n`);
+        errorLog.push(`download:${id}:${filename}: ${e.message}`);
+        stats.sceneOrgFails++;
+        // Don't record in demozoo_imported — re-run will retry
+        continue;
+      }
+
+      // Verify the downloaded file's basename matches what we expect
+      const downloadedBasename = path.basename(dlResult.path);
+      if (downloadedBasename.toLowerCase() !== destBasename.toLowerCase()) {
+        process.stderr.write(`[demozoo] filename mismatch: expected "${destBasename}", got "${downloadedBasename}", deleting\n`);
+        fs.unlinkSync(tmpPath);
+        errorLog.push(`filename mismatch:${id}:${destBasename}:${downloadedBasename}`);
+        stats.errors++;
+        continue;
+      }
+
+      // Move to final location
+      fs.renameSync(tmpPath, destPath);
+
+      // Insert into door_catalog
+      const catalogId = crypto.randomUUID();
+      const name = detail.title || path.basename(destBasename, path.extname(destBasename));
+      const version = (name.match(/v?[\d\.]+/i) ?? [])[0] ?? null;
+
+      try {
+        db.prepare(
+          `INSERT INTO door_catalog
+             (id, archive_name, archive_path, name, door_type, version, author,
+              description, release_date, platform, download_url, credits,
+              external_links, screenshots, archive_size, md5, sha256, source, indexed_at)
+           VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
+        ).run(
+          catalogId,
+          destBasename,
+          path.posix.join('Submitted', destBasename),
+          name,
+          version,
+          detail.credits?.[0]?.person ?? null,
+          detail.description ?? null,
+          detail.release_date ?? null,
+          detail.platform ?? null,
+          sceneOrgUrl,
+          parseCredits(detail.credits ?? []),
+          parseLinks(detail.external_links ?? []),
+          parseScreenshots(detail.screenshots ?? []),
+          dlResult.size,
+          dlResult.md5,
+          dlResult.sha256
+        );
+        db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
+        recordAudit(db, null, 'import-demozoo', destBasename, { new: true, catalogId });
+        process.stderr.write(`[demozoo] new door inserted id=${id} "${destBasename}" catalogId=${catalogId}\n`);
+        stats.newDoors++;
+      } catch (e: any) {
+        process.stderr.write(`[demozoo] INSERT failed id=${id} "${destBasename}": ${e.message}\n`);
+        errorLog.push(`insert:${id}:${destBasename}: ${e.message}`);
+        stats.errors++;
+        // File is on disk but DB insert failed — don't record as imported, re-run will retry
       }
     }
   }
 
   process.stderr.write(`\n[demozoo] Done. stats=${JSON.stringify(stats)}\n`);
   if (errorLog.length > 0) {
-    process.stderr.write(`[demozoo] Errors:\n`);
-    for (const e of errorLog) {
+    process.stderr.write(`[demozoo] Errors (${errorLog.length}):\n`);
+    for (const e of errorLog.slice(0, 50)) {
       process.stderr.write(`  ${e}\n`);
     }
+    if (errorLog.length > 50) process.stderr.write(`  ... and ${errorLog.length - 50} more\n`);
   }
 
   db.close();
 }
 
-function openSqlite(path: string): Database.Database {
-  return new Database(path);
+function openSqlite(p: string): Database.Database {
+  return new Database(p);
 }
 
 main().catch((e) => {
