@@ -17,7 +17,7 @@ import { openDb } from './db';
 import { buildGroupTags } from './describe';
 import { applyOverrides, hiddenExclusion, isHidden, loadOverrides, overridesStamp, hiddenStamp } from './effective';
 import type { ServerConfig } from './config';
-import { deleteMembers, findLhaBinary } from './lha-member-delete';
+import { deleteMembers, findArchiverBinary } from './lha-member-delete';
 import { getArchiveChecksums } from './checksums';
 
 export interface CatalogEntry {
@@ -244,7 +244,7 @@ export function stripArchiveOnServer(
       return { ok: false, reason: `archive file not found on disk: ${path.basename(absPath)}` };
     }
 
-    const binary = findLhaBinary();
+    const binary = findArchiverBinary();
     const ext = path.extname(absPath).toLowerCase();
     if (ext !== '.lha' && ext !== '.lzh') {
       return {

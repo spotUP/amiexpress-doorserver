@@ -26,7 +26,7 @@ import type { ServerConfig } from './config';
 import { analyzeArchive } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile } from './archive-reader';
-import { deleteMembers, findLhaBinary } from './lha-member-delete';
+import { deleteMembers, findArchiverBinary } from './lha-member-delete';
 import * as fs from 'fs';
 
 /**
@@ -903,7 +903,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         .get(archiveName) as { archive_path: string } | undefined;
       if (!row) { res.status(404).json({ error: 'no such door' }); return; }
       const absPath = resolveArchivePath(cfg, row.archive_path);
-      const binary = findLhaBinary();
+      const binary = findArchiverBinary();
       if (!binary) { res.status(400).json({ error: 'no lha binary available' }); return; }
       const result = deleteMembers(absPath, members, { binary });
       if (!result.ok) { res.status(400).json({ error: result.reason }); return; }

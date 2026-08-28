@@ -32,10 +32,10 @@ const defaultRunner: ArchiveRunner = (bin, args) => {
 };
 
 /** The archiver to use, or null when none is installed. */
-export function findLhaBinary(existsSync: (p: string) => boolean = fs.existsSync): string | null {
-  const override = process.env.LHA_COMMAND;
+export function findArchiverBinary(existsSync: (p: string) => boolean = fs.existsSync): string | null {
+  const override = process.env.ARCHIVER_COMMAND;
   if (override && existsSync(override)) return override;
-  for (const candidate of ['/usr/local/bin/lha', '/usr/bin/lha', '/opt/homebrew/bin/lha']) {
+  for (const candidate of ['/opt/homebrew/bin/7z', '/usr/bin/7z', '/usr/local/bin/lha', '/usr/bin/lha']) {
     if (existsSync(candidate)) return candidate;
   }
   return null;
@@ -47,12 +47,11 @@ export interface MemberDeleteCapability {
 }
 
 /**
- * Whether members can be removed from this archive in place. Format is
- * checked before tooling so the message names the real obstacle.
+ * Whether members can be removed from this archive in place.
  */
 export function canDeleteMembers(
   archivePath: string,
-  binary: string | null = findLhaBinary()
+  binary: string | null = findArchiverBinary()
 ): MemberDeleteCapability {
   const ext = path.extname(archivePath).toLowerCase();
   if (ext !== '.lha' && ext !== '.lzh') {
@@ -64,7 +63,7 @@ export function canDeleteMembers(
     };
   }
   if (!binary) {
-    return { ok: false, reason: 'No lha binary available on this server.' };
+    return { ok: false, reason: 'No archiver binary available on this server.' };
   }
   return { ok: true };
 }
@@ -76,15 +75,14 @@ export interface MemberDeleteResult {
 }
 
 /**
- * Removes `members` from `archivePath`. Returns how many the archiver was
- * asked to remove; a member that was already absent is not an error.
+ * Removes `members` from `archivePath`.
  */
 export function deleteMembers(
   archivePath: string,
   members: string[],
   opts: { binary?: string | null; runner?: ArchiveRunner } = {}
 ): MemberDeleteResult {
-  const binary = opts.binary === undefined ? findLhaBinary() : opts.binary;
+  const binary = opts.binary === undefined ? findArchiverBinary() : opts.binary;
   const runner = opts.runner ?? defaultRunner;
 
   const capability = canDeleteMembers(archivePath, binary);
@@ -95,12 +93,13 @@ export function deleteMembers(
     return { ok: true, removed: 0 };
   }
 
+  // 7z uses "d" to delete, just like lha
   const result = runner(binary as string, ['d', archivePath, ...members]);
   if (result.status !== 0) {
     return {
       ok: false,
       removed: 0,
-      reason: `lha (${binary}) exited ${result.status ?? 'null'}: ${(result.stderr || '').trim().slice(0, 200)}`,
+      reason: `archiver (${binary}) exited ${result.status ?? 'null'}: ${(result.stderr || '').trim().slice(0, 200)}`,
     };
   }
 
