@@ -323,4 +323,17 @@ describe('lha-member-delete', () => {
     expect(result.reason).toContain('exited 1');
     expect(result.reason).toContain('lha: archive not found');
   });
+
+  it('prefixes member names starting with - to avoid lha option parsing', () => {
+    const mockRunner: ArchiveRunner = (bin, args) => {
+      expect(args).toContain('./-foo.txt');
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const result = deleteMembers('/tmp/test.lha', ['-foo.txt'], {
+      binary: '/usr/bin/lha',
+      runner: mockRunner,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.removed).toBe(1);
+  });
 });

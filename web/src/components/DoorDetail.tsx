@@ -365,6 +365,7 @@ const BBS_OPTIONS = [
   { value: 'S!X', label: 'S!X' },
   { value: 'FAME', label: 'FAME' },
   { value: 'DayDream', label: 'DayDream' },
+  { value: 'Tempest', label: 'Tempest' },
 ];
 
 export function DoorDetailDialog({

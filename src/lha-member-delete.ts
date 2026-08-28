@@ -94,8 +94,11 @@ export function deleteMembers(
     return { ok: true, removed: 0 };
   }
 
-  // 7z uses "d" to delete, just like lha
-  const result = runner(binary as string, ['d', archivePath, ...members]);
+  // 7z uses "d" to delete, just like lha. Filenames starting with `-` would
+  // be parsed by lha as options (exit 2 + usage message); prefix with `./`
+  // to force positional interpretation.
+  const safeMembers = members.map((m) => (m.startsWith('-') ? `./${m}` : m));
+  const result = runner(binary as string, ['d', archivePath, ...safeMembers]);
   if (result.status !== 0) {
     const output = (result.stderr || result.stdout || '').trim().slice(0, 300);
     return {

@@ -75,7 +75,7 @@ const DOORISH_RE =
  * not a description of what the door DOES.
  */
 const COMPAT_RE =
-  /\b(?:now\s+work(?:s|ing)|works?\s+(?:only\s+)?(?:with|on)|requires?|needs?)\b.{0,12}\b(?:\/?X|amiexpress|fame|daydream|\d)/i;
+  /\b(?:now\s+work(?:s|ing)|works?\s+(?:only\s+)?(?:with|on)|requires?|needs?)\b.{0,12}\b(?:\/?X|amiexpress|fame|daydream|tempest|\d)/i;
 
 /**
  * A word needs at least two ASCII letters in its run. A 3-letter run alone
@@ -377,7 +377,7 @@ export function describeBlock(diz: string | null, cap = 70, prog?: string | null
 const VER_RE =
   /(?<![A-Za-zÀ-ÿ0-9.])[vV]\s?\.?\s?(\d{1,2}[.,][0-9oO]{1,3}[a-zA-Z]?)(?![0-9])|(?<![A-Za-zÀ-ÿ0-9.])[vV]\s?(\d{1,2})(?![0-9.])/g;
 const BARE_VER_RE = /(?<![\wÀ-ÿ./-])(\d{1,2}[.,]\d{1,2}[a-z]?)(?![\wÀ-ÿ.])/g;
-const BBS_CONTEXT_RE = /(?:\/X|amiexpress|ami|s!x|fame|daydream|for)\s*$/i;
+const BBS_CONTEXT_RE = /(?:\/X|amiexpress|ami|s!x|fame|daydream|tempest|for)\s*$/i;
 
 export function normaliseVersion(raw: string): string {
   return raw.trim().toLowerCase().replace(/,/g, '.').replace(/o/g, '0');
@@ -428,10 +428,11 @@ const BBS_NAMES: Record<string, string> = {
   daydream: 'DayDream',
   dd: 'DayDream',
   dreamdoor: 'DayDream',
+  tempest: 'Tempest',
 };
 
 const BBS_REQ_RE =
-  /(?:\b(?:for|only\s+for|requires?|required|needs?|works?\s+(?:only\s+)?(?:with|on)|coded\s+for|written\s+for|compatible\s+with)\b\s*[:-]?\s*)?(?<![A-Za-zÀ-ÿ0-9])(\/X|Ami-?Express|S!X|FAME|DayDream|AE|X)\s*(?:v(?:er(?:sion)?)?\.?\s*)?(\d{1,2}(?:[.,](?:[0-9]{1,3}[a-z]?|[xX]{1,3}))?\+?)/i;
+  /(?:\b(?:for|only\s+for|requires?|required|needs?|works?\s+(?:only\s+)?(?:with|on)|coded\s+for|written\s+for|compatible\s+with)\b\s*[:-]?\s*)?(?<![A-Za-zÀ-ÿ0-9])(\/X|Ami-?Express|S!X|FAME|DayDream|Tempest|AE|X)\s*(?:v(?:er(?:sion)?)?\.?\s*)?(\d{1,2}(?:[.,](?:[0-9]{1,3}[a-z]?|[xX]{1,3}))?\+?)/i;
 
 export function normaliseRequirement(name: string, ver: string): string {
   const key = name.toLowerCase().replace(/-/g, '');
