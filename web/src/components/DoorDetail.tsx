@@ -21,6 +21,8 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
   const [viewing, setViewing] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [learning, setLearning] = useState<Set<string>>(new Set());
   const [fileList, setFileList] = useState<DoorFile[]>(files);
   const learnPattern = useLearnPattern();
@@ -36,7 +38,8 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
   }
 
   async function deleteFile(path: string) {
-    if (!confirm(`Delete ${path} from the archive?`)) return;
+    setConfirmDelete(null);
+    setDeleteError(null);
     setDeleting((prev) => new Set(prev).add(path));
     try {
       const r = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/delete-files`, {
@@ -47,7 +50,12 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
       });
       if (r.ok) {
         setFileList((prev) => prev.filter((f) => f.path !== path));
+      } else {
+        const body = await r.json().catch(() => ({})) as { error?: string };
+        setDeleteError(body.error ?? `Failed (${r.status})`);
       }
+    } catch {
+      setDeleteError('Network error');
     } finally {
       setDeleting((prev) => { const next = new Set(prev); next.delete(path); return next; });
     }
@@ -85,17 +93,40 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
                 <Eye size={13} />
               </button>
             )}
-            <button
-              onClick={() => deleteFile(file.path)}
-              disabled={deleting.has(file.path)}
-              className="rounded p-1 text-muted hover:bg-danger/10 hover:text-danger"
-              title="Delete from archive"
-            >
-              <Trash2 size={13} />
-            </button>
+            {confirmDelete === file.path ? (
+              <span className="flex items-center gap-1 text-[11px]">
+                <span className="text-danger">Delete?</span>
+                <button
+                  onClick={() => void deleteFile(file.path)}
+                  disabled={deleting.has(file.path)}
+                  className="rounded bg-danger/10 px-1.5 py-0.5 text-danger hover:bg-danger/20"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="rounded px-1.5 py-0.5 text-muted hover:bg-raised"
+                >
+                  No
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => { setDeleteError(null); setConfirmDelete(file.path); }}
+                disabled={deleting.has(file.path)}
+                className="rounded p-1 text-muted hover:bg-danger/10 hover:text-danger"
+                title="Delete from archive"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </li>
         ))}
       </ul>
+
+      {deleteError && (
+        <p className="rounded border border-danger/30 bg-danger/5 px-3 py-1.5 text-xs text-danger">{deleteError}</p>
+      )}
 
       {viewing && (
         <div className="rounded-md border border-line bg-bg p-3">
