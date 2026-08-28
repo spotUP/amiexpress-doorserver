@@ -223,6 +223,8 @@ function StripAds({
   const learnPattern = useLearnPattern();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ removed: number; newJunkCount: number } | null>(null);
+  const [viewingFile, setViewingFile] = useState<{ path: string; content: string } | null>(null);
+  const [viewingLoading, setViewingLoading] = useState<string | null>(null);
 
   async function loadPreview() {
     const p = await stripPreviewQuery.mutateAsync();
@@ -239,15 +241,40 @@ function StripAds({
   }
 
   async function viewKeptFile(path: string) {
-    try {
-      const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
-      });
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch {}
+    const ext = path.split('.').pop()?.toLowerCase() ?? '';
+    const isText = /^(txt|me|guide|doc|diz|ans|asc|nfo|rip|info|readme)$/i.test(ext);
+
+    if (isText) {
+      // Text files: fetch and display in a modal (no download)
+      setViewingLoading(path);
+      try {
+        const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
+        });
+        if (!res.ok) return;
+        const text = await res.text();
+        setViewingFile({ path, content: text });
+      } finally {
+        setViewingLoading(null);
+      }
+    } else {
+      // Binary files: download with a proper filename
+      try {
+        const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = path.split('/').pop() ?? 'file';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch {}
+    }
   }
 
   function toggle(path: string) {
@@ -290,6 +317,7 @@ function StripAds({
 
   if (preview) {
     return (
+      <>
       <div className="space-y-2 rounded-md border border-line px-3 py-2">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium text-ink">
@@ -344,8 +372,31 @@ function StripAds({
           </div>
         )}
       </div>
-    );
-  }
+      {viewingFile && (
+        <Dialog.Root open={true} onOpenChange={(open) => !open && setViewingFile(null)}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
+            <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[min(60rem,94vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
+              <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-2">
+                <Dialog.Title className="truncate font-mono text-sm text-ink">{viewingFile.path}</Dialog.Title>
+                <Dialog.Close className="rounded p-1 text-muted hover:text-ink" aria-label="Close">
+                  <X size={16} />
+                </Dialog.Close>
+              </header>
+              <pre className="flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs text-ink">
+                {viewingFile.content}
+              </pre>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+      )}
+      {viewingLoading && (
+        <div className="fixed bottom-4 right-4 rounded-md border border-line bg-surface px-3 py-2 text-xs text-muted shadow-lg">
+          Loading {viewingLoading}...
+        </div>
+      )}
+    </>
+  );
 
   return (
     <Button onClick={loadPreview} disabled={isLoading}>
@@ -633,4 +684,3 @@ export function DoorDetailDialog({
     </Dialog.Root>
   );
 }
-// trigger rebuild
