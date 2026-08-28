@@ -7,7 +7,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Download, Eye, GraduationCap, ThumbsUp, ThumbsDown, Trash2, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote } from '../api/queries';
+import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote, useDoorAudit } from '../api/queries';
 import { api } from '../api/client';
 import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types';
 import { DizView } from './DizView';
@@ -138,19 +138,10 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
 }
 
 function DoorHistory({ archiveName }: { archiveName: string }) {
-  const [entries, setEntries] = useState<{ id: number; action: string; target: string; detail: Record<string, unknown> | null; at: number; by: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: entries, isLoading } = useDoorAudit(archiveName, true);
 
-  useEffect(() => {
-    if (!archiveName) return;
-    setLoading(true);
-    api.get<{ entries: typeof entries }>(`/admin/doors/${encodeURIComponent(archiveName)}/audit`)
-      .then((d) => { setEntries(d.entries ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [archiveName]);
-
-  if (loading) return <p className="text-sm text-muted">Loading history...</p>;
-  if (entries.length === 0) return <p className="text-sm text-muted">No edits recorded yet.</p>;
+  if (isLoading) return <p className="text-sm text-muted">Loading history...</p>;
+  if (!entries || entries.length === 0) return <p className="text-sm text-muted">No edits recorded yet.</p>;
 
   function timeAgo(ts: number): string {
     const diff = Math.floor(Date.now() / 1000) - ts;
@@ -220,19 +211,20 @@ function StripAds({
   archiveName,
   preview,
   setPreview,
+  stripPreviewQuery,
 }: {
   archiveName: string;
   preview: StripPreview | null;
-  setPreview: (p: StripPreview | null) => void;
+  setPreview: React.Dispatch<React.SetStateAction<StripPreview | null>>;
+  stripPreviewQuery: ReturnType<typeof import('../api/queries').useStripPreview>;
 }) {
-  const stripPreview = useStripPreview(archiveName);
   const stripArchive = useStripArchive(archiveName);
   const learnPattern = useLearnPattern();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ removed: number; newJunkCount: number } | null>(null);
 
   async function loadPreview() {
-    const p = await stripPreview.mutateAsync();
+    const p = await stripPreviewQuery.mutateAsync();
     setPreview(p);
     setSelected(new Set(p.stripped.map((f) => f.path)));
     setResult(null);
@@ -240,7 +232,7 @@ function StripAds({
 
   async function learnKeptFile(path: string) {
     await learnPattern.mutateAsync({ pattern: path, archiveName, filePath: path });
-    const p = await stripPreview.mutateAsync();
+    const p = await stripPreviewQuery.mutateAsync();
     setPreview(p);
     setSelected(new Set(p.stripped.map((f) => f.path)));
   }
@@ -271,6 +263,8 @@ function StripAds({
       setPreview(null);
     }
   }
+
+  const isLoading = stripPreviewQuery.isPending;
 
   if (result) {
     return (
@@ -338,8 +332,8 @@ function StripAds({
   }
 
   return (
-    <Button onClick={loadPreview} disabled={stripPreview.isPending}>
-      {stripPreview.isPending ? 'Analyzing...' : 'Strip Ads'}
+    <Button onClick={loadPreview} disabled={isLoading}>
+      {isLoading ? 'Analyzing...' : 'Strip Ads'}
     </Button>
   );
 }
@@ -378,6 +372,7 @@ export function DoorDetailDialog({
   const setTags = useSetDoorTags(archiveName ?? '');
   const { data: voteData } = useVoteStatus(archiveName ?? '', Boolean(archiveName));
   const vote = useVote(archiveName ?? '');
+  const stripPreviewQuery = useStripPreview(archiveName ?? '');
   const [newTag, setNewTag] = useState('');
   const tagInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<DoorFacts | null>(null);
@@ -404,6 +399,13 @@ export function DoorDetailDialog({
     setPreview(null);
     setStripPreview(null);
   }, [archiveName]);
+
+  // Auto-start the stripper when an admin opens a door that hasn't been stripped yet.
+  useEffect(() => {
+    if (!admin || !archiveName || !door || door.adsStripped) return;
+    if (stripPreviewQuery.isPending || stripPreviewQuery.isSuccess) return; // already running or done
+    stripPreviewQuery.mutateAsync().catch(() => {});
+  }, [admin, archiveName, door, stripPreviewQuery]);
 
   return (
     <Dialog.Root open={Boolean(archiveName)} onOpenChange={(open) => !open && onClose()}>
@@ -545,7 +547,7 @@ export function DoorDetailDialog({
                     )}
                   </div>
                   {archiveName && (
-                    <StripAds archiveName={archiveName} preview={stripPreview} setPreview={setStripPreview} />
+                    <StripAds archiveName={archiveName} preview={stripPreview} setPreview={setStripPreview} stripPreviewQuery={stripPreviewQuery} />
                   )}
                   {adminDoor &&
                     Object.entries(adminDoor.fields).map(([field, state]) => (
