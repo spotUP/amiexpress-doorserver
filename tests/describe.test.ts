@@ -175,7 +175,7 @@ describe('metadata is not description', () => {
 
   it("keeps the door's real line instead", () => {
     const { description } = read(MT20, 'MultiTop', 'MultiTop', 'MST-MT20.LHA');
-    expect(description).toBe('Multitop The Best Top Utility ever written for /X');
+    expect(description).toBe('MultiTop The Best Top Utility ever written for /X');
   });
 
   it('caps on a word boundary, never mid-bracket', () => {
@@ -383,7 +383,7 @@ describe('falling back', () => {
 
   it('skips a copyright line in favour of a later one', () => {
     const diz = 'hAUSfRAU!.exe - © FLi7e/SAD 1996\nHousewife simulator for AmiExpress';
-    expect(read(diz, null, null, 'HAUSFRAU.LHA').description).toBe('Housewife simulator for Amiexpress');
+    expect(read(diz, null, null, 'HAUSFRAU.LHA').description).toBe('Housewife simulator for AmiExpress');
   });
 
   it('keeps accented letters: they are letters, not decoration', () => {
@@ -436,5 +436,11 @@ describe('shouted words are normalised even in mixed text', () => {
 
   it('still de-shouts a whole shouted string', () => {
     expect(tidyCase('THE ALL CAPS DESCRIPTION HERE')).toBe('The All Caps Description Here');
+  });
+
+  it('preserves intentional CamelCase product names like SmokeySmallStats', () => {
+    expect(tidyCase('SmokeySmallStats')).toBe('SmokeySmallStats');
+    expect(tidyCase('SplitChat v2.0')).toBe('SplitChat v2.0');
+    expect(tidyCase('FileThing Pro Door')).toBe('FileThing Pro Door');
   });
 });

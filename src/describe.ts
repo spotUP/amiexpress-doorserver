@@ -662,6 +662,12 @@ const ACRONYMS = new Set([
   'NMI', 'CLI', 'GUI', 'TUI', 'CUI', 'NUI',
 ]);
 const MESSY_RE = /[a-zà-ÿ].*[A-ZÀ-Þ]/;
+/**
+ * CamelCase / PascalCase: capital + lowercase, then one or more internal
+ * capital+lowercase subwords. These are intentional product names like
+ * SmokeySmallStats, SplitChat, FileThing - NOT messy caps, do not rewrite.
+ */
+const CAMEL_RE = /^[A-ZÀ-Þ](?:[a-zà-ÿ]+|[0-9]+)(?:[A-ZÀ-Þ][a-zà-ÿ]+)+$/;
 
 function capitalise(w: string): string {
   if (!w) return w;
@@ -706,6 +712,7 @@ function tidyWord(w: string, handles: boolean): string {
     return capitalise(w);
   }
   if (MESSY_RE.test(w) || (w[0] === w[0].toLowerCase() && /[A-ZÀ-Þ]/.test(w))) {
+    if (CAMEL_RE.test(w)) return w; // SmokeySmallStats, SplitChat - keep as-is
     return capitalise(w);
   }
   return w;
