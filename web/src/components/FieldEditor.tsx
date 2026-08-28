@@ -58,6 +58,7 @@ export function FieldEditor({
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const sent = useRef<string | null>(null);
   const mounted = useRef(true);
+  const pasted = useRef(false);
 
   const flush = useCallback(() => {
     clearTimeout(timer.current);
@@ -157,9 +158,15 @@ export function FieldEditor({
             id={`field-${field}`}
             value={draft}
             rows={multiline ? (rows ?? 3) : undefined}
-            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-              change(event.target.value)
-            }
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+              const val = event.target.value;
+              change(val);
+              if (pasted.current && onTidy) {
+                pasted.current = false;
+                void onTidy(val).then((tidied) => { if (mounted.current) change(tidied); });
+              }
+            }}
+            onPaste={() => { pasted.current = true; }}
             onBlur={flush}
             className={cx(field === 'file_id_diz' ? 'font-amiga text-[15px] leading-[1.2]' : 'font-mono text-[13px]', dirty && 'border-accent-dim')}
             style={field === 'file_id_diz' ? { width: '45ch', whiteSpace: 'pre' } : undefined}
