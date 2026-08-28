@@ -135,13 +135,24 @@ function matchesPattern(filename: string, pattern: string): boolean {
  * Junk-detection verdict for a single file. Pure, no fs/network — shared
  * by analyzeArchive and stripArchive so classification exists in one place.
  */
+const SAFE_DIRS = new Set([
+  'examples', 'example', 'docs', 'doc', 'manual', 'manuals',
+  'help', 'readme', 'readme.txt', 'file_id.diz',
+]);
+
 export function classifyFile(
   name: string,
   buf: Buffer,
   filenamePatterns: string[],
   fingerprints: FingerprintDb
 ): 'pattern' | 'md5' | 'content-scan' | null {
-  const base = path.basename(name).toLowerCase();
+  const parts = name.toLowerCase().split('/');
+  const base = parts[parts.length - 1];
+  const dir = parts.length > 1 ? parts[parts.length - 2] : '';
+
+  // Files in example/doc/manual directories are almost never ads
+  if (SAFE_DIRS.has(dir)) return null;
+
   const ext = path.extname(base);
 
   // Content-based protection
