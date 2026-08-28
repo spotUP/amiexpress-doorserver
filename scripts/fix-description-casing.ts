@@ -43,9 +43,9 @@ function run() {
 
   const upsert = db.prepare(
     `INSERT INTO door_catalog_overrides (catalog_id, field, value, edited_by, edited_at)
-     VALUES (?, 'description', ?, 'fix-casing-script', strftime('%s','now'))
+     VALUES (?, 'description', ?, NULL, strftime('%s','now'))
      ON CONFLICT(catalog_id, field) DO UPDATE SET
-       value = excluded.value, edited_by = excluded.edited_by, edited_at = excluded.edited_at`
+       value = excluded.value, edited_by = NULL, edited_at = excluded.edited_at`
   );
 
   const tx = db.transaction(() => {
