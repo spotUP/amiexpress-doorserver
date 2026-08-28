@@ -248,6 +248,17 @@ function downloadToFile(url: string, destPath: string, expectedBasename: string,
 // ─── Core Logic ──────────────────────────────────────────────────────────────
 
 async function enumerateProductionIds(tag: string): Promise<number[]> {
+  const cacheFile = path.join('/tmp', `demozoo-ids-${tag}.json`);
+  if (fs.existsSync(cacheFile)) {
+    try {
+      const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf-8')) as number[];
+      process.stderr.write(`[demozoo] enumerate tag="${tag}" loaded ${cached.length} IDs from cache ${cacheFile}\n`);
+      return cached;
+    } catch {
+      // fall through to fresh enumeration
+    }
+  }
+
   const ids: number[] = [];
   let url = `${DEMOZOO_API}/productions/?tag=${encodeURIComponent(tag)}&format=json&fields=id`;
 
@@ -260,6 +271,13 @@ async function enumerateProductionIds(tag: string): Promise<number[]> {
     }
     url = data.next ?? '';
     if (url) await sleep(PAUSE_BETWEEN_REQUESTS_MS);
+  }
+
+  try {
+    fs.writeFileSync(cacheFile, JSON.stringify(ids));
+    process.stderr.write(`[demozoo] cached ${ids.length} IDs to ${cacheFile}\n`);
+  } catch (e: any) {
+    process.stderr.write(`[demozoo] WARNING: failed to write ID cache: ${e.message}\n`);
   }
 
   return ids;
