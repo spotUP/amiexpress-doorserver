@@ -19,9 +19,9 @@ export interface RepackResult {
   error?: string;
 }
 
-function run(bin: string, args: string[], cwd: string): { ok: boolean; stderr: string } {
-  const r = spawnSync(bin, args, { cwd, encoding: 'utf8', timeout: 120_000 });
-  return { ok: r.status === 0, stderr: r.stderr ?? '' };
+function run(bin: string, args: string[], cwd: string): { ok: boolean; stderr: string; stdout: string } {
+  const r = spawnSync(bin, args, { cwd, encoding: 'latin1', timeout: 120_000 });
+  return { ok: r.status === 0, stderr: r.stderr ?? '', stdout: r.stdout ?? '' };
 }
 
 /**
@@ -48,12 +48,10 @@ export function repackLzxToLha(archivePath: string): RepackResult {
       return { ok: false, error: `unlzx failed: ${extract.stderr.trim().slice(0, 200)}` };
     }
 
-    // Collect extracted files (skip any directories unlzx created)
-    const files = fs.readdirSync(tmpDir).filter((f) => {
-      const fp = path.join(tmpDir, f);
-      return fs.statSync(fp).isFile();
-    });
-    if (files.length === 0) {
+    // Build file list via find (handles non-UTF8 filenames that break readdirSync)
+    const findResult = run('find', ['.', '-type', 'f'], tmpDir);
+    const fileList = findResult.stdout.split('\n').filter(Boolean).map((f) => f.replace(/^\.\//, ''));
+    if (fileList.length === 0) {
       return { ok: false, error: 'unlzx extracted no files' };
     }
 
@@ -61,15 +59,15 @@ export function repackLzxToLha(archivePath: string): RepackResult {
     const base = path.basename(archivePath, path.extname(archivePath));
     const outputPath = path.join(path.dirname(archivePath), `${base}.lha`);
 
-    // Repack as LHA
-    const pack = run(LHA, ['a64', '-o1', '-r', outputPath, ...files], tmpDir);
-    if (!pack.ok) {
-      return { ok: false, error: `lha failed: ${pack.stderr.trim().slice(0, 200)}` };
+    // Repack as LHA — shell expansion handles non-UTF8 filenames
+    const quoted = fileList.map((f) => `"${f.replace(/"/g, '\\"')}"`).join(' ');
+    const pack = run('sh', ['-c', `${LHA} c "${outputPath}" ${quoted}`], tmpDir);
+    if (!pack.ok || !fs.existsSync(outputPath)) {
+      return { ok: false, error: `lha failed: ${(pack.stderr || pack.stdout).trim().slice(0, 200)}` };
     }
 
     return { ok: true, outputPath };
   } finally {
-    // Clean up temp dir
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
