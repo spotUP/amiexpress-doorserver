@@ -252,8 +252,17 @@ async function enumerateProductionIds(tag: string): Promise<number[]> {
   if (fs.existsSync(cacheFile)) {
     try {
       const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf-8')) as number[];
-      process.stderr.write(`[demozoo] enumerate tag="${tag}" loaded ${cached.length} IDs from cache ${cacheFile}\n`);
-      return cached;
+      // Reject poisoned caches: an enumeration that returned the unfiltered
+      // total (388K) would have been written here before the sanity check
+      // existed. Treat any cache over the sanity threshold as corrupt and
+      // force a re-fetch.
+      if (cached.length > 10000) {
+        process.stderr.write(`[demozoo] WARNING: cache ${cacheFile} has ${cached.length} IDs (>10000) — treating as poisoned, re-enumerating\n`);
+        fs.unlinkSync(cacheFile);
+      } else {
+        process.stderr.write(`[demozoo] enumerate tag="${tag}" loaded ${cached.length} IDs from cache ${cacheFile}\n`);
+        return cached;
+      }
     } catch {
       // fall through to fresh enumeration
     }
@@ -265,7 +274,15 @@ async function enumerateProductionIds(tag: string): Promise<number[]> {
   while (url) {
     process.stderr.write(`[demozoo] enumerate tag="${tag}" url=${url}\n`);
     const body = await fetch(url);
-    const data = parseJson<{ results: { id: number }[]; next: string | null }>(body);
+    const data = parseJson<{ count: number; results: { id: number }[]; next: string | null }>(body);
+    // Demozoo's production API is currently broken: it returns the unfiltered
+    // total (388K) regardless of the tag query. If we see the total count, the
+    // tag filter is being ignored — abort and do NOT cache, otherwise we'll
+    // burn 388K detail/HTML fetches for nothing.
+    if (data.count > 10000) {
+      process.stderr.write(`[demozoo] FATAL: tag="${tag}" returned count=${data.count} which exceeds the 10000 sanity threshold — demozoo's production filter API appears to be broken. NOT caching.\n`);
+      throw new Error(`demozoo tag filter returned count=${data.count} for tag "${tag}" (likely unfiltered) — refusing to enumerate`);
+    }
     for (const prod of data.results) {
       ids.push(prod.id);
     }
