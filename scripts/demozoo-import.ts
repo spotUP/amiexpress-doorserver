@@ -26,11 +26,11 @@ import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
 import { recordAudit } from '../src/auth';
 
-const TAGS = ['amiex', 'daydream-amiga', 'fame'];
+const PRODUCTION_TYPE_URL = 'https://demozoo.org/api/v1/productions/?production_type=53&format=json&fields=id';
 const DEMOZOO_API = 'https://demozoo.org/api/v1';
-const PAUSE_BETWEEN_REQUESTS_MS = 2000;
+const PAUSE_BETWEEN_REQUESTS_MS = 500;
 const PAUSE_EVERY_N_REQUESTS = 50;
-const PAUSE_DURATION_MS = 10000;
+const PAUSE_DURATION_MS = 5000;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 4000, 16000];
 
@@ -200,18 +200,18 @@ function downloadToFile(url: string, destPath: string, expectedBasename: string,
 
 // ─── Core Logic ──────────────────────────────────────────────────────────────
 
-async function enumerateProductionIds(tag: string): Promise<number[]> {
+async function enumerateProductionIds(): Promise<number[]> {
   const ids: number[] = [];
-  let url = `${DEMOZOO_API}/productions/?tag=${encodeURIComponent(tag)}&format=json&fields=id`;
+  let url: string | null = PRODUCTION_TYPE_URL;
 
   while (url) {
-    process.stderr.write(`[demozoo] enumerate tag="${tag}" url=${url}\n`);
+    process.stderr.write(`[demozoo] enumerate url=${url}\n`);
     const body = await fetch(url);
     const data = parseJson<{ results: { id: number }[]; next: string | null }>(body);
     for (const prod of data.results) {
       ids.push(prod.id);
     }
-    url = data.next ?? '';
+    url = data.next;
     if (url) await sleep(PAUSE_BETWEEN_REQUESTS_MS);
   }
 
@@ -261,20 +261,19 @@ async function main() {
   let requestCount = 0;
 
   // ── Phase 1: enumerate and backfill existing doors ──────────────────────────
-  for (const tag of TAGS) {
-    process.stderr.write(`[demozoo] Phase 1 tag="${tag}"\n`);
-    let ids: number[];
-    try {
-      ids = await enumerateProductionIds(tag);
-    } catch (e: any) {
-      process.stderr.write(`[demozoo] ERROR enumerating tag "${tag}": ${e.message}\n`);
-      errorLog.push(`enumerate:${tag}: ${e.message}`);
-      stats.errors++;
-      continue;
-    }
-    process.stderr.write(`[demozoo] tag="${tag}" found ${ids.length} productions\n`);
+  process.stderr.write(`[demozoo] Phase 1: enumerating productions\n`);
+  let ids: number[];
+  try {
+    ids = await enumerateProductionIds();
+  } catch (e: any) {
+    process.stderr.write(`[demozoo] ERROR enumerating: ${e.message}\n`);
+    errorLog.push(`enumerate: ${e.message}`);
+    stats.errors++;
+    return;
+  }
+  process.stderr.write(`[demozoo] found ${ids.length} productions\n`);
 
-    for (const id of ids) {
+  for (const id of ids) {
       if (imported.has(id)) {
         process.stderr.write(`[demozoo] id=${id} already imported, skipping\n`);
         continue;
@@ -356,7 +355,6 @@ async function main() {
         // already imported concurrently
       }
     }
-  }
 
   // ── Phase 2: download new doors from scene.org ──────────────────────────────
   if (newDoorCandidates.length > 0) {
