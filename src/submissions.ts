@@ -30,6 +30,7 @@ import type { Request } from 'express';
 import Busboy from 'busboy';
 import type Database from 'better-sqlite3';
 import { readLhaContents, readZipContents } from './archive-reader';
+import { repackLzxToLha } from './repack-lzx';
 import {
   analyseDoor,
   buildGroupTags,
@@ -534,9 +535,27 @@ export function approveSubmission(
 
   // Submissions land in their own directory, so the corpus a scan walks and
   // the files strangers sent stay distinguishable on disk.
-  const relativePath = path.posix.join('Submitted', row.archive_name);
-  const destination = path.join(cfg.archivesRoot, 'Submitted', row.archive_name);
+  let archiveName = row.archive_name;
+  let relativePath = path.posix.join('Submitted', archiveName);
+  let destination = path.join(cfg.archivesRoot, 'Submitted', archiveName);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
+
+  // LZX archives can't be read by the doorserver — repack as LHA on approval.
+  const ext = path.extname(archiveName).toLowerCase();
+  if (ext === '.lzx' || ext === '.lzh') {
+    const repacked = repackLzxToLha(row.quarantine_path);
+    if (!repacked.ok) {
+      throw new UploadError(`failed to repack ${ext.toUpperCase()}: ${repacked.error}`, 422);
+    }
+    // Replace quarantine file with the repacked LHA
+    fs.unlinkSync(row.quarantine_path);
+    fs.copyFileSync(repacked.outputPath!, row.quarantine_path);
+    fs.unlinkSync(repacked.outputPath!);
+    // Update name to .lha
+    archiveName = archiveName.replace(/\.(lzx|lzh)$/i, '.lha');
+    relativePath = path.posix.join('Submitted', archiveName);
+    destination = path.join(cfg.archivesRoot, 'Submitted', archiveName);
+  }
 
   const catalogId = crypto.randomUUID();
   const derived = derivedOf(row);
@@ -553,9 +572,9 @@ export function approveSubmission(
        VALUES (?, ?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'submission', strftime('%s','now'))`
     ).run(
       catalogId,
-      row.archive_name,
+      archiveName,
       relativePath,
-      derived?.name || path.basename(row.archive_name, path.extname(row.archive_name)),
+      derived?.name || path.basename(archiveName, path.extname(archiveName)),
       derived?.binaryName ?? null,
       derived?.version || null,
       derived?.author || null,
@@ -590,7 +609,7 @@ export function approveSubmission(
     throw error;
   }
 
-  return { archiveName: row.archive_name, catalogId };
+  return { archiveName, catalogId };
 }
 
 /** Turn a submission down. The file is removed from quarantine. */

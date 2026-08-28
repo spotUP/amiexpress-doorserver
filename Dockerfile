@@ -24,6 +24,13 @@ RUN npm run build
 # is compiled by this toolchain rather than needing one at runtime.
 RUN npm ci --omit=dev
 
+# Build unlzx from source — single-file C program, no deps beyond zlib.
+FROM alpine:3.21 AS unlzx-build
+RUN apk add --no-cache gcc musl-dev make zlib-dev git
+RUN cd /tmp && git clone https://github.com/svein83/unlzx.git && \
+    cd unlzx && gcc -O2 -o unlzx unlzx.c -lz && \
+    cp unlzx /usr/local/bin/unlzx
+
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
@@ -46,5 +53,7 @@ RUN node -e "require('./dist/src/app.js'); console.log('[OK] compiled server loa
 ARG GIT_SHA=unknown
 RUN echo "$GIT_SHA" > /app/.git-sha
 COPY --from=amiexpress-bbs /usr/local/bin/lha /usr/local/bin/lha
+COPY --from=unlzx-build /usr/local/bin/unlzx /usr/local/bin/unlzx
+RUN apk add --no-cache zlib && unlzx 2>&1 || true
 EXPOSE 3010
 CMD ["node", "dist/src/index.js"]
