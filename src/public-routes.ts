@@ -772,10 +772,21 @@ export function mountLearnRoute(router: Router, cfg: ServerConfig): void {
 
   // ─── votes ────────────────────────────────────────────────────────────
 
-  /** Derive a per-visitor voter ID from IP address. */
-  function voterId(req: Request): string {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '0.0.0.0';
-    return crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
+  /** Derive a per-visitor voter ID from a persistent cookie. */
+  function voterId(req: Request, res: Response): string {
+    // Parse voter_id from Cookie header manually (no cookie-parser dep).
+    let vid: string | undefined;
+    const cookieHeader = req.headers.cookie ?? '';
+    for (const pair of cookieHeader.split(';')) {
+      const [key, val] = pair.trim().split('=');
+      if (key === 'voter_id' && val) { vid = val; break; }
+    }
+    if (!vid) {
+      vid = crypto.randomBytes(16).toString('hex');
+      // Set cookie: 1 year, same-site lax, path /
+      res.setHeader('Set-Cookie', `voter_id=${vid}; Max-Age=${365 * 24 * 3600}; Path=/; SameSite=Lax`);
+    }
+    return vid;
   }
 
   /** GET /doors/:archiveName/votes — vote counts + this visitor's vote. */
@@ -794,7 +805,7 @@ export function mountLearnRoute(router: Router, cfg: ServerConfig): void {
       const up = counts.find((c) => c.vote === 1)?.n ?? 0;
       const down = counts.find((c) => c.vote === -1)?.n ?? 0;
 
-      const vid = voterId(req);
+      const vid = voterId(req, res);
       const mine = db
         .prepare('SELECT vote FROM door_votes WHERE catalog_id = ? AND voter_id = ?')
         .get(row.id, vid) as { vote: number } | undefined;
@@ -821,7 +832,7 @@ export function mountLearnRoute(router: Router, cfg: ServerConfig): void {
         .get(archiveName) as { id: string } | undefined;
       if (!row) { res.status(404).json({ error: 'no such door' }); return; }
 
-      const vid = voterId(req);
+      const vid = voterId(req, res);
       if (vote === 0) {
         db.prepare('DELETE FROM door_votes WHERE catalog_id = ? AND voter_id = ?').run(row.id, vid);
       } else {

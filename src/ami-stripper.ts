@@ -186,28 +186,28 @@ export function deriveStripPlan(
 
 // ─── Archive reading via archive-reader.ts ────────────────────────────────────
 
-function readArchiveContents(archivePath: string): ArchiveContents {
+function readArchiveContents(archivePath: string, bytes?: Buffer): ArchiveContents {
   const ext = path.extname(archivePath).toLowerCase();
-  const bytes = fs.readFileSync(archivePath);
+  const buf = bytes ?? fs.readFileSync(archivePath);
 
   if (ext === '.lha' || ext === '.lzh') {
-    const contents = readLhaContents(bytes);
-    if (contents.files.length === 0 && bytes.length > 0) {
-      throw new Error(`LHA reader returned 0 files from ${bytes.length}-byte archive — the file may be corrupt or an unsupported LHA variant`);
+    const contents = readLhaContents(buf);
+    if (contents.files.length === 0 && buf.length > 0) {
+      throw new Error(`LHA reader returned 0 files from ${buf.length}-byte archive — the file may be corrupt or an unsupported LHA variant`);
     }
     return contents;
   }
   if (ext === '.zip') {
-    const contents = readZipContents(bytes);
-    if (contents.files.length === 0 && bytes.length > 0) {
-      throw new Error(`ZIP reader returned 0 files from ${bytes.length}-byte archive — the file may be corrupt`);
+    const contents = readZipContents(buf);
+    if (contents.files.length === 0 && buf.length > 0) {
+      throw new Error(`ZIP reader returned 0 files from ${buf.length}-byte archive — the file may be corrupt`);
     }
     return contents;
   }
   if (ext === '.lzx') {
-    const contents = readLzxContents(bytes);
-    if (contents.files.length === 0 && bytes.length > 0) {
-      throw new Error(`LZX reader returned 0 files from ${bytes.length}-byte archive — the file may be corrupt or the WASM module is not available`);
+    const contents = readLzxContents(buf);
+    if (contents.files.length === 0 && buf.length > 0) {
+      throw new Error(`LZX reader returned 0 files from ${buf.length}-byte archive — the file may be corrupt or the WASM module is not available`);
     }
     return contents;
   }
@@ -222,9 +222,9 @@ function readArchiveContents(archivePath: string): ArchiveContents {
 function readArchiveFiles(
   archivePath: string
 ): Array<{ path: string; size: number; buf: Buffer }> {
-  const contents = readArchiveContents(archivePath);
-  const files: Array<{ path: string; size: number; buf: Buffer }> = [];
   const bytes = fs.readFileSync(archivePath);
+  const contents = readArchiveContents(archivePath, bytes);
+  const files: Array<{ path: string; size: number; buf: Buffer }> = [];
   const ext = path.extname(archivePath).toLowerCase();
 
   for (const entry of contents.files) {
