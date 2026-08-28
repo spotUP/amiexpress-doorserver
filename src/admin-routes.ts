@@ -307,7 +307,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
    * Re-scan a door to re-run the derivation and update the catalog.
    */
   router.post('/doors/:archiveName/rescan', (req: express.Request, res: express.Response) => {
-    const archiveName = req.params.archiveName;
+    const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[req.params.archiveName.length - 1] : req.params.archiveName;
     const db = openDb(cfg);
     try {
       const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string, archive_path: string } | undefined;
