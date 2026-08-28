@@ -100,7 +100,7 @@ export function deleteMembers(
     return {
       ok: false,
       removed: 0,
-      reason: `lha exited ${result.status ?? 'null'}: ${(result.stderr || '').trim().slice(0, 200)}`,
+      reason: `lha (${binary}) exited ${result.status ?? 'null'}: ${(result.stderr || '').trim().slice(0, 200)}`,
     };
   }
 
