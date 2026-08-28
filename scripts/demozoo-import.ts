@@ -690,7 +690,7 @@ async function main() {
         }
 
         try {
-          if (dryRun) { process.stderr.write("[demozoo] DRY: would mark id=${id} imported\n"); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
+          if (dryRun) { process.stderr.write(`[demozoo] DRY: would mark id=${id} imported\n`); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
         } catch {
           // already imported concurrently
         }
@@ -746,7 +746,7 @@ async function main() {
         const where = existingAtDest ? destPath : existingUnderRoot;
         process.stderr.write(`[demozoo] id=${id} "${filename}" already exists at ${where}, skipping\n`);
         try {
-          if (dryRun) { process.stderr.write("[demozoo] DRY: would mark id=${id} imported\n"); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
+          if (dryRun) { process.stderr.write(`[demozoo] DRY: would mark id=${id} imported\n`); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
         } catch { /* ok */ }
         continue;
       }
@@ -787,8 +787,14 @@ async function main() {
 
       // Insert into door_catalog
       const catalogId = crypto.randomUUID();
-      const name = detail.title || path.basename(destBasename, path.extname(destBasename));
-      const version = (name.match(/v?[\d\.]+/i) ?? [])[0] ?? null;
+      // Demozoo titles usually look like "Door Name v1.0" or "Door v1.2.3".
+      // Split out the trailing version so it goes into the version column
+      // rather than being part of the name.
+      const VERSION_RE = /\s+v(\d+(?:\.\d+)*)\b/i;
+      const m = detail.title.match(VERSION_RE);
+      const versionFromTitle = m ? `v${m[1]}` : null;
+      const name = (detail.title || path.basename(destBasename, path.extname(destBasename)))
+        .replace(VERSION_RE, '').replace(/\s+$/, '').trim();
       const group = extractReleaseGroup(detail);
       if (group) {
         db.prepare(
@@ -808,7 +814,7 @@ async function main() {
           destBasename,
           path.posix.join('Submitted', destBasename),
           name,
-          version,
+          versionFromTitle,
           detail.credits?.[0]?.person ?? null,
           detail.description ?? null,
           detail.release_date ?? null,
@@ -822,7 +828,7 @@ async function main() {
           dlResult.md5,
           dlResult.sha256
         );
-        if (dryRun) { process.stderr.write("[demozoo] DRY: would mark id=${id} imported\n"); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
+        if (dryRun) { process.stderr.write(`[demozoo] DRY: would mark id=${id} imported\n`); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
         recordAudit(db, null, 'import-demozoo', destBasename, { new: true, catalogId });
         process.stderr.write(`[demozoo] new door inserted id=${id} "${destBasename}" catalogId=${catalogId}\n`);
         stats.newDoors++;
