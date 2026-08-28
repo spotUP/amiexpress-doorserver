@@ -18,7 +18,7 @@ import { Badge, Button, formatSize } from './ui';
 
 const TEXT_EXTS = /\.(txt|me|guide|doc|diz|ans|asc|nfo|rip|info|readme)$/i;
 
-function FileList({ archiveName, files }: { archiveName: string; files: DoorFile[] }) {
+function FileList({ archiveName, files, viewFile }: { archiveName: string; files: DoorFile[]; viewFile: (path: string) => void }) {
   const [viewing, setViewing] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
@@ -566,7 +566,7 @@ export function DoorDetailDialog({
               </Tabs.Content>
 
               <Tabs.Content value="files">
-                <FileList archiveName={archiveName ?? ''} files={door?.files ?? []} />
+                <FileList archiveName={archiveName ?? ''} files={door?.files ?? []} viewFile={viewFile} />
               </Tabs.Content>
 
               {door?.doc && (
