@@ -687,7 +687,11 @@ export function createAdminRouter(cfg: ServerConfig): Router {
 
       let result;
       try {
-        result = analyzeArchive(absPath);
+        const learned = db
+          .prepare('SELECT pattern FROM learned_junk_patterns')
+          .all() as { pattern: string }[];
+        const extraPatterns = learned.map((r) => r.pattern);
+        result = analyzeArchive(absPath, extraPatterns.length > 0 ? extraPatterns : undefined);
       } catch (e: any) {
         res.status(400).json({ error: `cannot read archive: ${e?.message ?? String(e)}` });
         return;
@@ -745,6 +749,71 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       auditDb.close();
     }
     res.json({ ok: true, removed: result.removed, newJunkCount: result.newJunkCount });
+  });
+
+  // ─── learned junk patterns ──────────────────────────────────────
+
+  /** Add a learned junk pattern. The classifier will treat matching files as ad/junk in future previews. */
+  router.post('/learn', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { pattern?: unknown; archiveName?: unknown; filePath?: unknown };
+    const pattern = typeof body.pattern === 'string' ? body.pattern.trim() : '';
+    if (!pattern) {
+      res.status(400).json({ error: 'pattern is required' });
+      return;
+    }
+    const archiveName = typeof body.archiveName === 'string' ? body.archiveName : null;
+    const filePath = typeof body.filePath === 'string' ? body.filePath : null;
+    const db = openDb(cfg);
+    try {
+      const existing = db
+        .prepare('SELECT id FROM learned_junk_patterns WHERE pattern = ? COLLATE NOCASE')
+        .get(pattern) as { id: number } | undefined;
+      if (existing) {
+        res.json({ ok: true, id: existing.id, duplicate: true });
+        return;
+      }
+      const info = db
+        .prepare('INSERT INTO learned_junk_patterns (pattern, archive_name, file_path, learned_by) VALUES (?, ?, ?, ?)')
+        .run(pattern, archiveName, filePath, req.admin?.username ?? 'admin');
+      recordAudit(db, req.admin?.id ?? null, 'learn', archiveName ?? '', { pattern, filePath });
+      res.json({ ok: true, id: Number(info.lastInsertRowid), duplicate: false });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** List all learned junk patterns. */
+  router.get('/learned', requireAdmin(cfg), (_req: AuthedRequest, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const rows = db
+        .prepare('SELECT id, pattern, archive_name, file_path, learned_by, created_at FROM learned_junk_patterns ORDER BY created_at DESC')
+        .all() as { id: number; pattern: string; archive_name: string | null; file_path: string | null; learned_by: string; created_at: number }[];
+      res.json({ patterns: rows });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Remove a learned junk pattern. */
+  router.delete('/learned/:id', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const id = Number.parseInt(Array.isArray(req.params.id) ? '' : req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      res.status(400).json({ error: 'invalid id' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const info = db.prepare('DELETE FROM learned_junk_patterns WHERE id = ?').run(id);
+      if (info.changes === 0) {
+        res.status(404).json({ error: 'not found' });
+        return;
+      }
+      recordAudit(db, req.admin?.id ?? null, 'unlearn', '', { id });
+      res.json({ ok: true });
+    } finally {
+      db.close();
+    }
   });
 
   // ─── file extraction and deletion ──────────────────────────────────

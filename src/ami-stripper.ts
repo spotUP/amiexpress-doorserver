@@ -310,11 +310,14 @@ function extractZipMember(bytes: Buffer, targetPath: string): Buffer | null {
  * Analyze an archive for junk files. Supports LHA, LZH, and ZIP.
  * Returns empty results for unsupported formats (LZX, DMS, etc.).
  */
-export function analyzeArchive(archivePath: string): StripResult {
+export function analyzeArchive(archivePath: string, extraPatterns?: string[]): StripResult {
   const patterns = loadPatterns();
   const fingerprints = loadFingerprints();
+  const allPatterns = extraPatterns
+    ? [...patterns.filenamePatterns, ...extraPatterns]
+    : patterns.filenamePatterns;
   const files = readArchiveFiles(archivePath);
-  return deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
+  return deriveStripPlan(files, allPatterns, fingerprints);
 }
 
 /**

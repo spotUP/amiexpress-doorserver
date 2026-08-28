@@ -289,6 +289,15 @@ export function useStripArchive(archiveName: string) {
   });
 }
 
+export function useLearnPattern() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { pattern: string; archiveName?: string; filePath?: string }) =>
+      api.post<{ ok: boolean; id: number; duplicate?: boolean }>('/admin/learn', data),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
 // ─── release groups ─────────────────────────────────────────────────────
 
 export interface ReleaseGroup {

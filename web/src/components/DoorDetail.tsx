@@ -5,9 +5,9 @@
  */
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Download, Eye, Trash2, X } from 'lucide-react';
+import { Download, Eye, GraduationCap, Trash2, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
+import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
 import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types';
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
@@ -21,7 +21,9 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
   const [viewing, setViewing] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [learning, setLearning] = useState<Set<string>>(new Set());
   const [fileList, setFileList] = useState<DoorFile[]>(files);
+  const learnPattern = useLearnPattern();
 
   async function viewFile(path: string) {
     setViewing(path);
@@ -51,13 +53,32 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
     }
   }
 
+  async function learnFile(path: string) {
+    setLearning((prev) => new Set(prev).add(path));
+    try {
+      await learnPattern.mutateAsync({ pattern: path, archiveName, filePath: path });
+      setFileList((prev) => prev.map((f) => f.path === path ? { ...f, isJunk: true, junkReason: 'learned' } : f));
+    } finally {
+      setLearning((prev) => { const next = new Set(prev); next.delete(path); return next; });
+    }
+  }
+
   return (
     <div className="space-y-2">
       <ul className="divide-y divide-line rounded-md border border-line">
         {fileList.map((file) => (
           <li key={file.path} className="flex items-center gap-2 px-3 py-1.5 text-sm">
             <span className="flex-1 truncate font-mono text-[12px]">{file.path}</span>
-            {file.isJunk ? <Badge tone="warn">stripped</Badge> : null}
+            {file.isJunk ? <Badge tone="warn">stripped</Badge> : (
+              <button
+                onClick={() => learnFile(file.path)}
+                disabled={learning.has(file.path)}
+                className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
+                title="Learn as junk"
+              >
+                <GraduationCap size={13} />
+              </button>
+            )}
             <span className="font-mono text-[12px] text-muted">{formatSize(file.size)}</span>
             {TEXT_EXTS.test(file.path) && (
               <button onClick={() => viewFile(file.path)} className="rounded p-1 text-muted hover:bg-raised hover:text-accent" title="View contents">
@@ -180,6 +201,7 @@ function StripAds({
 }) {
   const stripPreview = useStripPreview(archiveName);
   const stripArchive = useStripArchive(archiveName);
+  const learnPattern = useLearnPattern();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ removed: number; newJunkCount: number } | null>(null);
 
@@ -188,6 +210,13 @@ function StripAds({
     setPreview(p);
     setSelected(new Set(p.stripped.map((f) => f.path)));
     setResult(null);
+  }
+
+  async function learnKeptFile(path: string) {
+    await learnPattern.mutateAsync({ pattern: path, archiveName, filePath: path });
+    const p = await stripPreview.mutateAsync();
+    setPreview(p);
+    setSelected(new Set(p.stripped.map((f) => f.path)));
   }
 
   function toggle(path: string) {
@@ -260,7 +289,23 @@ function StripAds({
           ))}
         </ul>
         {preview.kept.length > 0 && (
-          <p className="text-xs text-muted">{preview.kept.length} file{preview.kept.length !== 1 ? 's' : ''} kept</p>
+          <div className="space-y-1">
+            <p className="text-xs text-muted">{preview.kept.length} file{preview.kept.length !== 1 ? 's' : ''} kept</p>
+            <ul className="max-h-32 space-y-0.5 overflow-y-auto">
+              {preview.kept.map((f) => (
+                <li key={f.path} className="flex items-center gap-2 text-xs">
+                  <span className="flex-1 truncate font-mono text-muted">{f.path}</span>
+                  <button
+                    onClick={() => learnKeptFile(f.path)}
+                    className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
+                    title="Learn as junk"
+                  >
+                    <GraduationCap size={12} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     );

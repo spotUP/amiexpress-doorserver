@@ -168,6 +168,22 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 7,
+    name: 'learned_junk_patterns',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS learned_junk_patterns (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          pattern     TEXT NOT NULL,
+          archive_name TEXT,
+          file_path   TEXT,
+          learned_by  TEXT DEFAULT 'admin',
+          created_at  INTEGER DEFAULT (strftime('%s','now'))
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_ljp_pattern ON learned_junk_patterns(pattern)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {
