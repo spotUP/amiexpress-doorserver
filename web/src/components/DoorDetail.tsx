@@ -416,8 +416,8 @@ export function DoorDetailDialog({
 
   async function viewFile(path: string) {
     if (!archiveName) return;
-    const res = await api.get<ArrayBuffer>(`/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, { responseType: 'arraybuffer' });
-    setViewingFile({ path, content: new TextDecoder().decode(res) });
+    const text = await api.getText(`/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`);
+    setViewingFile({ path, content: text });
   }
   const currentTags = doorTags?.tags ?? [];
 
