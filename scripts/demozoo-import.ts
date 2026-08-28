@@ -169,9 +169,29 @@ function parseJson<T>(body: string): T {
   }
 }
 
+function parseFilenameFromUrl(url: string): string | null {
+  if (!url) return null;
+  try {
+    // Drop query string, take last path segment, decode percent-escapes.
+    const u = new URL(url);
+    const last = u.pathname.split('/').filter(Boolean).pop();
+    if (!last) return null;
+    return decodeURIComponent(last);
+  } catch {
+    return null;
+  }
+}
+
 function parseFilenameFromHtml(html: string): string | null {
   const match = html.match(/Filename:\s*([^\s<]+)/i);
   return match ? match[1] : null;
+}
+
+function parseFilename(downloadUrl: string | undefined, html: string | null): string | null {
+  // The download URL's last path segment is the filename on every production
+  // we tested. The HTML "Filename:" section is only present for files actually
+  // uploaded to demozoo (rare for BBS doors), so use URL first, HTML fallback.
+  return parseFilenameFromUrl(downloadUrl ?? '') ?? parseFilenameFromHtml(html ?? '');
 }
 
 function parseCredits(credits: { person: string; role: string }[]): string | null {
@@ -396,10 +416,11 @@ async function main() {
         }
 
         stats.processed++;
-        const filename = parseFilenameFromHtml(html!);
+        const downloadUrl = detail!.download_links?.[0]?.url;
+        const filename = parseFilename(downloadUrl, html!);
 
         if (!filename) {
-          process.stderr.write(`[demozoo] id=${id} "${detail!.title}" — no filename in HTML, skipping\n`);
+          process.stderr.write(`[demozoo] id=${id} "${detail!.title}" — no filename in URL or HTML, skipping\n`);
           errorLog.push(`nofilename:${id}: ${detail!.title}`);
           stats.unmatched++;
           continue;
