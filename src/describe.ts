@@ -744,6 +744,47 @@ export function fixCasing(text: string): string {
   return out;
 }
 
+/** Words that stay lowercase in title case unless they're the first word. */
+const TITLE_CASE_LOWERCASE = new Set([
+  'a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so',
+  'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'is', 'vs',
+]);
+
+/**
+ * Title case for door names: capitalise most words, keep small words
+ * lowercase unless they're the first word. Like This Example.
+ */
+export function fixTitleCasing(text: string): string {
+  if (!text) return text;
+
+  // Start with fixCasing to normalise whitespace, acronyms, etc.
+  let out = fixCasing(text);
+
+  // Apply title case: capitalise every word, then lowercase the small words
+  out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => {
+    const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '');
+    if (!core) return w;
+    // Always capitalise acronyms
+    if (ACRONYMS.has(core.toUpperCase())) {
+      return core.toUpperCase();
+    }
+    return capitalise(w);
+  });
+
+  // Now lowercase the small words, but not the first word
+  let first = true;
+  out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => {
+    const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '').toLowerCase();
+    if (first) { first = false; return w; }
+    if (TITLE_CASE_LOWERCASE.has(core)) {
+      return core;
+    }
+    return w;
+  });
+
+  return out;
+}
+
 // ─── composing name and body ───────────────────────────────────────────
 
 const FILLER = new Set([

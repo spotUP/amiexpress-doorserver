@@ -306,7 +306,7 @@ export function Browse() {
           }}
           onFixCasing={() => {
             batchPatch.mutate(
-              { archiveNames: [...selected], fields: { description: '__FIX_CASING__' } },
+              { archiveNames: [...selected], fields: { description: '__FIX_CASING__', name: '__FIX_TITLE_CASING__' } },
               { onSuccess: () => setSelected(new Set()) },
             );
           }}

@@ -243,7 +243,8 @@ export function useRedescribe(archiveName: string) {
  */
 export function useTidyCase() {
   return useMutation({
-    mutationFn: (text: string) => api.post<{ text: string }>('/admin/tidy-case', { text }),
+    mutationFn: ({ text, mode }: { text: string; mode?: 'sentence' | 'title' }) =>
+      api.post<{ text: string }>('/admin/tidy-case', { text, mode }),
   });
 }
 

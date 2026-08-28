@@ -18,8 +18,8 @@ import {
   verifyToken,
   type AuthedRequest,
 } from './auth';
-import { analyseDoor, buildGroupTags, fixCasing, tidyCase } from './describe';
-import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides } from './effective';
+import { analyseDoor, buildGroupTags, fixCasing, fixTitleCasing, tidyCase } from './describe';
+import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides, type OverrideMap } from './effective';
 import { UploadError, approveSubmission, rejectSubmission } from './submissions';
 import type { ServerConfig } from './config';
 import { analyzeArchive } from './ami-stripper';
@@ -61,6 +61,35 @@ function noteFailure(username: string, now: number): void {
 /** Exported for tests: forget every recorded failure. */
 export function _clearLoginFailuresForTests(): void {
   failures.clear();
+}
+
+const FIX_CASING_SENTINEL = '__FIX_CASING__';
+const FIX_TITLE_CASING_SENTINEL = '__FIX_TITLE_CASING__';
+
+/**
+ * If value is a casing sentinel, resolve it by reading the current effective
+ * value and applying the appropriate casing function.
+ * Returns the resolved value, or the original value for non-sentinel cases.
+ */
+function resolveFixCasingSentinel(
+  catalogId: string,
+  field: string,
+  value: string | null,
+  overrides: OverrideMap,
+): string | null {
+  if (value === FIX_TITLE_CASING_SENTINEL) {
+    const current = overrides.get(catalogId);
+    const currentVal = current?.[field as keyof typeof current] ?? null;
+    if (currentVal === null || currentVal === undefined) return value;
+    return fixTitleCasing(String(currentVal));
+  }
+  if (value === FIX_CASING_SENTINEL) {
+    const current = overrides.get(catalogId);
+    const currentVal = current?.[field as keyof typeof current] ?? null;
+    if (currentVal === null || currentVal === undefined) return value;
+    return fixCasing(String(currentVal));
+  }
+  return value;
 }
 
 export function createAdminRouter(cfg: ServerConfig): Router {
@@ -219,19 +248,21 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         res.status(404).json({ error: 'no such door' });
         return;
       }
-      const before = loadOverrides(db).get(row.id) ?? {};
+      const overrides = loadOverrides(db);
+      const before = overrides.get(row.id) ?? {};
       const write = db.transaction(() => {
         for (const [field, value] of entries) {
+          const resolved = resolveFixCasingSentinel(row.id, field, value as string | null, overrides);
           db.prepare(
             `INSERT INTO door_catalog_overrides (catalog_id, field, value, edited_by, edited_at)
              VALUES (?, ?, ?, ?, strftime('%s','now'))
              ON CONFLICT(catalog_id, field) DO UPDATE SET
                value = excluded.value, edited_by = excluded.edited_by, edited_at = excluded.edited_at`
-          ).run(row.id, field, value as string | null, req.admin?.id ?? null);
+          ).run(row.id, field, resolved, req.admin?.id ?? null);
           recordAudit(db, req.admin?.id ?? null, 'edit', row.id, {
             field,
             from: field in before ? before[field as never] : undefined,
-            to: value,
+            to: resolved,
           });
         }
       });
@@ -315,12 +346,13 @@ export function createAdminRouter(cfg: ServerConfig): Router {
    * can never disagree about what normal casing looks like.
    */
   router.post('/tidy-case', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
-    const { text } = (req.body ?? {}) as { text?: unknown };
+    const { text, mode } = (req.body ?? {}) as { text?: unknown; mode?: unknown };
     if (typeof text !== 'string') {
       res.status(400).json({ error: 'text must be a string' });
       return;
     }
-    res.json({ text: fixCasing(text) });
+    const fn = mode === 'title' ? fixTitleCasing : fixCasing;
+    res.json({ text: fn(text) });
   });
 
   /**
@@ -504,14 +536,16 @@ export function createAdminRouter(cfg: ServerConfig): Router {
          ON CONFLICT(catalog_id, field) DO UPDATE SET
            value = excluded.value, edited_by = excluded.edited_by, edited_at = excluded.edited_at`
       );
+      const overrides = loadOverrides(db);
       let count = 0;
       const write = db.transaction(() => {
         for (const archiveName of body.archiveNames!) {
           const row = lookup.get(archiveName) as { id: string } | undefined;
           if (!row) continue;
           for (const [field, value] of fieldEntries) {
-            upsert.run(row.id, field, value as string | null, req.admin?.id ?? null);
-            recordAudit(db, req.admin?.id ?? null, 'edit', row.id, { field, to: value, archiveName });
+            const resolved = resolveFixCasingSentinel(row.id, field, value as string | null, overrides);
+            upsert.run(row.id, field, resolved, req.admin?.id ?? null);
+            recordAudit(db, req.admin?.id ?? null, 'edit', row.id, { field, to: resolved, archiveName });
             count++;
           }
         }

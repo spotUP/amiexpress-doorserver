@@ -113,32 +113,55 @@ function DoorHistory({ archiveName }: { archiveName: string }) {
     return `${Math.floor(diff / 86400)}d ago`;
   }
 
+  function formatEntry(e: { action: string; detail: Record<string, unknown> | null }): string | null {
+    const d = e.detail;
+    if (!d) return null;
+    switch (e.action) {
+      case 'edit': {
+        const { field, from, to } = d as { field?: string; from?: unknown; to?: unknown };
+        if (field && to !== undefined) {
+          const label = field.replace(/_/g, ' ');
+          if (from === undefined || from === null) return `${label} set to "${String(to).slice(0, 60)}"`;
+          return `${label}: "${String(from).slice(0, 30)}" → "${String(to).slice(0, 30)}"`;
+        }
+        return null;
+      }
+      case 'revert': {
+        const { field } = d as { field?: string };
+        return field ? `reverted ${field.replace(/_/g, ' ')}` : null;
+      }
+      case 'strip': {
+        const { removed } = d as { removed?: number };
+        return removed ? `stripped ${removed} file${removed !== 1 ? 's' : ''}` : null;
+      }
+      case 'edit-tags': {
+        const { tags } = d as { tags?: string[] };
+        return tags?.length ? `tags: ${tags.join(', ')}` : 'tags cleared';
+      }
+      case 'delete-files': {
+        const { members } = d as { members?: string[] };
+        if (members?.length) {
+          const names = members.map((m) => m.split('/').pop() ?? m).slice(0, 2);
+          return `deleted ${names.join(', ')}${members.length > 2 ? ` (+${members.length - 2} more)` : ''}`;
+        }
+        return null;
+      }
+      default:
+        return null;
+    }
+  }
+
   return (
     <ul className="space-y-2">
       {entries.map((e) => (
         <li key={e.id} className="rounded border border-line px-3 py-2 text-xs">
           <div className="flex items-baseline justify-between gap-2">
-            <Badge>{e.action}</Badge>
+            <span className="font-medium capitalize text-ink">{e.action.replace(/-/g, ' ')}</span>
             <span className="text-muted">{timeAgo(e.at)}</span>
           </div>
-          <p className="mt-1 text-muted">by {e.by}</p>
-          {e.detail && e.action === 'edit' && (
-            <p className="mt-1 font-mono text-ink">
-              <span className="text-muted">{(e.detail as { field: string }).field}:</span>{' '}
-              <span className="line-through text-muted">{String((e.detail as { from: unknown }).from ?? '')}</span>
-              {' → '}
-              <span>{String((e.detail as { to: unknown }).to ?? '')}</span>
-            </p>
-          )}
-          {e.detail && e.action === 'edit-tags' && (
-            <p className="mt-1 font-mono text-ink">
-              tags: {JSON.stringify((e.detail as { tags: string[] }).tags)}
-            </p>
-          )}
-          {e.detail && e.action === 'strip' && (
-            <p className="mt-1 text-ink">
-              stripped {Array.isArray((e.detail as { removed: unknown[] }).removed) ? (e.detail as { removed: unknown[] }).removed.length : 0} files
-            </p>
+          <p className="mt-0.5 text-[11px] text-muted">by {e.by}</p>
+          {formatEntry(e) && (
+            <p className="mt-1 text-xs text-ink">{formatEntry(e)}</p>
           )}
         </li>
       ))}
@@ -430,7 +453,7 @@ export function DoorDetailDialog({
                         rows={FIELD_ROWS[field]}
                         onTidy={
                           TIDY_FIELDS.has(field)
-                            ? (text) => tidy.mutateAsync(text).then((res) => res.text)
+                            ? (text) => tidy.mutateAsync({ text, mode: field === 'name' ? 'title' : 'sentence' }).then((res) => res.text)
                             : undefined
                         }
                         reverting={revert.isPending}
