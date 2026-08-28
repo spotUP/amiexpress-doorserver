@@ -452,6 +452,13 @@ export function DoorDetailDialog({
   return (
     <Dialog.Root open={Boolean(archiveName)} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
+        {viewingFile && (
+          <ViewFileDialog
+            archiveName={archiveName ?? ''}
+            filePath={viewingFile.path}
+            onClose={() => setViewingFile(null)}
+          />
+        )}
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[min(60rem,94vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
           <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
