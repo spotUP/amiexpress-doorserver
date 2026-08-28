@@ -143,6 +143,7 @@ interface DemozooCredit {
 function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<string>): DoorJson {
   const corrected = applyOverrides(row, row.id, overrides);
   const edited = isOverridden(row.id, 'description', overrides);
+  const nameEdited = isOverridden(row.id, 'name', overrides);
   const facts = analyseDoor(
     {
       dizText: corrected.file_id_diz,
@@ -161,7 +162,7 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     system,
     name: named.name,
     catalogName: corrected.name,
-    nameSource: named.source,
+    nameSource: nameEdited ? 'catalog' : named.source,
     description: edited ? corrected.description ?? '' : facts.description,
     descriptionSource: edited ? 'edited' : 'diz',
     version: corrected.version ?? facts.version ?? null,
