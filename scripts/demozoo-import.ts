@@ -269,25 +269,36 @@ async function enumerateProductionIds(tag: string): Promise<number[]> {
   }
 
   const ids: number[] = [];
-  let url = `${DEMOZOO_API}/productions/?tag=${encodeURIComponent(tag)}&format=json&fields=id`;
+  // production_type=53 is the demozoo ID for "BBS Door" — Demozoo's JSON
+  // production API ignores tag filters (returns the unfiltered 388K
+  // total), so we scrape the HTML listing pages instead. The HTML
+  // search form accepts the production_type param and filters correctly.
+  // HTML doesn't break, while /api/v1/productions/?tag=foo does.
+  const TYPE_BBS_DOOR = 53;
+  let page = 1;
+  const seen = new Set<number>();
+  const PROD_LINK_RE = /href="\/productions\/(\d+)\/"/g;
 
-  while (url) {
-    process.stderr.write(`[demozoo] enumerate tag="${tag}" url=${url}\n`);
-    const body = await fetch(url);
-    const data = parseJson<{ count: number; results: { id: number }[]; next: string | null }>(body);
-    // Demozoo's production API is currently broken: it returns the unfiltered
-    // total (388K) regardless of the tag query. If we see the total count, the
-    // tag filter is being ignored — abort and do NOT cache, otherwise we'll
-    // burn 388K detail/HTML fetches for nothing.
-    if (data.count > 10000) {
-      process.stderr.write(`[demozoo] FATAL: tag="${tag}" returned count=${data.count} which exceeds the 10000 sanity threshold — demozoo's production filter API appears to be broken. NOT caching.\n`);
-      throw new Error(`demozoo tag filter returned count=${data.count} for tag "${tag}" (likely unfiltered) — refusing to enumerate`);
+  while (true) {
+    const url = `https://demozoo.org/productions/?tag=${encodeURIComponent(tag)}&production_type=${TYPE_BBS_DOOR}&page=${page}`;
+    process.stderr.write(`[demozoo] enumerate tag="${tag}" page=${page} url=${url}\n`);
+    const html = await fetch(url);
+    const matches = [...html.matchAll(PROD_LINK_RE)];
+    let addedThisPage = 0;
+    for (const m of matches) {
+      const id = Number(m[1]);
+      if (!seen.has(id)) { seen.add(id); ids.push(id); addedThisPage++; }
     }
-    for (const prod of data.results) {
-      ids.push(prod.id);
+    process.stderr.write(`[demozoo] tag="${tag}" page=${page} found ${addedThisPage} new IDs (${ids.length} total)\n`);
+    if (addedThisPage === 0) break; // last page reached
+    page++;
+    if (page > 200) {
+      // Safety cap: no real tag has more than a few hundred BBS-Door
+      // productions. If we're past 200 pages, something is wrong.
+      process.stderr.write(`[demozoo] WARNING: hit 200-page safety cap for tag="${tag}", aborting\n`);
+      break;
     }
-    url = data.next ?? '';
-    if (url) await sleep(PAUSE_BETWEEN_REQUESTS_MS);
+    await sleep(PAUSE_BETWEEN_REQUESTS_MS);
   }
 
   try {
