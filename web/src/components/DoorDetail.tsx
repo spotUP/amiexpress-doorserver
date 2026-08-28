@@ -152,9 +152,9 @@ function DoorHistory({ archiveName }: { archiveName: string }) {
     return `${Math.floor(diff / 86400)}d ago`;
   }
 
-  function formatEntry(e: { action: string; detail: Record<string, unknown> | null }): string | null {
+  function formatEntry(e: { action: string; detail: unknown }): string | null {
     const d = e.detail;
-    if (!d) return null;
+    if (!d || typeof d !== 'object') return null;
     switch (e.action) {
       case 'edit': {
         const { field, from, to } = d as { field?: string; from?: unknown; to?: unknown };
