@@ -21,11 +21,13 @@ export type ArchiveRunner = (bin: string, args: string[]) => {
 };
 
 const defaultRunner: ArchiveRunner = (bin, args) => {
+  console.log(`[lha-debug] running ${bin} with args ${JSON.stringify(args)}`);
   const r: SpawnSyncReturns<string> = spawnSync(bin, args, {
     encoding: 'utf8',
     timeout: 120_000,
     env: { ...process.env, LC_ALL: 'C' },
   });
+  console.log(`[lha-debug] result status: ${r.status}, stderr: ${r.stderr?.slice(0, 100)}`);
   return { status: r.status, stderr: r.stderr ?? '' };
 };
 
