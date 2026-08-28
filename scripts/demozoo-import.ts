@@ -476,6 +476,11 @@ async function fetchDetailHtml(id: number): Promise<string> {
 }
 
 async function main() {
+  const dryRun = process.argv.includes('--dry-run');
+  const noDownload = process.argv.includes('--no-download');
+  if (dryRun) process.stderr.write('[demozoo] DRY RUN — no changes will be written\n');
+  if (noDownload) process.stderr.write('[demozoo] NO DOWNLOAD — skipping Phase 2 archive downloads\n');
+
   const cfg = loadConfig();
   const db = openSqlite(cfg.dbPath);
   applySchema(db);
@@ -507,16 +512,25 @@ async function main() {
   let requestCount = 0;
 
   // ── Phase 1: enumerate and backfill existing doors ──────────────────────────
-  process.stderr.write(`[demozoo] Phase 1: enumerating all BBS-Door productions\n`);
+  // CLI: --ids=123,456,789 skips enumeration and processes only the
+  // given demozoo production IDs. Useful for testing a handful of
+  // doors without scraping 50K productions.
+  const idsArg = process.argv.find((a) => a.startsWith('--ids='));
   let ids: number[];
-  try {
-    ids = await enumerateProductionIds();
-  } catch (e: any) {
-    process.stderr.write(`[demozoo] ERROR enumerating: ${e.message}\n`);
-    errorLog.push(`enumerate: ${e.message}`);
-    process.exit(1);
+  if (idsArg) {
+    ids = idsArg.slice('--ids='.length).split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
+    process.stderr.write(`[demozoo] using --ids from CLI: ${ids.join(', ')}\n`);
+  } else {
+    process.stderr.write(`[demozoo] Phase 1: enumerating all BBS-Door productions\n`);
+    try {
+      ids = await enumerateProductionIds();
+    } catch (e: any) {
+      process.stderr.write(`[demozoo] ERROR enumerating: ${e.message}\n`);
+      errorLog.push(`enumerate: ${e.message}`);
+      process.exit(1);
+    }
+    process.stderr.write(`[demozoo] found ${ids.length} BBS-Door productions\n`);
   }
-  process.stderr.write(`[demozoo] found ${ids.length} BBS-Door productions\n`);
 
     const toProcess = ids.filter((id) => !imported.has(id));
     process.stderr.write(`[demozoo] ${toProcess.length} to process (${ids.length - toProcess.length} already imported)\n`);
@@ -605,8 +619,12 @@ async function main() {
         if (Object.keys(patch).length > 0) {
           const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
           const vals = Object.values(patch);
-          db.prepare(`UPDATE door_catalog SET ${sets} WHERE id = ?`).run(...vals, match.id);
-          recordAudit(db, null, 'import-demozoo', match.archive_name, { enriched: Object.keys(patch) });
+          if (dryRun) {
+            process.stderr.write(`[demozoo] DRY: would UPDATE ${match.archive_name} SET ${sets}\n`);
+          } else {
+            db.prepare(`UPDATE door_catalog SET ${sets} WHERE id = ?`).run(...vals, match.id);
+            recordAudit(db, null, 'import-demozoo', match.archive_name, { enriched: Object.keys(patch) });
+          }
           process.stderr.write(`[demozoo] backfilled id=${id} "${match.archive_name}" with ${Object.keys(patch).join(', ')}\n`);
           stats.backfilled++;
         } else {
@@ -614,7 +632,7 @@ async function main() {
         }
 
         try {
-          db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
+          if (dryRun) { process.stderr.write("[demozoo] DRY: would mark id=${id} imported\n"); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
         } catch {
           // already imported concurrently
         }
@@ -630,7 +648,13 @@ async function main() {
 
   // ── Phase 2: download new doors from scene.org ──────────────────────────────
   if (newDoorCandidates.length > 0) {
-    process.stderr.write(`[demozoo] Phase 2: ${newDoorCandidates.length} new door candidates\n`);
+    if (noDownload) {
+      process.stderr.write(`[demozoo] Phase 2: SKIPPED (--no-download). ${newDoorCandidates.length} candidates not downloaded:\n`);
+      for (const c of newDoorCandidates) {
+        process.stderr.write(`  - id=${c.id} "${c.detail.title}" → ${c.downloadUrl}\n`);
+      }
+    } else {
+      process.stderr.write(`[demozoo] Phase 2: ${newDoorCandidates.length} new door candidates\n`);
 
     for (const candidate of newDoorCandidates) {
       const { id, detail, filename, downloadUrl } = candidate;
@@ -664,7 +688,7 @@ async function main() {
         const where = existingAtDest ? destPath : existingUnderRoot;
         process.stderr.write(`[demozoo] id=${id} "${filename}" already exists at ${where}, skipping\n`);
         try {
-          db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
+          if (dryRun) { process.stderr.write("[demozoo] DRY: would mark id=${id} imported\n"); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
         } catch { /* ok */ }
         continue;
       }
@@ -740,7 +764,7 @@ async function main() {
           dlResult.md5,
           dlResult.sha256
         );
-        db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
+        if (dryRun) { process.stderr.write("[demozoo] DRY: would mark id=${id} imported\n"); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
         recordAudit(db, null, 'import-demozoo', destBasename, { new: true, catalogId });
         process.stderr.write(`[demozoo] new door inserted id=${id} "${destBasename}" catalogId=${catalogId}\n`);
         stats.newDoors++;
@@ -750,6 +774,7 @@ async function main() {
         stats.errors++;
         // File is on disk but DB insert failed — don't record as imported, re-run will retry
       }
+    }
     }
   }
 
