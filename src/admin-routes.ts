@@ -306,7 +306,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   /**
    * Re-scan a door to re-run the derivation and update the catalog.
    */
-  router.post('/doors/:archiveName/rescan', (req: express.Request, res: express.Response) => {
+  router.post('/doors/:archiveName/rescan', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[req.params.archiveName.length - 1] : req.params.archiveName;
     const db = openDb(cfg);
     try {
@@ -331,7 +331,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
               derived.docFilename, derived.doc, entry.id
           );
       
-      recordAudit(db, null, 'rescan-door', archiveName, { newName: derived.name });
+      recordAudit(db, req.admin?.id ?? null, 'rescan-door', archiveName, { newName: derived.name });
       res.json({ ok: true, name: derived.name });
     } catch (e) {
       res.status(500).json({ error: String(e) });
