@@ -422,6 +422,31 @@ const BBS_OPTIONS = [
   { value: 'CNet', label: 'CNet' },
 ];
 
+/** Door types, sorted by frequency in the corpus. */
+const DOOR_TYPE_OPTIONS = [
+  { value: 'XIM', label: 'XIM' },
+  { value: 'FIM', label: 'FIM' },
+  { value: 'SIM', label: 'SIM' },
+  { value: 'DD', label: 'DD' },
+  { value: 'REXX', label: 'REXX' },
+];
+
+/** Categories, sorted by frequency in the corpus. */
+const CATEGORY_OPTIONS = [
+  { value: '', label: '(none)' },
+  { value: 'auto-added', label: 'auto-added' },
+  { value: 'XIM-BBSCmd', label: 'XIM-BBSCmd' },
+  { value: 'FIM-Reference', label: 'FIM-Reference' },
+  { value: 'SIM', label: 'SIM' },
+  { value: 'DD-Reference', label: 'DD-Reference' },
+];
+
+const SELECT_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  requires_bbs: BBS_OPTIONS,
+  door_type: DOOR_TYPE_OPTIONS,
+  category: CATEGORY_OPTIONS,
+};
+
 export function DoorDetailDialog({
   archiveName,
   admin,
@@ -642,7 +667,7 @@ export function DoorDetailDialog({
                         state={state}
                         multiline={MULTILINE_FIELDS.has(field)}
                         rows={FIELD_ROWS[field]}
-                        selectOptions={field === 'requires_bbs' ? BBS_OPTIONS : undefined}
+                        selectOptions={SELECT_OPTIONS[field]}
                         onTidy={
                           TIDY_FIELDS.has(field)
                             ? (text) => tidy.mutateAsync({ text, mode: field === 'name' ? 'title' : 'sentence' }).then((res) => res.text)
