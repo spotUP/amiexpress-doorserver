@@ -233,7 +233,7 @@ export function receiveUpload(req: Request): Promise<ReceivedUpload> {
 const PROGRAM_EXT = /\.(exe|xim|aim|fim|sim|tim|iim|rexx)$/i;
 const NOT_PROGRAM = /\.(info|doc|txt|readme|me|guide|diz|nfo|dat|cfg|prefs|bak|library|font|iff|ilbm|png|gif|jpg|mod|8svx)$/i;
 /** Known ad/installer binaries that are never the door itself. */
-const AD_BINARY = /^(LE-win|Setup|Install)/i;
+const AD_BINARY = /^(LE-win|Setup|Install|ad-|ad_|-ad)/i;
 
 function squash(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
