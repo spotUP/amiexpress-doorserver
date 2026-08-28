@@ -24,6 +24,7 @@ const defaultRunner: ArchiveRunner = (bin, args) => {
   const r: SpawnSyncReturns<string> = spawnSync(bin, args, {
     encoding: 'utf8',
     timeout: 120_000,
+    env: { ...process.env, LC_ALL: 'C' },
   });
   return { status: r.status, stderr: r.stderr ?? '' };
 };
