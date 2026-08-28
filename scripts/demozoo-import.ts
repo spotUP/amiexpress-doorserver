@@ -30,21 +30,68 @@ import { recordAudit } from '../src/auth';
 // requires_bbs. The tag itself is descriptive (e.g. "mystic-bbs");
 // the implies field is the value to write into door_catalog.requires_bbs
 // for any production found under that tag. All of these are Amiga BBS
-// systems — PC-only ones (qbbs, telegard, etc.) are excluded by design.
-// Counts were verified against demozoo's /productions/tagged/<tag>/ pages
-// before adding — tags with <10 productions are skipped as not worth the
-// per-tag fetch.
+// systems — PC-only ones are kept below, commented out, so the curator
+// can opt in to PC doors later by removing the //.
+//
+// Source: https://demozoo.org/pages/bbs-related-tags/  (curated by
+// Demozoo — covers all known scene-BBS software).
 const TAGS: { tag: string; implies: string }[] = [
-  { tag: 'amiex',         implies: 'AmiExpress' },        // 50+
-  { tag: 's!x',           implies: 'S!X' },               // not validated
-  { tag: 'maxs',          implies: 'Maxs' },              // not validated
+  // ── Amiga BBS software ──────────────────────────────────────────────────
+  { tag: 'amiex',         implies: 'AmiExpress' },        // 50+ productions
+  { tag: 's!x',           implies: 'S!X' },               // predecessor
+  { tag: 'maxs',          implies: 'Maxs' },              // predecessor of S!X
   { tag: 'daydream-amiga',implies: 'DayDream' },          // 50+
   { tag: 'fame',          implies: 'FAME' },              // 47
   { tag: 'cnet-bbs',      implies: 'CNet' },              // 41
-  { tag: 'descent',       implies: 'Descent' },           // 1
-  { tag: 'lame',          implies: 'Lame' },              // not validated
-  { tag: 'tempest',       implies: 'Tempest' },           // 2
   { tag: 'mystic-bbs',    implies: 'Mystic' },            // 50+
+  { tag: 'tempest-bbs',   implies: 'Tempest' },
+  { tag: 'descent',       implies: 'Descent' },
+  { tag: 'lame',          implies: 'Lame' },
+  { tag: 'obbs',          implies: 'OBBS' },
+  { tag: 's!x-bbs',       implies: 'S!X' },               // alt slug
+  { tag: 'aquila-bbs-ripoff', implies: 'Aquila' },
+  { tag: 'celerity-bbs',  implies: 'Celerity' },
+  { tag: 'hysteria-bbs',  implies: 'Hysteria' },
+  { tag: 'illusion-bbs',  implies: 'Illusion' },
+  { tag: 'impulse-bbs',   implies: 'Impulse' },
+  { tag: 'insanity-bbs',  implies: 'Insanity' },
+  { tag: 'major-bbs',     implies: 'Major' },
+  { tag: 'metro-bbs',     implies: 'Metro' },
+  { tag: 'monarch-bbs',   implies: 'Monarch' },
+  { tag: 'narcosys-bbs',  implies: 'Narcosys' },
+  { tag: 'oblivion2',     implies: 'Oblivion' },
+  { tag: 'opus-bbs',      implies: 'Opus' },
+  { tag: 'original-bbs',  implies: 'Original' },
+  { tag: 'paragon-bbs',   implies: 'Paragon' },
+  { tag: 'pipeline-bbs',  implies: 'Pipeline' },
+  { tag: 'revelation-bbs',implies: 'Revelation' },
+  { tag: 'sentinel-bbs',  implies: 'Sentinel' },
+  { tag: 'skylight-bbs-ripoff', implies: 'Skylight' },
+  { tag: 'solarium-bbs-ripoff', implies: 'Solarium' },
+  { tag: 'squid-bbs-ripoff', implies: 'Squid' },
+  { tag: 'starport2-ripoff', implies: 'Starport' },
+  { tag: 'vision-x',      implies: 'Vision-X' },
+  { tag: 'vision2',      implies: 'Vision 2' },
+  { tag: 'waffle-bbs',    implies: 'Waffle' },
+  { tag: 'warning-bbs-ripoff', implies: 'Warning' },
+
+  // ── PC BBS software (disabled — uncomment to enable) ──────────────────
+  // { tag: 'pcboard',         implies: 'PCBoard' },
+  // { tag: 'qbbs',            implies: 'QBBS' },
+  // { tag: 'wildcat',         implies: 'WildCat' },
+  // { tag: 'wwiv',            implies: 'WWIV' },
+  // { tag: 'renegade-bbs',    implies: 'Renegade' },
+  // { tag: 'remoteaccess',    implies: 'RemoteAccess' },
+  // { tag: 'telegard',        implies: 'Telegard' },
+  // { tag: 'synchronet',      implies: 'Synchronet' },
+  // { tag: 'elebbs',          implies: 'EleBBS' },
+  // { tag: 'flash-bbs',       implies: 'Flash' },
+  // { tag: 'genesis-deluxe',  implies: 'Genesis' },
+  // { tag: 'iniquity',        implies: 'Iniquity' },
+  // { tag: 'proboard',        implies: 'ProBoard' },
+  // { tag: 'smbx',            implies: 'SMBX' },
+  // { tag: 'superbbs',        implies: 'SuperBBS' },
+  // { tag: 'tbbs',            implies: 'TBBS' },
 ];
 const DEMOZOO_API = 'https://demozoo.org/api/v1';
 const PAUSE_BETWEEN_REQUESTS_MS = 500;
@@ -290,13 +337,21 @@ function extractReleaseGroup(detail: DemozooDetail): { abbrev: string; fullName:
 function inferRequiresBbs(detail: DemozooDetail): string | null {
   const groupName = detail.author_nicks?.find((n) => n.releaser?.is_group)?.releaser.name ?? '';
   const lcGroup = groupName.toLowerCase();
-  // Group-name signal: some release crews only release for one BBS.
-  if (lcGroup.includes('up rough') || lcGroup.includes('amiexpress') || lcGroup.includes('/x')) return 'AmiExpress';
-  if (lcGroup.includes('quantum') || lcGroup.includes('hoodlum') || lcGroup.includes('s!x')) return 'S!X';
-  if (lcGroup.includes('daydream')) return 'DayDream';
-  if (lcGroup.includes('fame')) return 'FAME';
-  if (lcGroup.includes('demonic') || lcGroup.includes('phenom')) return 'Mystic';
-  if (lcGroup.includes('medellin') || lcGroup.includes('tcs')) return 'CNet';
+  // Group-name signal: most release crews only release for one BBS.
+  // This map covers all the well-known Amiga BBS scene groups.
+  const GROUP_TO_BBS: { match: RegExp; bbs: string }[] = [
+    { match: /up rough|amiexpress|\/x innovation/, bbs: 'AmiExpress' },
+    { match: /quantum|hoodlum|tcs/,             bbs: 'S!X' },
+    { match: /daydream/,                         bbs: 'DayDream' },
+    { match: /^fame$|fame.*design/,              bbs: 'FAME' },
+    { match: /demonic|phenom/,                  bbs: 'Mystic' },
+    { match: /medellin|phenom productions/,     bbs: 'CNet' },
+    { match: /delta|logic|expose/,              bbs: 'Aquila' },
+    { match: /insanity/,                         bbs: 'Insanity' },
+  ];
+  for (const { match, bbs } of GROUP_TO_BBS) {
+    if (match.test(lcGroup)) return bbs;
+  }
   // Tag fallback: only the first entry matters, and we don't know which
   // tag this production came from. So just check if any tag matches the
   // known TAGS list.
