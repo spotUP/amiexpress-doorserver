@@ -64,8 +64,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function requestText(path: string, init?: RequestInit): Promise<string> {
+  const token = getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  });
+
+  if (res.status === 401 && token) {
+    setToken(null);
+    onUnauthorized?.();
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(body.error ?? `${res.status} ${res.statusText}`, res.status);
+  }
+  return res.text();
+}
+
 export const api = {
   get: <T,>(path: string) => request<T>(path),
+  getText: (path: string) => requestText(path),
   post: <T,>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T,>(path: string, body: unknown) =>
