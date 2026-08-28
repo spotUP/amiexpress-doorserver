@@ -272,20 +272,25 @@ function pickProgram(files: { path: string; size: number }[], diz: string | null
  */
 function firstNameLine(diz: string | null): string | null {
   if (!diz) return null;
+
+  // 1. Try to find the title directly using the DIZ pattern: |..Title..|
+  const directMatch = diz.match(/\|\.\.(.+?)\.\.\|/);
+  if (directMatch && directMatch[1]) {
+    const candidate = toPlain(clean(directMatch[1]));
+    if (looksLikeName(candidate)) return candidate;
+  }
+
   const candidates: string[] = [];
   const creditWords = new Set(['DEVELOPMENT', 'DESIGN', 'PRESENTS', 'CODED', 'WRITTEN']);
   
-  for (const line of diz.replace(/\r/g, '').split('\n')) {
-    // Skip lines that have no alphanumeric content (likely ASCII art)
+  for (const line of diz.split(/[\r\n\x00-\x1f]+/)) {
     if (!/[A-Za-zÀ-ÿ0-9]/.test(line)) continue;
     
     for (const cell of line.split(/[|¦]+/)) {
       const candidate = toPlain(clean(cell));
       if (!looksLikeName(candidate) || looksLikeHandle(candidate)) continue;
-      // A cell that is only a group tag ("mYSTIC!") is not a name either.
       if (!/[A-Za-zÀ-ÿ]{3}/.test(candidate)) continue;
       
-      // Explicitly filter out lines that look like credits
       const upper = candidate.toUpperCase();
       if (upper.split(/\s+/).some(word => creditWords.has(word))) continue;
 
@@ -293,7 +298,6 @@ function firstNameLine(diz: string | null): string | null {
     }
   }
   
-  // Return the longest candidate, assuming it's the most descriptive title
   return candidates.length > 0 ? candidates.reduce((a, b) => a.length > b.length ? a : b) : null;
 }
 
