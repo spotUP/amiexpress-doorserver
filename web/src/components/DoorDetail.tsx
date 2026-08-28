@@ -138,10 +138,11 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
 }
 
 function DoorHistory({ archiveName }: { archiveName: string }) {
-  const { data: entries, isLoading } = useDoorAudit(archiveName, true);
+  const { data, isLoading } = useDoorAudit(archiveName, true);
+  const entries = data?.entries ?? [];
 
   if (isLoading) return <p className="text-sm text-muted">Loading history...</p>;
-  if (!entries || entries.length === 0) return <p className="text-sm text-muted">No edits recorded yet.</p>;
+  if (entries.length === 0) return <p className="text-sm text-muted">No edits recorded yet.</p>;
 
   function timeAgo(ts: number): string {
     const diff = Math.floor(Date.now() / 1000) - ts;
