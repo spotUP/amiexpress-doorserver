@@ -397,6 +397,7 @@ function StripAds({
       )}
     </>
   );
+  }
 
   return (
     <Button onClick={loadPreview} disabled={isLoading}>
@@ -418,6 +419,7 @@ const BBS_OPTIONS = [
   { value: 'FAME', label: 'FAME' },
   { value: 'DayDream', label: 'DayDream' },
   { value: 'Tempest', label: 'Tempest' },
+  { value: 'CNet', label: 'CNet' },
 ];
 
 export function DoorDetailDialog({
