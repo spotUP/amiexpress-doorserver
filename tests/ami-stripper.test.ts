@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { classifyFile, deriveStripPlan, analyzeArchive, stripArchive, type FingerprintDb } from '../src/ami-stripper';
-import { findLhaBinary, canDeleteMembers, deleteMembers, type ArchiveRunner } from '../src/lha-member-delete';
+import { findArchiverBinary, canDeleteMembers, deleteMembers, type ArchiveRunner } from '../src/lha-member-delete';
 
 // ─── classifyFile (pure junk detection) ───────────────────────────────────────
 
@@ -217,8 +217,8 @@ describe('stripArchive', () => {
 // ─── lha-member-delete ────────────────────────────────────────────────────────
 
 describe('lha-member-delete', () => {
-  it('findLhaBinary returns a path or null', () => {
-    const result = findLhaBinary();
+  it('findArchiverBinary returns a path or null', () => {
+    const result = findArchiverBinary();
     // On macOS with brew, this should find /opt/homebrew/bin/lha
     // On CI it may be null — that's fine, the function works correctly
     expect(typeof result === 'string' || result === null).toBe(true);

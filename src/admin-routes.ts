@@ -27,7 +27,6 @@ import { analyzeArchive } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
-import { extractFile } from './archive-reader';
 import * as fs from 'fs';
 
 /**
