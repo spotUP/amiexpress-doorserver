@@ -303,6 +303,43 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   });
 
   /**
+   * Re-scan a door to re-run the derivation and update the catalog.
+   */
+  router.post('/doors/:archiveName/rescan', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const db = openDb(cfg);
+    try {
+      const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string, archive_path: string } | undefined;
+      if (!entry) { res.status(404).json({ error: 'no such door' }); return; }
+
+      const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
+      if (!fs.existsSync(archivePath)) { res.status(404).json({ error: 'archive file missing' }); return; }
+
+      const bytes = fs.readFileSync(archivePath);
+      const groupTags = buildGroupTags(db.prepare('SELECT archive_name FROM door_catalog').all().map((r: any) => r.archive_name));
+      
+      const derived = deriveMetadata(bytes, archiveName, groupTags);
+      
+      db.prepare(`UPDATE door_catalog SET 
+          name = ?, version = ?, author = ?, description = ?, 
+          requires_bbs = ?, binary_name = ?, file_id_diz = ?, 
+          doc_filename = ?, doc_raw = ? 
+          WHERE id = ?`).run(
+              derived.name, derived.version, derived.author, derived.description,
+              derived.requiresBbs, derived.binaryName, derived.fileIdDiz,
+              derived.docFilename, derived.doc, entry.id
+          );
+      
+      recordAudit(db, req.admin?.id ?? null, 'rescan-door', archiveName, { newName: derived.name });
+      res.json({ ok: true, name: derived.name });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    } finally {
+      db.close();
+    }
+  });
+
+  /**
    * What the classifier WOULD say for this door, without writing anything -
    * the preview behind "re-read from the DIZ" in the UI.
    */

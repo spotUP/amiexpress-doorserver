@@ -272,6 +272,9 @@ function pickProgram(files: { path: string; size: number }[], diz: string | null
  */
 function firstNameLine(diz: string | null): string | null {
   if (!diz) return null;
+  const candidates: string[] = [];
+  const creditWords = new Set(['DEVELOPMENT', 'DESIGN', 'PRESENTS', 'CODED', 'WRITTEN']);
+  
   for (const line of diz.replace(/\r/g, '').split('\n')) {
     // Skip lines that have no alphanumeric content (likely ASCII art)
     if (!/[A-Za-zÀ-ÿ0-9]/.test(line)) continue;
@@ -281,10 +284,17 @@ function firstNameLine(diz: string | null): string | null {
       if (!looksLikeName(candidate) || looksLikeHandle(candidate)) continue;
       // A cell that is only a group tag ("mYSTIC!") is not a name either.
       if (!/[A-Za-zÀ-ÿ]{3}/.test(candidate)) continue;
-      return candidate;
+      
+      // Explicitly filter out lines that look like credits
+      const upper = candidate.toUpperCase();
+      if (upper.split(/\s+/).some(word => creditWords.has(word))) continue;
+
+      candidates.push(candidate);
     }
   }
-  return null;
+  
+  // Return the longest candidate, assuming it's the most descriptive title
+  return candidates.length > 0 ? candidates.reduce((a, b) => a.length > b.length ? a : b) : null;
 }
 
 export interface DerivedMetadata {
