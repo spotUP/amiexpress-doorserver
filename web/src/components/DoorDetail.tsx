@@ -238,6 +238,18 @@ function StripAds({
     setSelected(new Set(p.stripped.map((f) => f.path)));
   }
 
+  async function viewKeptFile(path: string) {
+    try {
+      const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch {}
+  }
+
   function toggle(path: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -305,7 +317,7 @@ function StripAds({
                 className="accent-accent"
               />
               <span className="flex-1 truncate font-mono">{f.path}</span>
-              <button onClick={() => window.open(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(f.path)}`)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
+              <button onClick={() => viewKeptFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
               <span className="text-muted">{preview.reason[f.path]}</span>
             </li>
           ))}
@@ -317,7 +329,7 @@ function StripAds({
               {preview.kept.map((f) => (
                 <li key={f.path} className="flex items-center gap-2 text-xs">
                   <span className="flex-1 truncate font-mono text-muted">{f.path}</span>
-              <button onClick={() => window.open(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(f.path)}`)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
+              <button onClick={() => viewKeptFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
                   <button
                     onClick={() => learnKeptFile(f.path)}
                     className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
