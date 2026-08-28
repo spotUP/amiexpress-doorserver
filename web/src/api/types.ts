@@ -25,6 +25,9 @@ export interface Door {
   adsStripped: boolean;
   hasDoc: boolean;
   downloadUrl: string;
+  votesUp: number;
+  votesDown: number;
+  indexedAt: number;
 }
 
 export interface DoorFile {

@@ -5,9 +5,10 @@
  */
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Download, Eye, GraduationCap, Trash2, X } from 'lucide-react';
+import { Download, Eye, GraduationCap, ThumbsUp, ThumbsDown, Trash2, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase } from '../api/queries';
+import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote } from '../api/queries';
+import { api } from '../api/client';
 import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types';
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
@@ -31,9 +32,8 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
     setViewing(path);
     setContent(null);
     try {
-      const r = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/file?path=${encodeURIComponent(path)}`, { credentials: 'include' });
-      if (r.ok) setContent(await r.text());
-      else setContent(`[could not read: ${r.status}]`);
+      const text = await api.getText(`/admin/doors/${encodeURIComponent(archiveName)}/file?path=${encodeURIComponent(path)}`);
+      setContent(text);
     } catch { setContent('[read error]'); }
   }
 
@@ -42,20 +42,16 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
     setDeleteError(null);
     setDeleting((prev) => new Set(prev).add(path));
     try {
-      const r = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/delete-files`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ members: [path] }),
-      });
-      if (r.ok) {
+      const result = await api.post<{ removed: string[] }>(
+        `/admin/doors/${encodeURIComponent(archiveName)}/delete-files`,
+        { members: [path] }
+      );
+      if (result.removed.length > 0) {
         setFileList((prev) => prev.filter((f) => f.path !== path));
-      } else {
-        const body = await r.json().catch(() => ({})) as { error?: string };
-        setDeleteError(body.error ?? `Failed (${r.status})`);
       }
-    } catch {
-      setDeleteError('Network error');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setDeleteError(msg || 'Failed');
     } finally {
       setDeleting((prev) => { const next = new Set(prev); next.delete(path); return next; });
     }
@@ -148,9 +144,8 @@ function DoorHistory({ archiveName }: { archiveName: string }) {
   useEffect(() => {
     if (!archiveName) return;
     setLoading(true);
-    fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/audit`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((d: { entries: typeof entries }) => { setEntries(d.entries ?? []); setLoading(false); })
+    api.get<{ entries: typeof entries }>(`/admin/doors/${encodeURIComponent(archiveName)}/audit`)
+      .then((d) => { setEntries(d.entries ?? []); setLoading(false); })
       .catch(() => setLoading(false));
   }, [archiveName]);
 
@@ -381,6 +376,8 @@ export function DoorDetailDialog({
   const { data: doorTags } = useDoorTags(archiveName ?? '', Boolean(admin));
   const { data: allTagData } = useAllTags(Boolean(admin));
   const setTags = useSetDoorTags(archiveName ?? '');
+  const { data: voteData } = useVoteStatus(archiveName ?? '', Boolean(archiveName));
+  const vote = useVote(archiveName ?? '');
   const [newTag, setNewTag] = useState('');
   const tagInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<DoorFacts | null>(null);
@@ -427,6 +424,29 @@ export function DoorDetailDialog({
               </Dialog.Description>
             </div>
             <div className="flex items-center gap-2">
+              {door && (
+                <div className="flex items-center gap-1 rounded-md border border-line px-1">
+                  <button
+                    onClick={() => vote.mutate(voteData?.myVote === 1 ? 0 : 1)}
+                    className={`rounded p-1.5 transition-colors ${voteData?.myVote === 1 ? 'bg-accent/20 text-accent' : 'text-muted hover:bg-raised hover:text-ink'}`}
+                    disabled={vote.isPending}
+                    title="Upvote"
+                  >
+                    <ThumbsUp size={14} />
+                  </button>
+                  <span className="min-w-[2ch] text-center text-sm font-mono text-ink">
+                    {voteData ? voteData.score : (door.votesUp - door.votesDown)}
+                  </span>
+                  <button
+                    onClick={() => vote.mutate(voteData?.myVote === -1 ? 0 : -1)}
+                    className={`rounded p-1.5 transition-colors ${voteData?.myVote === -1 ? 'bg-danger/20 text-danger' : 'text-muted hover:bg-raised hover:text-ink'}`}
+                    disabled={vote.isPending}
+                    title="Downvote"
+                  >
+                    <ThumbsDown size={14} />
+                  </button>
+                </div>
+              )}
               {door && (
                 // A real link, not a button that navigates: the browser then
                 // offers "save as", and the URL is copyable.

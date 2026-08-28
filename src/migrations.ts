@@ -184,6 +184,21 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_ljp_pattern ON learned_junk_patterns(pattern)');
     },
   },
+  {
+    version: 8,
+    name: 'door_votes',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS door_votes (
+          catalog_id  TEXT NOT NULL,
+          voter_id    TEXT NOT NULL,
+          vote        INTEGER NOT NULL DEFAULT 1,
+          created_at  INTEGER DEFAULT (strftime('%s','now')),
+          PRIMARY KEY (catalog_id, voter_id)
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dv_catalog ON door_votes(catalog_id)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

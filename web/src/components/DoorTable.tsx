@@ -9,6 +9,7 @@ export interface SortState {
 }
 
 const COLUMNS: { key: string; label: string; sortable: boolean; className?: string }[] = [
+  { key: 'indexed', label: 'Date', sortable: true, className: 'w-24' },
   { key: 'archive', label: 'Archive', sortable: true, className: 'w-56' },
   { key: 'name', label: 'Name', sortable: true, className: 'w-48' },
   { key: 'version', label: 'Version', sortable: true, className: 'w-20' },
@@ -16,6 +17,8 @@ const COLUMNS: { key: string; label: string; sortable: boolean; className?: stri
   { key: 'requires', label: 'Needs', sortable: true, className: 'w-28' },
   { key: 'author', label: 'Author', sortable: true, className: 'w-40' },
   { key: 'group', label: 'Group', sortable: true, className: 'w-44' },
+  { key: 'category', label: 'Category', sortable: true, className: 'w-28' },
+  { key: 'votes', label: 'Votes', sortable: true, className: 'w-16 text-right' },
   { key: 'size', label: 'Size', sortable: true, className: 'w-20 text-right' },
 ];
 
@@ -94,6 +97,9 @@ export function DoorTable({
                     />
                   </td>
                 )}
+                <td className="px-3 py-2 font-mono text-[11px] text-muted" title={new Date(door.indexedAt * 1000).toLocaleDateString()}>
+                  {door.indexedAt ? new Date(door.indexedAt * 1000).toLocaleDateString() : '-'}
+                </td>
                 <td className="px-3 py-2 font-mono text-[12px] text-accent">{door.archiveName}</td>
                 <td className="px-3 py-2">
                   <span className={door.nameSource === 'archive' ? 'text-muted' : undefined}>{door.name}</span>
@@ -112,6 +118,10 @@ export function DoorTable({
                 <td className="px-3 py-2 text-muted">{door.author ?? '-'}</td>
                 <td className="px-3 py-2 text-muted" title={door.releaseGroup ?? undefined}>
                   {door.releaseGroupFullName ?? door.releaseGroup ?? '-'}
+                </td>
+                <td className="px-3 py-2 text-muted">{door.category ?? '-'}</td>
+                <td className="px-3 py-2 text-right font-mono text-[12px] text-muted">
+                  {door.votesUp - door.votesDown || '-'}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-[12px] text-muted">{formatSize(door.size)}</td>
                 <td className="px-3 py-2">

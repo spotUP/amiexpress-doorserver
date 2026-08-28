@@ -395,3 +395,32 @@ export function useSetDoorTags(archiveName: string) {
     },
   });
 }
+
+// ─── votes ────────────────────────────────────────────────────────────
+
+export interface VoteStatus {
+  up: number;
+  down: number;
+  score: number;
+  myVote: number;
+}
+
+export function useVoteStatus(archiveName: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...doorKeys.detail(archiveName ?? ''), 'vote'],
+    queryFn: () => api.get<VoteStatus>(`/doors/${encodeURIComponent(archiveName as string)}/votes`),
+    enabled: enabled && Boolean(archiveName),
+  });
+}
+
+export function useVote(archiveName: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (vote: 1 | -1 | 0) =>
+      api.post<VoteStatus>(`/doors/${encodeURIComponent(archiveName)}/vote`, { vote }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: doorKeys.detail(archiveName) });
+      void client.invalidateQueries({ queryKey: doorKeys.all });
+    },
+  });
+}

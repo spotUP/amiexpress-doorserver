@@ -31,7 +31,7 @@ export function Browse() {
   const [requires, setRequires] = useState('');
   const [guessedOnly, setGuessedOnly] = useState(false);
   const [latestOnly, setLatestOnly] = useState(false);
-  const [sortState, setSortState] = useState<SortState>({ sort: 'archive', dir: 'asc' });
+  const [sortState, setSortState] = useState<SortState>({ sort: 'indexed', dir: 'desc' });
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
   const [admin, setAdmin] = useState<AdminUser | null>(null);

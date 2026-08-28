@@ -10,6 +10,7 @@
  * of the site.
  */
 import express, { type Request, type Response, type Router } from 'express';
+import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import { openDb } from './db';
 import { getCatalogRevision, getArchiveFiles, getCatalogEntryByArchive } from './catalog';
@@ -37,6 +38,7 @@ const SORT_COLUMNS: Record<string, string> = {
   requires: 'requires_bbs COLLATE NOCASE',
   version: 'version COLLATE NOCASE',
   indexed: 'indexed_at',
+  votes: '(COALESCE(v.up, 0) - COALESCE(v.down, 0))',
 };
 
 interface DoorRow {
@@ -61,6 +63,8 @@ interface DoorRow {
   ads_stripped: number;
   indexed_at: number;
   has_doc: number;
+  votes_up: number;
+  votes_down: number;
 }
 
 function firstPathSegment(archivePath: string): string {
@@ -109,6 +113,9 @@ interface DoorJson {
   adsStripped: boolean;
   hasDoc: boolean;
   downloadUrl: string;
+  votesUp: number;
+  votesDown: number;
+  indexedAt: number;
 }
 
 /**
@@ -154,6 +161,9 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     adsStripped: corrected.ads_stripped === 1,
     hasDoc: corrected.has_doc === 1,
     downloadUrl: `/api/door-repo/archive/${encodeURIComponent(corrected.archive_name)}`,
+    votesUp: corrected.votes_up ?? 0,
+    votesDown: corrected.votes_down ?? 0,
+    indexedAt: corrected.indexed_at ?? 0,
   };
 }
 
@@ -207,9 +217,9 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     const latest = strParam(req.query.latest) === '1';
     const page = intParam(req.query.page, 1, 1, 100000);
     const perPage = intParam(req.query.per_page, DEFAULT_PER_PAGE, 1, MAX_PER_PAGE);
-    const sortKey = strParam(req.query.sort) ?? 'archive';
-    const sort = SORT_COLUMNS[sortKey] ?? SORT_COLUMNS.archive;
-    const dir = strParam(req.query.dir)?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const sortKey = strParam(req.query.sort) ?? 'indexed';
+    const sort = SORT_COLUMNS[sortKey] ?? SORT_COLUMNS.indexed;
+    const dir = strParam(req.query.dir)?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
     const where: string[] = [];
     const params: (string | number)[] = [];
@@ -257,13 +267,18 @@ export function createPublicRouter(cfg: ServerConfig): Router {
         where.push(`d.indexed_at = (SELECT MAX(d2.indexed_at) FROM door_catalog d2 WHERE d2.name = d.name AND COALESCE(d2.author, '') = COALESCE(d.author, ''))`);
       }
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-      const SELECT_ROW = `SELECT id, archive_name, archive_path, binary_name, door_type, name, version, author,
+      const SELECT_ROW = `SELECT d.id, archive_name, archive_path, binary_name, door_type, name, version, author,
                   d.release_group, ${releaseGroupsTable ? 'rg.full_name' : 'NULL'} AS release_group_full_name,
                   category, description, requires_bbs, file_id_diz, archive_size,
                   md5, sha256, junk_count, ads_stripped, indexed_at,
-                  (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc
+                  (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc,
+                  COALESCE(v.up, 0) AS votes_up, COALESCE(v.down, 0) AS votes_down
              FROM door_catalog d
              ${releaseGroupsTable ? 'LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group' : ''}
+             LEFT JOIN (SELECT catalog_id,
+                               SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS up,
+                               SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS down
+                        FROM door_votes GROUP BY catalog_id) v ON v.catalog_id = d.id
              ${whereSql}
              ORDER BY ${sort} ${dir}, archive_name COLLATE NOCASE ASC`;
 
@@ -326,6 +341,8 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     let groupTags: ReadonlySet<string>;
     let overrides: OverrideMap;
     let releaseGroupFullName: string | null = null;
+    let votesUp = 0;
+    let votesDown = 0;
     try {
       groupTags = buildGroupTags(
         (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
@@ -339,6 +356,15 @@ export function createPublicRouter(cfg: ServerConfig): Router {
           .get(entry.release_group) as { full_name: string } | undefined;
         releaseGroupFullName = rgRow?.full_name ?? null;
       }
+      // Get vote counts
+      const catId = (entry as unknown as { id: string }).id;
+      if (catId) {
+        const counts = db
+          .prepare('SELECT vote, COUNT(*) AS n FROM door_votes WHERE catalog_id = ? GROUP BY vote')
+          .all(catId) as { vote: number; n: number }[];
+        votesUp = counts.find((c) => c.vote === 1)?.n ?? 0;
+        votesDown = counts.find((c) => c.vote === -1)?.n ?? 0;
+      }
     } finally {
       db.close();
     }
@@ -350,6 +376,8 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       requires_bbs: (entry as unknown as { requires_bbs?: string | null }).requires_bbs ?? null,
       indexed_at: 0,
       has_doc: entry.doc_raw && entry.doc_raw.length > 0 ? 1 : 0,
+      votes_up: votesUp,
+      votes_down: votesDown,
     };
 
     res.json({
@@ -737,6 +765,78 @@ export function mountLearnRoute(router: Router, cfg: ServerConfig): void {
         .prepare('INSERT INTO learned_junk_patterns (pattern, archive_name, file_path, learned_by) VALUES (?, ?, ?, ?)')
         .run(pattern, archiveName, filePath, 'doorman');
       res.json({ ok: true, id: Number(info.lastInsertRowid), duplicate: false });
+    } finally {
+      db.close();
+    }
+  });
+
+  // ─── votes ────────────────────────────────────────────────────────────
+
+  /** Derive a per-visitor voter ID from IP address. */
+  function voterId(req: Request): string {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '0.0.0.0';
+    return crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
+  }
+
+  /** GET /doors/:archiveName/votes — vote counts + this visitor's vote. */
+  router.get('/doors/:archiveName/votes', (req: Request, res: Response) => {
+    const archiveName = req.params.archiveName;
+    const db = openDb(cfg);
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) { res.status(404).json({ error: 'no such door' }); return; }
+
+      const counts = db
+        .prepare('SELECT vote, COUNT(*) AS n FROM door_votes WHERE catalog_id = ? GROUP BY vote')
+        .all(row.id) as { vote: number; n: number }[];
+      const up = counts.find((c) => c.vote === 1)?.n ?? 0;
+      const down = counts.find((c) => c.vote === -1)?.n ?? 0;
+
+      const vid = voterId(req);
+      const mine = db
+        .prepare('SELECT vote FROM door_votes WHERE catalog_id = ? AND voter_id = ?')
+        .get(row.id, vid) as { vote: number } | undefined;
+
+      res.json({ up, down, score: up - down, myVote: mine?.vote ?? 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** POST /doors/:archiveName/vote — cast or change a vote. Body: { vote: 1 | -1 | 0 } */
+  router.post('/doors/:archiveName/vote', (req: Request, res: Response) => {
+    const archiveName = req.params.archiveName;
+    const body = (req.body ?? {}) as { vote?: unknown };
+    const vote = Number(body.vote);
+    if (vote !== 1 && vote !== -1 && vote !== 0) {
+      res.status(400).json({ error: 'vote must be 1, -1, or 0' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) { res.status(404).json({ error: 'no such door' }); return; }
+
+      const vid = voterId(req);
+      if (vote === 0) {
+        db.prepare('DELETE FROM door_votes WHERE catalog_id = ? AND voter_id = ?').run(row.id, vid);
+      } else {
+        db.prepare(
+          'INSERT INTO door_votes (catalog_id, voter_id, vote) VALUES (?, ?, ?) ON CONFLICT(catalog_id, voter_id) DO UPDATE SET vote = excluded.vote'
+        ).run(row.id, vid, vote);
+      }
+
+      const counts = db
+        .prepare('SELECT vote, COUNT(*) AS n FROM door_votes WHERE catalog_id = ? GROUP BY vote')
+        .all(row.id) as { vote: number; n: number }[];
+      const up = counts.find((c) => c.vote === 1)?.n ?? 0;
+      const down = counts.find((c) => c.vote === -1)?.n ?? 0;
+
+      res.json({ up, down, score: up - down, myVote: vote });
     } finally {
       db.close();
     }
