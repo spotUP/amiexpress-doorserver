@@ -630,9 +630,35 @@ export function toPlain(s: string): string {
 
 /** Acronyms that must survive case normalisation. */
 const ACRONYMS = new Set([
+  // Amiga door/BBS
   'XIM', 'AIM', 'SIM', 'TIM', 'IIM', 'FIM', 'BBS', 'QWK', 'LZX', 'LHA', 'DMS', 'CRC', 'ZIP',
-  'ANSI', 'ASCII', 'MSG', 'OLM', 'ID', 'FTP', 'IRC', 'CPU', 'RAM', 'ROM', 'GUI', 'MUI', 'OS',
-  'PC', 'DD', 'ACP', 'UD', 'NUP', 'AGA', 'ECS', 'SX', 'X', 'II', 'III', 'IV', 'FAME', 'DIZ',
+  'ANSI', 'ASCII', 'MSG', 'OLM', 'ID', 'FAME', 'DIZ', 'NFO', 'DOC', 'TXT', 'CFG',
+  'UL', 'DL', 'LF', 'CR', 'BS', 'ESC', 'NAK', 'ACK', 'SOH', 'STX', 'ETX', 'EOT',
+  // Hardware / platform
+  'CPU', 'RAM', 'ROM', 'GUI', 'MUI', 'OS', 'PC', 'DD', 'ACP', 'UD', 'AGA', 'ECS', 'SX',
+  'NTSC', 'PAL', 'A1200', 'A500', 'A600', 'CD32', 'CDTV', 'VGA', 'SVGA', 'HAM', 'EHB',
+  'OCS', 'RTG', 'RTG', 'ISA', 'IDE', 'SCSI', 'ATA', 'SATA', 'USB', 'NMI',
+  'II', 'III', 'IV', 'IX', 'XL', 'XT', 'AT', 'DX', 'SX',
+  // Networking / comms
+  'FTP', 'IRC', 'TCP', 'IP', 'UDP', 'SSH', 'SSL', 'TLS', 'HTTP', 'HTTPS', 'URL', 'URI',
+  'DNS', 'DHCP', 'LAN', 'WAN', 'WIFI', 'MODEM', 'BPS', 'CTS', 'RTS', 'DTR', 'DSR', 'DCD',
+  'RAS', 'SLIP', 'PPP', 'UUCP', 'FIDO', 'FREQ',
+  // File / disk
+  'HD', 'DD', 'SS', 'DS', 'MB', 'KB', 'GB', 'TB', 'BPS', 'RPM',
+  'FAT', 'NTFS', 'HFS', 'EXT', 'ISO', 'UDF',
+  // Software / general computing
+  'API', 'SDK', 'IDE', 'OS', 'DOS', 'BIOS', 'CMOS', 'ROM', 'RAM', 'VRAM',
+  'ALU', 'FPU', 'MMU', 'DMA', 'IRQ', 'IO', 'POS', 'COM', 'LPT', 'PRN',
+  'DPI', 'CRT', 'LCD', 'LED', 'OLED', 'HDTV',
+  'HTML', 'CSS', 'XML', 'JSON', 'SQL', 'CSV', 'TSV', 'PDF', 'PNG', 'GIF', 'JPG', 'JPEG', 'BMP',
+  'BBS', 'FIDONET', 'Internet', 'Usenet',
+  'DB', 'DBA', 'DBMS', 'RDBMS', 'ACID',
+  'AI', 'ML', 'VR', 'AR', 'CAD', 'CAM', 'CAI', 'CBE',
+  'MP3', 'MP4', 'AVI', 'WAV', 'OGG', 'FLAC', 'AAC',
+  'CD', 'DVD', 'BD', 'CDR', 'CDRW', 'DVDR',
+  'DIY', 'FAQ', 'RTFM', 'GFDL', 'GPL', 'LGPL', 'MIT', 'BSD',
+  'ALSA', 'JCL', 'TCL', 'PERL', 'AWK', 'SED',
+  'NMI', 'CLI', 'GUI', 'TUI', 'CUI', 'NUI',
 ]);
 const MESSY_RE = /[a-zà-ÿ].*[A-ZÀ-Þ]/;
 
@@ -702,11 +728,38 @@ export function tidyCase(text: string, handles = false): string {
 export function fixCasing(text: string): string {
   if (!text) return text;
 
+  // Protect ANSI escape sequences (Esc[XXm) from all processing.
+  const ansi: string[] = [];
+  let out = text.replace(/\x1b\[[0-9;]*m/g, (m) => { ansi.push(m); return `\x00ANSI${ansi.length - 1}\x00`; });
+  // Also protect literal "Esc[XXm" representations used in plain-text DIZ files.
+  out = out.replace(/Esc\[\d{0,3}m/gi, (m) => { ansi.push(m); return `\x00ANSI${ansi.length - 1}\x00`; });
+
   // Strip box-art borders: pipes, colons used as borders, leading/trailing dashes
-  let out = text.replace(/[|]/g, ' ');
+  out = out.replace(/[|]/g, ' ');
+
+  // Strip ASCII-art decoration: sequences of 3+ slashes/backslashes
+  // (with optional spaces between) that form box-drawing art.
+  // Protects legitimate content like "/X" (single slash + letter).
+  out = out.replace(/[/\\](?:\s*[/\\]){2,}/g, ' ');
+
+  // Strip trailing dashes left over from box-art borders (e.g. "text!!!-")
+  out = out.replace(/[-]{1,3}\s*$/g, '');
 
   // Collapse multiple lines/whitespace to single line
   out = out.replace(/\s+/g, ' ').trim();
+
+  // Strip excessive punctuation: !!!! → !, ??? → ?, ... (trailing or excessive) → .
+  out = out.replace(/!{2,}/g, '!');
+  out = out.replace(/\?{2,}/g, '?');
+  out = out.replace(/\.{4,}/g, '...');
+  // Strip trailing ellipsis noise (e.g. "text! ...")
+  out = out.replace(/\s*\.{3}\s*$/g, '');
+
+  // Space after commas in lists: "TXT,DMS,LZX" → "TXT, DMS, LZX"
+  out = out.replace(/,(\S)/g, ', $1');
+
+  // Spacing around & : "node&time" → "node & time"
+  out = out.replace(/(\w)&(\w)/g, '$1 & $2');
 
   // Remove space before ! and !! (and other punctuation)
   out = out.replace(/\s+([!?])/g, '$1');
@@ -743,6 +796,9 @@ export function fixCasing(text: string): string {
   out = out.replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (match, sep, letter) => {
     return sep + letter.toUpperCase();
   });
+
+  // Restore ANSI escape sequences.
+  out = out.replace(/\x00ANSI(\d+)\x00/g, (_, i) => ansi[Number(i)]);
 
   return out;
 }

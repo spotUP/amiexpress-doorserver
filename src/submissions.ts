@@ -232,6 +232,8 @@ export function receiveUpload(req: Request): Promise<ReceivedUpload> {
  */
 const PROGRAM_EXT = /\.(exe|xim|aim|fim|sim|tim|iim|rexx)$/i;
 const NOT_PROGRAM = /\.(info|doc|txt|readme|me|guide|diz|nfo|dat|cfg|prefs|bak|library|font|iff|ilbm|png|gif|jpg|mod|8svx)$/i;
+/** Known ad/installer binaries that are never the door itself. */
+const AD_BINARY = /^(LE-win|Setup|Install)/i;
 
 function squash(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -241,6 +243,7 @@ function pickProgram(files: { path: string; size: number }[], diz: string | null
   const candidates = files.filter((f) => {
     const base = f.path.split('/').pop() ?? '';
     if (!base || NOT_PROGRAM.test(base)) return false;
+    if (AD_BINARY.test(base)) return false;
     return PROGRAM_EXT.test(base) || !base.includes('.');
   });
   if (!candidates.length) return null;
