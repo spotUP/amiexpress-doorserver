@@ -77,7 +77,7 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
         {fileList.map((file) => (
           <li key={file.path} className="flex items-center gap-2 px-3 py-1.5 text-sm">
             <span className="flex-1 truncate font-mono text-[12px]">{file.path}</span>
-            {file.isJunk ? <Badge tone="warn">stripped</Badge> : (
+            {file.isJunk ? <Badge tone="warn">junk</Badge> : (
               <button
                 onClick={() => learnFile(file.path)}
                 disabled={learning.has(file.path)}
@@ -510,7 +510,7 @@ export function DoorDetailDialog({
 
               {admin && (
                 <Tabs.Content value="edit" className="space-y-3">
-                  {archiveName && <RemoveDoor archiveName={archiveName} hidden={Boolean(adminDoor?.hidden)} />}
+                  {archiveName && <RemoveDoor archiveName={archiveName} hidden={Boolean(adminDoor?.hidden)} onRemoved={onClose} />}
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={() => redescribe.mutateAsync().then(setPreview)}

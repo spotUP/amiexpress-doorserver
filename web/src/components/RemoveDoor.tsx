@@ -13,7 +13,7 @@ import { RotateCcw, Trash2 } from 'lucide-react';
 import { useHideDoor, useRestoreDoor } from '../api/queries';
 import { Button, Input } from './ui';
 
-export function RemoveDoor({ archiveName, hidden }: { archiveName: string; hidden: boolean }) {
+export function RemoveDoor({ archiveName, hidden, onRemoved }: { archiveName: string; hidden: boolean; onRemoved?: () => void }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const hide = useHideDoor(archiveName);
@@ -58,7 +58,7 @@ export function RemoveDoor({ archiveName, hidden }: { archiveName: string; hidde
             <AlertDialog.Action asChild>
               <Button
                 variant="danger"
-                onClick={() => hide.mutate(reason)}
+                onClick={() => hide.mutate(reason, { onSuccess: () => onRemoved?.() })}
                 disabled={hide.isPending}
               >
                 <Trash2 size={13} /> Remove

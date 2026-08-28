@@ -869,6 +869,12 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       if (!binary) { res.status(400).json({ error: 'no lha binary available' }); return; }
       const result = deleteMembers(absPath, members, { binary });
       if (!result.ok) { res.status(400).json({ error: result.reason }); return; }
+      // Update door_catalog_files to remove deleted members
+      const catRow = db.prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string } | undefined;
+      if (catRow) {
+        const delStmt = db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ? AND path = ?');
+        for (const m of members) delStmt.run(catRow.id, m);
+      }
       recordAudit(db, req.admin?.id ?? null, 'delete-files', archiveName, { members, removed: result.removed });
       res.json({ ok: true, removed: result.removed });
     } finally {
