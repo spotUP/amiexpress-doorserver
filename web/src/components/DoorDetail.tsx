@@ -415,6 +415,7 @@ const TIDY_FIELDS = new Set(['name', 'description']);
 const BBS_OPTIONS = [
   { value: '', label: '(none)' },
   { value: '/X', label: '/X (AmiExpress)' },
+  { value: 'AmiExpress-Web', label: 'AmiExpress-Web' },
   { value: 'S!X', label: 'S!X' },
   { value: 'FAME', label: 'FAME' },
   { value: 'DayDream', label: 'DayDream' },

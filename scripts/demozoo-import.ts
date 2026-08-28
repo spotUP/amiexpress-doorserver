@@ -38,6 +38,8 @@ import { recordAudit } from '../src/auth';
 const TAGS: { tag: string; implies: string }[] = [
   // ── Amiga BBS software ──────────────────────────────────────────────────
   { tag: 'amiex',         implies: 'AmiExpress' },        // 50+ productions
+  { tag: 'ami-express-web',implies: 'AmiExpress-Web' },   // new web port
+  { tag: 'amiex-web',     implies: 'AmiExpress-Web' },   // alt slug
   { tag: 's!x',           implies: 'S!X' },               // predecessor
   { tag: 'maxs',          implies: 'Maxs' },              // predecessor of S!X
   { tag: 'daydream-amiga',implies: 'DayDream' },          // 50+
@@ -341,6 +343,7 @@ function inferRequiresBbs(detail: DemozooDetail): string | null {
   // This map covers all the well-known Amiga BBS scene groups.
   const GROUP_TO_BBS: { match: RegExp; bbs: string }[] = [
     { match: /up rough|amiexpress|\/x innovation/, bbs: 'AmiExpress' },
+    { match: /ami-?express-?web|amiexweb/,         bbs: 'AmiExpress-Web' },
     { match: /quantum|hoodlum|tcs/,             bbs: 'S!X' },
     { match: /daydream/,                         bbs: 'DayDream' },
     { match: /^fame$|fame.*design/,              bbs: 'FAME' },
