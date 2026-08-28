@@ -1,0 +1,11 @@
+{
+  "name": "lzx-wasm",
+  "version": "0.1.0",
+  "files": [
+    "lzx_wasm_bg.wasm",
+    "lzx_wasm.js",
+    "lzx_wasm.d.ts"
+  ],
+  "main": "lzx_wasm.js",
+  "types": "lzx_wasm.d.ts"
+}

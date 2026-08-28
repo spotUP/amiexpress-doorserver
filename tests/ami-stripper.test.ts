@@ -143,9 +143,9 @@ describe('analyzeArchive', () => {
   });
 
   it('throws for an unsupported format', () => {
-    const lzxPath = path.join(tmpDir, 'test.lzx');
-    fs.writeFileSync(lzxPath, Buffer.from('not really LZX'));
-    expect(() => analyzeArchive(lzxPath)).toThrow(/unsupported/i);
+    const rarPath = path.join(tmpDir, 'test.rar');
+    fs.writeFileSync(rarPath, Buffer.from('not really RAR'));
+    expect(() => analyzeArchive(rarPath)).toThrow(/unsupported/i);
   });
 });
 

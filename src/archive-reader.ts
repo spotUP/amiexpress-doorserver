@@ -16,10 +16,12 @@
  * work in memory: a submission is at most 8 MB and nothing is written until
  * a curator says so.
  *
- * LHA and ZIP only. LZX needs a separate decoder the BBS runs as WASM, and
- * DMS is a whole-disk format never used to distribute doors; for those the
- * fields stay empty and a curator fills them in, which the console is for.
+ * LHA, ZIP, and LZX (via WASM). DMS is a whole-disk format never used to
+ * distribute doors; for those the fields stay empty and a curator fills
+ * them in, which the console is for.
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import * as zlib from 'zlib';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const LHA = require('./lha.js') as {
@@ -263,6 +265,95 @@ export function readZipContents(bytes: Buffer): ArchiveContents {
   }
 
   return { files, fileIdDiz, docFilename, doc };
+}
+
+// ─── LZX via WASM ───────────────────────────────────────────────────────────
+
+let lzxWasm: any = null;
+
+function getLzxWasm(): any {
+  if (!lzxWasm) {
+    const pkgPath = path.join(__dirname, '..', '..', 'wasm', 'lzx', 'lzx_wasm');
+    try {
+      lzxWasm = require(pkgPath);
+    } catch {
+      // WASM module not available — LZX support disabled
+      return null;
+    }
+  }
+  return lzxWasm;
+}
+
+/**
+ * Read an LZX archive's member list and its documentation via the Rust/WASM
+ * lzx_wasm module. Same contract as readLhaContents/readZipContents: never
+ * throws, returns an empty result on failure.
+ */
+export function readLzxContents(bytes: Buffer): ArchiveContents {
+  const empty: ArchiveContents = { files: [], fileIdDiz: null, docFilename: null, doc: null };
+  const wasm = getLzxWasm();
+  if (!wasm) return empty;
+
+  let entries: Array<{ name: string; data: number[] }>;
+  try {
+    const json = wasm.lzx_extract_all(new Uint8Array(bytes)) as string;
+    entries = JSON.parse(json);
+  } catch {
+    return empty;
+  }
+
+  const files: { path: string; size: number }[] = [];
+  let fileIdDiz: string | null = null;
+  let docFilename: string | null = null;
+  let doc: string | null = null;
+  let docSize = 0;
+
+  for (const entry of entries) {
+    const entryPath = relativeName(entry.name || '');
+    if (!entryPath || entryPath.endsWith('/')) continue;
+    const dataSize = entry.data?.length ?? 0;
+    files.push({ path: entryPath, size: dataSize });
+
+    const buf = Buffer.from(entry.data);
+    const wantsDiz = DIZ_NAME.test(entryPath) && fileIdDiz === null;
+    const wantsDoc = DOC_NAME.test(entryPath) && dataSize > docSize;
+    if (!wantsDiz && !wantsDoc) continue;
+
+    if (wantsDiz) {
+      fileIdDiz = decodeLatin1(new Uint8Array(buf));
+    } else if (wantsDoc) {
+      doc = decodeLatin1(new Uint8Array(buf));
+      docFilename = entryPath;
+      docSize = dataSize;
+    }
+  }
+
+  return { files, fileIdDiz, docFilename, doc };
+}
+
+/**
+ * Extract a single file from an LZX archive by name via WASM.
+ */
+export function extractLzxFile(bytes: Buffer, memberPath: string): Uint8Array | null {
+  const wasm = getLzxWasm();
+  if (!wasm) return null;
+
+  let entries: Array<{ name: string; data: number[] }>;
+  try {
+    const json = wasm.lzx_extract_all(new Uint8Array(bytes)) as string;
+    entries = JSON.parse(json);
+  } catch {
+    return null;
+  }
+
+  const target = memberPath.toLowerCase();
+  for (const entry of entries) {
+    const path = relativeName(entry.name || '').toLowerCase();
+    if (path === target) {
+      return new Uint8Array(entry.data);
+    }
+  }
+  return null;
 }
 
 /**

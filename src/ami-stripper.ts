@@ -23,7 +23,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as zlib from 'zlib';
-import { readLhaContents, readZipContents, type ArchiveContents } from './archive-reader';
+import { readLhaContents, readZipContents, readLzxContents, extractLzxFile, type ArchiveContents } from './archive-reader';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AdmZip = require('adm-zip');
@@ -204,6 +204,13 @@ function readArchiveContents(archivePath: string): ArchiveContents {
     }
     return contents;
   }
+  if (ext === '.lzx') {
+    const contents = readLzxContents(bytes);
+    if (contents.files.length === 0 && bytes.length > 0) {
+      throw new Error(`LZX reader returned 0 files from ${bytes.length}-byte archive — the file may be corrupt or the WASM module is not available`);
+    }
+    return contents;
+  }
 
   throw new Error(`Unsupported archive format: ${ext || '(none)'}`);
 }
@@ -242,6 +249,9 @@ function readArchiveFiles(
       }
     } else if (ext === '.zip') {
       buf = extractZipMember(bytes, entry.path);
+    } else if (ext === '.lzx') {
+      const extracted = extractLzxFile(bytes, entry.path);
+      if (extracted) buf = Buffer.from(extracted);
     }
 
     if (buf) {

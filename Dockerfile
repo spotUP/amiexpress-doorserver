@@ -19,6 +19,7 @@ COPY src ./src
 COPY contract ./contract
 COPY scripts ./scripts
 COPY seeds ./seeds
+COPY wasm ./wasm
 RUN npm run build
 # Prune to production deps in the SAME stage, so the rebuilt native binding
 # is compiled by this toolchain rather than needing one at runtime.
@@ -41,6 +42,7 @@ COPY --from=build /app/node_modules ./node_modules
 # failing on the host at first start.
 RUN node -e "require('better-sqlite3'); console.log('[OK] native binding loads')"
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/wasm ./wasm
 # The built site sits beside the compiled server, where app.ts looks for it.
 COPY --from=web /dist/web ./dist/web
 COPY package.json ./
