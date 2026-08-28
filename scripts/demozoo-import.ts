@@ -28,9 +28,10 @@ import { recordAudit } from '../src/auth';
 
 const TAGS = ['amiex', 'daydream-amiga', 'fame'];
 const DEMOZOO_API = 'https://demozoo.org/api/v1';
-const PAUSE_BETWEEN_REQUESTS_MS = 2000;
-const PAUSE_EVERY_N_REQUESTS = 50;
-const PAUSE_DURATION_MS = 10000;
+const PAUSE_BETWEEN_REQUESTS_MS = 500;
+const PAUSE_EVERY_N_REQUESTS = 100;
+const PAUSE_DURATION_MS = 5000;
+const MAX_CONCURRENT = 3;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 4000, 16000];
 
@@ -112,6 +113,52 @@ function fetch(url: string, retries = 0): Promise<string> {
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function processBatch<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+    if (i + concurrency < items.length) {
+      await sleep(PAUSE_BETWEEN_REQUESTS_MS);
+    }
+  }
+  return results;
+}
+
+async function concurrencyMap<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let idx = 0;
+  const workers = Math.min(concurrency, items.length);
+  const inFlight: Promise<void>[] = [];
+
+  async function worker(): Promise<void> {
+    while (idx < items.length) {
+      const i = idx++;
+      const item = items[i];
+      try {
+        results[i] = await fn(item, i);
+      } catch (e) {
+        results[i] = Promise.reject(e) as unknown as R;
+      }
+    }
+  }
+
+  for (let w = 0; w < workers; w++) {
+    inFlight.push(worker());
+  }
+  await Promise.all(inFlight);
+  return results;
 }
 
 function parseJson<T>(body: string): T {
@@ -274,86 +321,95 @@ async function main() {
     }
     process.stderr.write(`[demozoo] tag="${tag}" found ${ids.length} productions\n`);
 
-    for (const id of ids) {
-      if (imported.has(id)) {
-        process.stderr.write(`[demozoo] id=${id} already imported, skipping\n`);
-        continue;
+    const toProcess = ids.filter((id) => !imported.has(id));
+    process.stderr.write(`[demozoo] tag="${tag}" ${toProcess.length} to process (${ids.length - toProcess.length} already imported)\n`);
+
+    let batchStart = 0;
+    while (batchStart < toProcess.length) {
+      const batch = toProcess.slice(batchStart, batchStart + MAX_CONCURRENT);
+      batchStart += MAX_CONCURRENT;
+
+      const fetched = await Promise.all(
+        batch.map(async (id) => {
+          try {
+            const [detail, html] = await Promise.all([fetchDetailJson(id), fetchDetailHtml(id)]);
+            return { id, detail, html, error: null };
+          } catch (e: any) {
+            return { id, detail: null, html: null, error: e.message };
+          }
+        })
+      );
+
+      for (const { id, detail, html, error } of fetched) {
+        requestCount++;
+        if (error) {
+          process.stderr.write(`[demozoo] ERROR fetching id=${id}: ${error}\n`);
+          errorLog.push(`fetch:${id}: ${error}`);
+          stats.errors++;
+          continue;
+        }
+
+        stats.processed++;
+        const filename = parseFilenameFromHtml(html!);
+
+        if (!filename) {
+          process.stderr.write(`[demozoo] id=${id} "${detail!.title}" — no filename in HTML, skipping\n`);
+          errorLog.push(`nofilename:${id}: ${detail!.title}`);
+          stats.unmatched++;
+          continue;
+        }
+
+        const lookup = filename.toLowerCase();
+        const match = archiveNameToDoor.get(lookup);
+
+        if (!match) {
+          const sceneOrgUrl = detail!.download_links?.[0]?.url ?? null;
+          if (sceneOrgUrl) {
+            newDoorCandidates.push({ id, detail: detail!, filename });
+          } else {
+            process.stderr.write(`[demozoo] id=${id} "${detail!.title}" filename="${filename}" — no local match and no scene.org URL, skipping\n`);
+            errorLog.push(`nomatch+nodl:${id}:${filename}:${detail!.title}`);
+            stats.skippedNoDownload++;
+          }
+          stats.unmatched++;
+          continue;
+        }
+
+        const patch: Record<string, unknown> = {};
+        if (detail!.release_date && !match.release_date) patch.release_date = detail!.release_date;
+        if (detail!.platform && !match.platform) patch.platform = detail!.platform;
+        const dl = detail!.download_links?.[0]?.url;
+        if (dl && !match.download_url) patch.download_url = dl;
+        const creds = parseCredits(detail!.credits ?? []);
+        if (creds && !match.credits) patch.credits = creds;
+        const links = parseLinks(detail!.external_links ?? []);
+        if (links && !match.external_links) patch.external_links = links;
+        const shots = parseScreenshots(detail!.screenshots ?? []);
+        if (shots && !match.screenshots) patch.screenshots = shots;
+
+        if (Object.keys(patch).length > 0) {
+          const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
+          const vals = Object.values(patch);
+          db.prepare(`UPDATE door_catalog SET ${sets} WHERE id = ?`).run(...vals, match.id);
+          recordAudit(db, null, 'import-demozoo', match.archive_name, { enriched: Object.keys(patch) });
+          process.stderr.write(`[demozoo] backfilled id=${id} "${match.archive_name}" with ${Object.keys(patch).join(', ')}\n`);
+          stats.backfilled++;
+        } else {
+          process.stderr.write(`[demozoo] id=${id} "${match.archive_name}" already enriched\n`);
+        }
+
+        try {
+          db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
+        } catch {
+          // already imported concurrently
+        }
       }
 
-      requestCount++;
-      if (requestCount % PAUSE_EVERY_N_REQUESTS === 0) {
-        process.stderr.write(`[demozoo] request count ${requestCount}, pausing ${PAUSE_DURATION_MS}ms\n`);
+      if (batchStart % PAUSE_EVERY_N_REQUESTS < MAX_CONCURRENT) {
+        process.stderr.write(`[demozoo] processed ${batchStart}/${toProcess.length}, pausing ${PAUSE_DURATION_MS}ms\n`);
         await sleep(PAUSE_DURATION_MS);
       } else {
         await sleep(PAUSE_BETWEEN_REQUESTS_MS);
-      }
-
-      let detail: DemozooDetail;
-      let html: string;
-      try {
-        [detail, html] = await Promise.all([fetchDetailJson(id), fetchDetailHtml(id)]);
-      } catch (e: any) {
-        process.stderr.write(`[demozoo] ERROR fetching id=${id}: ${e.message}\n`);
-        errorLog.push(`fetch:${id}: ${e.message}`);
-        stats.errors++;
-        continue;
-      }
-
-      stats.processed++;
-      const filename = parseFilenameFromHtml(html);
-
-      if (!filename) {
-        process.stderr.write(`[demozoo] id=${id} "${detail.title}" — no filename in HTML, skipping\n`);
-        errorLog.push(`nofilename:${id}: ${detail.title}`);
-        stats.unmatched++;
-        continue;
-      }
-
-      const lookup = filename.toLowerCase();
-      const match = archiveNameToDoor.get(lookup);
-
-      if (!match) {
-        // No local match — might be a new door
-        const sceneOrgUrl = detail.download_links?.[0]?.url ?? null;
-        if (sceneOrgUrl) {
-          newDoorCandidates.push({ id, detail, filename });
-        } else {
-          process.stderr.write(`[demozoo] id=${id} "${detail.title}" filename="${filename}" — no local match and no scene.org URL, skipping\n`);
-          errorLog.push(`nomatch+nodl:${id}:${filename}:${detail.title}`);
-          stats.skippedNoDownload++;
-        }
-        stats.unmatched++;
-        continue;
-      }
-
-      // Existing door — backfill NULL columns
-      const patch: Record<string, unknown> = {};
-      if (detail.release_date && !match.release_date) patch.release_date = detail.release_date;
-      if (detail.platform && !match.platform) patch.platform = detail.platform;
-      const dl = detail.download_links?.[0]?.url;
-      if (dl && !match.download_url) patch.download_url = dl;
-      const creds = parseCredits(detail.credits ?? []);
-      if (creds && !match.credits) patch.credits = creds;
-      const links = parseLinks(detail.external_links ?? []);
-      if (links && !match.external_links) patch.external_links = links;
-      const shots = parseScreenshots(detail.screenshots ?? []);
-      if (shots && !match.screenshots) patch.screenshots = shots;
-
-      if (Object.keys(patch).length > 0) {
-        const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
-        const vals = Object.values(patch);
-        db.prepare(`UPDATE door_catalog SET ${sets} WHERE id = ?`).run(...vals, match.id);
-        recordAudit(db, null, 'import-demozoo', match.archive_name, { enriched: Object.keys(patch) });
-        process.stderr.write(`[demozoo] backfilled id=${id} "${match.archive_name}" with ${Object.keys(patch).join(', ')}\n`);
-        stats.backfilled++;
-      } else {
-        process.stderr.write(`[demozoo] id=${id} "${match.archive_name}" already enriched\n`);
-      }
-
-      try {
-        db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
-      } catch {
-        // already imported concurrently
       }
     }
   }
