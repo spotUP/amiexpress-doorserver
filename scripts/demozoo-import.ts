@@ -95,8 +95,10 @@ interface NewDoorCandidate {
   id: number;
   detail: DemozooDetail;
   filename: string;
-  /** requires_bbs value inferred from the tag this production was found under. */
+  /** requires_bbs value inferred from the production's group / tags. */
   requiresBbs: string | null;
+  /** Best download URL picked from download_links (prefers scene.org). */
+  downloadUrl: string;
 }
 
 interface ImporterStats {
@@ -309,6 +311,26 @@ interface DownloadResult {
   size: number;
   md5: string;
   sha256: string;
+}
+
+/**
+ * Pick the best download URL from a demozoo production's download_links.
+ * Preference order: files.scene.org > amigascne > anything else.
+ * Skips broken/undesirable mirrors (currently the .se swedish mirror).
+ */
+function pickBestDownload(links: { url: string; type: string }[] | undefined | null): string | null {
+  if (!links || links.length === 0) return null;
+  // Drop known-bad mirrors first.
+  const usable = links.filter((l) => !/\.se\b/.test(new URL(l.url).hostname));
+  if (usable.length === 0) return null;
+  // Prefer scene.org.
+  const sceneOrg = usable.find((l) => l.url.includes('files.scene.org'));
+  if (sceneOrg) return sceneOrg.url;
+  // Then amigascne.
+  const amigascne = usable.find((l) => l.url.includes('amigascne.org'));
+  if (amigascne) return amigascne.url;
+  // First remaining link.
+  return usable[0].url;
 }
 
 function downloadToFile(url: string, destPath: string, expectedBasename: string, retries = 0): Promise<DownloadResult> {
@@ -540,11 +562,14 @@ async function main() {
         const implies = inferRequiresBbs(detail!);
 
         if (!match) {
-          const sceneOrgUrl = detail!.download_links?.[0]?.url ?? null;
-          if (sceneOrgUrl) {
-            newDoorCandidates.push({ id, detail: detail!, filename, requiresBbs: implies });
+          // Pick the best download URL. Prefer files.scene.org (most
+          // reliable mirror) and skip .se mirrors (the broken swedish
+          // mirror). Amigascne is a fine fallback.
+          const pickUrl = pickBestDownload(detail!.download_links);
+          if (pickUrl) {
+            newDoorCandidates.push({ id, detail: detail!, filename, requiresBbs: implies, downloadUrl: pickUrl });
           } else {
-            process.stderr.write(`[demozoo] id=${id} "${detail!.title}" filename="${filename}" — no local match and no scene.org URL, skipping\n`);
+            process.stderr.write(`[demozoo] id=${id} "${detail!.title}" filename="${filename}" — no usable download URL, skipping\n`);
             errorLog.push(`nomatch+nodl:${id}:${filename}:${detail!.title}`);
             stats.skippedNoDownload++;
           }
@@ -608,8 +633,8 @@ async function main() {
     process.stderr.write(`[demozoo] Phase 2: ${newDoorCandidates.length} new door candidates\n`);
 
     for (const candidate of newDoorCandidates) {
-      const { id, detail, filename } = candidate;
-      const sceneOrgUrl = detail.download_links?.[0]?.url;
+      const { id, detail, filename, downloadUrl } = candidate;
+      const sceneOrgUrl = downloadUrl;
       if (!sceneOrgUrl) {
         stats.skippedNoDownload++;
         continue;
