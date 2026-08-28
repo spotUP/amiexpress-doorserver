@@ -406,6 +406,30 @@ export function useSetDoorTags(archiveName: string) {
   });
 }
 
+// ─── authors (multi-value) ──────────────────────────────────────────────
+
+export function useDoorAuthors(archiveName: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...doorKeys.detail(archiveName ?? ''), 'authors'],
+    queryFn: () => api.get<{ authors: string[] }>(`/admin/doors/${encodeURIComponent(archiveName as string)}/authors`),
+    enabled: enabled && Boolean(archiveName),
+  });
+}
+
+export function useSetDoorAuthors(archiveName: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (authors: string[]) =>
+      api.patch<{ ok: boolean; authors: string[] }>(
+        `/admin/doors/${encodeURIComponent(archiveName)}/authors`,
+        { authors },
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: doorKeys.detail(archiveName) });
+    },
+  });
+}
+
 // ─── votes ────────────────────────────────────────────────────────────
 
 export interface VoteStatus {
@@ -431,6 +455,10 @@ export function useVote(archiveName: string) {
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: doorKeys.detail(archiveName) });
       void client.invalidateQueries({ queryKey: doorKeys.all });
+    },
+    onError: (e: unknown) => {
+      // eslint-disable-next-line no-console
+      console.error('[vote] failed:', e);
     },
   });
 }

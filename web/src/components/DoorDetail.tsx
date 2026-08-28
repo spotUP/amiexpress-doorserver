@@ -7,7 +7,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Download, Eye, GraduationCap, ThumbsUp, ThumbsDown, Trash2, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAdminDoor, useDoor, useDoorTags, useAllTags, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote, useDoorAudit } from '../api/queries';
+import { useAdminDoor, useDoor, useDoorAuthors, useDoorTags, useAllTags, useSetDoorAuthors, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote, useDoorAudit } from '../api/queries';
 import { api } from '../api/client';
 import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types';
 import { DizView } from './DizView';
@@ -440,14 +440,18 @@ export function DoorDetailDialog({
   const { data: doorTags } = useDoorTags(archiveName ?? '', Boolean(admin));
   const { data: allTagData } = useAllTags(Boolean(admin));
   const setTags = useSetDoorTags(archiveName ?? '');
+  const { data: authorsData } = useDoorAuthors(archiveName ?? '', Boolean(admin));
+  const setAuthors = useSetDoorAuthors(archiveName ?? '');
   const { data: voteData } = useVoteStatus(archiveName ?? '', Boolean(archiveName));
   const vote = useVote(archiveName ?? '');
   const stripPreviewQuery = useStripPreview(archiveName ?? '');
   const [newTag, setNewTag] = useState('');
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const [newAuthor, setNewAuthor] = useState('');
   const [preview, setPreview] = useState<DoorFacts | null>(null);
   const [stripPreview, setStripPreview] = useState<StripPreview | null>(null);
   const currentTags = doorTags?.tags ?? [];
+  const currentAuthors = authorsData?.authors ?? [];
 
   const addTag = useCallback(() => {
     const t = newTag.trim().toLowerCase();
@@ -458,6 +462,17 @@ export function DoorDetailDialog({
   const removeTag = useCallback((tag: string) => {
     setTags.mutateAsync(currentTags.filter((t) => t !== tag));
   }, [currentTags, setTags]);
+
+  const addAuthor = useCallback(() => {
+    const a = newAuthor.trim();
+    if (!a) return;
+    if (currentAuthors.some((x) => x.toLowerCase() === a.toLowerCase())) { setNewAuthor(''); return; }
+    setAuthors.mutateAsync([...currentAuthors, a]).then(() => setNewAuthor(''));
+  }, [newAuthor, currentAuthors, setAuthors]);
+
+  const removeAuthor = useCallback((author: string) => {
+    setAuthors.mutateAsync(currentAuthors.filter((a) => a !== author));
+  }, [currentAuthors, setAuthors]);
 
   const suggestions = (allTagData?.tags ?? [])
     .map((t) => t.tag)
@@ -670,6 +685,25 @@ export function DoorDetailDialog({
                         ))}
                       </div>
                     )}
+                  </div>
+                  <div className="border-t border-line pt-3">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Authors</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {currentAuthors.map((author) => (
+                        <span key={author} className="inline-flex items-center gap-1 rounded-full border border-line bg-raised px-2.5 py-0.5 text-xs text-ink">
+                          {author}
+                          <button onClick={() => removeAuthor(author)} className="ml-0.5 text-muted hover:text-ink"><X size={10} /></button>
+                        </span>
+                      ))}
+                      <input
+                        value={newAuthor}
+                        onChange={(e) => setNewAuthor(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAuthor(); } }}
+                        placeholder={currentAuthors.length === 0 ? 'Add author...' : '+'}
+                        className="min-w-[6rem] flex-1 border-0 bg-transparent py-0.5 text-xs text-ink outline-none placeholder:text-muted"
+                      />
+                    </div>
+                    {setAuthors.isPending && <p className="mt-1 text-[10px] text-muted">Saving...</p>}
                   </div>
                 </Tabs.Content>
               )}

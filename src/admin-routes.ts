@@ -1155,5 +1155,78 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  // ─── authors (multi-value: stored as JSON array in the author column) ────
+
+  /** Parse the author column into an array. Legacy rows hold a single name
+   *  in plain text - return that as a one-element array so the UI is uniform. */
+  function readAuthors(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((s): s is string => typeof s === 'string' && s.length > 0);
+        }
+      } catch {
+        // fall through to legacy handling
+      }
+    }
+    return [trimmed];
+  }
+
+  router.get('/doors/:archiveName/authors', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const row = db
+        .prepare('SELECT id, author FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string; author: string | null } | undefined;
+      if (!row) { res.status(404).json({ error: 'no such door' }); return; }
+      res.json({ authors: readAuthors(row.author) });
+    } finally {
+      db.close();
+    }
+  });
+
+  router.patch('/doors/:archiveName/authors', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const body = (req.body ?? {}) as { authors?: unknown };
+    if (!Array.isArray(body.authors)) {
+      res.status(400).json({ error: 'authors must be an array of strings' });
+      return;
+    }
+    const authors = body.authors
+      .filter((s): s is string => typeof s === 'string')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    // Dedupe (case-insensitive) so the UI can be lazy about it
+    const seen = new Set<string>();
+    const unique = authors.filter((a) => {
+      const k = a.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
+    const db = openDb(cfg);
+    try {
+      const row = db
+        .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { id: string } | undefined;
+      if (!row) { res.status(404).json({ error: 'no such door' }); return; }
+
+      const stored = unique.length === 0 ? null : JSON.stringify(unique);
+      db.prepare(
+        `UPDATE door_catalog SET author = ?, indexed_at = strftime('%s','now') WHERE id = ?`
+      ).run(stored, row.id);
+      recordAudit(db, req.admin?.id ?? null, 'edit-authors', archiveName, { authors: unique });
+      res.json({ ok: true, authors: unique });
+    } finally {
+      db.close();
+    }
+  });
+
   return router;
 }
