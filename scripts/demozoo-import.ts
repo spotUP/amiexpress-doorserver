@@ -47,6 +47,11 @@ interface DemozooDetail {
   external_links: { url: string; type: string }[];
   screenshots: string[];
   description: string | null;
+  author_nicks: {
+    name: string;
+    abbreviation: string;
+    releaser: { id: number; name: string; is_group: boolean };
+  }[];
 }
 
 interface ExistingDoor {
@@ -61,6 +66,7 @@ interface ExistingDoor {
   credits: string | null;
   external_links: string | null;
   screenshots: string | null;
+  release_group: string | null;
 }
 
 interface NewDoorCandidate {
@@ -207,6 +213,19 @@ function parseLinks(links: { url: string; type: string }[]): string | null {
 function parseScreenshots(screenshots: string[]): string | null {
   if (!screenshots || screenshots.length === 0) return null;
   return JSON.stringify(screenshots);
+}
+
+/** Demozoo's `author_nicks` lists everyone who contributed. The first one
+ *  with `is_group: true` is the release crew — that's what we want for
+ *  `door_catalog.release_group` (abbreviation) and
+ *  `release_groups.full_name` (e.g. "Up Rough /X Innovations"). */
+function extractReleaseGroup(detail: DemozooDetail): { abbrev: string; fullName: string } | null {
+  for (const nick of detail.author_nicks ?? []) {
+    if (nick.releaser?.is_group && nick.abbreviation) {
+      return { abbrev: nick.abbreviation, fullName: nick.releaser.name };
+    }
+  }
+  return null;
 }
 
 interface DownloadResult {
@@ -361,7 +380,7 @@ async function main() {
   const errorLog: string[] = [];
 
   const existingDoors = db
-    .prepare('SELECT id, archive_name, name, version, author, release_date, platform, download_url, credits, external_links, screenshots FROM door_catalog WHERE archive_name IS NOT NULL')
+    .prepare('SELECT id, archive_name, name, version, author, release_date, platform, download_url, credits, external_links, screenshots, release_group FROM door_catalog WHERE archive_name IS NOT NULL')
     .all() as ExistingDoor[];
 
   const archiveNameToDoor = new Map(existingDoors.map((d) => [d.archive_name.toLowerCase(), d]));
@@ -453,6 +472,15 @@ async function main() {
         if (links && !match.external_links) patch.external_links = links;
         const shots = parseScreenshots(detail!.screenshots ?? []);
         if (shots && !match.screenshots) patch.screenshots = shots;
+        const group = extractReleaseGroup(detail!);
+        if (group && !match.release_group) {
+          patch.release_group = group.abbrev;
+          // Upsert into the release_groups lookup so the UI can show
+          // "Up Rough /X Innovations" alongside the abbreviation.
+          db.prepare(
+            'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
+          ).run(group.abbrev, group.fullName);
+        }
 
         if (Object.keys(patch).length > 0) {
           const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
@@ -542,14 +570,20 @@ async function main() {
       const catalogId = crypto.randomUUID();
       const name = detail.title || path.basename(destBasename, path.extname(destBasename));
       const version = (name.match(/v?[\d\.]+/i) ?? [])[0] ?? null;
+      const group = extractReleaseGroup(detail);
+      if (group) {
+        db.prepare(
+          'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
+        ).run(group.abbrev, group.fullName);
+      }
 
       try {
         db.prepare(
           `INSERT INTO door_catalog
              (id, archive_name, archive_path, name, door_type, version, author,
               description, release_date, platform, download_url, credits,
-              external_links, screenshots, archive_size, md5, sha256, source, indexed_at)
-           VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
+              external_links, screenshots, release_group, archive_size, md5, sha256, source, indexed_at)
+           VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
         ).run(
           catalogId,
           destBasename,
@@ -564,6 +598,7 @@ async function main() {
           parseCredits(detail.credits ?? []),
           parseLinks(detail.external_links ?? []),
           parseScreenshots(detail.screenshots ?? []),
+          group?.abbrev ?? null,
           dlResult.size,
           dlResult.md5,
           dlResult.sha256
