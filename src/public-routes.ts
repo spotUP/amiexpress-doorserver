@@ -584,6 +584,34 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /**
+   * GET /api/door-repo/learned-patterns — read-only list of learned junk
+   * patterns for Amiga clients (doorrepo.c) and other consumers.  No auth
+   * required: this is public read-only data that helps clients classify
+   * files locally.
+   */
+  router.get('/learned-patterns', (_req: Request, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const rows = db
+        .prepare(
+          `SELECT id, pattern, archive_name, file_path, learned_by, created_at
+             FROM learned_junk_patterns ORDER BY created_at DESC`
+        )
+        .all() as {
+          id: number;
+          pattern: string;
+          archive_name: string | null;
+          file_path: string | null;
+          learned_by: string | null;
+          created_at: number;
+        }[];
+      res.json({ patterns: rows });
+    } finally {
+      db.close();
+    }
+  });
+
   router.get('/events', (req: Request, res: Response) => subscribe(cfg, req, res));
 
   mountLearnRoute(router, cfg);
