@@ -9,7 +9,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { classifyFile, deriveStripPlan, analyzeArchive, stripArchive, type FingerprintDb } from '../src/ami-stripper';
+import { classifyFile, deriveStripPlan, analyzeArchive, stripArchive, stripDizLines, type FingerprintDb } from '../src/ami-stripper';
 import { findArchiverBinary, canDeleteMembers, deleteMembers, type ArchiveRunner } from '../src/lha-member-delete';
 
 // ─── classifyFile (pure junk detection) ───────────────────────────────────────
@@ -61,6 +61,37 @@ describe('classifyFile', () => {
   it('always protects file_id.diz', () => {
     expect(classifyFile('file_id.diz', Buffer.from('call us at +1 555-1234'), ['file_id.diz'], {})).toBeNull();
   });
+
+  it('flags filenames with illegal chars (#?*@|) as pattern', () => {
+    // istrip06's whole design: random-rename ads use these chars
+    expect(classifyFile('#?#?#?banner', Buffer.from('x'), [], {})).toBe('pattern');
+    expect(classifyFile('*.*', Buffer.from('x'), [], {})).toBe('pattern');
+    expect(classifyFile('foo@bar.txt', Buffer.from('x'), [], {})).toBe('pattern');
+  });
+});
+
+// ─── stripDizLines (DIZ ad-phrase removal) ────────────────────────────────────
+
+describe('stripDizLines', () => {
+  it('drops lines matching ad phrases and keeps the rest', () => {
+    const diz = 'A really cool door\nSPREAD BY ALPHA COURIERS\nGreat door for BBSes';
+    const out = stripDizLines(diz, ['alpha couriers']);
+    expect(out).toBe('A really cool door\nGreat door for BBSes');
+  });
+
+  it('returns null when every line is an ad phrase', () => {
+    const diz = 'SPREAD BY RISC\nLEECHED FROM BEST BBS';
+    expect(stripDizLines(diz, ['spread by', 'leeched from'])).toBeNull();
+  });
+
+  it('returns null for empty input', () => {
+    expect(stripDizLines('', ['anything'])).toBeNull();
+  });
+
+  it('is a no-op when no patterns match', () => {
+    const diz = 'A clean door\nNo ads here';
+    expect(stripDizLines(diz, ['spread by'])).toBe(diz);
+  });
 });
 
 // ─── deriveStripPlan (strip-plan derivation) ──────────────────────────────────
@@ -96,7 +127,20 @@ describe('deriveStripPlan', () => {
       {}
     );
     expect(plan.stripped).toEqual([]);
-    expect(plan.kept).toHaveLength(1);
+    expect(plan.cleanedDiz).toBeNull();
+  });
+
+  it('produces cleanedDiz when FILE_ID.DIZ has ad-phrase lines', () => {
+    const plan = deriveStripPlan(
+      [
+        { path: 'file_id.diz', size: 50, buf: Buffer.from('Great door!\nSPREAD BY ALPHA COURIERS\nVisit our BBS') },
+        { path: 'door.bin', size: 100, buf: Buffer.from('binary') },
+      ],
+      [],
+      {},
+      ['spread by alpha couriers']
+    );
+    expect(plan.cleanedDiz).toBe('Great door!\nVisit our BBS');
   });
 });
 
@@ -234,7 +278,7 @@ describe('lha-member-delete', () => {
   it('canDeleteMembers rejects when no binary is available', () => {
     expect(canDeleteMembers('/tmp/test.lha', null)).toEqual({
       ok: false,
-      reason: 'No lha binary available on this server.',
+      reason: 'No archiver binary available on this server.',
     });
   });
 

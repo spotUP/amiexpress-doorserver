@@ -47,6 +47,8 @@ export interface StripResult {
   kept: StripEntry[];
   stripped: StripEntry[];
   reason: Record<string, 'pattern' | 'md5' | 'content-scan'>;
+  /** Cleaned FILE_ID.DIZ text if any ad-phrase lines were stripped, else null. */
+  cleanedDiz?: string | null;
 }
 
 export interface StripArchiveResult extends StripResult {
@@ -140,6 +142,13 @@ const SAFE_DIRS = new Set([
   'help', 'readme', 'readme.txt', 'file_id.diz',
 ]);
 
+/**
+ * Characters that BBS ad-randomizers use because they break shell commands
+ * and filename globbers. istrip06's whole design: any member with these in
+ * its name is by construction a random-rename ad.
+ */
+const ILLEGAL_FILENAME_CHARS = /[#?*@|]/;
+
 export function classifyFile(
   name: string,
   buf: Buffer,
@@ -162,6 +171,10 @@ export function classifyFile(
   if (['.cfg', '.dat', '.data', '.stat', '.config'].includes(ext) && isBinaryContent(buf)) return null;
   if (base === 'file_id.diz') return null;
 
+  // Illegal-character class: random-rename ads use # ? * @ | to defeat
+  // pattern matchers and shell tools. istrip06's whole design.
+  if (ILLEGAL_FILENAME_CHARS.test(name)) return 'pattern';
+
   const md5 = crypto.createHash('md5').update(buf).digest('hex');
   if (fingerprints[md5]) return 'md5';
 
@@ -173,17 +186,41 @@ export function classifyFile(
 }
 
 /**
+ * Strip ad phrases from a FILE_ID.DIZ. The dizPatterns DB ships 539
+ * ad-phrase strings. We treat each as a case-insensitive substring match
+ * against each non-empty line; any matching line is dropped. Returns the
+ * trimmed DIZ, or null if nothing remains.
+ */
+export function stripDizLines(dizText: string, dizPatterns: string[]): string | null {
+  if (!dizText) return null;
+  const lines = dizText.split(/\r?\n/).map((l) => l.trim());
+  const keep: string[] = [];
+  const lcPatterns = dizPatterns.map((p) => p.toLowerCase());
+  for (const line of lines) {
+    if (line.length === 0) continue;
+    const lc = line.toLowerCase();
+    const isAd = lcPatterns.some((p) => p.length > 0 && lc.includes(p));
+    if (!isAd) keep.push(line);
+  }
+  return keep.length > 0 ? keep.join('\n') : null;
+}
+
+/**
  * Strip-plan derivation: sort entries into kept/stripped/reason.
  * Pure and synchronous — shared by analyzeArchive and stripArchive.
  */
 export function deriveStripPlan(
   entries: Array<{ path: string; size: number; buf: Buffer }>,
   filenamePatterns: string[],
-  fingerprints: FingerprintDb
+  fingerprints: FingerprintDb,
+  dizPatterns: string[] = []
 ): StripResult {
   const kept: StripEntry[] = [];
   const stripped: StripEntry[] = [];
   const reason: Record<string, 'pattern' | 'md5' | 'content-scan'> = {};
+
+  let dizBuf: Buffer | null = null;
+  let dizPath: string | null = null;
 
   for (const entry of entries) {
     const md5 = crypto.createHash('md5').update(entry.buf).digest('hex');
@@ -194,9 +231,22 @@ export function deriveStripPlan(
     } else {
       kept.push({ path: entry.path, size: entry.size, md5 });
     }
+    // Capture the FILE_ID.DIZ so we can strip ad-phrase lines from it
+    if (dizPatterns.length > 0 && dizBuf === null) {
+      const base = entry.path.split('/').pop()?.toLowerCase() ?? '';
+      if (base === 'file_id.diz') {
+        dizBuf = entry.buf;
+        dizPath = entry.path;
+      }
+    }
   }
 
-  return { kept, stripped, reason };
+  let cleanedDiz: string | null = null;
+  if (dizBuf !== null && dizPatterns.length > 0) {
+    cleanedDiz = stripDizLines(dizBuf.toString('latin1'), dizPatterns);
+  }
+
+  return { kept, stripped, reason, cleanedDiz };
 }
 
 // ─── Archive reading via archive-reader.ts ────────────────────────────────────
@@ -358,7 +408,7 @@ export function analyzeArchive(archivePath: string, extraPatterns?: string[]): S
     ? [...patterns.filenamePatterns, ...extraPatterns]
     : patterns.filenamePatterns;
   const files = readArchiveFiles(archivePath);
-  return deriveStripPlan(files, allPatterns, fingerprints);
+  return deriveStripPlan(files, allPatterns, fingerprints, patterns.dizPatterns);
 }
 
 /**
@@ -373,12 +423,19 @@ export function stripArchive(
   const patterns = loadPatterns();
   const fingerprints = loadFingerprints();
   const files = readArchiveFiles(archivePath);
-  const plan = deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
+  const plan = deriveStripPlan(files, patterns.filenamePatterns, fingerprints, patterns.dizPatterns);
   const stripPaths = new Set(plan.stripped.filter(e => !preservePaths?.has(e.path)).map(e => e.path));
 
   const zip = new AdmZip();
   for (const file of files) {
     if (stripPaths.has(file.path)) continue;
+    if (plan.cleanedDiz !== null && plan.cleanedDiz !== undefined) {
+      const base = file.path.split('/').pop()?.toLowerCase();
+      if (base === 'file_id.diz') {
+        zip.addFile(file.path, Buffer.from(plan.cleanedDiz, 'latin1'));
+        continue;
+      }
+    }
     zip.addFile(file.path, file.buf);
   }
 
@@ -417,7 +474,7 @@ export function analyzeDirectory(dirPath: string): StripResult {
   }
 
   scanDir(dirPath, '');
-  return deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
+  return deriveStripPlan(files, patterns.filenamePatterns, fingerprints, patterns.dizPatterns);
 }
 
 /**
@@ -441,7 +498,7 @@ export function extractClean(archivePath: string, destDir: string, preservePaths
   const patterns = loadPatterns();
   const fingerprints = loadFingerprints();
   const files = readArchiveFiles(archivePath);
-  const plan = deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
+  const plan = deriveStripPlan(files, patterns.filenamePatterns, fingerprints, patterns.dizPatterns);
   const stripPaths = new Set(plan.stripped.filter(e => !preservePaths?.has(e.path)).map(e => e.path));
 
   fs.mkdirSync(destDir, { recursive: true });
