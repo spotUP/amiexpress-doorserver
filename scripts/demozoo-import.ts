@@ -61,6 +61,8 @@ interface DemozooDetail {
   title: string;
   release_date: string | null;
   platform: string | null;
+  /** Demozoo returns platforms as an array of {id, name, url}. */
+  platforms: { id: number; name: string; url: string }[];
   download_links: { url: string; type: string }[];
   credits: { person: string; role: string }[];
   external_links: { url: string; type: string }[];
@@ -71,6 +73,7 @@ interface DemozooDetail {
     abbreviation: string;
     releaser: { id: number; name: string; is_group: boolean };
   }[];
+  tags: string[];
 }
 
 interface ExistingDoor {
@@ -277,6 +280,30 @@ function extractReleaseGroup(detail: DemozooDetail): { abbrev: string; fullName:
   return null;
 }
 
+/**
+ * Best-effort `requires_bbs` for a production, based on the production
+ * data we have. Tries group-name match first, then falls back to the
+ * known tag→BBS mapping. Returns null if no signal.
+ */
+function inferRequiresBbs(detail: DemozooDetail): string | null {
+  const groupName = detail.author_nicks?.find((n) => n.releaser?.is_group)?.releaser.name ?? '';
+  const lcGroup = groupName.toLowerCase();
+  // Group-name signal: some release crews only release for one BBS.
+  if (lcGroup.includes('up rough') || lcGroup.includes('amiexpress') || lcGroup.includes('/x')) return 'AmiExpress';
+  if (lcGroup.includes('quantum') || lcGroup.includes('hoodlum') || lcGroup.includes('s!x')) return 'S!X';
+  if (lcGroup.includes('daydream')) return 'DayDream';
+  if (lcGroup.includes('fame')) return 'FAME';
+  if (lcGroup.includes('demonic') || lcGroup.includes('phenom')) return 'Mystic';
+  if (lcGroup.includes('medellin') || lcGroup.includes('tcs')) return 'CNet';
+  // Tag fallback: only the first entry matters, and we don't know which
+  // tag this production came from. So just check if any tag matches the
+  // known TAGS list.
+  for (const { tag, implies } of TAGS) {
+    if (detail.tags?.includes(tag)) return implies;
+  }
+  return null;
+}
+
 interface DownloadResult {
   path: string;
   size: number;
@@ -335,8 +362,8 @@ function downloadToFile(url: string, destPath: string, expectedBasename: string,
 
 // ─── Core Logic ──────────────────────────────────────────────────────────────
 
-async function enumerateProductionIds(tag: string): Promise<number[]> {
-  const cacheFile = path.join('/tmp', `demozoo-ids-${tag}.json`);
+async function enumerateProductionIds(): Promise<number[]> {
+  const cacheFile = path.join('/tmp', 'demozoo-ids-bbs-doors.json');
   if (fs.existsSync(cacheFile)) {
     try {
       const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf-8')) as number[];
@@ -344,11 +371,11 @@ async function enumerateProductionIds(tag: string): Promise<number[]> {
       // total (388K) would have been written here before the sanity check
       // existed. Treat any cache over the sanity threshold as corrupt and
       // force a re-fetch.
-      if (cached.length > 10000) {
-        process.stderr.write(`[demozoo] WARNING: cache ${cacheFile} has ${cached.length} IDs (>10000) — treating as poisoned, re-enumerating\n`);
+      if (cached.length > 50000) {
+        process.stderr.write(`[demozoo] WARNING: cache ${cacheFile} has ${cached.length} IDs (>50000) — treating as poisoned, re-enumerating\n`);
         fs.unlinkSync(cacheFile);
       } else {
-        process.stderr.write(`[demozoo] enumerate tag="${tag}" loaded ${cached.length} IDs from cache ${cacheFile}\n`);
+        process.stderr.write(`[demozoo] enumerate loaded ${cached.length} BBS-Door IDs from cache ${cacheFile}\n`);
         return cached;
       }
     } catch {
@@ -357,19 +384,23 @@ async function enumerateProductionIds(tag: string): Promise<number[]> {
   }
 
   const ids: number[] = [];
-  // production_type=53 is the demozoo ID for "BBS Door" — Demozoo's JSON
+  // production_type=53 is the demozoo ID for "BBS Door". Demozoo's JSON
   // production API ignores tag filters (returns the unfiltered 388K
   // total), so we scrape the HTML listing pages instead. The HTML
   // search form accepts the production_type param and filters correctly.
-  // HTML doesn't break, while /api/v1/productions/?tag=foo does.
+  // URL: https://demozoo.org/productions/?platform=&production_type=53
+  // (no tag, no platform — gets every BBS Door regardless of scene
+  // group; per-BBS inference happens later from the actual production
+  // data, not the tag).
   const TYPE_BBS_DOOR = 53;
   let page = 1;
   const seen = new Set<number>();
-  const PROD_LINK_RE = /href="\/productions\/(\d+)\/"/g;
+  const PROD_LINK_RE = /\/productions\/(\d+)\//g;
+  let consecutiveEmpty = 0;
 
   while (true) {
-    const url = `https://demozoo.org/productions/?tag=${encodeURIComponent(tag)}&production_type=${TYPE_BBS_DOOR}&page=${page}`;
-    process.stderr.write(`[demozoo] enumerate tag="${tag}" page=${page} url=${url}\n`);
+    const url = `https://demozoo.org/productions/?production_type=${TYPE_BBS_DOOR}&page=${page}`;
+    process.stderr.write(`[demozoo] enumerate BBS-Door page=${page} url=${url}\n`);
     const html = await fetch(url);
     const matches = [...html.matchAll(PROD_LINK_RE)];
     let addedThisPage = 0;
@@ -377,24 +408,36 @@ async function enumerateProductionIds(tag: string): Promise<number[]> {
       const id = Number(m[1]);
       if (!seen.has(id)) { seen.add(id); ids.push(id); addedThisPage++; }
     }
-    process.stderr.write(`[demozoo] tag="${tag}" page=${page} found ${addedThisPage} new IDs (${ids.length} total)\n`);
-    if (addedThisPage === 0) break; // last page reached
+    process.stderr.write(`[demozoo] page=${page} found ${addedThisPage} new IDs (${ids.length} total)\n`);
+    // Persist the cache after every page so a crash mid-enumeration
+    // doesn't lose the 1000s of IDs we've already paginated through.
+    try {
+      fs.writeFileSync(cacheFile, JSON.stringify(ids));
+    } catch (e: any) {
+      process.stderr.write(`[demozoo] WARNING: failed to write ID cache: ${e.message}\n`);
+    }
+    if (addedThisPage === 0) {
+      // Could be either end-of-list OR rate-limit. Retry once after
+      // a long pause; if still empty, treat as end-of-list.
+      consecutiveEmpty++;
+      if (consecutiveEmpty > 2) break;
+      process.stderr.write(`[demozoo] page=${page} empty — could be rate-limited, retrying after 10s\n`);
+      await sleep(10000);
+      continue;
+    }
+    consecutiveEmpty = 0;
     page++;
-    if (page > 200) {
-      // Safety cap: no real tag has more than a few hundred BBS-Door
-      // productions. If we're past 200 pages, something is wrong.
-      process.stderr.write(`[demozoo] WARNING: hit 200-page safety cap for tag="${tag}", aborting\n`);
+    if (page > 1000) {
+      // Safety cap: there are ~1K pages of BBS Door productions on
+      // demozoo (50 IDs each = ~50K total). If we're past 1000 pages,
+      // something is wrong.
+      process.stderr.write(`[demozoo] WARNING: hit 1000-page safety cap, aborting\n`);
       break;
     }
     await sleep(PAUSE_BETWEEN_REQUESTS_MS);
   }
 
-  try {
-    fs.writeFileSync(cacheFile, JSON.stringify(ids));
-    process.stderr.write(`[demozoo] cached ${ids.length} IDs to ${cacheFile}\n`);
-  } catch (e: any) {
-    process.stderr.write(`[demozoo] WARNING: failed to write ID cache: ${e.message}\n`);
-  }
+  process.stderr.write(`[demozoo] enumeration complete: ${ids.length} IDs\n`);
 
   return ids;
 }
@@ -442,21 +485,19 @@ async function main() {
   let requestCount = 0;
 
   // ── Phase 1: enumerate and backfill existing doors ──────────────────────────
-  for (const { tag, implies } of TAGS) {
-    process.stderr.write(`[demozoo] Phase 1 tag="${tag}" implies requires_bbs="${implies}"\n`);
-    let ids: number[];
-    try {
-      ids = await enumerateProductionIds(tag);
-    } catch (e: any) {
-      process.stderr.write(`[demozoo] ERROR enumerating tag "${tag}": ${e.message}\n`);
-      errorLog.push(`enumerate:${tag}: ${e.message}`);
-      stats.errors++;
-      continue;
-    }
-    process.stderr.write(`[demozoo] tag="${tag}" found ${ids.length} productions\n`);
+  process.stderr.write(`[demozoo] Phase 1: enumerating all BBS-Door productions\n`);
+  let ids: number[];
+  try {
+    ids = await enumerateProductionIds();
+  } catch (e: any) {
+    process.stderr.write(`[demozoo] ERROR enumerating: ${e.message}\n`);
+    errorLog.push(`enumerate: ${e.message}`);
+    process.exit(1);
+  }
+  process.stderr.write(`[demozoo] found ${ids.length} BBS-Door productions\n`);
 
     const toProcess = ids.filter((id) => !imported.has(id));
-    process.stderr.write(`[demozoo] tag="${tag}" ${toProcess.length} to process (${ids.length - toProcess.length} already imported)\n`);
+    process.stderr.write(`[demozoo] ${toProcess.length} to process (${ids.length - toProcess.length} already imported)\n`);
 
     let batchStart = 0;
     while (batchStart < toProcess.length) {
@@ -496,11 +537,12 @@ async function main() {
 
         const lookup = filename.toLowerCase();
         const match = archiveNameToDoor.get(lookup);
+        const implies = inferRequiresBbs(detail!);
 
         if (!match) {
           const sceneOrgUrl = detail!.download_links?.[0]?.url ?? null;
           if (sceneOrgUrl) {
-            newDoorCandidates.push({ id, detail: detail!, filename, requiresBbs: implies || null });
+            newDoorCandidates.push({ id, detail: detail!, filename, requiresBbs: implies });
           } else {
             process.stderr.write(`[demozoo] id=${id} "${detail!.title}" filename="${filename}" — no local match and no scene.org URL, skipping\n`);
             errorLog.push(`nomatch+nodl:${id}:${filename}:${detail!.title}`);
@@ -515,6 +557,7 @@ async function main() {
         // Overwrite the row values — curator edits live in door_catalog_overrides
         // and are layered on at read time, so nothing user-edited is lost.
         if (detail!.release_date) patch.release_date = detail!.release_date;
+        if (detail!.platforms?.length) patch.platform = detail!.platforms.map((p) => p.name).join(', ');
         const dl = detail!.download_links?.[0]?.url;
         if (dl) patch.download_url = dl;
         const creds = parseCredits(detail!.credits ?? []);
@@ -559,7 +602,6 @@ async function main() {
         await sleep(PAUSE_BETWEEN_REQUESTS_MS);
       }
     }
-  }
 
   // ── Phase 2: download new doors from scene.org ──────────────────────────────
   if (newDoorCandidates.length > 0) {
@@ -576,8 +618,26 @@ async function main() {
       const destBasename = filename;
       const destPath = path.join(submittedDir, destBasename);
 
-      if (fs.existsSync(destPath)) {
-        process.stderr.write(`[demozoo] id=${id} "${filename}" already exists in Submitted/, skipping\n`);
+      // Check both the Submitted/ staging dir AND the whole archives
+      // root — if the file already lives anywhere under archivesRoot
+      // (e.g. AmiExpress/UP-MD15.LHA), don't re-download. A duplicate
+      // would be confusing to curators and waste scene.org bandwidth.
+      const existingAtDest = fs.existsSync(destPath);
+      let existingUnderRoot: string | null = null;
+      if (!existingAtDest) {
+        try {
+          const entries = fs.readdirSync(archivesRoot, { withFileTypes: true });
+          for (const e of entries) {
+            if (e.isFile() && e.name.toLowerCase() === destBasename.toLowerCase()) {
+              existingUnderRoot = path.join(archivesRoot, e.name);
+              break;
+            }
+          }
+        } catch { /* best effort */ }
+      }
+      if (existingAtDest || existingUnderRoot) {
+        const where = existingAtDest ? destPath : existingUnderRoot;
+        process.stderr.write(`[demozoo] id=${id} "${filename}" already exists at ${where}, skipping\n`);
         try {
           db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
         } catch { /* ok */ }
@@ -645,7 +705,7 @@ async function main() {
           detail.credits?.[0]?.person ?? null,
           detail.description ?? null,
           detail.release_date ?? null,
-          detail.platform ?? null,
+          detail.platforms?.map((p) => p.name).join(', ') ?? null,
           sceneOrgUrl,
           parseCredits(detail.credits ?? []),
           parseLinks(detail.external_links ?? []),
