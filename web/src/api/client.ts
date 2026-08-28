@@ -86,8 +86,8 @@ async function requestText(path: string, init?: RequestInit): Promise<string> {
 }
 
 export const api = {
-  get: <T,>(path: string) => request<T>(path),
-  getText: (path: string) => requestText(path),
+  get: <T,>(path: string, init?: RequestInit) => request<T>(path, init),
+  getText: (path: string, init?: RequestInit) => requestText(path, init),
   post: <T,>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T,>(path: string, body: unknown) =>

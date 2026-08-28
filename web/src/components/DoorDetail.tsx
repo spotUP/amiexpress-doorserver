@@ -18,7 +18,7 @@ import { Badge, Button, formatSize } from './ui';
 
 const TEXT_EXTS = /\.(txt|me|guide|doc|diz|ans|asc|nfo|rip|info|readme)$/i;
 
-function FileList({ archiveName, files, viewFile }: { archiveName: string; files: DoorFile[]; viewFile: (path: string) => void }) {
+function FileList({ archiveName, files }: { archiveName: string; files: DoorFile[] }) {
   const [viewing, setViewing] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
@@ -28,7 +28,7 @@ function FileList({ archiveName, files, viewFile }: { archiveName: string; files
   const [fileList, setFileList] = useState<DoorFile[]>(files);
   const learnPattern = useLearnPattern();
 
-  async function viewFile(path: string) {
+  async function loadFileContent(path: string) {
     setViewing(path);
     setContent(null);
     try {
@@ -85,7 +85,7 @@ function FileList({ archiveName, files, viewFile }: { archiveName: string; files
             )}
             <span className="font-mono text-[12px] text-muted">{formatSize(file.size)}</span>
             {TEXT_EXTS.test(file.path) && (
-              <button onClick={() => viewFile(file.path)} className="rounded p-1 text-muted hover:bg-raised hover:text-accent" title="View contents">
+              <button onClick={() => loadFileContent(file.path)} className="rounded p-1 text-muted hover:bg-raised hover:text-accent" title="View contents">
                 <Eye size={13} />
               </button>
             )}
@@ -317,7 +317,7 @@ function StripAds({
               {preview.kept.map((f) => (
                 <li key={f.path} className="flex items-center gap-2 text-xs">
                   <span className="flex-1 truncate font-mono text-muted">{f.path}</span>
-              <button onClick={() => viewFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
+              <button onClick={() => window.open(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(f.path)}`)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
                   <button
                     onClick={() => learnKeptFile(f.path)}
                     className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
@@ -355,38 +355,6 @@ const BBS_OPTIONS = [
   { value: 'DayDream', label: 'DayDream' },
 ];
 
-function ViewFileDialog({
-  archiveName,
-  filePath,
-  onClose,
-}: {
-  archiveName: string;
-  filePath: string;
-  onClose: () => void;
-}) {
-  const [content, setContent] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.get<ArrayBuffer>(`/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(filePath)}`, { responseType: 'arraybuffer' })
-      .then(res => setContent(new TextDecoder().decode(res)))
-      .catch(e => console.error(e));
-  }, [archiveName, filePath]);
-
-  return (
-    <Dialog.Root open={true} onOpenChange={onClose}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/70" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[min(50rem,90vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
-          <header className="border-b border-line px-4 py-3 font-semibold text-ink">{filePath}</header>
-          <div className="flex-1 overflow-auto p-4">
-            {content ? <DizView text={content} label={filePath} /> : <p className="text-sm text-muted">Loading...</p>}
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
 export function DoorDetailDialog({
   archiveName,
   admin,
@@ -412,13 +380,6 @@ export function DoorDetailDialog({
   const tagInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<DoorFacts | null>(null);
   const [stripPreview, setStripPreview] = useState<StripPreview | null>(null);
-  const [viewingFile, setViewingFile] = useState<{ path: string; content: string } | null>(null);
-
-  async function viewFile(path: string) {
-    if (!archiveName) return;
-    const text = await api.getText(`/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`);
-    setViewingFile({ path, content: text });
-  }
   const currentTags = doorTags?.tags ?? [];
 
   const addTag = useCallback(() => {
@@ -452,13 +413,6 @@ export function DoorDetailDialog({
   return (
     <Dialog.Root open={Boolean(archiveName)} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        {viewingFile && (
-          <ViewFileDialog
-            archiveName={archiveName ?? ''}
-            filePath={viewingFile.path}
-            onClose={() => setViewingFile(null)}
-          />
-        )}
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[min(60rem,94vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
           <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
@@ -566,7 +520,7 @@ export function DoorDetailDialog({
               </Tabs.Content>
 
               <Tabs.Content value="files">
-                <FileList archiveName={archiveName ?? ''} files={door?.files ?? []} viewFile={viewFile} />
+                <FileList archiveName={archiveName ?? ''} files={door?.files ?? []} />
               </Tabs.Content>
 
               {door?.doc && (
