@@ -7,6 +7,7 @@
  * serves the public API exactly as before and has no admin surface at all.
  */
 import express, { type Response, type Router } from 'express';
+import * as path from 'path';
 import { openDb } from './db';
 import {
   bearerToken,
@@ -20,7 +21,7 @@ import {
 } from './auth';
 import { analyseDoor, buildGroupTags, fixCasing, fixTitleCasing, tidyCase } from './describe';
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides, type OverrideMap } from './effective';
-import { UploadError, approveSubmission, rejectSubmission } from './submissions';
+import { UploadError, approveSubmission, rejectSubmission, deriveMetadata } from './submissions';
 import type { ServerConfig } from './config';
 import { analyzeArchive } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
