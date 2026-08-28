@@ -27,6 +27,7 @@ import { analyzeArchive } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
+import { extractFile } from './archive-reader';
 import * as fs from 'fs';
 
 /**
@@ -303,10 +304,31 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
-  /**
-   * Re-scan a door to re-run the derivation and update the catalog.
-   */
-  router.post('/doors/:archiveName/rescan', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+  /** Get the content of a file inside an archive. */
+  router.get('/doors/:archiveName/files/:filePath(*)', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[0] : req.params.archiveName;
+    const filePath = Array.isArray(req.params.filePath) ? req.params.filePath.join('/') : req.params.filePath;
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const entry = db.prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { archive_path: string } | undefined;
+      if (!entry) { res.status(404).json({ error: 'no such door' }); return; }
+
+      const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
+      if (!fs.existsSync(archivePath)) { res.status(404).json({ error: 'archive file missing' }); return; }
+
+      const bytes = fs.readFileSync(archivePath);
+      const fileBytes = extractFile(bytes, filePath);
+      
+      if (!fileBytes) { res.status(404).json({ error: 'file not found in archive' }); return; }
+      
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.send(Buffer.from(fileBytes));
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    } finally {
+      db.close();
+    }
+  });
     const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[req.params.archiveName.length - 1] : req.params.archiveName;
     const db = openDb(cfg);
     try {
@@ -333,6 +355,32 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       
       recordAudit(db, req.admin?.id ?? null, 'rescan-door', archiveName, { newName: derived.name });
       res.json({ ok: true, name: derived.name });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Get the content of a file inside an archive. */
+  router.get('/doors/:archiveName/files/:filePath(*)', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[0] : req.params.archiveName;
+    const filePath = Array.isArray(req.params.filePath) ? req.params.filePath.join('/') : req.params.filePath;
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const entry = db.prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { archive_path: string } | undefined;
+      if (!entry) { res.status(404).json({ error: 'no such door' }); return; }
+
+      const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
+      if (!fs.existsSync(archivePath)) { res.status(404).json({ error: 'archive file missing' }); return; }
+
+      const bytes = fs.readFileSync(archivePath);
+      const fileBytes = extractFile(bytes, filePath);
+      
+      if (!fileBytes) { res.status(404).json({ error: 'file not found in archive' }); return; }
+      
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.send(Buffer.from(fileBytes));
     } catch (e) {
       res.status(500).json({ error: String(e) });
     } finally {
