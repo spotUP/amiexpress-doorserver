@@ -199,6 +199,45 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_dv_catalog ON door_votes(catalog_id)');
     },
   },
+  {
+    version: 9,
+    name: 'door_catalog.demozoo_enrichment',
+    up: (db) => {
+      if (!hasColumn(db, 'door_catalog', 'release_date')) {
+        db.exec("ALTER TABLE door_catalog ADD COLUMN release_date TEXT");
+      }
+      if (!hasColumn(db, 'door_catalog', 'platform')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN platform TEXT');
+      }
+      if (!hasColumn(db, 'door_catalog', 'download_url')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN download_url TEXT');
+      }
+      if (!hasColumn(db, 'door_catalog', 'credits')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN credits TEXT');
+      }
+      if (!hasColumn(db, 'door_catalog', 'external_links')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN external_links TEXT');
+      }
+      if (!hasColumn(db, 'door_catalog', 'screenshots')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN screenshots TEXT');
+      }
+    },
+  },
+  {
+    version: 10,
+    name: 'demozoo_imported',
+    up: (db) => {
+      // Production ids we have already processed. A re-run reads
+      // this at startup and skips every id in it - no fetch, no
+      // insert, no audit row. Makes the import safely resumable
+      // across crashes, network blips, or a Ctrl-C.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS demozoo_imported (
+          id          INTEGER PRIMARY KEY,
+          imported_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        )`);
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

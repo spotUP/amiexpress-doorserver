@@ -21,7 +21,13 @@ CREATE TABLE IF NOT EXISTS door_catalog (
   source              TEXT DEFAULT 'scan',
   indexed_at          INTEGER DEFAULT (strftime('%s','now')),
   md5                 TEXT,
-  sha256              TEXT
+  sha256              TEXT,
+  release_date        TEXT,
+  platform            TEXT,
+  download_url        TEXT,
+  credits             TEXT,
+  external_links      TEXT,
+  screenshots         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_door_catalog_category ON door_catalog(category);
 CREATE INDEX IF NOT EXISTS idx_door_catalog_name ON door_catalog(name);

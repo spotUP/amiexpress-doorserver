@@ -65,6 +65,12 @@ interface DoorRow {
   has_doc: number;
   votes_up: number;
   votes_down: number;
+  release_date: string | null;
+  platform: string | null;
+  download_url: string | null;
+  credits: string | null;
+  external_links: string | null;
+  screenshots: string | null;
 }
 
 function firstPathSegment(archivePath: string): string {
@@ -116,6 +122,17 @@ interface DoorJson {
   votesUp: number;
   votesDown: number;
   indexedAt: number;
+  releaseDate: string | null;
+  platform: string | null;
+  credits: DemozooCredit[] | null;
+  externalLinks: string[] | null;
+  screenshots: { thumbnailUrl: string; standardUrl: string }[] | null;
+}
+
+interface DemozooCredit {
+  nick: string;
+  category: string;
+  role: string;
 }
 
 /**
@@ -164,7 +181,25 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     votesUp: corrected.votes_up ?? 0,
     votesDown: corrected.votes_down ?? 0,
     indexedAt: corrected.indexed_at ?? 0,
+    releaseDate: corrected.release_date ?? null,
+    platform: corrected.platform ?? null,
+    credits: parseJsonOrNull<DemozooCredit[]>(corrected.credits),
+    externalLinks: parseJsonOrNull<string[]>(corrected.external_links),
+    screenshots: parseJsonOrNull<{ thumbnailUrl: string; standardUrl: string }[]>(corrected.screenshots),
   };
+}
+
+/** A column written as JSON by the Demozoo importer. Return null for empty
+ *  strings or anything JSON.parse refuses: the door's row was scanned before
+ *  the column existed, so the value will be NULL, and a stray empty string
+ *  should not be turned into a meaningless "[]". */
+function parseJsonOrNull<T>(value: string | null | undefined): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -272,7 +307,8 @@ export function createPublicRouter(cfg: ServerConfig): Router {
                   category, description, requires_bbs, file_id_diz, archive_size,
                   md5, sha256, junk_count, ads_stripped, indexed_at,
                   (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc,
-                  COALESCE(v.up, 0) AS votes_up, COALESCE(v.down, 0) AS votes_down
+                  COALESCE(v.up, 0) AS votes_up, COALESCE(v.down, 0) AS votes_down,
+                  release_date, platform, download_url, credits, external_links, screenshots
              FROM door_catalog d
              ${releaseGroupsTable ? 'LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group' : ''}
              LEFT JOIN (SELECT catalog_id,

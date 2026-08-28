@@ -43,6 +43,12 @@ export interface CatalogEntry {
   source: string | null;
   md5: string | null;
   sha256: string | null;
+  release_date: string | null;
+  platform: string | null;
+  download_url: string | null;
+  credits: string | null;
+  external_links: string | null;
+  screenshots: string | null;
 }
 
 export interface ArchiveFile {

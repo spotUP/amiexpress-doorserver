@@ -28,6 +28,18 @@ export interface Door {
   votesUp: number;
   votesDown: number;
   indexedAt: number;
+  /** Demozoo enrichment. null when the importer has not seen this door. */
+  releaseDate: string | null;
+  platform: string | null;
+  credits: DemozooCredit[] | null;
+  externalLinks: string[] | null;
+  screenshots: { thumbnailUrl: string; standardUrl: string }[] | null;
+}
+
+export interface DemozooCredit {
+  nick: string;
+  category: string;
+  role: string;
 }
 
 export interface DoorFile {
