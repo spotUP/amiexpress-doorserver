@@ -26,7 +26,26 @@ import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
 import { recordAudit } from '../src/auth';
 
-const TAGS = ['amiex', 'daydream-amiga', 'fame'];
+// Each tag entry knows what demozoo calls it AND what it implies about
+// requires_bbs. The tag itself is descriptive (e.g. "mystic-bbs");
+// the implies field is the value to write into door_catalog.requires_bbs
+// for any production found under that tag. All of these are Amiga BBS
+// systems — PC-only ones (qbbs, telegard, etc.) are excluded by design.
+// Counts were verified against demozoo's /productions/tagged/<tag>/ pages
+// before adding — tags with <10 productions are skipped as not worth the
+// per-tag fetch.
+const TAGS: { tag: string; implies: string }[] = [
+  { tag: 'amiex',         implies: 'AmiExpress' },        // 50+
+  { tag: 's!x',           implies: 'S!X' },               // not validated
+  { tag: 'maxs',          implies: 'Maxs' },              // not validated
+  { tag: 'daydream-amiga',implies: 'DayDream' },          // 50+
+  { tag: 'fame',          implies: 'FAME' },              // 47
+  { tag: 'cnet-bbs',      implies: 'CNet' },              // 41
+  { tag: 'descent',       implies: 'Descent' },           // 1
+  { tag: 'lame',          implies: 'Lame' },              // not validated
+  { tag: 'tempest',       implies: 'Tempest' },           // 2
+  { tag: 'mystic-bbs',    implies: 'Mystic' },            // 50+
+];
 const DEMOZOO_API = 'https://demozoo.org/api/v1';
 const PAUSE_BETWEEN_REQUESTS_MS = 500;
 const PAUSE_EVERY_N_REQUESTS = 100;
@@ -73,6 +92,8 @@ interface NewDoorCandidate {
   id: number;
   detail: DemozooDetail;
   filename: string;
+  /** requires_bbs value inferred from the tag this production was found under. */
+  requiresBbs: string | null;
 }
 
 interface ImporterStats {
@@ -198,6 +219,34 @@ function parseFilename(downloadUrl: string | undefined, html: string | null): st
   // we tested. The HTML "Filename:" section is only present for files actually
   // uploaded to demozoo (rare for BBS doors), so use URL first, HTML fallback.
   return parseFilenameFromUrl(downloadUrl ?? '') ?? parseFilenameFromHtml(html ?? '');
+}
+
+/** Parse the "Info files" list from a demozoo production detail page.
+ *  Each entry is a filename + size (e.g. "UP-MD15.NFO - (19545 bytes)"). */
+function parseInfoFiles(html: string): { name: string; size: number }[] {
+  const m = html.match(/<ul class="info_files">([\s\S]*?)<\/ul>/);
+  if (!m) return [];
+  const items: { name: string; size: number }[] = [];
+  for (const li of m[1].matchAll(/<a[^>]+title="([^"]+)\s+-\s+\((\d+)\s*bytes\)">([^<]+)<\/a>/g)) {
+    // ti order: 1=name-with-extension, 2=size, 3=display-name
+    // Some titles have format: "FILE_ID.DIZ - (533 bytes)" → split on " - ("
+    const title = li[1];
+    const name = title.replace(/\s*-\s*\(\d+\s*bytes\)\s*$/, '').trim();
+    items.push({ name, size: Number(li[2]) });
+  }
+  return items;
+}
+
+/** Pick the primary "doc" file from demozoo's info-file list.
+ *  Prefer .NFO (the standard scene extra-info file). Fall back to .TXT.
+ *  Skip FILE_ID.DIZ — that goes into file_id_diz, not doc_raw. */
+function pickDocFile(infoFiles: { name: string; size: number }[]): string | null {
+  const candidates = infoFiles.filter((f) => !/^file_?id\.diz$/i.test(f.name));
+  const nfo = candidates.find((f) => /\.nfo$/i.test(f.name));
+  if (nfo) return nfo.name;
+  const txt = candidates.find((f) => /\.txt$/i.test(f.name));
+  if (txt) return txt.name;
+  return candidates[0]?.name ?? null;
 }
 
 function parseCredits(credits: { person: string; role: string }[]): string | null {
@@ -393,8 +442,8 @@ async function main() {
   let requestCount = 0;
 
   // ── Phase 1: enumerate and backfill existing doors ──────────────────────────
-  for (const tag of TAGS) {
-    process.stderr.write(`[demozoo] Phase 1 tag="${tag}"\n`);
+  for (const { tag, implies } of TAGS) {
+    process.stderr.write(`[demozoo] Phase 1 tag="${tag}" implies requires_bbs="${implies}"\n`);
     let ids: number[];
     try {
       ids = await enumerateProductionIds(tag);
@@ -451,7 +500,7 @@ async function main() {
         if (!match) {
           const sceneOrgUrl = detail!.download_links?.[0]?.url ?? null;
           if (sceneOrgUrl) {
-            newDoorCandidates.push({ id, detail: detail!, filename });
+            newDoorCandidates.push({ id, detail: detail!, filename, requiresBbs: implies || null });
           } else {
             process.stderr.write(`[demozoo] id=${id} "${detail!.title}" filename="${filename}" — no local match and no scene.org URL, skipping\n`);
             errorLog.push(`nomatch+nodl:${id}:${filename}:${detail!.title}`);
@@ -481,6 +530,9 @@ async function main() {
             'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
           ).run(group.abbrev, group.fullName);
         }
+        // The tag itself is a strong signal for which BBS this door runs on.
+        // e.g. tag "amiex" → requires_bbs "AmiExpress" /X.
+        if (implies) patch.requires_bbs = implies;
 
         if (Object.keys(patch).length > 0) {
           const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
