@@ -391,6 +391,111 @@ function pickBestDownload(links: { url: string; type: string }[] | undefined | n
   return usable[0].url;
 }
 
+/**
+ * Compute md5 + sha256 + size of a local file. Used when registering
+ * an existing-on-disk archive into the catalog without re-downloading.
+ */
+function statLocalFile(absPath: string): { size: number; md5: string; sha256: string } {
+  const buf = fs.readFileSync(absPath);
+  return {
+    size: buf.length,
+    md5: crypto.createHash('md5').update(buf).digest('hex'),
+    sha256: crypto.createHash('sha256').update(buf).digest('hex'),
+  };
+}
+
+interface RegisterArgs {
+  candidate: NewDoorCandidate;
+  where: string;
+  db: Database.Database;
+  archivesRoot: string;
+  dryRun: boolean;
+}
+
+/**
+ * Register an archive that already exists on disk into door_catalog,
+ * then backfill demozoo fields. Used when the file is found locally
+ * but has never been added to the catalog — common for legacy archives
+ * that predate the demozoo import.
+ */
+async function registerExistingFile(args: RegisterArgs): Promise<void> {
+  const { candidate, where, db, archivesRoot, dryRun } = args;
+  const { id, detail, filename, downloadUrl, requiresBbs } = candidate;
+  const basename = path.basename(where);
+  const archivePath = path.relative(archivesRoot, where);
+  const relPath = archivePath.split(path.sep).join('/');
+  // If the row already exists in the catalog, just backfill (the
+  // normal path handles this — we never get here for catalog hits
+  // because the caller checks door_catalog first).
+  const existing = db
+    .prepare('SELECT id, archive_name FROM door_catalog WHERE archive_name = ?')
+    .get(basename) as { id: string; archive_name: string } | undefined;
+  if (existing) {
+    process.stderr.write(`[demozoo] id=${id} "${filename}" already in catalog (${existing.id}), nothing to register\n`);
+    return;
+  }
+  // Compute file stats. For large archives this is cheap (single read).
+  let stats;
+  try { stats = statLocalFile(where); }
+  catch (e: any) {
+    process.stderr.write(`[demozoo] ERROR reading ${where}: ${e.message}\n`);
+    return;
+  }
+  // Extract version from title and strip it from the name.
+  const VERSION_RE = /\s+v(\d+(?:\.\d+)*)\b/i;
+  const m = detail.title.match(VERSION_RE);
+  const versionFromTitle = m ? `v${m[1]}` : null;
+  const name = (detail.title || path.basename(filename, path.extname(filename)))
+    .replace(VERSION_RE, '').replace(/\s+$/, '').trim();
+  const group = extractReleaseGroup(detail);
+  if (group) {
+    db.prepare(
+      'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
+    ).run(group.abbrev, group.fullName);
+  }
+  process.stderr.write(`[demozoo] id=${id} registering local ${where} (${stats.size} bytes)\n`);
+  if (dryRun) {
+    process.stderr.write(`[demozoo] DRY: would INSERT ${basename} (${relPath}) — name="${name}" version="${versionFromTitle}"\n`);
+  } else {
+    const catalogId = crypto.randomUUID();
+    db.prepare(
+      `INSERT INTO door_catalog
+         (id, archive_name, archive_path, name, door_type, version, author,
+          description, release_date, platform, download_url, credits,
+          external_links, screenshots, release_group, archive_size, md5, sha256, source, indexed_at)
+       VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
+    ).run(
+      catalogId,
+      basename,
+      relPath,
+      name,
+      versionFromTitle,
+      detail.credits?.[0]?.person ?? null,
+      detail.description ?? null,
+      detail.release_date ?? null,
+      detail.platforms?.map((p) => p.name).join(', ') ?? null,
+      downloadUrl,
+      parseCredits(detail.credits ?? []),
+      parseLinks(detail.external_links ?? []),
+      parseScreenshots(detail.screenshots ?? []),
+      group?.abbrev ?? null,
+      stats.size,
+      stats.md5,
+      stats.sha256
+    );
+    recordAudit(db, null, 'import-demozoo', basename, { source: 'local' });
+  }
+  // Mark as imported so we don't re-process this production on
+  // a subsequent run.
+  try {
+    if (dryRun) {
+      process.stderr.write(`[demozoo] DRY: would mark id=${id} imported\n`);
+    } else {
+      db.prepare('INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)').run(id, Date.now());
+    }
+  } catch { /* already imported concurrently */ }
+}
+
 function downloadToFile(url: string, destPath: string, expectedBasename: string, retries = 0): Promise<DownloadResult> {
   return new Promise((resolve, reject) => {
     const doDownload = (attempt: number) => {
@@ -689,6 +794,9 @@ async function main() {
           process.stderr.write(`[demozoo] id=${id} "${match.archive_name}" already enriched\n`);
         }
 
+        // Always mark as imported when the archive already exists in
+        // the catalog, even if no new fields were patched (avoid
+        // re-scanning the same production on every run).
         try {
           if (dryRun) { process.stderr.write(`[demozoo] DRY: would mark id=${id} imported\n`); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
         } catch {
@@ -726,28 +834,41 @@ async function main() {
       const destPath = path.join(submittedDir, destBasename);
 
       // Check both the Submitted/ staging dir AND the whole archives
-      // root — if the file already lives anywhere under archivesRoot
-      // (e.g. AmiExpress/UP-MD15.LHA), don't re-download. A duplicate
-      // would be confusing to curators and waste scene.org bandwidth.
+      // root recursively — if the file already lives anywhere under
+      // archivesRoot (e.g. AmiExpress/UP-MD15.LHA), don't re-download.
+      // A duplicate would be confusing to curators and waste scene.org
+      // bandwidth.
       const existingAtDest = fs.existsSync(destPath);
       let existingUnderRoot: string | null = null;
       if (!existingAtDest) {
-        try {
-          const entries = fs.readdirSync(archivesRoot, { withFileTypes: true });
+        // Walk archivesRoot recursively looking for a file with the
+        // matching basename (case-insensitive).
+        const want = destBasename.toLowerCase();
+        function walk(dir: string): void {
+          let entries: fs.Dirent[];
+          try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+          catch { return; }
           for (const e of entries) {
-            if (e.isFile() && e.name.toLowerCase() === destBasename.toLowerCase()) {
-              existingUnderRoot = path.join(archivesRoot, e.name);
-              break;
+            const p = path.join(dir, e.name);
+            if (e.isFile() && e.name.toLowerCase() === want) {
+              existingUnderRoot = p;
+              return;
+            }
+            if (e.isDirectory() && e.name !== 'Submitted' && e.name !== 'node_modules') {
+              walk(p);
+              if (existingUnderRoot) return;
             }
           }
-        } catch { /* best effort */ }
+        }
+        walk(archivesRoot);
       }
       if (existingAtDest || existingUnderRoot) {
-        const where = existingAtDest ? destPath : existingUnderRoot;
-        process.stderr.write(`[demozoo] id=${id} "${filename}" already exists at ${where}, skipping\n`);
-        try {
-          if (dryRun) { process.stderr.write(`[demozoo] DRY: would mark id=${id} imported\n`); } else { db.prepare("INSERT OR IGNORE INTO demozoo_imported (id, imported_at) VALUES (?, ?)").run(id, Date.now()); }
-        } catch { /* ok */ }
+        const where = existingAtDest ? destPath : existingUnderRoot!;
+        // File exists on disk — register it in the catalog if not
+        // already there, then backfill from demozoo.
+        await registerExistingFile({
+          candidate, where, db, archivesRoot, dryRun,
+        });
         continue;
       }
 
