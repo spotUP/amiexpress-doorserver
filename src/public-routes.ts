@@ -854,7 +854,7 @@ export function mountLearnRoute(router: Router, cfg: ServerConfig): void {
   });
 
   /** POST /doors/:archiveName/vote — cast or change a vote. Body: { vote: 1 | -1 | 0 } */
-  router.post('/doors/:archiveName/vote', (req: Request, res: Response) => {
+  router.post('/doors/:archiveName/vote', express.json({ limit: '1kb' }), (req: Request, res: Response) => {
     const archiveName = req.params.archiveName;
     const body = (req.body ?? {}) as { vote?: unknown };
     const vote = Number(body.vote);
