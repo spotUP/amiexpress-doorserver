@@ -101,6 +101,22 @@ function isBinaryContent(buf: Buffer): boolean {
   return false;
 }
 
+const AD_SIGNAL_PATTERNS = [
+  /\+\d{1,2}[\s-]\d+/,
+  /\d{3}[-. ]\d{3,4}[-. ]\d{4}/,
+  /call us/i,
+  /greetings from/i,
+  /visit us/i,
+  /logon to/i,
+  /connect to/i,
+  /download here/i,
+];
+
+function hasAdSignals(buf: Buffer): boolean {
+  const text = buf.toString('latin1');
+  return AD_SIGNAL_PATTERNS.some(re => re.test(text));
+}
+
 function matchesPattern(filename: string, pattern: string): boolean {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
   const regexStr = '^' + escaped.replace(/\*/g, '.*').replace(/\?/g, '.') + '$';
@@ -347,4 +363,71 @@ export function stripArchive(
   zip.writeZip(outputPath);
 
   return { ...plan, outputPath };
+}
+
+// ─── Directory-based operations (installed doors) ────────────────────────────
+
+/**
+ * Analyze a directory of installed door files for junk. Reads every file
+ * recursively and classifies each one. Portable — pure fs, no archive
+ * format concerns.
+ */
+export function analyzeDirectory(dirPath: string): StripResult {
+  const patterns = loadPatterns();
+  const fingerprints = loadFingerprints();
+  const files: Array<{ path: string; size: number; buf: Buffer }> = [];
+
+  function scanDir(absDir: string, relPrefix: string): void {
+    let entries: string[];
+    try { entries = fs.readdirSync(absDir); } catch { return; }
+    for (const name of entries) {
+      const absPath = path.join(absDir, name);
+      const relPath = relPrefix ? `${relPrefix}/${name}` : name;
+      const stat = fs.statSync(absPath);
+      if (stat.isDirectory()) { scanDir(absPath, relPath); continue; }
+      let buf: Buffer;
+      try { buf = fs.readFileSync(absPath); } catch { continue; }
+      files.push({ path: relPath, size: stat.size, buf });
+    }
+  }
+
+  scanDir(dirPath, '');
+  return deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
+}
+
+/**
+ * Delete junk files from an installed door directory. RelPaths are
+ * relative to dirPath. Errors are silently ignored — a file that cannot
+ * be deleted (permissions, etc.) is left in place.
+ */
+export function stripFilesFromDirectory(dirPath: string, relPaths: string[]): void {
+  for (const rel of relPaths) {
+    const abs = path.join(dirPath, rel);
+    try { if (fs.existsSync(abs)) fs.unlinkSync(abs); } catch { /* ignore */ }
+  }
+}
+
+/**
+ * Extract an archive to destDir, omitting junk files (unless listed in
+ * preservePaths — files flagged but kept anyway by user choice).
+ * Portable — reads via the doorserver's own LHA/ZIP readers.
+ */
+export function extractClean(archivePath: string, destDir: string, preservePaths?: Set<string>): void {
+  const patterns = loadPatterns();
+  const fingerprints = loadFingerprints();
+  const files = readArchiveFiles(archivePath);
+  const plan = deriveStripPlan(files, patterns.filenamePatterns, fingerprints);
+  const stripPaths = new Set(plan.stripped.filter(e => !preservePaths?.has(e.path)).map(e => e.path));
+
+  fs.mkdirSync(destDir, { recursive: true });
+  const destRoot = path.normalize(destDir + path.sep);
+
+  for (const file of files) {
+    if (stripPaths.has(file.path)) continue;
+
+    const outPath = path.normalize(path.join(destDir, file.path));
+    if (!outPath.startsWith(destRoot)) continue; // zip-slip guard
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, file.buf);
+  }
 }
