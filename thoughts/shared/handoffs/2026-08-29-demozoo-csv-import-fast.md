@@ -82,24 +82,65 @@ Steps:
 
 ## Local → live workflow
 
+The live doorserver runs in a Docker container on the Hetzner VPS. The
+DB and archive root are inside the container at `/data/doors.db` and
+`/data/Archives`, mounted from the `doorserver-data` named volume.
+
+**You need to be able to reach the VPS via SSH.** I can't from this
+local env, so the steps below are what YOU run.
+
 ```bash
 # ── LOCAL: import + build bundle (run once, takes ~90 sec) ───────────
 cd /Users/spot/Code/amiexpress-doorserver
 npx tsx scripts/demozoo-csv-import.ts /Users/spot/Downloads/bbs-doors.csv --concurrency=16
 npx tsx scripts/demozoo-sync-bundle.ts /tmp/demozoo-bundle
 
-# ── LOCAL: ship bundle to live (rsync, takes ~10 sec for 60 MB) ──────
-rsync -avz /tmp/demozoo-bundle/ root@<vps>:/tmp/demozoo-bundle/
+# ── LOCAL: pull latest code, push if needed (already at a370356) ─────
+git status --short
+git push  # if anything is uncommitted
 
-# ── LIVE: apply bundle (takes ~30 sec, includes sha256 verify) ───────
-ssh root@<vps> 'cd /app/doorserver && \
-  git pull && npm run build && \
-  DOORSERVER_DB="/var/lib/docker/volumes/doorserver-data/_data/doors.db" \
-  DOOR_ARCHIVES_ROOT="/var/lib/docker/volumes/amiexpress-bbs-data/_data/bbs" \
-  npx tsx scripts/demozoo-sync-apply.ts /tmp/demozoo-bundle'
+# ── LIVE: redeploy so the new scripts (sync-apply) are in the image ──
+# Easiest path: trigger the deploy workflow in GitHub Actions.
+# Alternative: SSH in and rebuild the container manually.
+gh workflow run deploy.yml  # or whatever your deploy workflow is called
+
+# ── LIVE: copy the bundle INTO the running container ────────────────
+# (docker cp is the right tool — the bundle is too big to mount as a
+#  volume, and we want it gone after apply)
+VPS_USER=spot           # your SSH user on the Hetzner box
+CONTAINER=amiexpress-doorserver-doorserver-1   # or `docker ps` to find it
+scp -r /tmp/demozoo-bundle ${VPS_USER}@<vps>:/tmp/demozoo-bundle
+ssh ${VPS_USER}@<vps> "docker cp /tmp/demozoo-bundle ${CONTAINER}:/tmp/demozoo-bundle"
+
+# ── LIVE: apply the bundle inside the container ─────────────────────
+ssh ${VPS_USER}@<vps> "docker exec -w /app/doorserver ${CONTAINER} \
+  npx tsx scripts/demozoo-sync-apply.ts /tmp/demozoo-bundle"
+
+# ── LIVE: clean up the bundle from the container + host ─────────────
+ssh ${VPS_USER}@<vps> "docker exec ${CONTAINER} rm -rf /tmp/demozoo-bundle && \
+                        rm -rf /tmp/demozoo-bundle"
 ```
 
 Total time on live: 2-3 minutes. No downloads against scene.org.
+
+**To find the live container name:**
+```bash
+ssh ${VPS_USER}@<vps> 'docker ps --format "{{.Names}}" | grep doorserver'
+```
+
+**To verify the apply worked:**
+```bash
+ssh ${VPS_USER}@<vps> "docker exec ${CONTAINER} sqlite3 /data/doors.db \
+  'SELECT source, COUNT(*) FROM door_catalog GROUP BY source'"
+# expect: demozoo|1600  scan|4287  submission|4  (or similar)
+```
+
+**Rollback if anything looks wrong:** the apply is fully idempotent,
+so re-running it is safe. If a row was inserted that you don't want,
+delete the row from the DB and `rm` the file from `/data/Archives/Submitted/`
+inside the container. There's no migration-tracking table; the bundle
+just re-applies the same state.
+
 
 ## What was actually run locally
 
