@@ -21,18 +21,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          rm -rf /tmp/demozoo-bundle
-          mkdir -p /tmp/demozoo-bundle
+          BUNDLE_DIR="${RUNNER_TEMP}/demozoo-bundle"
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p "$BUNDLE_DIR"
           gh release download "${{ inputs.release_tag }}" \
             --repo "$GITHUB_REPOSITORY" \
-            --dir /tmp/demozoo-bundle \
+            --dir "$BUNDLE_DIR" \
             --pattern 'patch.sql' \
             --pattern 'submitted-files.tar.gz' \
             --pattern 'manifest.json'
-          ls -la /tmp/demozoo-bundle/
-          test -s /tmp/demozoo-bundle/patch.sql
-          test -s /tmp/demozoo-bundle/submitted-files.tar.gz
-          test -s /tmp/demozoo-bundle/manifest.json
+          echo "== downloaded files =="
+          ls -la "$BUNDLE_DIR"
+          test -s "$BUNDLE_DIR/patch.sql"
+          test -s "$BUNDLE_DIR/submitted-files.tar.gz"
+          test -s "$BUNDLE_DIR/manifest.json"
+          # Persist for next step
+          echo "BUNDLE_DIR=${BUNDLE_DIR}" >> "$GITHUB_ENV"
+          echo "::notice title=bundle staged::${BUNDLE_DIR}"
 
       - name: Copy bundle to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -40,12 +45,14 @@ jobs:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "/tmp/demozoo-bundle"
+          source: "${{ env.BUNDLE_DIR }}"
           target: "/tmp/demozoo-bundle"
           overwrite: true
 
       - name: Apply bundle in doorserver container
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          BUNDLE_DIR: ${{ env.BUNDLE_DIR }}
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
@@ -53,6 +60,7 @@ jobs:
           command_timeout: 15m
           script: |
             set -euo pipefail
+            echo "== bundle on VPS =="
             ls -la /tmp/demozoo-bundle/
             CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])doorserver([-_]|$)' | head -1)
             if [ -z "$CONTAINER" ]; then
