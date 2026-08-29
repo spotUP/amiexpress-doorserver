@@ -30,23 +30,19 @@ jobs:
             git fetch --prune origin main
             git reset --hard origin/main
             echo "== ensure .env is in place =="
-            # The .env file is gitignored (correctly — it holds a signing
+            # The .env file is gitignored (correctly - it holds a signing
             # secret). The deploy workflow writes it from a GitHub Actions
             # secret on every run, so a container restart never has to guess
             # what's in the file. If the secret isn't set, the script
-            # writes a placeholder and the admin API will return 503 — the
+            # writes a placeholder and the admin API will return 503 - the
             # public site keeps working.
             if [ -n "${DOORSERVER_JWT_SECRET:-}" ]; then
-              cat > .env <<EOF
-DOORSERVER_JWT_SECRET=${DOORSERVER_JWT_SECRET}
-EOF
+              printf 'DOORSERVER_JWT_SECRET=%s\n' "${DOORSERVER_JWT_SECRET}" > .env
               chmod 600 .env
               echo "[OK] .env written from secret"
             elif [ ! -f .env ]; then
+              printf 'DOORSERVER_JWT_SECRET=\n' > .env
               echo "[WARN] DOORSERVER_JWT_SECRET not set in workflow; admin API will be disabled"
-              cat > .env <<'EOF'
-DOORSERVER_JWT_SECRET=
-EOF
             fi
             echo "== prune builder cache + dangling/unused images (host runs at 91% disk, 3.6 GB free) =="
             docker builder prune -f
