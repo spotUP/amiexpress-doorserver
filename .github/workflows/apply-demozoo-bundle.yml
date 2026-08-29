@@ -35,24 +35,24 @@ jobs:
           test -s "$BUNDLE_DIR/patch.sql"
           test -s "$BUNDLE_DIR/submitted-files.tar.gz"
           test -s "$BUNDLE_DIR/manifest.json"
-          # Persist for next step
+          # appleboy/scp-action tars the source dir with its base name.
+          # Pass the CONTENTS directory (.) so files land directly at
+          # /tmp/demozoo-bundle on the VPS.
           echo "BUNDLE_DIR=${BUNDLE_DIR}" >> "$GITHUB_ENV"
-          echo "::notice title=bundle staged::${BUNDLE_DIR}"
 
-      - name: Copy bundle to VPS
+      - name: Copy bundle contents to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "${{ env.BUNDLE_DIR }}"
+          source: "${{ env.BUNDLE_DIR }}/*"
           target: "/tmp/demozoo-bundle"
+          strip_components: 0
           overwrite: true
 
       - name: Apply bundle in doorserver container
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          BUNDLE_DIR: ${{ env.BUNDLE_DIR }}
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
@@ -70,16 +70,16 @@ jobs:
             fi
             echo "== container: $CONTAINER =="
             echo "== before =="
-            docker exec "$CONTAINER" sqlite3 /data/doors.db \
-              "SELECT source, COUNT(*) FROM door_catalog GROUP BY source"
+            docker exec -w /app/doorserver "$CONTAINER" \
+              npx tsx scripts/db-stats.ts /data/doors.db
             echo "== copy bundle into container =="
             docker cp /tmp/demozoo-bundle "$CONTAINER:/tmp/demozoo-bundle"
             echo "== apply =="
             docker exec -w /app/doorserver "$CONTAINER" \
               npx tsx scripts/demozoo-sync-apply.ts /tmp/demozoo-bundle
             echo "== after =="
-            docker exec "$CONTAINER" sqlite3 /data/doors.db \
-              "SELECT source, COUNT(*) FROM door_catalog GROUP BY source"
+            docker exec -w /app/doorserver "$CONTAINER" \
+              npx tsx scripts/db-stats.ts /data/doors.db
             echo "== cleanup =="
             docker exec "$CONTAINER" rm -rf /tmp/demozoo-bundle
             rm -rf /tmp/demozoo-bundle
