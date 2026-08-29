@@ -37,6 +37,7 @@ import * as crypto from 'crypto';
 import { loadConfig } from '../src/config';
 import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
+import { readLhaContents, readZipContents, readLzxContents, type ArchiveContents } from '../src/archive-reader';
 
 // ─── CSV parser ──────────────────────────────────────────────────────────────
 
@@ -521,12 +522,29 @@ async function main() {
     `INSERT INTO door_catalog
        (id, archive_name, archive_path, name, door_type, version, author,
         release_date, platform, download_url, demozoo_url, release_group,
+        file_id_diz, doc_filename, doc_raw,
         archive_size, md5, sha256, source, indexed_at)
-     VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
+     VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
   );
   const trackStmt = db.prepare(
     'INSERT OR IGNORE INTO demozoo_csv_imported (row_num, demozoo_url, archive_name) VALUES (?, ?, ?)'
   );
+  const insertFileStmt = db.prepare(
+    'INSERT OR IGNORE INTO door_catalog_files (catalog_id, path, size) VALUES (?, ?, ?)'
+  );
+
+  // Pick the right archive reader based on extension. LZX support
+  // requires the WASM module; if it isn't available, we get an empty
+  // result rather than a crash, which is fine — the rest of the row
+  // still goes in, the curator can fill the DIZ in by hand if needed.
+  function readContents(archivePath: string): ArchiveContents {
+    const buf = fs.readFileSync(archivePath);
+    const ext = path.extname(archivePath).toLowerCase();
+    if (ext === '.lha' || ext === '.lzh') return readLhaContents(buf, archivePath);
+    if (ext === '.lzx') return readLzxContents(buf);
+    if (ext === '.zip') return readZipContents(buf);
+    return { files: [], fileIdDiz: null, docFilename: null, doc: null };
+  }
 
   // Async lock — better-sqlite3 is synchronous so concurrent JS tasks
   // would interleave their .run() calls. Each DB write goes through
@@ -540,19 +558,21 @@ async function main() {
     try { return fn(); } finally { resolveNext(); }
   };
 
-  // Register an existing file on disk: hash it, insert the DB row.
-  // The "file already exists" branch is what makes a re-run after a
-  // partial download recover. The serial version skipped this and just
-  // counted it as a skip — meaning the local DB ended up with 0 demozoo
-  // rows even though 1600 files were sitting in Submitted/. That was
-  // the silent-loss bug. Hashing 1600 small files takes a few seconds
-  // total and is much cheaper than re-downloading them.
+  // Register an existing file on disk: hash it, read its FILE_ID.DIZ,
+  // insert the DB row + file list. The "file already exists" branch is
+  // what makes a re-run after a partial download recover. The serial
+  // version skipped this and just counted it as a skip — meaning the
+  // local DB ended up with 0 demozoo rows even though 1600 files were
+  // sitting in Submitted/. That was the silent-loss bug. Hashing 1600
+  // small files takes a few seconds total and is much cheaper than
+  // re-downloading them. Reading the DIZ is another few seconds.
   const registerExisting = async (row: CsvRow, destPath: string, filename: string) => {
     const split = splitNameAndVersion(row.title, filename.replace(/\.(lha|lzx|lzh|zip|dms)$/i, ''));
     const buf = fs.readFileSync(destPath);
     const md5 = crypto.createHash('md5').update(buf).digest('hex');
     const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
     const size = buf.length;
+    const contents = readContents(destPath);
     if (dryRun) {
       newDoors++;
       await withDb(() => { try { trackStmt.run(row.rowNum, row.demozooUrl, filename); } catch {} });
@@ -574,14 +594,20 @@ async function main() {
           row.downloadUrl || null,
           row.demozooUrl || null,
           null,
+          contents.fileIdDiz,
+          contents.docFilename,
+          contents.doc,
           size,
           md5,
           sha256,
         );
+        for (const f of contents.files) {
+          try { insertFileStmt.run(catalogId, f.path, f.size); } catch {}
+        }
         try { trackStmt.run(row.rowNum, row.demozooUrl, filename); } catch {}
       });
       newDoors++;
-      if (process.env.CSV_VERBOSE) process.stderr.write(`\n[csv] registered existing row ${row.rowNum} ${filename} (${size} bytes)\n`);
+      if (process.env.CSV_VERBOSE) process.stderr.write(`\n[csv] registered existing row ${row.rowNum} ${filename} (${size} bytes, ${contents.fileIdDiz ? 'DIZ ' + contents.fileIdDiz.length + ' chars' : 'no DIZ'}, ${contents.files.length} files)\n`);
       progress2.tick(true, size);
     } catch (e: any) {
       errors++;
@@ -623,6 +649,7 @@ async function main() {
         return;
       }
       const split = splitNameAndVersion(row.title, filename.replace(/\.(lha|lzx|lzh|zip|dms)$/i, ''));
+      const contents = readContents(destPath);
       const catalogId = crypto.randomUUID();
       try {
         await withDb(() => {
@@ -638,14 +665,20 @@ async function main() {
             row.downloadUrl || null,
             row.demozooUrl || null,
             null,
+            contents.fileIdDiz,
+            contents.docFilename,
+            contents.doc,
             dl.size,
             dl.md5,
             dl.sha256,
           );
+          for (const f of contents.files) {
+            try { insertFileStmt.run(catalogId, f.path, f.size); } catch {}
+          }
           try { trackStmt.run(row.rowNum, row.demozooUrl, filename); } catch {}
         });
         newDoors++;
-        if (process.env.CSV_VERBOSE) process.stderr.write(`\n[csv] new door inserted row ${row.rowNum} ${filename} (${dl.size} bytes)\n`);
+        if (process.env.CSV_VERBOSE) process.stderr.write(`\n[csv] new door inserted row ${row.rowNum} ${filename} (${dl.size} bytes, ${contents.fileIdDiz ? 'DIZ ' + contents.fileIdDiz.length + ' chars' : 'no DIZ'}, ${contents.files.length} files)\n`);
         progress2.tick(true, dl.bytesFromNetwork);
       } catch (e: any) {
         errors++;

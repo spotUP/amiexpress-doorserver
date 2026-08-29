@@ -81,11 +81,26 @@ async function main() {
   //    UPDATE that sets all the patchable columns in one statement.
   const backfillRows = db.prepare(`
     SELECT id, archive_name, name, version, author, release_date, platform,
-           download_url, release_group, demozoo_url
+           download_url, release_group, demozoo_url, file_id_diz, doc_filename, doc_raw
       FROM door_catalog
      WHERE source = 'scan'
        AND demozoo_url IS NOT NULL
   `).all() as any[];
+
+  // 2b. DIZ-only backfill: every row that now has a file_id_diz
+  //     populated locally (extracted from the archive by the CSV
+  //     importer or by demozoo-backfill-diz.ts) but might be missing
+  //     it on the live side. We emit a UPDATE that COALESCEs the
+  //     values so it's non-destructive on re-apply.
+  const dizBackfillRows = db.prepare(`
+    SELECT id, file_id_diz, doc_filename, doc_raw
+      FROM door_catalog
+     WHERE file_id_diz IS NOT NULL AND file_id_diz != ''
+       AND (
+         source = 'demozoo'
+         OR (source = 'scan' AND demozoo_url IS NOT NULL)
+       )
+  `).all() as { id: string; file_id_diz: string; doc_filename: string | null; doc_raw: string | null }[];
 
   // 3. List of files referenced by the new rows that exist on disk.
   const files: { archiveName: string; size: number; sha256: string }[] = [];
@@ -163,6 +178,24 @@ async function main() {
     out.write('\n');
   }
 
+  // DIZ backfill — write file_id_diz (and doc_filename, doc_raw) into
+  // rows that have them locally but might be missing them on the live
+  // side. COALESCE keeps the patch non-destructive: a curator who has
+  // already set their own DIZ in the admin console keeps it.
+  if (dizBackfillRows.length) {
+    out.write(`-- DIZ backfill (COALESCE — preserves any curator-set DIZ on the live side)\n`);
+    for (const r of dizBackfillRows) {
+      out.write(
+        `UPDATE door_catalog SET\n` +
+        `  file_id_diz = COALESCE(file_id_diz, ${quote(r.file_id_diz)}),\n` +
+        `  doc_filename = COALESCE(doc_filename, ${quote(r.doc_filename)}),\n` +
+        `  doc_raw = COALESCE(doc_raw, ${quote(r.doc_raw)})\n` +
+        `WHERE id = ${quote(r.id)};\n`,
+      );
+    }
+    out.write('\n');
+  }
+
   out.write('COMMIT;\n');
   out.end();
   await new Promise<void>((r) => out.on('finish', () => r()));
@@ -198,6 +231,7 @@ async function main() {
     counts: {
       newDemozooRows: newRows.length,
       backfilledScanRows: backfillRows.length,
+      dizBackfillRows: dizBackfillRows.length,
       filesInTarball: files.length,
     },
     sizes: {
