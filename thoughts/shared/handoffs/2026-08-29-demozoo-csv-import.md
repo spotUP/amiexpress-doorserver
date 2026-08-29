@@ -34,6 +34,22 @@ status: final
    - 1678 new doors queued for download (--no-download mode)
    - 132 rows skipped (empty download URL)
 
+## Current status (2026-08-29)
+
+Local DB run is in progress:
+- Backfill: 402 existing doors enriched with demozoo_url
+- New downloads: ~50 done in first 2 minutes (rate limited by scene.org
+  at ~30/min). 1717 total to download.
+- Skipped (no filename): 132 rows (empty download URLs in the CSV)
+
+Script runs in background. To monitor:
+```bash
+tail -f /tmp/demozoo-csv-import.log
+ls /Users/spot/Code/amiexpress_doors/Archives/Submitted/ | wc -l
+sqlite3 /Users/spot/Code/amiexpress-doorserver/data/doors.db \
+  "SELECT source, COUNT(*) FROM door_catalog GROUP BY source"
+```
+
 ## To run on the live VPS
 
 After the code deploys (migration runs on start), SSH to the VPS and run
