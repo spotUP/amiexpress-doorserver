@@ -112,9 +112,28 @@ async function main() {
      WHERE file_id_diz IS NOT NULL AND file_id_diz != ''
        AND (
          source = 'demozoo'
-         OR (source = 'scan' AND demozoo_url IS NOT NULL)
-       )
+          OR (source = 'scan' AND demozoo_url IS NOT NULL)
+        )
   `).all() as { id: string; file_id_diz: string; doc_filename: string | null; doc_raw: string | null }[];
+
+  // 2c0. Demozoo API enrichment: write the credits / external_links /
+  //      screenshots / release_date the API scraper pulled down. These
+  //      were filled in by `scripts/demozoo-import.ts` running against
+  //      demozoo.org's API after the CSV import. The new-row INSERT
+  //      above uses OR IGNORE so it never updates existing rows on the
+  //      live side; this section is the one that does. COALESCE keeps
+  //      it non-destructive: a curator who has typed in their own
+  //      credits in the admin console keeps them.
+  const apiEnrichmentRows = db.prepare(`
+    SELECT id, release_date, credits, external_links, screenshots
+      FROM door_catalog
+     WHERE (source = 'demozoo'
+            OR (source = 'scan' AND demozoo_url IS NOT NULL))
+       AND (release_date IS NOT NULL AND release_date != ''
+            OR credits IS NOT NULL AND credits != ''
+            OR external_links IS NOT NULL AND external_links != ''
+            OR screenshots IS NOT NULL AND screenshots != '')
+  `).all() as { id: string; release_date: string | null; credits: string | null; external_links: string | null; screenshots: string | null }[];
 
   // 2c. door_catalog_files entries for the same set of rows. The
   //     scanner populates this table when it lists each archive's
@@ -249,6 +268,26 @@ async function main() {
     out.write('\n');
   }
 
+  // Demozoo API enrichment — write credits / external_links /
+  // screenshots / release_date pulled from demozoo.org's API.
+  // COALESCE on every field, same rule as DIZ backfill: live wins
+  // on a conflict (a curator's edits are not overwritten).
+  if (apiEnrichmentRows.length) {
+    out.write(`-- Demozoo API enrichment (COALESCE — preserves any curator-set values on live)\n`);
+    for (const r of apiEnrichmentRows) {
+      // Only emit columns that are non-null locally; the COALESCE on
+      // the apply side keeps it idempotent.
+      const sets: string[] = [];
+      if (r.release_date) sets.push(`  release_date = COALESCE(release_date, ${quote(r.release_date)})`);
+      if (r.credits) sets.push(`  credits = COALESCE(credits, ${quoteBlob(r.credits)})`);
+      if (r.external_links) sets.push(`  external_links = COALESCE(external_links, ${quoteBlob(r.external_links)})`);
+      if (r.screenshots) sets.push(`  screenshots = COALESCE(screenshots, ${quoteBlob(r.screenshots)})`);
+      if (sets.length === 0) continue;
+      out.write(`UPDATE door_catalog SET\n${sets.join(',\n')}\nWHERE id = ${quote(r.id)};\n`);
+    }
+    out.write('\n');
+  }
+
   // door_catalog_files — the archive member list. INSERT OR IGNORE
   // so re-applying is safe. The (catalog_id, path) primary key
   // prevents duplicates.
@@ -317,6 +356,7 @@ async function main() {
       newDemozooRows: newRows.length,
       backfilledScanRows: backfillRows.length,
       dizBackfillRows: dizBackfillRows.length,
+      apiEnrichmentRows: apiEnrichmentRows.length,
       doorCatalogFileRows: fileRows.length,
       releaseGroupUpserts: releaseGroupsToUpsert.length,
       filesInTarball: files.length,
