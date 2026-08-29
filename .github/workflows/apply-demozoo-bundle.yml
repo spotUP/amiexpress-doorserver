@@ -35,24 +35,33 @@ jobs:
           test -s "$BUNDLE_DIR/patch.sql"
           test -s "$BUNDLE_DIR/submitted-files.tar.gz"
           test -s "$BUNDLE_DIR/manifest.json"
-          # Pack into a single tarball so we can scp ONE file. scp-action
-          # has weird behaviour with directory sources; one file is
-          # reliable.
+          # Pack into a single tarball for one-shot transfer.
           cd "$BUNDLE_DIR"
           tar czf "${RUNNER_TEMP}/demozoo-bundle.tar.gz" \
             patch.sql submitted-files.tar.gz manifest.json
           ls -la "${RUNNER_TEMP}/demozoo-bundle.tar.gz"
 
-      - name: Copy single tarball to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: root
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "${{ runner.temp }}/demozoo-bundle.tar.gz"
-          target: "/tmp/demozoo-bundle.tar.gz"
-          strip_components: 0
-          overwrite: true
+      - name: rsync tarball to VPS
+        # appleboy/scp-action always creates a folder, even for a
+        # single file. The reliable alternative is rsync over SSH
+        # using the secret key written to a tmpfile. This puts the
+        # tarball at /tmp/demozoo-bundle.tar.gz on the VPS.
+        env:
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          KEY_FILE=~/.ssh/hetzner_apply_key
+          printf '%s\n' "$HETZNER_SSH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          # known_hosts: skip host key check (deploy-doorserver.yml
+          # has the same setup). For one-shot workflows this is
+          # acceptable; for recurring ones, set up known_hosts properly.
+          rsync -avz -e "ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            "${RUNNER_TEMP}/demozoo-bundle.tar.gz" \
+            "root@${HETZNER_HOST}:/tmp/demozoo-bundle.tar.gz"
+          rm -f "$KEY_FILE"
 
       - name: Apply bundle in doorserver container
         uses: appleboy/ssh-action@v1.0.3
