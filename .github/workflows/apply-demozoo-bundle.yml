@@ -72,42 +72,31 @@ jobs:
           command_timeout: 15m
           script: |
             set -euo pipefail
-            BUNDLE=/tmp/demozoo-bundle
-            rm -rf "$BUNDLE"
-            mkdir -p "$BUNDLE"
-            tar xzf /tmp/demozoo-bundle.tar.gz -C "$BUNDLE"
-            echo "== bundle on VPS =="
-            ls -la "$BUNDLE/"
-
-            CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])doorserver([-_]|$)' | head -1)
-            if [ -z "$CONTAINER" ]; then
-              echo "ERROR: no doorserver container found"
-              docker ps -a
-              exit 1
+            # Debug: see what /tmp/ looks like on the VPS.
+            echo "== /tmp/ on VPS =="
+            ls -la /tmp/ | head -20
+            echo "== file type of /tmp/demozoo-bundle.tar.gz =="
+            file /tmp/demozoo-bundle.tar.gz || true
+            stat /tmp/demozoo-bundle.tar.gz || true
+            echo "== size if file =="
+            if [ -f /tmp/demozoo-bundle.tar.gz ]; then
+              ls -la /tmp/demozoo-bundle.tar.gz
             fi
-            echo "== container: $CONTAINER =="
-
-            # /app is the container cwd. Compiled scripts live at
-            # /app/dist/scripts. Use node + the compiled .js.
-            echo "== before =="
-            docker exec -w /app "$CONTAINER" \
-              node dist/scripts/db-stats.js /data/doors.db
-
-            echo "== copy bundle into container =="
-            docker cp "$BUNDLE" "$CONTAINER:/tmp/demozoo-bundle"
-
-            echo "== apply =="
-            docker exec -w /app "$CONTAINER" \
-              sh -c 'DOORSERVER_DB=/data/doors.db DOOR_ARCHIVES_ROOT=/data/Archives node dist/scripts/demozoo-sync-apply.js /tmp/demozoo-bundle'
-
-            echo "== after =="
-            docker exec -w /app "$CONTAINER" \
-              node dist/scripts/db-stats.js /data/doors.db
-
-            echo "== cleanup =="
-            docker exec "$CONTAINER" rm -rf /tmp/demozoo-bundle
-            rm -rf "$BUNDLE" /tmp/demozoo-bundle.tar.gz
-            echo "== done =="
+            echo "== content if dir =="
+            if [ -d /tmp/demozoo-bundle.tar.gz ]; then
+              ls -la /tmp/demozoo-bundle.tar.gz/
+            fi
+            # If it's a dir from a previous failed run, nuke it.
+            rm -rf /tmp/demozoo-bundle.tar.gz
+            # We need to re-transfer. The bundle should already be
+            # on the VPS from the rsync step, but if it got put in
+            # a folder somehow, we need to pull the actual file.
+            # Use the bundle files directly from the release instead
+            # of the tarball — split the rsync into per-file copies
+            # that won't get auto-foldered.
+            echo "== after cleanup =="
+            ls -la /tmp/demozoo-bundle.tar.gz 2>&1 || true
+            exit 1  # FAIL HERE so we can see the debug output
 
       - name: Delete draft release (one-shot)
         if: success()
