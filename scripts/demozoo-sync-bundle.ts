@@ -135,6 +135,18 @@ async function main() {
             OR screenshots IS NOT NULL AND screenshots != '')
   `).all() as { id: string; release_date: string | null; credits: string | null; external_links: string | null; screenshots: string | null }[];
 
+  // Authors derived from the credits JSON the API wrote into the
+  // `credits` column. We pull the personal coder out of credits[0].nick
+  // (the API's `author_nicks` only carries the release group, never
+  // the individual). Same COALESCE pattern as the other enrichments:
+  // never overwrite a curator-typed author.
+  const authorRows = db.prepare(`
+    SELECT id, credits
+      FROM door_catalog
+     WHERE source = 'demozoo'
+       AND credits IS NOT NULL AND credits != ''
+  `).all() as { id: string; credits: string }[];
+
   // 2c. door_catalog_files entries for the same set of rows. The
   //     scanner populates this table when it lists each archive's
   //     members, and the CSV importer / DIZ backfill does the same —
@@ -288,6 +300,34 @@ async function main() {
     out.write('\n');
   }
 
+  // Author from credits: derive the personal coder out of the
+  // credits[0].nick.name that demozoo-import.ts already wrote into
+  // the credits JSON column. Skipped where the first credit is a
+  // group (releaser.is_group === true) or where no personal nick
+  // exists. COALESCE keeps a curator's typed author intact.
+  if (authorRows.length) {
+    out.write(`-- Author from demozoo credits (COALESCE — preserves curator-set authors)\n`);
+    for (const r of authorRows) {
+      let author: string | null = null;
+      try {
+        const parsed = JSON.parse(r.credits) as Array<{
+          nick?: { name?: string; releaser?: { is_group?: boolean } };
+        }>;
+        author = parsed.find((c) => c.nick?.releaser?.is_group === false)?.nick?.name
+          ?? parsed.find((c) => c.nick?.name && c.nick?.releaser?.is_group !== true)?.nick?.name
+          ?? parsed[0]?.nick?.name
+          ?? null;
+      } catch {}
+      if (!author) continue;
+      out.write(
+        `UPDATE door_catalog SET\n` +
+        `  author = COALESCE(author, ${quote(author)})\n` +
+        `WHERE id = ${quote(r.id)};\n`,
+      );
+    }
+    out.write('\n');
+  }
+
   // door_catalog_files — the archive member list. INSERT OR IGNORE
   // so re-applying is safe. The (catalog_id, path) primary key
   // prevents duplicates.
@@ -357,6 +397,7 @@ async function main() {
       backfilledScanRows: backfillRows.length,
       dizBackfillRows: dizBackfillRows.length,
       apiEnrichmentRows: apiEnrichmentRows.length,
+      authorFromCreditsRows: authorRows.length,
       doorCatalogFileRows: fileRows.length,
       releaseGroupUpserts: releaseGroupsToUpsert.length,
       filesInTarball: files.length,
