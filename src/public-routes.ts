@@ -104,7 +104,7 @@ interface DoorJson {
   catalogName: string;
   /** Where the displayed name came from: 'archive' means it is a guess. */
   nameSource: NameSource;
-  description: string;
+  description: string | null;
   descriptionSource: 'edited' | 'diz';
   version: string | null;
   author: string | null;
@@ -165,7 +165,7 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     name: named.name,
     catalogName: corrected.name,
     nameSource: nameEdited ? 'catalog' : named.source,
-    description: edited ? corrected.description ?? '' : facts.description,
+    description: edited ? (corrected.description || null) : facts.description,
     descriptionSource: edited ? 'edited' : 'diz',
     version: corrected.version ?? facts.version ?? null,
     author: corrected.author ?? (facts.author || null),

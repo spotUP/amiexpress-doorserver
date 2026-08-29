@@ -56,7 +56,7 @@ function run() {
         derived = existingOverrides.get(row.id)!;
       } else {
         // Derive from DIZ via the classifier
-        derived = analyseDoor(
+        const fromDiz = analyseDoor(
           {
             dizText: row.file_id_diz,
             name: row.name,
@@ -67,6 +67,7 @@ function run() {
           },
           groupTags
         ).description;
+        derived = fromDiz ?? '';
       }
 
       const fixed = fixCasing(derived);

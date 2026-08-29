@@ -40,7 +40,7 @@ function read(
   archiveName: string,
   extra?: { version?: string | null; author?: string | null }
 ) {
-  return analyseDoor(
+  const facts = analyseDoor(
     {
       dizText: diz,
       name,
@@ -51,6 +51,7 @@ function read(
     },
     TAGS
   );
+  return { ...facts, description: facts.description ?? '' };
 }
 
 const JC40 = [
@@ -334,9 +335,11 @@ describe('falling back', () => {
     expect(version).toBe('1.1');
   });
 
-  it('names a door after its archive rather than leaving it blank', () => {
+  it('returns no description when the only prose is a credit (was: archive name)', () => {
     // The real KDZ!LUDB.LHA: its one prose line is a credit, so the author
-    // field takes the whole of it and nothing is left to describe the door.
+    // field takes the whole of it. With the new "no description is better
+    // than a misleading one" rule, the description comes back as '' rather
+    // than the archive base name.
     const diz = [
       '  ___. __________   __. _________',
       ' /   |/  _/   __ \\_/  |/  _/  __/__   kEKS',
@@ -348,7 +351,7 @@ describe('falling back', () => {
     ].join('\n');
     const { description, author } = read(diz, null, 'LE-win5-96.exe', 'KDZ!LUDB.LHA');
     expect(author).toContain('Seraph');
-    expect(description).toBe('Ludb');
+    expect(description).toBe('');
   });
 
   it('uses the catalog name when every DIZ line is art', () => {

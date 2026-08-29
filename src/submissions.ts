@@ -303,7 +303,7 @@ function firstNameLine(diz: string | null): string | null {
 
 export interface DerivedMetadata {
   name: string;
-  description: string;
+  description: string | null;
   version: string;
   author: string;
   requiresBbs: string;

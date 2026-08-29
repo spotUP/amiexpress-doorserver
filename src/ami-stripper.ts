@@ -68,7 +68,14 @@ function loadPatterns(): PatternDb {
   if (!fs.existsSync(PATTERNS_JSON)) {
     return { filenamePatterns: [], dizPatterns: [] };
   }
-  return JSON.parse(fs.readFileSync(PATTERNS_JSON, 'utf-8'));
+  const loaded = JSON.parse(fs.readFileSync(PATTERNS_JSON, 'utf-8')) as PatternDb;
+  // Filter out patterns that would match every file. A glob of just '*'
+  // or '?' or '.*.*.*...' would mark every archive member as junk on
+  // the next preview. The POST /learn route already refuses to insert
+  // these, so this is a belt-and-suspenders for data the file might
+  // have picked up before that guard was added.
+  const safeGlobs = (loaded.filenamePatterns ?? []).filter((p) => !/^[*?]+$/.test(p) && !/^\.\*(\.\*)*$/.test(p));
+  return { filenamePatterns: safeGlobs, dizPatterns: loaded.dizPatterns ?? [] };
 }
 
 function loadFingerprints(): FingerprintDb {
@@ -482,9 +489,20 @@ export function analyzeDirectory(dirPath: string): StripResult {
     let entries: string[];
     try { entries = fs.readdirSync(absDir); } catch { return; }
     for (const name of entries) {
+      // Skip members whose basename is just a glob meta-character ("*"
+      // and "?"). The strip-preview already tags them via the ILLEGAL
+      // rule for files inside archives, but on a real filesystem a
+      // directory entry named exactly "*" or "?" cannot exist on most
+      // platforms, and a stray broken symlink can throw from
+      // fs.statSync and abort the whole scan. The try/catch is the
+      // safety net; the basename filter is the cheap preventive.
+      const base = name.split('/').pop() ?? name;
+      if (base === '*' || base === '?') continue;
+
       const absPath = path.join(absDir, name);
       const relPath = relPrefix ? `${relPrefix}/${name}` : name;
-      const stat = fs.statSync(absPath);
+      let stat: fs.Stats;
+      try { stat = fs.statSync(absPath); } catch { continue; }
       if (stat.isDirectory()) { scanDir(absPath, relPath); continue; }
       let buf: Buffer;
       try { buf = fs.readFileSync(absPath); } catch { continue; }

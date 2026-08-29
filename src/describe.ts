@@ -1091,8 +1091,13 @@ export function readName(
 // ─── the whole reading ─────────────────────────────────────────────────
 
 export interface DoorFacts {
-  /** One line, at most 60 characters, of what the door is. */
-  description: string;
+  /**
+   * One line, at most 60 characters, of what the door is. null when the
+   * DIZ is just an ASCII art banner with no real description - in that
+   * case the UI shows nothing rather than the program's title or
+   * group credit (which would be misleading).
+   */
+  description: string | null;
   /** The door's own version ("1.05"), or ''. */
   version: string;
   /** Who coded it ("Killraven/Mystic"), or ''. */
@@ -1152,13 +1157,15 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
   prog = capitaliseName(stripVersionTail(prog, ver.version));
   if (prog && progCoveredByBody(prog, body)) prog = '';
 
-  let description = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))));
+  let description: string | null = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))));
   if (!description) {
-    // Everything the DIZ offered was a credit: KDZ!LUDB.LHA's only prose
-    // line is "dONE bY sERAPH - !BUGFIXED VERSION", which moves wholesale
-    // into the author field and leaves nothing behind. A row with no
-    // description at all is worse than one named after its archive.
-    description = finalise(toPlain(tidyCase(prettifyInText(archiveBase(input.archiveName), groupTags))));
+    // Everything the DIZ offered was a credit (KDZ!LUDB.LHA's only
+    // prose line is "dONE bY sERAPH - !BUGFIXED VERSION", which moves
+    // wholesale into the author field) or a banner with no real
+    // description. Rather than fall back to the program name and
+    // mislead the UI into showing a title, return null - the field
+    // simply has no description.
+    description = null;
   }
 
   return {

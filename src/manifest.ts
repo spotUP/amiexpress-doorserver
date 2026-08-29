@@ -230,9 +230,9 @@ export function fetchCatalogRows(cfg: ServerConfig, opts?: CatalogQuery): DoorCa
  * One row's description: what a human wrote if anyone has, otherwise what
  * ./describe.ts reads out of the door's FILE_ID.DIZ.
  */
-export function describeRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string {
+export function describeRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string | null {
   if (row.description_overridden) {
-    return row.description ?? '';
+    return row.description ?? null;
   }
   return analyseDoor(
     {

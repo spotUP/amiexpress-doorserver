@@ -995,6 +995,14 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       res.status(400).json({ error: 'pattern is required' });
       return;
     }
+    // Reject patterns that would match every file: bare '*' or '?', or any
+    // pattern whose compiled form is anchored on both ends and contains
+    // only wildcards. Without this guard, learning a single '*' file
+    // would mark every future door as junk.
+    if (/^[*?]+$/.test(pattern) || /^\.\*(\.\*)*$/.test(pattern)) {
+      res.status(400).json({ error: `pattern '${pattern}' would match every file - refuse to learn` });
+      return;
+    }
     const archiveName = typeof body.archiveName === 'string' ? body.archiveName : null;
     const filePath = typeof body.filePath === 'string' ? body.filePath : null;
     const db = openDb(cfg);

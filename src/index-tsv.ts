@@ -66,7 +66,7 @@ function renderRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string 
   const filename = tsvField(row.archive_name);
   const pathCol = tsvField(firstPathSegment(row.archive_path));
   const size = formatSize(row.archive_size ?? 0);
-  return `${filename}\t${pathCol}\t${size}\t${tsvField(describeRow(row, groupTags))}`;
+  return `${filename}\t${pathCol}\t${size}\t${tsvField(describeRow(row, groupTags) ?? '')}`;
 }
 
 export const TSV_HEADER = 'Filename\tPath\tSize\tDescription';
