@@ -59,14 +59,17 @@ function findSystemLha(): string | null {
 }
 
 /** Run `lha lq` against a file and return one line per member:
- *  "<size> <month> <day> <year> <filename>". Returns [] on any error. */
+ *  "<size> <month> <day> <year> <filename>". Returns [] on any error.
+ *  `lha` exits non-zero when it cannot read a header (corrupt members,
+ *  unknown compression levels) but still prints every member it CAN read,
+ *  so we accept any non-empty listing. */
 function listLhaViaSystem(bin: string, archivePath: string): { size: number; name: string }[] {
   const r = spawnSync(bin, ['lq', archivePath], {
     encoding: 'utf8',
     timeout: 30_000,
     env: { ...process.env, LC_ALL: 'C', LANG: 'C' },
   });
-  if (r.status !== 0 || !r.stdout) return [];
+  if (!r.stdout) return [];
   const out: { size: number; name: string }[] = [];
   for (const raw of r.stdout.split('\n')) {
     const line = raw.trim();
