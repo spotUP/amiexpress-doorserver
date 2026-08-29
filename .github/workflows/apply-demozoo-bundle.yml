@@ -30,23 +30,27 @@ jobs:
             --pattern 'patch.sql' \
             --pattern 'submitted-files.tar.gz' \
             --pattern 'manifest.json'
+          echo "== downloaded files =="
           ls -la "$BUNDLE_DIR"
           test -s "$BUNDLE_DIR/patch.sql"
           test -s "$BUNDLE_DIR/submitted-files.tar.gz"
           test -s "$BUNDLE_DIR/manifest.json"
-          echo "BUNDLE_DIR=${BUNDLE_DIR}" >> "$GITHUB_ENV"
+          # Pack into a single tarball so we can scp ONE file. scp-action
+          # has weird behaviour with directory sources; one file is
+          # reliable.
+          cd "$BUNDLE_DIR"
+          tar czf "${RUNNER_TEMP}/demozoo-bundle.tar.gz" \
+            patch.sql submitted-files.tar.gz manifest.json
+          ls -la "${RUNNER_TEMP}/demozoo-bundle.tar.gz"
 
-      - name: Copy bundle tarball to VPS
-        # appleboy/scp-action handles a single file cleanly; we already
-        # have a tarball, so just ship that. The manifest.json and
-        # patch.sql are tiny — re-tar everything for one transfer.
+      - name: Copy single tarball to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "${{ env.BUNDLE_DIR }}"
-          target: "/tmp/demozoo-stage"
+          source: "${{ runner.temp }}/demozoo-bundle.tar.gz"
+          target: "/tmp/demozoo-bundle.tar.gz"
           strip_components: 0
           overwrite: true
 
@@ -59,20 +63,11 @@ jobs:
           command_timeout: 15m
           script: |
             set -euo pipefail
-            # scp-action tars the source dir and untars on the target.
-            # Depending on the action version the contents land either at
-            # the target dir itself or under target/<dirname>/. Handle
-            # both.
-            if [ -f /tmp/demozoo-stage/patch.sql ]; then
-              BUNDLE=/tmp/demozoo-stage
-            elif [ -d /tmp/demozoo-stage/demozoo-bundle ]; then
-              BUNDLE=/tmp/demozoo-stage/demozoo-bundle
-            else
-              echo "ERROR: cannot find patch.sql under /tmp/demozoo-stage"
-              find /tmp/demozoo-stage -maxdepth 3 -type f
-              exit 1
-            fi
-            echo "== using bundle: $BUNDLE =="
+            BUNDLE=/tmp/demozoo-bundle
+            rm -rf "$BUNDLE"
+            mkdir -p "$BUNDLE"
+            tar xzf /tmp/demozoo-bundle.tar.gz -C "$BUNDLE"
+            echo "== bundle on VPS =="
             ls -la "$BUNDLE/"
 
             CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])doorserver([-_]|$)' | head -1)
@@ -83,10 +78,8 @@ jobs:
             fi
             echo "== container: $CONTAINER =="
 
-            # Workdir in the container is /app. Compiled scripts live at
-            # /app/dist/scripts. We can use either the .js directly or
-            # run via npx tsx (tsx is not installed in prod image, so use
-            # node + the compiled .js).
+            # /app is the container cwd. Compiled scripts live at
+            # /app/dist/scripts. Use node + the compiled .js.
             echo "== before =="
             docker exec -w /app "$CONTAINER" \
               node dist/scripts/db-stats.js /data/doors.db
@@ -104,7 +97,7 @@ jobs:
 
             echo "== cleanup =="
             docker exec "$CONTAINER" rm -rf /tmp/demozoo-bundle
-            rm -rf /tmp/demozoo-stage
+            rm -rf "$BUNDLE" /tmp/demozoo-bundle.tar.gz
             echo "== done =="
 
       - name: Delete draft release (one-shot)
