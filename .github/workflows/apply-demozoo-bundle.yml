@@ -46,6 +46,12 @@ jobs:
         # single file. The reliable alternative is rsync over SSH
         # using the secret key written to a tmpfile. This puts the
         # tarball at /tmp/demozoo-bundle.tar.gz on the VPS.
+        #
+        # IMPORTANT: rsync's default behaviour treats the destination
+        # as a directory if it already exists. After a previous failed
+        # run, /tmp/demozoo-bundle.tar.gz may be a directory, so the
+        # next run puts the file INSIDE it. The --no-target-directory
+        # flag tells rsync to refuse if the destination is a dir.
         env:
           HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
           HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
@@ -55,10 +61,12 @@ jobs:
           KEY_FILE=~/.ssh/hetzner_apply_key
           printf '%s\n' "$HETZNER_SSH_KEY" > "$KEY_FILE"
           chmod 600 "$KEY_FILE"
-          # known_hosts: skip host key check (deploy-doorserver.yml
-          # has the same setup). For one-shot workflows this is
-          # acceptable; for recurring ones, set up known_hosts properly.
-          rsync -avz -e "ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+          # Pre-cleanup: nuke any leftover from a previous failed run.
+          # (VPS doesn't have its own cleanup of /tmp.)
+          ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "root@${HETZNER_HOST}" 'rm -rf /tmp/demozoo-bundle.tar.gz /tmp/demozoo-bundle /tmp/demozoo-stage' || true
+          rsync -avz --no-target-directory \
+            -e "ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             "${RUNNER_TEMP}/demozoo-bundle.tar.gz" \
             "root@${HETZNER_HOST}:/tmp/demozoo-bundle.tar.gz"
           rm -f "$KEY_FILE"
@@ -72,31 +80,43 @@ jobs:
           command_timeout: 15m
           script: |
             set -euo pipefail
-            # Debug: see what /tmp/ looks like on the VPS.
-            echo "== /tmp/ on VPS =="
-            ls -la /tmp/ | head -20
-            echo "== file type of /tmp/demozoo-bundle.tar.gz =="
-            file /tmp/demozoo-bundle.tar.gz || true
-            stat /tmp/demozoo-bundle.tar.gz || true
-            echo "== size if file =="
-            if [ -f /tmp/demozoo-bundle.tar.gz ]; then
-              ls -la /tmp/demozoo-bundle.tar.gz
+            test -f /tmp/demozoo-bundle.tar.gz || { echo "missing tarball"; exit 1; }
+            BUNDLE=/tmp/demozoo-bundle
+            rm -rf "$BUNDLE"
+            mkdir -p "$BUNDLE"
+            tar xzf /tmp/demozoo-bundle.tar.gz -C "$BUNDLE"
+            echo "== bundle on VPS =="
+            ls -la "$BUNDLE/"
+
+            CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])doorserver([-_]|$)' | head -1)
+            if [ -z "$CONTAINER" ]; then
+              echo "ERROR: no doorserver container found"
+              docker ps -a
+              exit 1
             fi
-            echo "== content if dir =="
-            if [ -d /tmp/demozoo-bundle.tar.gz ]; then
-              ls -la /tmp/demozoo-bundle.tar.gz/
-            fi
-            # If it's a dir from a previous failed run, nuke it.
-            rm -rf /tmp/demozoo-bundle.tar.gz
-            # We need to re-transfer. The bundle should already be
-            # on the VPS from the rsync step, but if it got put in
-            # a folder somehow, we need to pull the actual file.
-            # Use the bundle files directly from the release instead
-            # of the tarball — split the rsync into per-file copies
-            # that won't get auto-foldered.
-            echo "== after cleanup =="
-            ls -la /tmp/demozoo-bundle.tar.gz 2>&1 || true
-            exit 1  # FAIL HERE so we can see the debug output
+            echo "== container: $CONTAINER =="
+
+            # /app is the container cwd. Compiled scripts live at
+            # /app/dist/scripts. Use node + the compiled .js.
+            echo "== before =="
+            docker exec -w /app "$CONTAINER" \
+              node dist/scripts/db-stats.js /data/doors.db
+
+            echo "== copy bundle into container =="
+            docker cp "$BUNDLE" "$CONTAINER:/tmp/demozoo-bundle"
+
+            echo "== apply =="
+            docker exec -w /app "$CONTAINER" \
+              sh -c 'DOORSERVER_DB=/data/doors.db DOOR_ARCHIVES_ROOT=/data/Archives node dist/scripts/demozoo-sync-apply.js /tmp/demozoo-bundle'
+
+            echo "== after =="
+            docker exec -w /app "$CONTAINER" \
+              node dist/scripts/db-stats.js /data/doors.db
+
+            echo "== cleanup =="
+            docker exec "$CONTAINER" rm -rf /tmp/demozoo-bundle
+            rm -rf "$BUNDLE" /tmp/demozoo-bundle.tar.gz
+            echo "== done =="
 
       - name: Delete draft release (one-shot)
         if: success()
