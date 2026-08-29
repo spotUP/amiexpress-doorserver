@@ -429,17 +429,52 @@ function fileExistsUnderRoot(basename: string, archivesRoot: string): string | n
 
 /**
  * Split a demozoo title into (name, version). Version is vN or vN.N...
- * followed by a non-digit, non-dot boundary so "Slt!ReAdd v1.o" (literal
- * letter o) is NOT misread as v1.0. Returns just the trimmed name when
- * no version is present.
+ * followed by a non-digit, non-dot boundary so "Slt!ReAdd v1.o" (which
+ * is elite casing where the trailing 'o' is a stylised zero) is still
+ * captured as version="v1.0". The matching stops only at a true
+ * non-digit, non-dot, non-letter boundary (i.e. end of string or
+ * whitespace), so "Slt!ReAdd v1.o" still matches and "Door v2 abc"
+ * (v followed by letter) does not.
+ *
+ * Elite casing note: scenes often render 0 as the letter O, so "v1.o"
+ * is "v1.0". We replace the trailing 'o' with '0' before storing. The
+ * name field is left with the elite casing intact for display.
  */
-const VERSION_RE = /\s+v(\d+(?:\.\d+)*)(?!\d|\.)/i;
+// Match the version-like suffix of a demozoo title: 'v' followed by
+// digits, periods, and possibly an elite-cased trailing zero (the
+// scene's stylised 'o'/'O' for '0'). e.g. matches all of:
+//   'v1', 'v1.0', 'v1.0.1', 'v1.o', 'v2.3.O', 'v1.O.0'
+// Then a normalise + validate pass converts the elite zero to '0'
+// and rejects strings that contain any other letter (so "Door v2 abc"
+// doesn't get misread as v2 with "abc" left over).
+const VERSION_RE = /\s+v([\d.]*[\doO]+)/i;
 function splitNameAndVersion(title: string, fallbackBasename?: string): { name: string; version: string | null } {
   const m = title.match(VERSION_RE);
-  const version = m ? `v${m[1]}` : null;
+  if (!m) {
+    return { name: (title || fallbackBasename || '').trim(), version: null };
+  }
+  // Validate: if the capture contains any letter other than o/O, the
+  // match was a false positive (e.g. "Door v2abc" → captured "v2abc"
+  // would still match, but the "abc" isn't part of a version).
+  if (/[a-zA-Z]/.test(m[1].replace(/[oO]/g, ''))) {
+    return { name: (title || fallbackBasename || '').trim(), version: null };
+  }
+  // Strip trailing dots (handles "v1." with no digits after).
+  // Convert any trailing o/O to 0 (elite zero).
+  let raw = m[1].replace(/\.+$/, '').replace(/[oO]$/, '0');
+  // If after translation the result isn't a valid version (digits and
+  // dots only), reject the match — the regex would have matched too
+  // much on inputs like "v1abc" or "v 1.2".
+  if (!/^\d+(\.\d+)*$/.test(raw)) {
+    return { name: (title || fallbackBasename || '').trim(), version: null };
+  }
+  // Strip the matched version (using the original elite casing) from
+  // the name field so "Slt!ReAdd v1.o" becomes name="Slt!ReAdd"
+  // and version="v1.0".
+  const escapedMatch = m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const name = (title || fallbackBasename || '')
-    .replace(VERSION_RE, '').replace(/\s+$/, '').trim();
-  return { name, version };
+    .replace(new RegExp(escapedMatch, 'i'), '').replace(/\s+$/, '').trim();
+  return { name, version: `v${raw}` };
 }
 
 interface RegisterArgs {
