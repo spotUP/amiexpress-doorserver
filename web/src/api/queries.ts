@@ -308,6 +308,17 @@ export function useLearnPattern() {
   });
 }
 
+export function useUnlearnByPath() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { archiveName: string; filePath: string }) =>
+      api.del<{ ok: boolean; removed: number }>(
+        `/admin/learned/by-path?archiveName=${encodeURIComponent(data.archiveName)}&filePath=${encodeURIComponent(data.filePath)}`,
+      ),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
 // ─── release groups ─────────────────────────────────────────────────────
 
 export interface ReleaseGroup {

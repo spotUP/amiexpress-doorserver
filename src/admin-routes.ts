@@ -1037,6 +1037,37 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /**
+   * Remove a learned pattern that was attached to a specific file in a
+   * specific archive. Used by the "junk" toggle in the file list when the
+   * admin realises they flagged the wrong file. Looks up the pattern that
+   * was created with this archive+file pair and deletes it; the door's
+   * file list and the catalog's is_junk flags then refresh on the next
+   * strip-preview.
+   */
+  router.delete('/learned/by-path', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = typeof req.query.archiveName === 'string' ? req.query.archiveName : '';
+    const filePath = typeof req.query.filePath === 'string' ? req.query.filePath : '';
+    if (!archiveName || !filePath) {
+      res.status(400).json({ error: 'archiveName and filePath are required' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const info = db
+        .prepare('DELETE FROM learned_junk_patterns WHERE archive_name = ? COLLATE NOCASE AND file_path = ? COLLATE NOCASE')
+        .run(archiveName, filePath);
+      if (info.changes === 0) {
+        res.status(404).json({ error: 'no learned pattern for that file' });
+        return;
+      }
+      recordAudit(db, req.admin?.id ?? null, 'unlearn', archiveName, { filePath });
+      res.json({ ok: true, removed: info.changes });
+    } finally {
+      db.close();
+    }
+  });
+
   // ─── file extraction and deletion ──────────────────────────────────
 
   /** Extract a single file from an archive and return its content. */

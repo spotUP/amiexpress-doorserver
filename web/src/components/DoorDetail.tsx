@@ -7,7 +7,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Download, Eye, GraduationCap, ThumbsUp, ThumbsDown, Trash2, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAdminDoor, useDoor, useDoorAuthors, useDoorTags, useAllTags, useSetDoorAuthors, useSetDoorTags, useLearnPattern, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote, useDoorAudit } from '../api/queries';
+import { useAdminDoor, useDoor, useDoorAuthors, useDoorTags, useAllTags, useSetDoorAuthors, useSetDoorTags, useLearnPattern, useUnlearnByPath, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote, useDoorAudit } from '../api/queries';
 import { api } from '../api/client';
 import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types';
 import { DizView } from './DizView';
@@ -27,6 +27,7 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
   const [learning, setLearning] = useState<Set<string>>(new Set());
   const [fileList, setFileList] = useState<DoorFile[]>(files);
   const learnPattern = useLearnPattern();
+  const unlearnByPath = useUnlearnByPath();
 
   async function loadFileContent(path: string) {
     setViewing(path);
@@ -67,13 +68,33 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
     }
   }
 
+  async function unlearnFile(path: string) {
+    setLearning((prev) => new Set(prev).add(path));
+    try {
+      await unlearnByPath.mutateAsync({ archiveName, filePath: path });
+      setFileList((prev) => prev.map((f) => f.path === path ? { ...f, isJunk: false, junkReason: null } : f));
+    } finally {
+      setLearning((prev) => { const next = new Set(prev); next.delete(path); return next; });
+    }
+  }
+
   return (
     <div className="space-y-2">
       <ul className="divide-y divide-line rounded-md border border-line">
         {fileList.map((file) => (
           <li key={file.path} className="flex items-center gap-2 px-3 py-1.5 text-sm">
             <span className="flex-1 truncate font-mono text-[12px]">{file.path}</span>
-            {file.isJunk ? <Badge tone="warn">junk</Badge> : (
+            {file.isJunk ? (
+              <button
+                onClick={() => unlearnFile(file.path)}
+                disabled={learning.has(file.path)}
+                className="inline-flex items-center gap-1 rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-[10px] font-medium text-warn hover:bg-warn/20 disabled:opacity-50"
+                title="Click to unmark as junk"
+              >
+                <Badge tone="warn">junk</Badge>
+                <X size={10} />
+              </button>
+            ) : (
               <button
                 onClick={() => learnFile(file.path)}
                 disabled={learning.has(file.path)}
