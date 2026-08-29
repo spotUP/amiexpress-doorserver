@@ -677,6 +677,8 @@ export function DoorDetailDialog({
                     ['Category', door?.category],
                     ['Needs', door?.requiresBbs],
                     ['Type', door?.doorType],
+                    ['Platform', door?.platform],
+                    ['Released', door?.releaseDate],
                     ['MD5', door?.md5],
                   ].map(([label, value]) => (
                     <div key={label as string}>
@@ -685,6 +687,47 @@ export function DoorDetailDialog({
                     </div>
                   ))}
                 </dl>
+                {(door?.demozooUrl || (door?.externalLinks && door.externalLinks.length > 0)) && (
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-wide text-muted">Links</p>
+                    <div className="flex flex-wrap gap-2">
+                      {door.demozooUrl && (
+                        <a
+                          href={door.demozooUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded border border-line bg-bg px-2 py-0.5 text-[11px] text-ink hover:border-accent hover:text-accent"
+                        >
+                          Demozoo ↗
+                        </a>
+                      )}
+                      {door.externalLinks?.map((url, i) => (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded border border-line bg-bg px-2 py-0.5 text-[11px] text-ink hover:border-accent hover:text-accent"
+                        >
+                          {url.replace(/^https?:\/\//, '').split('/')[0]} ↗
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {door?.credits && door.credits.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-wide text-muted">Credits</p>
+                    <ul className="space-y-0.5 text-sm">
+                      {door.credits.map((c, i) => (
+                        <li key={i} className="text-ink">
+                          <span className="font-mono">{c.nick}</span>
+                          {c.role && <span className="text-muted"> — {c.role}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </Tabs.Content>
 
               <Tabs.Content value="diz">

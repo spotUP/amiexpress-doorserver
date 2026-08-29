@@ -71,6 +71,7 @@ interface DoorRow {
   credits: string | null;
   external_links: string | null;
   screenshots: string | null;
+  demozoo_url: string | null;
 }
 
 function firstPathSegment(archivePath: string): string {
@@ -127,6 +128,7 @@ interface DoorJson {
   credits: DemozooCredit[] | null;
   externalLinks: string[] | null;
   screenshots: { thumbnailUrl: string; standardUrl: string }[] | null;
+  demozooUrl: string | null;
 }
 
 interface DemozooCredit {
@@ -187,6 +189,7 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     credits: parseJsonOrNull<DemozooCredit[]>(corrected.credits),
     externalLinks: parseJsonOrNull<string[]>(corrected.external_links),
     screenshots: parseJsonOrNull<{ thumbnailUrl: string; standardUrl: string }[]>(corrected.screenshots),
+    demozooUrl: corrected.demozoo_url ?? null,
   };
 }
 
@@ -309,7 +312,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
                   md5, sha256, junk_count, ads_stripped, indexed_at,
                   (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc,
                   COALESCE(v.up, 0) AS votes_up, COALESCE(v.down, 0) AS votes_down,
-                  release_date, platform, download_url, credits, external_links, screenshots
+                  release_date, platform, download_url, credits, external_links, screenshots, demozoo_url
              FROM door_catalog d
              ${releaseGroupsTable ? 'LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group' : ''}
              LEFT JOIN (SELECT catalog_id,
@@ -415,6 +418,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       has_doc: entry.doc_raw && entry.doc_raw.length > 0 ? 1 : 0,
       votes_up: votesUp,
       votes_down: votesDown,
+      demozoo_url: (entry as unknown as { demozoo_url?: string | null }).demozoo_url ?? null,
     };
 
     res.json({

@@ -259,6 +259,15 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_dnj_archive ON door_not_junk(archive_name)');
     },
   },
+  {
+    version: 12,
+    name: 'door_catalog.demozoo_url',
+    up: (db) => {
+      if (!hasColumn(db, 'door_catalog', 'demozoo_url')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN demozoo_url TEXT');
+      }
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

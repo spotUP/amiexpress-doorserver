@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS door_catalog (
   download_url        TEXT,
   credits             TEXT,
   external_links      TEXT,
-  screenshots         TEXT
+  screenshots         TEXT,
+  demozoo_url         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_door_catalog_category ON door_catalog(category);
 CREATE INDEX IF NOT EXISTS idx_door_catalog_name ON door_catalog(name);

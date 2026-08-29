@@ -183,6 +183,18 @@ export function DoorTable({
                   />
                 )}
                 {door.hasDoc && <FileText size={13} className="text-muted" />}
+                {door.demozooUrl && (
+                  <a
+                    href={door.demozooUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
+                    title="View on Demozoo"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span className="text-[9px] font-bold tracking-wide">DZ</span>
+                  </a>
+                )}
                 <a href={door.downloadUrl} className="rounded p-1 text-muted hover:bg-raised hover:text-accent">
                   <Download size={14} />
                 </a>

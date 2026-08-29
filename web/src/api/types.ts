@@ -34,6 +34,8 @@ export interface Door {
   credits: DemozooCredit[] | null;
   externalLinks: string[] | null;
   screenshots: { thumbnailUrl: string; standardUrl: string }[] | null;
+  /** Direct link to the Demozoo production page, if the row was enriched. */
+  demozooUrl: string | null;
 }
 
 export interface DemozooCredit {
