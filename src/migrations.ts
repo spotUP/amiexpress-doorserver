@@ -238,6 +238,27 @@ export const MIGRATIONS: Migration[] = [
         )`);
     },
   },
+  {
+    version: 11,
+    name: 'door_not_junk',
+    up: (db) => {
+      // An explicit "this is NOT junk" override. When the auto-stripper
+      // misclassifies a real door file as an ad, the admin marks it here
+      // and it is always treated as kept on every future strip-preview,
+      // regardless of filename pattern, MD5, or content scan.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS door_not_junk (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          archive_name TEXT NOT NULL,
+          file_path   TEXT NOT NULL,
+          reason      TEXT,
+          marked_by   TEXT DEFAULT 'admin',
+          marked_at   INTEGER DEFAULT (strftime('%s','now')),
+          UNIQUE (archive_name, file_path)
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dnj_archive ON door_not_junk(archive_name)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

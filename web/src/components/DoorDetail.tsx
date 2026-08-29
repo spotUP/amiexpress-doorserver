@@ -5,9 +5,9 @@
  */
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Download, Eye, GraduationCap, ThumbsUp, ThumbsDown, Trash2, X } from 'lucide-react';
+import { Download, Eye, GraduationCap, ShieldCheck, ThumbsUp, ThumbsDown, Trash2, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAdminDoor, useDoor, useDoorAuthors, useDoorTags, useAllTags, useSetDoorAuthors, useSetDoorTags, useLearnPattern, useUnlearnByPath, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote, useDoorAudit } from '../api/queries';
+import { useAdminDoor, useDoor, useDoorAuthors, useDoorTags, useAllTags, useSetDoorAuthors, useSetDoorTags, useFileInfo, useLearnPattern, useMarkNotJunk, useUnlearnByPath, useUnmarkNotJunk, useRedescribe, useRevertField, useSaveField, useStripArchive, useStripPreview, useTidyCase, useVoteStatus, useVote, useDoorAudit } from '../api/queries';
 import { api } from '../api/client';
 import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types';
 import { DizView } from './DizView';
@@ -16,11 +16,10 @@ import { FieldEditor } from './FieldEditor';
 import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
 
-const TEXT_EXTS = /\.(txt|me|guide|doc|diz|ans|asc|nfo|rip|info|readme)$/i;
-
 function FileList({ archiveName, files }: { archiveName: string; files: DoorFile[] }) {
   const [viewing, setViewing] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
+  const [contentBinary, setContentBinary] = useState(false);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -28,11 +27,23 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
   const [fileList, setFileList] = useState<DoorFile[]>(files);
   const learnPattern = useLearnPattern();
   const unlearnByPath = useUnlearnByPath();
+  const fetchFileInfo = useFileInfo(archiveName);
 
   async function loadFileContent(path: string) {
     setViewing(path);
     setContent(null);
+    setContentBinary(false);
     try {
+      // Ask the server whether this file is text. The server sniffs the
+      // first 2 KB — a null byte or clusters of C0 controls means binary,
+      // anything else is treated as Latin-1 text (Amiga text, including
+      // accented letters and box-drawing characters).
+      const info = await fetchFileInfo(path);
+      if (!info.isText) {
+        setContentBinary(true);
+        setContent(null);
+        return;
+      }
       const text = await api.getText(`/admin/doors/${encodeURIComponent(archiveName)}/file?path=${encodeURIComponent(path)}`);
       setContent(text);
     } catch { setContent('[read error]'); }
@@ -105,11 +116,13 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
               </button>
             )}
             <span className="font-mono text-[12px] text-muted">{formatSize(file.size)}</span>
-            {TEXT_EXTS.test(file.path) && (
-              <button onClick={() => loadFileContent(file.path)} className="rounded p-1 text-muted hover:bg-raised hover:text-accent" title="View contents">
-                <Eye size={13} />
-              </button>
-            )}
+            <button
+              onClick={() => loadFileContent(file.path)}
+              className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
+              title="View contents"
+            >
+              <Eye size={13} />
+            </button>
             {confirmDelete === file.path ? (
               <span className="flex items-center gap-1 text-[11px]">
                 <span className="text-danger">Delete?</span>
@@ -151,7 +164,11 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
             <span className="font-mono text-xs text-accent">{viewing}</span>
             <button onClick={() => setViewing(null)} className="text-muted hover:text-ink"><X size={14} /></button>
           </div>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] text-ink">{content ?? 'Loading...'}</pre>
+          {contentBinary ? (
+            <p className="text-xs text-muted">This file is binary — no text viewer.</p>
+          ) : (
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] text-ink">{content ?? 'Loading...'}</pre>
+          )}
         </div>
       )}
     </div>
@@ -242,6 +259,9 @@ function StripAds({
 }) {
   const stripArchive = useStripArchive(archiveName);
   const learnPattern = useLearnPattern();
+  const markNotJunk = useMarkNotJunk();
+  const unmarkNotJunk = useUnmarkNotJunk();
+  const fetchFileInfo = useFileInfo(archiveName);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ removed: number; newJunkCount: number } | null>(null);
   const [viewingFile, setViewingFile] = useState<{ path: string; content: string } | null>(null);
@@ -261,40 +281,43 @@ function StripAds({
     setSelected(new Set(p.stripped.map((f) => f.path)));
   }
 
-  async function viewKeptFile(path: string) {
-    const ext = path.split('.').pop()?.toLowerCase() ?? '';
-    const isText = /^(txt|me|guide|doc|diz|ans|asc|nfo|rip|info|readme)$/i.test(ext);
+  async function markKeptNotJunk(path: string) {
+    await markNotJunk.mutateAsync({ archiveName, path });
+    const p = await stripPreviewQuery.mutateAsync();
+    setPreview(p);
+    setSelected(new Set(p.stripped.map((f) => f.path)));
+  }
 
-    if (isText) {
-      // Text files: fetch and display in a modal (no download)
-      setViewingLoading(path);
-      try {
-        const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
-        });
-        if (!res.ok) return;
-        const text = await res.text();
-        setViewingFile({ path, content: text });
-      } finally {
-        setViewingLoading(null);
-      }
-    } else {
-      // Binary files: download with a proper filename
-      try {
-        const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
-        });
-        if (!res.ok) return;
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = path.split('/').pop() ?? 'file';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } catch {}
+  async function unmarkKeptNotJunk(path: string) {
+    await unmarkNotJunk.mutateAsync({ archiveName, path });
+    const p = await stripPreviewQuery.mutateAsync();
+    setPreview(p);
+    setSelected(new Set(p.stripped.map((f) => f.path)));
+  }
+
+  async function viewKeptFile(path: string) {
+    // Sniff text-vs-binary on the server rather than guessing from the
+    // extension — .Dox, .nfo, .readme etc. are all valid text and the
+    // extension list is brittle.
+    const info = await fetchFileInfo(path);
+    if (!info.isText) {
+      // Binary: trigger a download with a sane filename.
+      const link = document.createElement('a');
+      link.href = `/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`;
+      link.download = path.split('/').pop() ?? path;
+      link.click();
+      return;
+    }
+    setViewingLoading(path);
+    try {
+      const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
+      });
+      if (!res.ok) return;
+      const text = await res.text();
+      setViewingFile({ path, content: text });
+    } finally {
+      setViewingLoading(null);
     }
   }
 
@@ -376,19 +399,39 @@ function StripAds({
           <div className="space-y-1">
             <p className="text-xs text-muted">{preview.kept.length} file{preview.kept.length !== 1 ? 's' : ''} kept</p>
             <ul className="max-h-32 space-y-0.5 overflow-y-auto">
-              {preview.kept.map((f) => (
-                <li key={f.path} className="flex items-center gap-2 text-xs">
-                  <span className="flex-1 truncate font-mono text-muted">{f.path}</span>
-              <button onClick={() => viewKeptFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
-                  <button
-                    onClick={() => learnKeptFile(f.path)}
-                    className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
-                    title="Learn as junk"
-                  >
-                    <GraduationCap size={12} />
-                  </button>
-                </li>
-              ))}
+              {preview.kept.map((f) => {
+                const isMarkedNotJunk = preview.notJunk?.includes(f.path) ?? false;
+                return (
+                  <li key={f.path} className="flex items-center gap-2 text-xs">
+                    <span className="flex-1 truncate font-mono text-muted">{f.path}</span>
+                    <button onClick={() => viewKeptFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
+                    {isMarkedNotJunk ? (
+                      <button
+                        onClick={() => unmarkKeptNotJunk(f.path)}
+                        className="inline-flex items-center gap-0.5 rounded border border-success/40 bg-success/10 px-1 py-0.5 text-[10px] font-medium text-success hover:bg-success/20"
+                        title="This file is marked as 'not junk' — click to remove the mark"
+                      >
+                        <ShieldCheck size={10} /> not junk
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => markKeptNotJunk(f.path)}
+                        className="rounded p-1 text-muted hover:bg-raised hover:text-success"
+                        title="Mark as not junk (the stripper will always keep this file)"
+                      >
+                        <ShieldCheck size={12} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => learnKeptFile(f.path)}
+                      className="rounded p-1 text-muted hover:bg-raised hover:text-accent"
+                      title="Learn as junk (add to the global junk-pattern list)"
+                    >
+                      <GraduationCap size={12} />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

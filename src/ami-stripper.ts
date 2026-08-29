@@ -400,15 +400,34 @@ function extractZipMember(bytes: Buffer, targetPath: string): Buffer | null {
 /**
  * Analyze an archive for junk files. Supports LHA, LZH, and ZIP.
  * Returns empty results for unsupported formats (LZX, DMS, etc.).
+ *
+ * `preservePaths` is a set of files the caller has explicitly marked as
+ * "not junk" — they are removed from the `stripped` list and reported
+ * as `kept` instead, so the stripper learns from each correction.
  */
-export function analyzeArchive(archivePath: string, extraPatterns?: string[]): StripResult {
+export function analyzeArchive(archivePath: string, extraPatterns?: string[], preservePaths?: Set<string>): StripResult {
   const patterns = loadPatterns();
   const fingerprints = loadFingerprints();
   const allPatterns = extraPatterns
     ? [...patterns.filenamePatterns, ...extraPatterns]
     : patterns.filenamePatterns;
   const files = readArchiveFiles(archivePath);
-  return deriveStripPlan(files, allPatterns, fingerprints, patterns.dizPatterns);
+  const plan = deriveStripPlan(files, allPatterns, fingerprints, patterns.dizPatterns);
+  if (!preservePaths || preservePaths.size === 0) return plan;
+
+  // Move every preserved file from stripped to kept.
+  const kept = [...plan.kept];
+  const stripped: typeof plan.stripped = [];
+  const reason: Record<string, 'pattern' | 'md5' | 'content-scan'> = { ...plan.reason };
+  for (const entry of plan.stripped) {
+    if (preservePaths.has(entry.path)) {
+      kept.push(entry);
+      delete reason[entry.path];
+    } else {
+      stripped.push(entry);
+    }
+  }
+  return { kept, stripped, reason, cleanedDiz: plan.cleanedDiz };
 }
 
 /**

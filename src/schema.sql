@@ -52,3 +52,14 @@ CREATE TABLE IF NOT EXISTS learned_junk_patterns (
   created_at  INTEGER DEFAULT (strftime('%s','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ljp_pattern ON learned_junk_patterns(pattern);
+
+CREATE TABLE IF NOT EXISTS door_not_junk (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  archive_name TEXT NOT NULL,
+  file_path   TEXT NOT NULL,
+  reason      TEXT,
+  marked_by   TEXT DEFAULT 'admin',
+  marked_at   INTEGER DEFAULT (strftime('%s','now')),
+  UNIQUE (archive_name, file_path)
+);
+CREATE INDEX IF NOT EXISTS idx_dnj_archive ON door_not_junk(archive_name);

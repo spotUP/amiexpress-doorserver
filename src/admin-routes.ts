@@ -25,7 +25,7 @@ import { UploadError, approveSubmission, rejectSubmission, deriveMetadata } from
 import type { ServerConfig } from './config';
 import { analyzeArchive } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
-import { extractFile, readLhaContents, readZipContents, readLzxContents } from './archive-reader';
+import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
 import * as fs from 'fs';
 
@@ -907,13 +907,25 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         return;
       }
 
+      // Files the admin has marked as "not junk" are always kept, even
+      // when the auto-stripper would flag them. This is the feedback
+      // channel that makes the stripper smarter over time.
+      const notJunk = db
+        .prepare('SELECT file_path AS path FROM door_not_junk WHERE archive_name = ? COLLATE NOCASE')
+        .all(archiveName) as { path: string }[];
+      const preservePaths = new Set(notJunk.map((r) => r.path));
+
       let result;
       try {
         const learned = db
           .prepare('SELECT pattern FROM learned_junk_patterns')
           .all() as { pattern: string }[];
         const extraPatterns = learned.map((r) => r.pattern);
-        result = analyzeArchive(absPath, extraPatterns.length > 0 ? extraPatterns : undefined);
+        result = analyzeArchive(
+          absPath,
+          extraPatterns.length > 0 ? extraPatterns : undefined,
+          preservePaths.size > 0 ? preservePaths : undefined,
+        );
       } catch (e: any) {
         res.status(400).json({ error: `cannot read archive: ${e?.message ?? String(e)}` });
         return;
@@ -931,6 +943,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         kept: result.kept,
         stripped: result.stripped,
         reason: result.reason,
+        notJunk: Array.from(preservePaths ?? new Set<string>()),
       });
     } finally {
       db.close();
@@ -1068,6 +1081,76 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /**
+   * Mark a file as "explicitly not junk" — the stripper will always keep
+   * it, regardless of filename pattern, MD5 fingerprint, or content
+   * scan. This is how an admin teaches the stripper "no, that .nfo
+   * ISN'T an ad". A second call with the same path is a no-op.
+   */
+  router.post('/doors/:archiveName/not-junk', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const body = (req.body ?? {}) as { path?: unknown; reason?: unknown };
+    const filePath = typeof body.path === 'string' ? body.path.trim() : '';
+    if (!filePath) {
+      res.status(400).json({ error: 'path is required' });
+      return;
+    }
+    const reason = typeof body.reason === 'string' ? body.reason.slice(0, 500) : null;
+    const db = openDb(cfg);
+    try {
+      db.prepare(
+        `INSERT INTO door_not_junk (archive_name, file_path, reason, marked_by)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(archive_name, file_path) DO UPDATE SET
+           reason = excluded.reason,
+           marked_by = excluded.marked_by,
+           marked_at = strftime('%s','now')`
+      ).run(archiveName, filePath, reason, req.admin?.username ?? 'admin');
+      recordAudit(db, req.admin?.id ?? null, 'not-junk', archiveName, { filePath, reason });
+      res.json({ ok: true, archiveName, filePath });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Drop a "not junk" override. */
+  router.delete('/doors/:archiveName/not-junk', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const filePath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!filePath) {
+      res.status(400).json({ error: 'path query parameter required' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const info = db
+        .prepare('DELETE FROM door_not_junk WHERE archive_name = ? COLLATE NOCASE AND file_path = ?')
+        .run(archiveName, filePath);
+      if (info.changes === 0) {
+        res.status(404).json({ error: 'no not-junk entry for that file' });
+        return;
+      }
+      recordAudit(db, req.admin?.id ?? null, 'not-junk-remove', archiveName, { filePath });
+      res.json({ ok: true, removed: info.changes });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** List every "not junk" override for an archive. */
+  router.get('/doors/:archiveName/not-junk', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const rows = db
+        .prepare('SELECT file_path AS path, reason, marked_by AS markedBy, marked_at AS markedAt FROM door_not_junk WHERE archive_name = ? COLLATE NOCASE ORDER BY file_path')
+        .all(archiveName) as { path: string; reason: string | null; markedBy: string; markedAt: number }[];
+      res.json({ entries: rows });
+    } finally {
+      db.close();
+    }
+  });
+
   // ─── file extraction and deletion ──────────────────────────────────
 
   /** Extract a single file from an archive and return its content. */
@@ -1090,6 +1173,42 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       if (!unpacked) { res.status(404).json({ error: 'member not found or cannot be decoded' }); return; }
       res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
       res.send(Buffer.from(unpacked));
+    } catch {
+      res.status(500).json({ error: 'failed to read archive' });
+    } finally {
+      db.close();
+    }
+  });
+
+  /**
+   * Report whether a file inside an archive is text. Used by the UI to
+   * decide whether to offer a "view" button. Reads up to 2 KB - the
+   * detection only needs to spot null bytes and clusters of C0 controls,
+   * not parse the whole document.
+   */
+  router.get('/doors/:archiveName/file-info', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const memberPath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!memberPath) {
+      res.status(400).json({ error: 'path query parameter required' });
+      return;
+    }
+    const db = openDb(cfg, { readonly: true });
+    try {
+      const row = db
+        .prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+        .get(archiveName) as { archive_path: string } | undefined;
+      if (!row) { res.status(404).json({ error: 'no such door' }); return; }
+      const absPath = resolveArchivePath(cfg, row.archive_path);
+      const bytes = fs.readFileSync(absPath);
+      const unpacked = extractFile(bytes, memberPath);
+      if (!unpacked) { res.status(404).json({ error: 'member not found or cannot be decoded' }); return; }
+      const buf = Buffer.from(unpacked);
+      res.json({
+        path: memberPath,
+        size: buf.length,
+        isText: looksLikeText(buf),
+      });
     } catch {
       res.status(500).json({ error: 'failed to read archive' });
     } finally {

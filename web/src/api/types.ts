@@ -189,6 +189,8 @@ export interface StripPreview {
   kept: StripPreviewFile[];
   stripped: StripPreviewFile[];
   reason: Record<string, 'pattern' | 'md5' | 'content-scan'>;
+  /** Paths the admin has marked as explicitly not junk — always kept. */
+  notJunk?: string[];
 }
 
 export interface StripResult {

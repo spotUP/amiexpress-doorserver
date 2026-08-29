@@ -457,6 +457,35 @@ export function extractLzxFile(bytes: Buffer, memberPath: string): Uint8Array | 
 }
 
 /**
+ * Heuristic: does this byte buffer look like printable text?
+ *
+ * Amiga doors and their DIZs are Latin-1: bytes 0x00-0x7F are ASCII,
+ * bytes 0x80-0xFF hold accented letters and box-drawing characters that
+ * show up in scene art. A null byte (0x00) is the strongest binary
+ * signal — a real text file basically never contains one. Beyond that
+ * we accept anything that isn't a C0 control character; high-bit
+ * characters are normal Latin-1.
+ *
+ * Returns true for empty buffers (vacuously text - the UI shows an
+ * empty doc, not a binary error).
+ */
+export function looksLikeText(buf: Buffer | Uint8Array | null | undefined): boolean {
+  if (!buf || buf.length === 0) return true;
+  const limit = Math.min(buf.length, 2048);
+  let controlCount = 0;
+  for (let i = 0; i < limit; i++) {
+    const b = buf[i];
+    if (b === 0x00) return false;
+    if (b < 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d && b !== 0x0c && b !== 0x1b) {
+      controlCount++;
+    }
+  }
+  // Tolerate a stray control char (line noise from scene editors) but
+  // reject a buffer that's mostly controls (clearly binary).
+  return controlCount / limit < 0.1;
+}
+
+/**
  * Extract a single file from an LHA or ZIP archive. Returns the decompressed
  * bytes, or null if the member is not found or cannot be decoded.
  */

@@ -290,6 +290,13 @@ export function useStripPreview(archiveName: string) {
   });
 }
 
+export function useFileInfo(archiveName: string) {
+  return (path: string) =>
+    api.get<{ path: string; size: number; isText: boolean }>(
+      `/admin/doors/${encodeURIComponent(archiveName)}/file-info?path=${encodeURIComponent(path)}`,
+    );
+}
+
 export function useStripArchive(archiveName: string) {
   const client = useQueryClient();
   return useMutation({
@@ -314,6 +321,29 @@ export function useUnlearnByPath() {
     mutationFn: (data: { archiveName: string; filePath: string }) =>
       api.del<{ ok: boolean; removed: number }>(
         `/admin/learned/by-path?archiveName=${encodeURIComponent(data.archiveName)}&filePath=${encodeURIComponent(data.filePath)}`,
+      ),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
+export function useMarkNotJunk() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { archiveName: string; path: string; reason?: string }) =>
+      api.post<{ ok: boolean }>(`/admin/doors/${encodeURIComponent(data.archiveName)}/not-junk`, {
+        path: data.path,
+        reason: data.reason,
+      }),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
+export function useUnmarkNotJunk() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { archiveName: string; path: string }) =>
+      api.del<{ ok: boolean; removed: number }>(
+        `/admin/doors/${encodeURIComponent(data.archiveName)}/not-junk?path=${encodeURIComponent(data.path)}`,
       ),
     onSuccess: () => invalidateEverything(client),
   });
