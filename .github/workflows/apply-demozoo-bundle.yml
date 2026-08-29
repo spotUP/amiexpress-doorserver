@@ -16,7 +16,7 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Download bundle from release (onto GHA runner)
+      - name: Download bundle from release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -30,24 +30,23 @@ jobs:
             --pattern 'patch.sql' \
             --pattern 'submitted-files.tar.gz' \
             --pattern 'manifest.json'
-          echo "== downloaded files =="
           ls -la "$BUNDLE_DIR"
           test -s "$BUNDLE_DIR/patch.sql"
           test -s "$BUNDLE_DIR/submitted-files.tar.gz"
           test -s "$BUNDLE_DIR/manifest.json"
-          # appleboy/scp-action tars the source dir with its base name.
-          # Pass the CONTENTS directory (.) so files land directly at
-          # /tmp/demozoo-bundle on the VPS.
           echo "BUNDLE_DIR=${BUNDLE_DIR}" >> "$GITHUB_ENV"
 
-      - name: Copy bundle contents to VPS
+      - name: Copy bundle tarball to VPS
+        # appleboy/scp-action handles a single file cleanly; we already
+        # have a tarball, so just ship that. The manifest.json and
+        # patch.sql are tiny — re-tar everything for one transfer.
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "${{ env.BUNDLE_DIR }}/*"
-          target: "/tmp/demozoo-bundle"
+          source: "${{ env.BUNDLE_DIR }}"
+          target: "/tmp/demozoo-stage"
           strip_components: 0
           overwrite: true
 
@@ -60,8 +59,22 @@ jobs:
           command_timeout: 15m
           script: |
             set -euo pipefail
-            echo "== bundle on VPS =="
-            ls -la /tmp/demozoo-bundle/
+            # scp-action tars the source dir and untars on the target.
+            # Depending on the action version the contents land either at
+            # the target dir itself or under target/<dirname>/. Handle
+            # both.
+            if [ -f /tmp/demozoo-stage/patch.sql ]; then
+              BUNDLE=/tmp/demozoo-stage
+            elif [ -d /tmp/demozoo-stage/demozoo-bundle ]; then
+              BUNDLE=/tmp/demozoo-stage/demozoo-bundle
+            else
+              echo "ERROR: cannot find patch.sql under /tmp/demozoo-stage"
+              find /tmp/demozoo-stage -maxdepth 3 -type f
+              exit 1
+            fi
+            echo "== using bundle: $BUNDLE =="
+            ls -la "$BUNDLE/"
+
             CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])doorserver([-_]|$)' | head -1)
             if [ -z "$CONTAINER" ]; then
               echo "ERROR: no doorserver container found"
@@ -69,20 +82,29 @@ jobs:
               exit 1
             fi
             echo "== container: $CONTAINER =="
+
+            # Workdir in the container is /app. Compiled scripts live at
+            # /app/dist/scripts. We can use either the .js directly or
+            # run via npx tsx (tsx is not installed in prod image, so use
+            # node + the compiled .js).
             echo "== before =="
-            docker exec -w /app/doorserver "$CONTAINER" \
-              npx tsx scripts/db-stats.ts /data/doors.db
+            docker exec -w /app "$CONTAINER" \
+              node dist/scripts/db-stats.js /data/doors.db
+
             echo "== copy bundle into container =="
-            docker cp /tmp/demozoo-bundle "$CONTAINER:/tmp/demozoo-bundle"
+            docker cp "$BUNDLE" "$CONTAINER:/tmp/demozoo-bundle"
+
             echo "== apply =="
-            docker exec -w /app/doorserver "$CONTAINER" \
-              npx tsx scripts/demozoo-sync-apply.ts /tmp/demozoo-bundle
+            docker exec -w /app "$CONTAINER" \
+              sh -c 'DOORSERVER_DB=/data/doors.db DOOR_ARCHIVES_ROOT=/data/Archives node dist/scripts/demozoo-sync-apply.js /tmp/demozoo-bundle'
+
             echo "== after =="
-            docker exec -w /app/doorserver "$CONTAINER" \
-              npx tsx scripts/db-stats.ts /data/doors.db
+            docker exec -w /app "$CONTAINER" \
+              node dist/scripts/db-stats.js /data/doors.db
+
             echo "== cleanup =="
             docker exec "$CONTAINER" rm -rf /tmp/demozoo-bundle
-            rm -rf /tmp/demozoo-bundle
+            rm -rf /tmp/demozoo-stage
             echo "== done =="
 
       - name: Delete draft release (one-shot)
