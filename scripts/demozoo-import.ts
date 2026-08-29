@@ -748,15 +748,18 @@ async function fetchDetailHtml(id: number): Promise<string> {
 }
 
 async function main() {
+  process.stderr.write('[demozoo] starting\n');
   const dryRun = process.argv.includes('--dry-run');
   const noDownload = process.argv.includes('--no-download');
   if (dryRun) process.stderr.write('[demozoo] DRY RUN — no changes will be written\n');
   if (noDownload) process.stderr.write('[demozoo] NO DOWNLOAD — skipping Phase 2 archive downloads\n');
 
   const cfg = loadConfig();
+  process.stderr.write(`[demozoo] loaded config: db=${cfg.dbPath} archives=${cfg.archivesRoot}\n`);
   const db = openSqlite(cfg.dbPath);
   applySchema(db);
   runMigrations(db);
+  process.stderr.write('[demozoo] db ready\n');
 
   const archivesRoot = cfg.archivesRoot;
   const submittedDir = path.join(archivesRoot, 'Submitted');
