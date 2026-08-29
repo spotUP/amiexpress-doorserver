@@ -47,11 +47,9 @@ jobs:
         # using the secret key written to a tmpfile. This puts the
         # tarball at /tmp/demozoo-bundle.tar.gz on the VPS.
         #
-        # IMPORTANT: rsync's default behaviour treats the destination
-        # as a directory if it already exists. After a previous failed
-        # run, /tmp/demozoo-bundle.tar.gz may be a directory, so the
-        # next run puts the file INSIDE it. The --no-target-directory
-        # flag tells rsync to refuse if the destination is a dir.
+        # IMPORTANT: rsync creates the destination as a directory if
+        # the path already exists. After a previous failed run, that
+        # path may already be a directory. Pre-cleanup removes it.
         env:
           HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
           HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
@@ -64,11 +62,16 @@ jobs:
           # Pre-cleanup: nuke any leftover from a previous failed run.
           # (VPS doesn't have its own cleanup of /tmp.)
           ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            "root@${HETZNER_HOST}" 'rm -rf /tmp/demozoo-bundle.tar.gz /tmp/demozoo-bundle /tmp/demozoo-stage' || true
-          rsync -avz --no-target-directory \
+            "root@${HETZNER_HOST}" \
+            'rm -rf /tmp/demozoo-bundle.tar.gz /tmp/demozoo-bundle /tmp/demozoo-stage'
+          rsync -avz \
             -e "ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             "${RUNNER_TEMP}/demozoo-bundle.tar.gz" \
             "root@${HETZNER_HOST}:/tmp/demozoo-bundle.tar.gz"
+          # Verify the file is a file, not a directory.
+          ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "root@${HETZNER_HOST}" \
+            'test -f /tmp/demozoo-bundle.tar.gz' || { echo "rsync created a directory, not a file"; exit 1; }
           rm -f "$KEY_FILE"
 
       - name: Apply bundle in doorserver container
