@@ -21,10 +21,14 @@ services:
       DOOR_ARCHIVES_ROOT: /data/Archives
       PORT: "3010"
       DOORSERVER_ADMIN_KEYS: ${DOORSERVER_ADMIN_KEYS:-}
-      # Signing key for admin sessions. UNSET means the admin API answers 503
-      # to everything and the public site is unaffected - so this host can run
-      # without it and gain an admin console the moment it is set.
+      # The .env file (managed by the deploy workflow) holds the
+      # signing key. We bind-mount it so an unset key produces a
+      # predictable 503 on the admin API rather than a container
+      # that silently boots with no auth surface.
       DOORSERVER_JWT_SECRET: ${DOORSERVER_JWT_SECRET:-}
+    env_file:
+      - path: .env
+        required: false
       # Uploads wait in /data/quarantine (beside the database, never inside
       # the archive root); the server creates it at startup.
     healthcheck:
