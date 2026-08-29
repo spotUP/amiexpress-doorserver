@@ -33,13 +33,32 @@ const defaultRunner: ArchiveRunner = (bin, args) => {
 };
 
 /** The archiver to use, or null when none is installed. */
-export function findArchiverBinary(existsSync: (p: string) => boolean = fs.existsSync): string | null {
+/**
+ * Pick the right archiver for the given archive. Different formats need
+ * different tools — `lha` only handles LHA/LZH, `7z` handles LHA/LZH/
+ * ZIP/7Z. We default to lha (the corpus is LHA-heavy) and fall back to
+ * 7z for the formats lha doesn't understand. The ARCHIVER_COMMAND env
+ * override forces a specific binary and skips the preference logic.
+ */
+function findArchiverFor(archivePath: string, existsSync: (p: string) => boolean = fs.existsSync): string | null {
   const override = process.env.ARCHIVER_COMMAND;
   if (override && existsSync(override)) return override;
-  for (const candidate of ['/opt/homebrew/bin/7z', '/usr/bin/7z', '/usr/local/bin/lha', '/usr/bin/lha']) {
+  const ext = path.extname(archivePath).toLowerCase();
+  const isZipLike = ext === '.zip' || ext === '.7z';
+  const preferred = isZipLike
+    ? ['/usr/bin/7z', '/opt/homebrew/bin/7z']
+    : ['/usr/local/bin/lha', '/usr/bin/lha', '/opt/homebrew/bin/7z', '/usr/bin/7z'];
+  for (const candidate of preferred) {
     if (existsSync(candidate)) return candidate;
   }
   return null;
+}
+
+export function findArchiverBinary(existsSync: (p: string) => boolean = fs.existsSync): string | null {
+  // Legacy entry point used by tests; defaults to LHA-first preference
+  // (the doorserver's primary workload). Tests can pass a custom
+  // existsSync to keep their fake filesystems working.
+  return findArchiverFor('/dummy.lha', existsSync);
 }
 
 export interface MemberDeleteCapability {
@@ -52,7 +71,7 @@ export interface MemberDeleteCapability {
  */
 export function canDeleteMembers(
   archivePath: string,
-  binary: string | null = findArchiverBinary()
+  binary: string | null = findArchiverFor(archivePath)
 ): MemberDeleteCapability {
   const ext = path.extname(archivePath).toLowerCase();
   // lha CLI: only supports .lha / .lzh. 7z supports those plus .zip and
@@ -89,7 +108,7 @@ export function deleteMembers(
   members: string[],
   opts: { binary?: string | null; runner?: ArchiveRunner } = {}
 ): MemberDeleteResult {
-  const binary = opts.binary === undefined ? findArchiverBinary() : opts.binary;
+  const binary = opts.binary === undefined ? findArchiverFor(archivePath) : opts.binary;
   const runner = opts.runner ?? defaultRunner;
 
   const capability = canDeleteMembers(archivePath, binary);
