@@ -56,6 +56,13 @@ ARG GIT_SHA=unknown
 RUN echo "$GIT_SHA" > /app/.git-sha
 COPY --from=amiexpress-bbs /usr/local/bin/lha /usr/local/bin/lha
 COPY --from=unlzx-build /usr/local/bin/unlzx /usr/local/bin/unlzx
-RUN apk add --no-cache zlib && unlzx 2>&1 || true
+# 7z handles LHA, LZH, ZIP and 7z in-place edits via `7z d archive.zip
+# member`. The `lha` CLI is lha/lzh only; 7z is the only path that lets
+# the stripper / file-delete UI work on zip doors. alpine's package is
+# `p7zip` and the binary is named `7z` after install.
+RUN apk add --no-cache p7zip zlib && \
+    test -x /usr/bin/7z && echo "[OK] 7z installed at /usr/bin/7z" || \
+    (echo "[FAIL] 7z not found" && exit 1)
+RUN unlzx 2>&1 || true
 EXPOSE 3010
 CMD ["node", "dist/src/index.js"]
