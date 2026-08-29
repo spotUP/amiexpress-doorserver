@@ -332,6 +332,28 @@ function extractReleaseGroup(detail: DemozooDetail): { abbrev: string; fullName:
 }
 
 /**
+ * Best-effort `door_type` from demozoo's tags. The "xim" tag means the
+ * archive contains an Amiga executable; "arexx" means it's an ARexx
+ * script; "cli" is a CLI command. Returns null if no signal.
+ */
+const DOOR_TYPE_FROM_TAG: { match: RegExp; doorType: string }[] = [
+  { match: /^xim$/i,    doorType: 'XIM' },
+  { match: /^arexx$/i,  doorType: 'ARexx' },
+  { match: /^cli$/i,    doorType: 'CLI' },
+  { match: /^sim$/i,    doorType: 'SIM' },
+  { match: /^rexx$/i,   doorType: 'REXX' },
+  { match: /^cmd$/i,    doorType: 'CMD' },
+];
+function inferDoorType(detail: DemozooDetail): string | null {
+  for (const tag of detail.tags ?? []) {
+    for (const { match, doorType } of DOOR_TYPE_FROM_TAG) {
+      if (match.test(tag)) return doorType;
+    }
+  }
+  return null;
+}
+
+/**
  * Best-effort `requires_bbs` for a production, based on the production
  * data we have. Tries group-name match first, then falls back to the
  * known tag→BBS mapping. Returns null if no signal.
@@ -349,17 +371,32 @@ function inferRequiresBbs(detail: DemozooDetail): string | null {
     { match: /^fame$|fame.*design/,              bbs: 'FAME' },
     { match: /demonic|phenom/,                  bbs: 'Mystic' },
     { match: /medellin|phenom productions/,     bbs: 'CNet' },
+    { match: /sceptic|^scp$|sad-file/,           bbs: 'AmiExpress' }, // Sceptic/SAD = textadder crew
+    { match: /shelter/,                          bbs: 'AmiExpress' }, // SLT! = Shelter, AmiExpress ad-tools
+    { match: /outlaws|otl/,                     bbs: 'AmiExpress' }, // OTL = Outlaws, AmiExpress ad-tools
+    { match: /decade|dcd/,                       bbs: 'AmiExpress' }, // Decade = AmiExpress ad-tools
     { match: /delta|logic|expose/,              bbs: 'Aquila' },
     { match: /insanity/,                         bbs: 'Insanity' },
   ];
   for (const { match, bbs } of GROUP_TO_BBS) {
     if (match.test(lcGroup)) return bbs;
   }
-  // Tag fallback: only the first entry matters, and we don't know which
-  // tag this production came from. So just check if any tag matches the
-  // known TAGS list.
+  // Tag-based signal. Many ami-express-* tags imply AmiExpress even
+  // when the group isn't in the map above.
+  const tags = detail.tags ?? [];
+  for (const tag of tags) {
+    if (/^amiex(?!-web)/i.test(tag)) return 'AmiExpress';
+    if (/^amiex-?web/i.test(tag)) return 'AmiExpress-Web';
+    if (/^s!x/i.test(tag)) return 'S!X';
+    if (/^daydream/i.test(tag)) return 'DayDream';
+    if (/^fame/i.test(tag)) return 'FAME';
+    if (/^mystic/i.test(tag)) return 'Mystic';
+    if (/^cnet/i.test(tag)) return 'CNet';
+    if (/^tempest/i.test(tag)) return 'Tempest';
+  }
+  // Tag fallback: check if any tag matches the known TAGS list.
   for (const { tag, implies } of TAGS) {
-    if (detail.tags?.includes(tag)) return implies;
+    if (tags.includes(tag)) return implies;
   }
   return null;
 }
@@ -834,6 +871,13 @@ async function main() {
         if (detail!.platforms?.length) patch.platform = detail!.platforms.map((p) => p.name).join(', ');
         const dl = detail!.download_links?.[0]?.url;
         if (dl) patch.download_url = dl;
+        // Author: the first credit in demozoo's credits array (usually
+        // the coder). Falls back to the first author_nicks person if
+        // credits is empty.
+        const firstPerson = detail!.credits?.[0]?.person
+          ?? detail!.author_nicks?.find((n) => !n.releaser.is_group)?.name
+          ?? null;
+        if (firstPerson) patch.author = firstPerson;
         const creds = parseCredits(detail!.credits ?? []);
         if (creds) patch.credits = creds;
         const links = parseLinks(detail!.external_links ?? []);
@@ -850,6 +894,9 @@ async function main() {
         // The tag itself is a strong signal for which BBS this door runs on.
         // e.g. tag "amiex" → requires_bbs "AmiExpress" /X.
         if (implies) patch.requires_bbs = implies;
+        // Door executable type: "xim" → XIM, "arexx" → ARexx, etc.
+        const doorType = inferDoorType(detail!);
+        if (doorType) patch.door_type = doorType;
 
         if (Object.keys(patch).length > 0) {
           const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
