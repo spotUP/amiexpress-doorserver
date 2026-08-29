@@ -492,7 +492,7 @@ async function registerExistingFile(args: RegisterArgs): Promise<void> {
   }
   process.stderr.write(`[demozoo] id=${id} registering local ${where} (${stats.size} bytes)\n`);
   if (dryRun) {
-    process.stderr.write(`[demozoo] DRY: would INSERT ${basename} (${relPath}) — name="${name}" version="${versionFromTitle}"\n`);
+    process.stderr.write(`[demozoo] DRY: would INSERT ${basename} (${relPath}) — name="${name}" version="${versionFromTitle ?? '(none)'}"\n`);
   } else {
     const catalogId = crypto.randomUUID();
     db.prepare(
