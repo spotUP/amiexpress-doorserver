@@ -1037,27 +1037,6 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
-  /** Remove a learned junk pattern. */
-  router.delete('/learned/:id', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
-    const id = Number.parseInt(Array.isArray(req.params.id) ? '' : req.params.id, 10);
-    if (!Number.isFinite(id) || id <= 0) {
-      res.status(400).json({ error: 'invalid id' });
-      return;
-    }
-    const db = openDb(cfg);
-    try {
-      const info = db.prepare('DELETE FROM learned_junk_patterns WHERE id = ?').run(id);
-      if (info.changes === 0) {
-        res.status(404).json({ error: 'not found' });
-        return;
-      }
-      recordAudit(db, req.admin?.id ?? null, 'unlearn', '', { id });
-      res.json({ ok: true });
-    } finally {
-      db.close();
-    }
-  });
-
   /**
    * Remove a learned pattern that was attached to a specific file in a
    * specific archive. Used by the "junk" toggle in the file list when the
@@ -1065,6 +1044,9 @@ export function createAdminRouter(cfg: ServerConfig): Router {
    * was created with this archive+file pair and deletes it; the door's
    * file list and the catalog's is_junk flags then refresh on the next
    * strip-preview.
+   *
+   * Registered BEFORE /learned/:id so the literal segment "by-path" doesn't
+   * get captured as an :id value. Express matches in declaration order.
    */
   router.delete('/learned/by-path', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = typeof req.query.archiveName === 'string' ? req.query.archiveName : '';
@@ -1084,6 +1066,27 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       }
       recordAudit(db, req.admin?.id ?? null, 'unlearn', archiveName, { filePath });
       res.json({ ok: true, removed: info.changes });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Remove a learned junk pattern. */
+  router.delete('/learned/:id', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const id = Number.parseInt(Array.isArray(req.params.id) ? '' : req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      res.status(400).json({ error: 'invalid id' });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const info = db.prepare('DELETE FROM learned_junk_patterns WHERE id = ?').run(id);
+      if (info.changes === 0) {
+        res.status(404).json({ error: 'not found' });
+        return;
+      }
+      recordAudit(db, req.admin?.id ?? null, 'unlearn', '', { id });
+      res.json({ ok: true });
     } finally {
       db.close();
     }

@@ -54,13 +54,20 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
     setDeleteError(null);
     setDeleting((prev) => new Set(prev).add(path));
     try {
-      const result = await api.post<{ removed: string[] }>(
+      // The delete-files endpoint returns { ok, removed: number, ... }.
+      // The server removed the file from the archive on disk; we then
+      // re-list the door's files to refresh the UI. A simpler "trust the
+      // request and remove the row locally" is tempting but lies if the
+      // server actually rejected the delete.
+      await api.post<{ ok: boolean; removed: number }>(
         `/admin/doors/${encodeURIComponent(archiveName)}/delete-files`,
-        { members: [path] }
+        { members: [path] },
       );
-      if (result.removed.length > 0) {
-        setFileList((prev) => prev.filter((f) => f.path !== path));
-      }
+      // Refresh from the canonical source so the user sees the real
+      // post-delete state, including the junk flag if the stripper
+      // re-classified anything as a result.
+      const fresh = await api.get<{ files: DoorFile[] }>(`/doors/${encodeURIComponent(archiveName)}`);
+      setFileList(fresh.files ?? []);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setDeleteError(msg || 'Failed');

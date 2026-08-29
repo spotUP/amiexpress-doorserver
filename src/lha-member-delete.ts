@@ -55,7 +55,13 @@ export function canDeleteMembers(
   binary: string | null = findArchiverBinary()
 ): MemberDeleteCapability {
   const ext = path.extname(archivePath).toLowerCase();
-  if (ext !== '.lha' && ext !== '.lzh') {
+  // lha CLI: only supports .lha / .lzh. 7z supports those plus .zip and
+  // .7z. Pick the supported set per binary.
+  const is7z = !!binary && (binary.endsWith('7z') || binary.includes('/7z'));
+  const supported = is7z
+    ? new Set(['.lha', '.lzh', '.zip', '.7z'])
+    : new Set(['.lha', '.lzh']);
+  if (!supported.has(ext)) {
     return {
       ok: false,
       reason: ext === '.lzx'
@@ -99,17 +105,23 @@ export function deleteMembers(
   // to force positional interpretation.
   const safeMembers = members.map((m) => (m.startsWith('-') ? `./${m}` : m));
   const useLha = binary!.endsWith('lha') || binary!.includes('/lha');
+  // 7z needs a different syntax for zip: `7z d archive.zip member` works
+  // for lha, but for zip 7z needs `-bb` to print byte-level detail and
+  // `-sccUTF-8` for utf-8 output, plus `7z d` exits 1 on warnings
+  // (like "no files matched") so we accept that. Some 7z builds also
+  // want `-y` to auto-confirm the delete.
+  const is7zDelete = !useLha;
+  const args = is7zDelete
+    ? ['d', '-y', '-bb0', '-sccUTF-8', archivePath, ...safeMembers]
+    : ['dq', '--archive-kanji-code=latin1', '--system-kanji-code=utf8', archivePath, ...safeMembers];
   // First try: explicit latin1/utf8 encoding flags (correct for Amiga archives).
   // Fallback: 'cap' encoding which doesn't need iconv - works on filenames
   // whose bytes aren't valid in any standard 8-bit encoding.
-  const primaryArgs = useLha
-    ? ['dq', '--archive-kanji-code=latin1', '--system-kanji-code=utf8', archivePath, ...safeMembers]
-    : ['d', archivePath, ...safeMembers];
   const fallbackArgs = useLha
     ? ['dq', '--archive-kanji-code=cap', '--system-kanji-code=utf8', archivePath, ...safeMembers]
-    : primaryArgs;
-  let result = runner(binary as string, primaryArgs);
-  if (result.status !== 0 && /iconv/.test(result.stderr || '')) {
+    : args;
+  let result = runner(binary as string, args);
+  if (!is7zDelete && result.status !== 0 && /iconv/.test(result.stderr || '')) {
     result = runner(binary as string, fallbackArgs);
   }
   if (result.status !== 0) {
