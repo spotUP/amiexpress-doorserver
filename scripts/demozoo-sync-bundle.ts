@@ -45,6 +45,20 @@ function quote(v: string | number | null): string {
   return `'${String(v).replace(/'/g, "''")}'`;
 }
 
+/**
+ * SQLite has no support for multi-line string literals in standard SQL —
+ * a literal 'foo\nbar' is a syntax error. We work around this by
+ * writing the value as a hex blob and casting to TEXT. The bytes round-
+ * trip exactly, so any byte sequence (including embedded NULs, newlines,
+ * quotes) goes through unchanged.
+ */
+function quoteBlob(v: string | number | null): string {
+  if (v === null || v === undefined) return 'NULL';
+  if (typeof v === 'number') return String(v);
+  const buf = Buffer.from(String(v), 'utf8');
+  return `CAST(X'${buf.toString('hex')}' AS TEXT)`;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const outDir = args[0];
@@ -102,6 +116,24 @@ async function main() {
        )
   `).all() as { id: string; file_id_diz: string; doc_filename: string | null; doc_raw: string | null }[];
 
+  // 2c. door_catalog_files entries for the same set of rows. The
+  //     scanner populates this table when it lists each archive's
+  //     members, and the CSV importer / DIZ backfill does the same —
+  //     a row in door_catalog without any rows in door_catalog_files
+  //     shows up as "0 files" in the admin UI. The patch must carry
+  //     these entries to keep the file list in sync.
+  const relevantIds = new Set<string>([
+    ...newRows.map((r: any) => r.id),
+    ...backfillRows.map((r: any) => r.id),
+  ]);
+  const fileRows = relevantIds.size
+    ? (db.prepare(
+        `SELECT catalog_id, path, size, is_junk, junk_reason
+           FROM door_catalog_files
+          WHERE catalog_id IN (${[...relevantIds].map(() => '?').join(',')})`,
+      ).all(...[...relevantIds]) as { catalog_id: string; path: string; size: number; is_junk: number; junk_reason: string | null }[])
+    : [];
+
   // 3. List of files referenced by the new rows that exist on disk.
   const files: { archiveName: string; size: number; sha256: string }[] = [];
   for (const r of newRows) {
@@ -148,7 +180,11 @@ async function main() {
         'indexed_at','md5','sha256','requires_bbs','ads_stripped','release_date',
         'platform','download_url','credits','external_links','screenshots','demozoo_url',
       ];
-      const vals = cols.map((c) => quote(r[c]));
+      // file_id_diz, doc_filename, doc_raw are multi-line TEXT — go
+      // through the hex blob literal so embedded newlines and quotes
+      // round-trip exactly.
+      const blobCols = new Set(['file_id_diz', 'doc_filename', 'doc_raw']);
+      const vals = cols.map((c) => blobCols.has(c) ? quoteBlob(r[c]) : quote(r[c]));
       out.write(`INSERT OR IGNORE INTO door_catalog (${cols.join(', ')}) VALUES (${vals.join(', ')});\n`);
     }
     out.write('\n');
@@ -187,10 +223,24 @@ async function main() {
     for (const r of dizBackfillRows) {
       out.write(
         `UPDATE door_catalog SET\n` +
-        `  file_id_diz = COALESCE(file_id_diz, ${quote(r.file_id_diz)}),\n` +
-        `  doc_filename = COALESCE(doc_filename, ${quote(r.doc_filename)}),\n` +
-        `  doc_raw = COALESCE(doc_raw, ${quote(r.doc_raw)})\n` +
+        `  file_id_diz = COALESCE(file_id_diz, ${quoteBlob(r.file_id_diz)}),\n` +
+        `  doc_filename = COALESCE(doc_filename, ${quoteBlob(r.doc_filename)}),\n` +
+        `  doc_raw = COALESCE(doc_raw, ${quoteBlob(r.doc_raw)})\n` +
         `WHERE id = ${quote(r.id)};\n`,
+      );
+    }
+    out.write('\n');
+  }
+
+  // door_catalog_files — the archive member list. INSERT OR IGNORE
+  // so re-applying is safe. The (catalog_id, path) primary key
+  // prevents duplicates.
+  if (fileRows.length) {
+    out.write(`-- door_catalog_files entries (${fileRows.length} rows)\n`);
+    for (const f of fileRows) {
+      out.write(
+        `INSERT OR IGNORE INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) ` +
+        `VALUES (${quote(f.catalog_id)}, ${quote(f.path)}, ${quote(f.size)}, ${quote(f.is_junk)}, ${quote(f.junk_reason)});\n`,
       );
     }
     out.write('\n');
@@ -232,6 +282,7 @@ async function main() {
       newDemozooRows: newRows.length,
       backfilledScanRows: backfillRows.length,
       dizBackfillRows: dizBackfillRows.length,
+      doorCatalogFileRows: fileRows.length,
       filesInTarball: files.length,
     },
     sizes: {
