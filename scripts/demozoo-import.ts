@@ -96,12 +96,12 @@ const TAGS: { tag: string; implies: string }[] = [
   // { tag: 'tbbs',            implies: 'TBBS' },
 ];
 const DEMOZOO_API = 'https://demozoo.org/api/v1';
-const PAUSE_BETWEEN_REQUESTS_MS = 500;
-const PAUSE_EVERY_N_REQUESTS = 100;
-const PAUSE_DURATION_MS = 5000;
+const PAUSE_BETWEEN_REQUESTS_MS = 1500;       // 1.5s between requests to avoid 429
+const PAUSE_EVERY_N_REQUESTS = 50;
+const PAUSE_DURATION_MS = 15000;              // 15s break every 50 requests
 const MAX_CONCURRENT = 3;
-const MAX_RETRIES = 3;
-const RETRY_DELAYS_MS = [1000, 4000, 16000];
+const MAX_RETRIES = 5;
+const RETRY_DELAYS_MS = [2000, 8000, 30000, 60000, 120000];  // 2s, 8s, 30s, 1m, 2m
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
