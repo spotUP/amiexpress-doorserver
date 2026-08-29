@@ -33,3 +33,47 @@
     @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
   }
 }
+
+/* ansi_up renders colour via these class names when use_classes: true.
+   The 8 standard SGR foregrounds and 8 backgrounds, plus bright variants
+   and the bold/underline/italic attribute styles. PC-DOS FILE_ID.DIZ
+   files are drawn against a black background in the original - we keep
+   the same default here so the colours land where the author intended. */
+.ansi-diz .ansi-black-fg   { color: #000000; }
+.ansi-diz .ansi-red-fg     { color: #aa0000; }
+.ansi-diz .ansi-green-fg   { color: #00aa00; }
+.ansi-diz .ansi-yellow-fg  { color: #aa5500; }
+.ansi-diz .ansi-blue-fg    { color: #0000aa; }
+.ansi-diz .ansi-magenta-fg { color: #aa00aa; }
+.ansi-diz .ansi-cyan-fg    { color: #00aaaa; }
+.ansi-diz .ansi-white-fg   { color: #aaaaaa; }
+.ansi-diz .ansi-bright-black-fg   { color: #555555; }
+.ansi-diz .ansi-bright-red-fg     { color: #ff5555; }
+.ansi-diz .ansi-bright-green-fg   { color: #55ff55; }
+.ansi-diz .ansi-bright-yellow-fg  { color: #ffff55; }
+.ansi-diz .ansi-bright-blue-fg    { color: #5555ff; }
+.ansi-diz .ansi-bright-magenta-fg { color: #ff55ff; }
+.ansi-diz .ansi-bright-cyan-fg    { color: #55ffff; }
+.ansi-diz .ansi-bright-white-fg   { color: #ffffff; }
+
+.ansi-diz .ansi-black-bg   { background-color: #000000; }
+.ansi-diz .ansi-red-bg     { background-color: #aa0000; }
+.ansi-diz .ansi-green-bg   { background-color: #00aa00; }
+.ansi-diz .ansi-yellow-bg  { background-color: #aa5500; }
+.ansi-diz .ansi-blue-bg    { background-color: #0000aa; }
+.ansi-diz .ansi-magenta-bg { background-color: #aa00aa; }
+.ansi-diz .ansi-cyan-bg    { background-color: #00aaaa; }
+.ansi-diz .ansi-white-bg   { background-color: #aaaaaa; }
+.ansi-diz .ansi-bright-black-bg   { background-color: #555555; }
+.ansi-diz .ansi-bright-red-bg     { background-color: #ff5555; }
+.ansi-diz .ansi-bright-green-bg   { background-color: #55ff55; }
+.ansi-diz .ansi-bright-yellow-bg  { background-color: #ffff55; }
+.ansi-diz .ansi-bright-blue-bg    { background-color: #5555ff; }
+.ansi-diz .ansi-bright-magenta-bg { background-color: #ff55ff; }
+.ansi-diz .ansi-bright-cyan-bg    { background-color: #55ffff; }
+.ansi-diz .ansi-bright-white-bg   { background-color: #ffffff; }
+
+.ansi-diz .ansi-bold       { font-weight: bold; }
+.ansi-diz .ansi-italic     { font-style: italic; }
+.ansi-diz .ansi-underline  { text-decoration: underline; }
+.ansi-diz .ansi-faint      { opacity: 0.7; }
