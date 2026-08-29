@@ -1,0 +1,87 @@
+name: Apply demozoo sync bundle to live
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag containing the bundle (e.g. demozoo-bundle-20260829-173024)'
+        required: true
+        type: string
+
+concurrency:
+  group: apply-demozoo-bundle
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download bundle from release (onto GHA runner)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/demozoo-bundle
+          mkdir -p /tmp/demozoo-bundle
+          gh release download "${{ inputs.release_tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir /tmp/demozoo-bundle \
+            --pattern 'patch.sql' \
+            --pattern 'submitted-files.tar.gz' \
+            --pattern 'manifest.json'
+          ls -la /tmp/demozoo-bundle/
+          test -s /tmp/demozoo-bundle/patch.sql
+          test -s /tmp/demozoo-bundle/submitted-files.tar.gz
+          test -s /tmp/demozoo-bundle/manifest.json
+
+      - name: Copy bundle to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "/tmp/demozoo-bundle"
+          target: "/tmp/demozoo-bundle"
+          overwrite: true
+
+      - name: Apply bundle in doorserver container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            ls -la /tmp/demozoo-bundle/
+            CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])doorserver([-_]|$)' | head -1)
+            if [ -z "$CONTAINER" ]; then
+              echo "ERROR: no doorserver container found"
+              docker ps -a
+              exit 1
+            fi
+            echo "== container: $CONTAINER =="
+            echo "== before =="
+            docker exec "$CONTAINER" sqlite3 /data/doors.db \
+              "SELECT source, COUNT(*) FROM door_catalog GROUP BY source"
+            echo "== copy bundle into container =="
+            docker cp /tmp/demozoo-bundle "$CONTAINER:/tmp/demozoo-bundle"
+            echo "== apply =="
+            docker exec -w /app/doorserver "$CONTAINER" \
+              npx tsx scripts/demozoo-sync-apply.ts /tmp/demozoo-bundle
+            echo "== after =="
+            docker exec "$CONTAINER" sqlite3 /data/doors.db \
+              "SELECT source, COUNT(*) FROM door_catalog GROUP BY source"
+            echo "== cleanup =="
+            docker exec "$CONTAINER" rm -rf /tmp/demozoo-bundle
+            rm -rf /tmp/demozoo-bundle
+            echo "== done =="
+
+      - name: Delete draft release (one-shot)
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ inputs.release_tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --yes || echo "release already deleted, ignoring"
