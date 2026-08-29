@@ -96,7 +96,10 @@ const TAGS: { tag: string; implies: string }[] = [
   // { tag: 'tbbs',            implies: 'TBBS' },
 ];
 const DEMOZOO_API = 'https://demozoo.org/api/v1';
-const PAUSE_BETWEEN_REQUESTS_MS = 1500;       // 1.5s between requests to avoid 429
+// Demozoo's rate limit is 1 request per second per IP. With MAX_CONCURRENT=3
+// in flight, we need at least a 3s pause between batches to stay under it.
+// 3.5s gives a small margin for slow responses.
+const PAUSE_BETWEEN_REQUESTS_MS = 3500;
 const PAUSE_EVERY_N_REQUESTS = 50;
 const PAUSE_DURATION_MS = 15000;              // 15s break every 50 requests
 const MAX_CONCURRENT = 3;
@@ -113,7 +116,7 @@ interface DemozooDetail {
   /** Demozoo returns platforms as an array of {id, name, url}. */
   platforms: { id: number; name: string; url: string }[];
   download_links: { url: string; type: string }[];
-  credits: { person: string; role: string }[];
+  credits: { nick: { name: string; releaser: { is_group: boolean } }; category: string; role: string }[];
   external_links: { url: string; type: string }[];
   screenshots: string[];
   description: string | null;
@@ -311,7 +314,7 @@ function pickDocFile(infoFiles: { name: string; size: number }[]): string | null
   return candidates[0]?.name ?? null;
 }
 
-function parseCredits(credits: { person: string; role: string }[]): string | null {
+function parseCredits(credits: { nick?: { name?: string }; category?: string; role?: string }[]): string | null {
   if (!credits || credits.length === 0) return null;
   return JSON.stringify(credits);
 }
@@ -587,7 +590,7 @@ async function registerExistingFile(args: RegisterArgs): Promise<void> {
       relPath,
       name,
       versionFromTitle,
-      detail.credits?.[0]?.person ?? null,
+      detail.credits?.[0]?.nick?.name ?? null,
       detail.description ?? null,
       detail.release_date ?? null,
       detail.platforms?.map((p) => p.name).join(', ') ?? null,
@@ -882,12 +885,12 @@ async function main() {
         if (detail!.platforms?.length) patch.platform = detail!.platforms.map((p) => p.name).join(', ');
         const dl = detail!.download_links?.[0]?.url;
         if (dl) patch.download_url = dl;
-        // Author: the first credit in demozoo's credits array (usually
-        // the coder). Falls back to the first author_nicks person if
-        // credits is empty.
-        const firstPerson = detail!.credits?.[0]?.person
-          ?? detail!.author_nicks?.find((n) => !n.releaser.is_group)?.name
-          ?? null;
+        // Author: the first coder credit in demozoo's credits array.
+        // The credits array is `[{nick: {name, ...}, category, role}]`
+        // where the nick is the individual coder (or a group they
+        // released under). author_nicks only carries the release group,
+        // so we can't fall back to it for the personal author.
+        const firstPerson = detail!.credits?.[0]?.nick?.name ?? null;
         if (firstPerson) patch.author = firstPerson;
         const creds = parseCredits(detail!.credits ?? []);
         if (creds) patch.credits = creds;
@@ -1083,7 +1086,7 @@ async function main() {
           path.posix.join('Submitted', destBasename),
           name,
           versionFromTitle,
-          detail.credits?.[0]?.person ?? null,
+      detail.credits?.[0]?.nick?.name ?? null,
           detail.description ?? null,
           detail.release_date ?? null,
           detail.platforms?.map((p) => p.name).join(', ') ?? null,
