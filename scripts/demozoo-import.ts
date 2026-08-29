@@ -166,7 +166,10 @@ interface ImporterStats {
 function fetch(url: string, retries = 0): Promise<string> {
   return new Promise((resolve, reject) => {
     const doFetch = (attempt: number) => {
-      https.get(url, { headers: { Accept: 'application/json', 'User-Agent': 'AmiExpress-DoorServer/1.0' } }, (res) => {
+      // 60s per request — a slow demozoo page should never take this
+      // long, so if it does we abort and retry (or fail). Without a
+      // timeout, a hung TCP connection can stall the whole run.
+      const req = https.get(url, { headers: { Accept: 'application/json', 'User-Agent': 'AmiExpress-DoorServer/1.0' } }, (res) => {
         if (res.statusCode === 429 && attempt < MAX_RETRIES) {
           console.error(`[demozoo] 429 rate-limit, retry ${attempt + 1}/${MAX_RETRIES} in ${RETRY_DELAYS_MS[attempt]}ms`);
           setTimeout(() => doFetch(attempt + 1), RETRY_DELAYS_MS[attempt]);
@@ -179,7 +182,12 @@ function fetch(url: string, retries = 0): Promise<string> {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
         res.on('end', () => resolve(data));
-      }).on('error', (err) => {
+      });
+      // 60s wall-clock timeout — a hung connection can't stall the run.
+      req.setTimeout(60_000, () => {
+        req.destroy(new Error(`timeout after 60s for ${url}`));
+      });
+      req.on('error', (err) => {
         if (attempt < MAX_RETRIES) {
           console.error(`[demozoo] fetch error (attempt ${attempt + 1}/${MAX_RETRIES}): ${err.message}`);
           setTimeout(() => doFetch(attempt + 1), RETRY_DELAYS_MS[attempt]);
