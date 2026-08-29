@@ -256,7 +256,7 @@ function readArchiveContents(archivePath: string, bytes?: Buffer): ArchiveConten
   const buf = bytes ?? fs.readFileSync(archivePath);
 
   if (ext === '.lha' || ext === '.lzh') {
-    const contents = readLhaContents(buf);
+    const contents = readLhaContents(buf, archivePath);
     if (contents.files.length === 0 && buf.length > 0) {
       throw new Error(`LHA reader returned 0 files from ${buf.length}-byte archive — the file may be corrupt or an unsupported LHA variant`);
     }

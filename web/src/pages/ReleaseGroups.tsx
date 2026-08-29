@@ -1,6 +1,6 @@
 /** Release group abbreviation → full name editor. Admin only. */
 import * as Dialog from '@radix-ui/react-dialog';
-import { Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useReleaseGroups, useUpdateReleaseGroup } from '../api/queries';
 
@@ -16,6 +16,10 @@ export function ReleaseGroupsPanel({
   const { data } = useReleaseGroups(enabled && open);
   const update = useUpdateReleaseGroup();
   const [filter, setFilter] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [newAbbr, setNewAbbr] = useState('');
+  const [newName, setNewName] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const groups = data?.groups ?? [];
@@ -44,18 +48,120 @@ export function ReleaseGroupsPanel({
     [update],
   );
 
+  const handleAdd = useCallback(() => {
+    const abbr = newAbbr.trim().toUpperCase();
+    const name = newName.trim();
+    if (!abbr) {
+      setAddError('abbreviation is required');
+      return;
+    }
+    if (groups.some((g) => g.abbreviation.toUpperCase() === abbr)) {
+      setAddError(`a group called "${abbr}" already exists`);
+      return;
+    }
+    if (!name) {
+      setAddError('full name is required');
+      return;
+    }
+    update.mutate(
+      { [abbr]: { fullName: name } },
+      {
+        onSuccess: () => {
+          setAdding(false);
+          setNewAbbr('');
+          setNewName('');
+          setAddError(null);
+        },
+        onError: (e: Error) => setAddError(e.message),
+      },
+    );
+  }, [newAbbr, newName, groups, update]);
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
         <Dialog.Content className="fixed right-0 top-0 z-50 flex h-full w-[min(40rem,94vw)] flex-col border-l border-line bg-surface shadow-2xl">
-          <Dialog.Title className="border-b border-line px-5 py-4 text-lg font-semibold">
-            Release Groups
-            <span className="ml-2 text-sm font-normal text-muted">{groups.length} groups</span>
+          <Dialog.Title className="flex items-center justify-between border-b border-line px-5 py-4 text-lg font-semibold">
+            <span>
+              Release Groups
+              <span className="ml-2 text-sm font-normal text-muted">{groups.length} groups</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setAdding((a) => !a);
+                setAddError(null);
+              }}
+              className="inline-flex items-center gap-1 rounded border border-line bg-bg px-2 py-1 text-xs font-medium text-ink hover:border-accent hover:text-accent"
+              title="Add a new group"
+            >
+              <Plus size={14} /> Add
+            </button>
           </Dialog.Title>
           <Dialog.Description className="sr-only">
             Map release group abbreviations to their full names.
           </Dialog.Description>
+
+          {adding && (
+            <div className="border-b border-line bg-bg/40 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="ABBR"
+                  value={newAbbr}
+                  onChange={(e) => setNewAbbr(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAdd();
+                    if (e.key === 'Escape') {
+                      setAdding(false);
+                      setAddError(null);
+                    }
+                  }}
+                  className="w-20 shrink-0 rounded border border-line bg-bg px-2 py-1 font-mono text-[12px] font-medium text-accent focus:border-accent focus:outline-none"
+                  maxLength={10}
+                />
+                <input
+                  type="text"
+                  placeholder="Full name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAdd();
+                    if (e.key === 'Escape') {
+                      setAdding(false);
+                      setAddError(null);
+                    }
+                  }}
+                  className="flex-1 rounded border border-line bg-bg px-2 py-1 font-mono text-[12px] text-ink focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  disabled={update.isPending}
+                  className="rounded bg-accent px-3 py-1 text-xs font-medium text-bg hover:opacity-90 disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdding(false);
+                    setNewAbbr('');
+                    setNewName('');
+                    setAddError(null);
+                  }}
+                  className="rounded p-1 text-muted hover:text-ink"
+                  title="Cancel"
+                >
+                  ×
+                </button>
+              </div>
+              {addError && (
+                <div className="mt-2 text-xs text-red">{addError}</div>
+              )}
+            </div>
+          )}
 
           <div className="border-b border-line px-5 py-2">
             <input

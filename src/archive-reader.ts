@@ -23,6 +23,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
+import { spawnSync } from 'child_process';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const LHA = require('./lha.js') as {
   read: (data: Uint8Array) => LhaEntry[];
@@ -48,6 +49,66 @@ export interface ArchiveContents {
 const DIZ_NAME = /(^|\/)file_id\.diz$/i;
 const DOC_NAME = /\.(guide|doc|readme|txt|me)$/i;
 
+/** A system `lha` binary, used as a fallback when the in-memory JS reader
+ *  fails on a compression level it doesn't support (e.g. lh0, lh4, lh6). */
+function findSystemLha(): string | null {
+  for (const candidate of ['/opt/homebrew/bin/lha', '/usr/local/bin/lha', '/usr/bin/lha']) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/** Run `lha lq` against a file and return one line per member:
+ *  "<size> <month> <day> <year> <filename>". Returns [] on any error. */
+function listLhaViaSystem(bin: string, archivePath: string): { size: number; name: string }[] {
+  const r = spawnSync(bin, ['lq', archivePath], {
+    encoding: 'utf8',
+    timeout: 30_000,
+    env: { ...process.env, LC_ALL: 'C', LANG: 'C' },
+  });
+  if (r.status !== 0 || !r.stdout) return [];
+  const out: { size: number; name: string }[] = [];
+  for (const raw of r.stdout.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = /^\[[^\]]+\]\s+(\d+)\s+\S+\s+\S+\s+\S+\s+\S+\s+(.+)$/.exec(line);
+    if (m) {
+      const size = Number(m[1]);
+      const name = m[2].trim();
+      if (name && !name.endsWith('/')) out.push({ size, name });
+      continue;
+    }
+    const m2 = /^\[unknown\]\s+(\d+)\s+\S+\s+\S+\s+\S+\s+\S+\s+(.+)$/.exec(line);
+    if (m2) {
+      const size = Number(m2[1]);
+      const name = m2[2].trim();
+      if (name && !name.endsWith('/')) out.push({ size, name });
+    }
+  }
+  return out;
+}
+
+/** Extract one member from an LHA via the system binary, returns raw bytes
+ *  or null on failure. Streams to a temp file to handle binary members
+ *  safely (no shell, no encoding). */
+function extractLhaMemberViaSystem(bin: string, archivePath: string, member: string): Buffer | null {
+  const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'lha-extract-'));
+  try {
+    const r = spawnSync(bin, ['xq', archivePath, member], {
+      cwd: tmpDir,
+      encoding: 'utf8',
+      timeout: 30_000,
+      env: { ...process.env, LC_ALL: 'C', LANG: 'C' },
+    });
+    if (r.status !== 0) return null;
+    const extracted = path.join(tmpDir, member);
+    if (!fs.existsSync(extracted)) return null;
+    return fs.readFileSync(extracted);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
 /** AmigaDOS writes "Work:Doors\Thing", and a member path must stay relative. */
 function relativeName(raw: string): string {
   return raw
@@ -64,22 +125,24 @@ function decodeLatin1(bytes: Uint8Array): string {
  * Read an LHA archive's member list and its documentation. Never throws: a
  * submission that cannot be read is still a submission, and a curator can
  * look at it by hand.
+ *
+ * Falls back to the system `lha` binary when the in-memory JS reader
+ * returns no members - some LHA levels (lh0, lh6, lh7, ...) are not
+ * supported by lha.js. The system binary handles them all.
  */
-export function readLhaContents(bytes: Buffer): ArchiveContents {
+export function readLhaContents(bytes: Buffer, sourcePath?: string): ArchiveContents {
   const empty: ArchiveContents = { files: [], fileIdDiz: null, docFilename: null, doc: null };
   let entries: LhaEntry[];
   try {
     entries = LHA.read(new Uint8Array(bytes));
   } catch {
-    return empty;
+    entries = [];
   }
 
   const files: { path: string; size: number }[] = [];
   let fileIdDiz: string | null = null;
   let docFilename: string | null = null;
   let doc: string | null = null;
-  // The largest document wins: an archive often ships both a one-line
-  // .readme and the real .guide.
   let docSize = 0;
 
   for (const entry of entries) {
@@ -95,8 +158,6 @@ export function readLhaContents(bytes: Buffer): ArchiveContents {
     try {
       unpacked = LHA.unpack(entry);
     } catch {
-      // One member failing to unpack says nothing about the others; Amiga
-      // archives routinely carry a member a strict reader rejects.
       continue;
     }
     if (!unpacked) continue;
@@ -107,6 +168,42 @@ export function readLhaContents(bytes: Buffer): ArchiveContents {
       doc = decodeLatin1(unpacked);
       docFilename = path;
       docSize = entry.length ?? 0;
+    }
+  }
+
+  if (files.length > 0 || !sourcePath) {
+    return { files, fileIdDiz, docFilename, doc };
+  }
+
+  // Fallback: ask the system lha to list members. The same archive may
+  // carry compression levels (lh0/lh6/...) lha.js refuses, while the
+  // installed `lha` binary handles them. We need sourcePath here because
+  // the binary reads the file by name, not from a buffer.
+  const bin = findSystemLha();
+  if (!bin) return { files, fileIdDiz, docFilename, doc };
+  const members = listLhaViaSystem(bin, sourcePath);
+  if (members.length === 0) return { files, fileIdDiz, docFilename, doc };
+
+  for (const m of members) {
+    const rel = relativeName(m.name);
+    if (!rel || rel.endsWith('/')) continue;
+    if (!files.some((f) => f.path === rel)) files.push({ path: rel, size: m.size });
+  }
+
+  // Pull the DIZ and the largest .guide/.doc/.readme/.txt/.me member.
+  for (const m of members) {
+    const rel = relativeName(m.name);
+    if (!rel || rel.endsWith('/')) continue;
+    if (!fileIdDiz && DIZ_NAME.test(rel)) {
+      const data = extractLhaMemberViaSystem(bin, sourcePath, m.name);
+      if (data) fileIdDiz = decodeLatin1(data);
+    } else if (DOC_NAME.test(rel) && m.size > docSize) {
+      const data = extractLhaMemberViaSystem(bin, sourcePath, m.name);
+      if (data) {
+        doc = decodeLatin1(data);
+        docFilename = rel;
+        docSize = m.size;
+      }
     }
   }
 

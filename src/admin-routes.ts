@@ -25,7 +25,7 @@ import { UploadError, approveSubmission, rejectSubmission, deriveMetadata } from
 import type { ServerConfig } from './config';
 import { analyzeArchive } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
-import { extractFile } from './archive-reader';
+import { extractFile, readLhaContents, readZipContents, readLzxContents } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
 import * as fs from 'fs';
 
@@ -338,6 +338,164 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     } finally {
       db.close();
     }
+  });
+
+  /**
+   * Re-extract the file list for a door and write it into
+   * door_catalog_files. Also updates FILE_ID.DIZ, doc, name, version,
+   * author, description, binary_name, requires_bbs from the archive.
+   *
+   * Use this for doors that were scanned before the reader supported
+   * their compression level — the catalog row exists, but no files were
+   * ever written.
+   */
+  router.post('/doors/:archiveName/reextract', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[req.params.archiveName.length - 1] : req.params.archiveName;
+    const db = openDb(cfg);
+    try {
+      const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string; archive_path: string } | undefined;
+      if (!entry) { res.status(404).json({ error: 'no such door' }); return; }
+
+      const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
+      if (!fs.existsSync(archivePath)) { res.status(404).json({ error: 'archive file missing' }); return; }
+
+      const bytes = fs.readFileSync(archivePath);
+      const groupTags = buildGroupTags(
+        (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
+          (r) => r.archive_name
+        )
+      );
+
+      const derived = deriveMetadata(bytes, archiveName, groupTags);
+
+      // Pull the file list directly from the archive reader, which now
+      // falls back to the system `lha` binary when the JS reader fails.
+      const ext = path.extname(archivePath).toLowerCase();
+      let files: { path: string; size: number }[] = [];
+      if (ext === '.lha' || ext === '.lzh') {
+        const contents = readLhaContents(bytes, archivePath);
+        files = contents.files;
+      } else if (ext === '.zip') {
+        const contents = readZipContents(bytes);
+        files = contents.files;
+      } else if (ext === '.lzx') {
+        const contents = readLzxContents(bytes);
+        files = contents.files;
+      }
+
+      const write = db.transaction(() => {
+        // Update catalog metadata from the freshly-read archive.
+        db.prepare(`UPDATE door_catalog SET 
+            name = ?, version = ?, author = ?, description = ?, 
+            requires_bbs = ?, binary_name = ?, file_id_diz = ?, 
+            doc_filename = ?, doc_raw = ?, indexed_at = strftime('%s','now')
+            WHERE id = ?`).run(
+                derived.name, derived.version, derived.author, derived.description,
+                derived.requiresBbs, derived.binaryName, derived.fileIdDiz,
+                derived.docFilename, derived.doc, entry.id
+            );
+        // Wipe and rewrite the file list — overwrites any previous junk
+        // flagging, which is what a full re-extract means.
+        db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ?').run(entry.id);
+        if (files.length > 0) {
+          const ins = db.prepare(
+            'INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)'
+          );
+          for (const f of files) ins.run(entry.id, f.path, f.size);
+        }
+        recordAudit(db, req.admin?.id ?? null, 'reextract', archiveName, {
+          fileCount: files.length,
+          dizFound: Boolean(derived.fileIdDiz),
+          docFound: Boolean(derived.doc),
+        });
+      });
+      write();
+
+      res.json({
+        ok: true,
+        archiveName,
+        fileCount: files.length,
+        name: derived.name,
+        version: derived.version,
+        author: derived.author,
+        description: derived.description,
+        binaryName: derived.binaryName,
+        fileIdDiz: derived.fileIdDiz,
+        docFilename: derived.docFilename,
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Re-extract the file list for every door that currently has zero files.
+   *  Useful as a one-shot fix after adding a fallback reader. Returns the
+   *  count fixed and the names that still could not be read. */
+  router.post('/doors/reextract-empty', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const db = openDb(cfg);
+    const groupTags = buildGroupTags(
+      (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
+        (r) => r.archive_name
+      )
+    );
+    const empty = db.prepare(
+      `SELECT id, archive_name, archive_path FROM door_catalog
+        WHERE id NOT IN (SELECT DISTINCT catalog_id FROM door_catalog_files)
+        ORDER BY archive_name`
+    ).all() as { id: string; archive_name: string; archive_path: string }[];
+
+    const fixed: string[] = [];
+    const stillEmpty: string[] = [];
+    const errors: { name: string; error: string }[] = [];
+
+    for (const entry of empty) {
+      const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
+      if (!fs.existsSync(archivePath)) {
+        stillEmpty.push(entry.archive_name);
+        continue;
+      }
+      try {
+        const bytes = fs.readFileSync(archivePath);
+        const ext = path.extname(archivePath).toLowerCase();
+        let files: { path: string; size: number }[] = [];
+        if (ext === '.lha' || ext === '.lzh') {
+          files = readLhaContents(bytes, archivePath).files;
+        } else if (ext === '.zip') {
+          files = readZipContents(bytes).files;
+        } else if (ext === '.lzx') {
+          files = readLzxContents(bytes).files;
+        }
+        if (files.length === 0) {
+          stillEmpty.push(entry.archive_name);
+          continue;
+        }
+        const derived = deriveMetadata(bytes, entry.archive_name, groupTags);
+        const write = db.transaction(() => {
+          db.prepare(`UPDATE door_catalog SET 
+              name = ?, version = ?, author = ?, description = ?, 
+              requires_bbs = ?, binary_name = ?, file_id_diz = ?, 
+              doc_filename = ?, doc_raw = ?, indexed_at = strftime('%s','now')
+              WHERE id = ?`).run(
+                  derived.name, derived.version, derived.author, derived.description,
+                  derived.requiresBbs, derived.binaryName, derived.fileIdDiz,
+                  derived.docFilename, derived.doc, entry.id
+              );
+          db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ?').run(entry.id);
+          const ins = db.prepare(
+            'INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)'
+          );
+          for (const f of files) ins.run(entry.id, f.path, f.size);
+        });
+        write();
+        fixed.push(entry.archive_name);
+        recordAudit(db, req.admin?.id ?? null, 'reextract', entry.archive_name, { fileCount: files.length });
+      } catch (e) {
+        errors.push({ name: entry.archive_name, error: String(e) });
+      }
+    }
+    res.json({ ok: true, fixed: fixed.length, stillEmpty: stillEmpty.length, errors, fixedNames: fixed, stillEmptyNames: stillEmpty });
   });
 
   /** Get the content of a file inside an archive. */
