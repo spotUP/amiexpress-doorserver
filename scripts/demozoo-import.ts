@@ -404,6 +404,29 @@ function statLocalFile(absPath: string): { size: number; md5: string; sha256: st
   };
 }
 
+/**
+ * Walk archivesRoot recursively looking for a file with the given
+ * basename (case-insensitive). Returns the absolute path if found, else null.
+ */
+function fileExistsUnderRoot(basename: string, archivesRoot: string): string | null {
+  const want = basename.toLowerCase();
+  function walk(dir: string): string | null {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return null; }
+    for (const e of entries) {
+      const p = path.join(dir, e.name);
+      if (e.isFile() && e.name.toLowerCase() === want) return p;
+      if (e.isDirectory() && e.name !== 'Submitted' && e.name !== 'node_modules') {
+        const found = walk(p);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return walk(archivesRoot);
+}
+
 interface RegisterArgs {
   candidate: NewDoorCandidate;
   where: string;
@@ -812,12 +835,59 @@ async function main() {
       }
     }
 
+  // ── Pre-pass: register any candidates whose archive already exists
+  // locally into the catalog. Runs regardless of --no-download so a
+  // curator doing a test run still sees the existing files registered.
+  for (const candidate of newDoorCandidates) {
+    const { filename } = candidate;
+    const destBasename = filename;
+    const destPath = path.join(submittedDir, destBasename);
+    const existingAtDest = fs.existsSync(destPath);
+    let existingUnderRoot: string | null = null;
+    if (!existingAtDest) {
+      const want = destBasename.toLowerCase();
+      function walk(dir: string): void {
+        let entries: fs.Dirent[];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+        catch { return; }
+        for (const e of entries) {
+          const p = path.join(dir, e.name);
+          if (e.isFile() && e.name.toLowerCase() === want) {
+            existingUnderRoot = p;
+            return;
+          }
+          if (e.isDirectory() && e.name !== 'Submitted' && e.name !== 'node_modules') {
+            walk(p);
+            if (existingUnderRoot) return;
+          }
+        }
+      }
+      walk(archivesRoot);
+    }
+    if (existingAtDest || existingUnderRoot) {
+      const where = existingAtDest ? destPath : existingUnderRoot!;
+      await registerExistingFile({
+        candidate, where, db, archivesRoot, dryRun,
+      });
+    }
+  }
+
   // ── Phase 2: download new doors from scene.org ──────────────────────────────
   if (newDoorCandidates.length > 0) {
     if (noDownload) {
-      process.stderr.write(`[demozoo] Phase 2: SKIPPED (--no-download). ${newDoorCandidates.length} candidates not downloaded:\n`);
-      for (const c of newDoorCandidates) {
-        process.stderr.write(`  - id=${c.id} "${c.detail.title}" → ${c.downloadUrl}\n`);
+      // Re-list after the pre-pass: any candidate whose local file was
+      // found is already registered. Show the rest as "would download".
+      const remaining = newDoorCandidates.filter((c) =>
+        !fs.existsSync(path.join(submittedDir, c.filename)) &&
+        !fileExistsUnderRoot(c.filename, archivesRoot)
+      );
+      if (remaining.length > 0) {
+        process.stderr.write(`[demozoo] Phase 2: SKIPPED (--no-download). ${remaining.length} candidates not downloaded:\n`);
+        for (const c of remaining) {
+          process.stderr.write(`  - id=${c.id} "${c.detail.title}" → ${c.downloadUrl}\n`);
+        }
+      } else {
+        process.stderr.write(`[demozoo] Phase 2: SKIPPED (--no-download) — all candidates already on disk\n`);
       }
     } else {
       process.stderr.write(`[demozoo] Phase 2: ${newDoorCandidates.length} new door candidates\n`);
@@ -833,42 +903,11 @@ async function main() {
       const destBasename = filename;
       const destPath = path.join(submittedDir, destBasename);
 
-      // Check both the Submitted/ staging dir AND the whole archives
-      // root recursively — if the file already lives anywhere under
-      // archivesRoot (e.g. AmiExpress/UP-MD15.LHA), don't re-download.
-      // A duplicate would be confusing to curators and waste scene.org
-      // bandwidth.
-      const existingAtDest = fs.existsSync(destPath);
-      let existingUnderRoot: string | null = null;
-      if (!existingAtDest) {
-        // Walk archivesRoot recursively looking for a file with the
-        // matching basename (case-insensitive).
-        const want = destBasename.toLowerCase();
-        function walk(dir: string): void {
-          let entries: fs.Dirent[];
-          try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-          catch { return; }
-          for (const e of entries) {
-            const p = path.join(dir, e.name);
-            if (e.isFile() && e.name.toLowerCase() === want) {
-              existingUnderRoot = p;
-              return;
-            }
-            if (e.isDirectory() && e.name !== 'Submitted' && e.name !== 'node_modules') {
-              walk(p);
-              if (existingUnderRoot) return;
-            }
-          }
-        }
-        walk(archivesRoot);
-      }
-      if (existingAtDest || existingUnderRoot) {
-        const where = existingAtDest ? destPath : existingUnderRoot!;
-        // File exists on disk — register it in the catalog if not
-        // already there, then backfill from demozoo.
-        await registerExistingFile({
-          candidate, where, db, archivesRoot, dryRun,
-        });
+      // Skip if the file already exists anywhere — pre-pass already
+      // registered it in the catalog if it was missing.
+      if (fs.existsSync(destPath) || fileExistsUnderRoot(destBasename, archivesRoot)) {
+        const where = fs.existsSync(destPath) ? destPath : fileExistsUnderRoot(destBasename, archivesRoot)!;
+        process.stderr.write(`[demozoo] id=${id} "${filename}" already exists at ${where}, registered in pre-pass\n`);
         continue;
       }
 
