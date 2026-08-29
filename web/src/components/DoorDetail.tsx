@@ -721,7 +721,8 @@ export function DoorDetailDialog({
                     <ul className="space-y-0.5 text-sm">
                       {door.credits.map((c, i) => (
                         <li key={i} className="text-ink">
-                          <span className="font-mono">{c.nick}</span>
+                          <span className="font-mono">{c.nick?.name ?? c.nick?.releaser?.name ?? '?'}</span>
+                          {c.nick?.abbreviation && <span className="text-muted"> [{c.nick.abbreviation}]</span>}
                           {c.role && <span className="text-muted"> — {c.role}</span>}
                         </li>
                       ))}

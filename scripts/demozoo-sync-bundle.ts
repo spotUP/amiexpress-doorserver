@@ -134,6 +134,23 @@ async function main() {
       ).all(...[...relevantIds]) as { catalog_id: string; path: string; size: number; is_junk: number; junk_reason: string | null }[])
     : [];
 
+  // 2d. release_groups entries (the abbreviation → full-name mapping).
+  //     For each demozoo row with a release_group, look up the full
+  //     name from the local release_groups table. Emit UPSERTs so the
+  //     live side gets the full name and the door detail page can
+  //     display "Up Rough /X Innovations" instead of just "UP".
+  const releaseGroupsToUpsert = (db.prepare(`
+    SELECT DISTINCT d.release_group AS abbreviation, COALESCE(rg.full_name, '') AS full_name
+      FROM door_catalog d
+      LEFT JOIN release_groups rg ON rg.abbreviation = d.release_group
+     WHERE d.release_group IS NOT NULL AND d.release_group != ''
+       AND (
+         d.source = 'demozoo'
+         OR (d.source = 'scan' AND d.demozoo_url IS NOT NULL)
+       )
+  `).all() as { abbreviation: string; full_name: string }[])
+    .filter((r) => r.full_name && r.full_name !== r.abbreviation);
+
   // 3. List of files referenced by the new rows that exist on disk.
   const files: { archiveName: string; size: number; sha256: string }[] = [];
   for (const r of newRows) {
@@ -246,6 +263,24 @@ async function main() {
     out.write('\n');
   }
 
+  // release_groups — abbreviation → full name. ON CONFLICT keeps the
+  // existing full_name if the live side has a non-empty one. This
+  // way the curator's edits on live win.
+  if (releaseGroupsToUpsert.length) {
+    out.write(`-- release_groups entries (${releaseGroupsToUpsert.length} rows)\n`);
+    for (const g of releaseGroupsToUpsert) {
+      out.write(
+        `INSERT INTO release_groups (abbreviation, full_name, updated_at) VALUES (${quote(g.abbreviation)}, ${quoteBlob(g.full_name)}, strftime('%s','now'))\n` +
+        `ON CONFLICT(abbreviation) DO UPDATE SET\n` +
+        `  full_name = CASE WHEN release_groups.full_name IS NULL OR release_groups.full_name = '' OR release_groups.full_name = release_groups.abbreviation\n` +
+        `                  THEN excluded.full_name\n` +
+        `                  ELSE release_groups.full_name END,\n` +
+        `  updated_at = strftime('%s','now');\n`,
+      );
+    }
+    out.write('\n');
+  }
+
   out.write('COMMIT;\n');
   out.end();
   await new Promise<void>((r) => out.on('finish', () => r()));
@@ -283,6 +318,7 @@ async function main() {
       backfilledScanRows: backfillRows.length,
       dizBackfillRows: dizBackfillRows.length,
       doorCatalogFileRows: fileRows.length,
+      releaseGroupUpserts: releaseGroupsToUpsert.length,
       filesInTarball: files.length,
     },
     sizes: {

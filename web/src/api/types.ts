@@ -38,8 +38,27 @@ export interface Door {
   demozooUrl: string | null;
 }
 
+/**
+ * A single credit entry from a Demozoo production's credits list.
+ * The `nick` is the display handle (often the same as `releaser.name`
+ * for individuals, or a separate string for group nicks). The
+ * `releaser` is the Demozoo entity — a person or a group — and has
+ * the full name + canonical id. `abbreviation` is the scene-style
+ * short tag (e.g. "TRSI" for Tristar and Red Sector Inc).
+ */
+export interface DemozooNick {
+  name: string;
+  abbreviation: string;
+  releaser: {
+    url: string;
+    id: number;
+    name: string;
+    is_group: boolean;
+  };
+}
+
 export interface DemozooCredit {
-  nick: string;
+  nick: DemozooNick;
   category: string;
   role: string;
 }

@@ -142,6 +142,108 @@ function splitNameAndVersion(title: string, fallback: string): { name: string; v
   return { name, version: `v${raw}` };
 }
 
+// ─── By-field parsing (author + release_group) ───────────────────────────────
+
+/**
+ * Split the demozoo CSV "By" field into author + release_group. The
+ * convention: when the field is a personal credit "X / Y", X is the
+ * individual author and Y is the group. When it's a crossover like
+ * "Up Rough /X Innovations", both sides are groups and the whole
+ * string is one group name.
+ *
+ * Discriminator: is each side a known group? We learn "known group"
+ * from the existing catalog (any author credit that appears 3 or more
+ * times). Groups dominate demozoo's "By" field so the default for
+ * ambiguous cases is "this whole thing is a group name".
+ *
+ *   "Ice-T Junior / Prozac"   → author=Ice-T Junior, group=Prozac
+ *   "Up Rough /X Innovations" → author=null,         group=Up Rough /X Innovations
+ *   "fANTASTiC/cracKerz"      → author=null,         group=fANTASTiC/cracKerz
+ *   "Prozac" (known group)    → author=null,         group=Prozac
+ *   "Alexander Corris" (unkn) → author=Alexander Corris, group=null
+ */
+function splitByAndGroup(
+  by: string,
+  knownGroups: ReadonlySet<string>,
+): { author: string | null; releaseGroup: string | null } {
+  const v = by.trim();
+  if (!v) return { author: null, releaseGroup: null };
+
+  // The 'X / Y' scene convention. Splits on the first ' / ' (spaces
+  // around the slash) — the form used for "person / group". Tighter
+  // patterns like ' /Y' (X Innovations) or 'X/Y' (Cracking/Ansi) are
+  // crossovers between two groups; the whole string stays intact.
+  const spaced = v.indexOf(' / ');
+  if (spaced > 0) {
+    const left = v.slice(0, spaced).trim();
+    const right = v.slice(spaced + 3).trim();
+    if (left && right) {
+      const leftIsGroup = knownGroups.has(left);
+      const rightIsGroup = knownGroups.has(right);
+      if (leftIsGroup && rightIsGroup) {
+        // Both are known groups — treat the whole thing as one group
+        // name (crossover). Don't try to pick a side.
+        return { author: null, releaseGroup: v };
+      }
+      if (rightIsGroup) {
+        return { author: left, releaseGroup: right };
+      }
+      if (leftIsGroup) {
+        return { author: right, releaseGroup: left };
+      }
+      // Neither is a known group. Demozoo's "By" is mostly groups,
+      // so default to release_group rather than author.
+      return { author: null, releaseGroup: v };
+    }
+  }
+
+  // No ' / ' separator. Check if the whole string is a known group.
+  if (knownGroups.has(v)) {
+    return { author: null, releaseGroup: v };
+  }
+
+  // Single token that doesn't match any known group. Treat it as a
+  // personal author credit (the alternative — release_group=null,
+  // author=null — would discard the information entirely).
+  return { author: v, releaseGroup: null };
+}
+
+/**
+ * Build the set of known group names from the existing catalog. A
+ * "group" is any non-empty author credit appearing 3 or more times.
+ * This is a noisy heuristic but it lines up with the scene: real
+ * groups produce a lot of releases, one-off author credits do not.
+ */
+function buildKnownGroups(db: Database.Database): Set<string> {
+  const rows = db.prepare(`
+    SELECT author, COUNT(*) as n
+      FROM door_catalog
+     WHERE author IS NOT NULL AND author != ''
+     GROUP BY author
+    HAVING n >= 3
+  `).all() as { author: string; n: number }[];
+  const s = new Set<string>();
+  for (const r of rows) s.add(r.author);
+  return s;
+}
+
+/**
+ * Extract the short release-group tag from an archive filename. The
+ * scene convention is "TAG-suffix" where TAG is 1-5 alphanumeric
+ * characters, e.g. UP-PL10.ZIP → UP, FLT-001.LHA → FLT, 5D-FOO.ZIP
+ * → 5D. This is the same regex buildGroupTags() uses on the corpus.
+ *
+ * Returns uppercase or null if no recognizable prefix. We never guess
+ * a group from the DIZ text — the filename is the only reliable
+ * source when the curator hasn't set a release_group explicitly.
+ */
+const GROUP_TAG_RE = /^([A-Za-z0-9!$^&]{1,5})[-_^!.]/;
+function releaseGroupFromFilename(archiveName: string): string | null {
+  const m = GROUP_TAG_RE.exec(archiveName);
+  if (!m) return null;
+  return m[1].toUpperCase();
+}
+
 // ─── Download (parallel, keep-alive) ─────────────────────────────────────────
 
 // Per-host keep-alive agent. scene.org is the dominant target — a single
@@ -324,13 +426,27 @@ function applyBackfill(
   existing: ExistingDoor,
   row: CsvRow,
   split: { name: string; version: string | null },
+  knownGroups: ReadonlySet<string>,
   dryRun: boolean,
 ): { changed: boolean; fields: string[] } {
   const patch: Record<string, string | null> = {};
+  // release_group short tag: from filename. Only set if the existing
+  // row has no group yet — we never overwrite a curator's choice.
+  const filenameTag = releaseGroupFromFilename(existing.archive_name);
+  if (!existing.release_group && filenameTag) patch.release_group = filenameTag;
+
+  // author / release_group_full_name (via release_groups table): from
+  // the CSV's "By" field. We split it into personal author vs group
+  // full name, only filling NULLs. Author is only set when the field
+  // parses to a personal credit (not a group name).
+  const by = row.author ? splitByAndGroup(row.author, knownGroups) : null;
+  if (!existing.author && by?.author) patch.author = by.author;
+  // (release_group_full_name is stored in the release_groups table,
+  //  not in door_catalog — see upsertReleaseGroup below.)
+
   if (!existing.release_date && row.releaseDate) patch.release_date = row.releaseDate;
   if (!existing.platform && row.platform) patch.platform = row.platform;
   if (!existing.download_url && row.downloadUrl) patch.download_url = row.downloadUrl;
-  if (!existing.author && row.author) patch.author = row.author;
   if (!existing.version && split.version) patch.version = split.version;
   if (!existing.demozoo_url && row.demozooUrl) patch.demozoo_url = row.demozooUrl;
   // Name: only overwrite if the existing name is missing/empty AND the CSV
@@ -347,8 +463,31 @@ function applyBackfill(
     const sets = fields.map((f) => `${f} = ?`).join(', ');
     const vals = fields.map((f) => patch[f]);
     db.prepare(`UPDATE door_catalog SET ${sets} WHERE id = ?`).run(...vals, existing.id);
+    if (filenameTag && by?.releaseGroup) {
+      upsertReleaseGroup(db, filenameTag, by.releaseGroup);
+    }
   }
   return { changed: true, fields };
+}
+
+/**
+ * Upsert a (short tag, full name) entry into the release_groups table.
+ * If the tag already exists with a different full name, the new name
+ * is only adopted when the existing one is empty. This way the
+ * curator's edits win.
+ */
+function upsertReleaseGroup(db: Database.Database, abbreviation: string, fullName: string): void {
+  db.prepare(`
+    INSERT INTO release_groups (abbreviation, full_name, updated_at)
+    VALUES (?, ?, strftime('%s','now'))
+    ON CONFLICT(abbreviation) DO UPDATE
+      SET full_name = CASE
+        WHEN release_groups.full_name IS NULL OR release_groups.full_name = ''
+        THEN excluded.full_name
+        ELSE release_groups.full_name
+      END,
+      updated_at = strftime('%s','now')
+  `).run(abbreviation, fullName);
 }
 
 // ─── Progress reporter ───────────────────────────────────────────────────────
@@ -457,11 +596,12 @@ async function main() {
 
   const progress1 = new Progress(toBackfill.length, 'backfill');
   let backfilled = 0;
+  const knownGroups = buildKnownGroups(db);
   for (const row of toBackfill) {
     const filename = filenameFromUrl(row.downloadUrl)!;
     const split = splitNameAndVersion(row.title, filename.replace(/\.(lha|lzx|lzh|zip|dms)$/i, ''));
     const existing = archiveNameToDoor.get(filename.toLowerCase())!;
-    const { changed, fields } = applyBackfill(db, existing, row, split, dryRun);
+    const { changed, fields } = applyBackfill(db, existing, row, split, knownGroups, dryRun);
     if (changed) {
       backfilled++;
       if (!dryRun) process.stderr.write(`\n[csv] backfilled row ${row.rowNum} ${existing.archive_name} (${fields.join(', ')})\n`);
@@ -573,6 +713,8 @@ async function main() {
     const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
     const size = buf.length;
     const contents = readContents(destPath);
+    const filenameTag = releaseGroupFromFilename(filename);
+    const by = row.author ? splitByAndGroup(row.author, knownGroups) : null;
     if (dryRun) {
       newDoors++;
       await withDb(() => { try { trackStmt.run(row.rowNum, row.demozooUrl, filename); } catch {} });
@@ -588,12 +730,12 @@ async function main() {
           path.posix.join('Submitted', filename),
           split.name,
           split.version,
-          row.author || null,
+          by?.author || null,
           row.releaseDate || null,
           row.platform || null,
           row.downloadUrl || null,
           row.demozooUrl || null,
-          null,
+          filenameTag,
           contents.fileIdDiz,
           contents.docFilename,
           contents.doc,
@@ -603,6 +745,9 @@ async function main() {
         );
         for (const f of contents.files) {
           try { insertFileStmt.run(catalogId, f.path, f.size); } catch {}
+        }
+        if (filenameTag && by?.releaseGroup) {
+          upsertReleaseGroup(db, filenameTag, by.releaseGroup);
         }
         try { trackStmt.run(row.rowNum, row.demozooUrl, filename); } catch {}
       });
@@ -650,6 +795,8 @@ async function main() {
       }
       const split = splitNameAndVersion(row.title, filename.replace(/\.(lha|lzx|lzh|zip|dms)$/i, ''));
       const contents = readContents(destPath);
+      const filenameTag = releaseGroupFromFilename(filename);
+      const by = row.author ? splitByAndGroup(row.author, knownGroups) : null;
       const catalogId = crypto.randomUUID();
       try {
         await withDb(() => {
@@ -659,12 +806,12 @@ async function main() {
             path.posix.join('Submitted', filename),
             split.name,
             split.version,
-            row.author || null,
+            by?.author || null,
             row.releaseDate || null,
             row.platform || null,
             row.downloadUrl || null,
             row.demozooUrl || null,
-            null,
+            filenameTag,
             contents.fileIdDiz,
             contents.docFilename,
             contents.doc,
@@ -674,6 +821,9 @@ async function main() {
           );
           for (const f of contents.files) {
             try { insertFileStmt.run(catalogId, f.path, f.size); } catch {}
+          }
+          if (filenameTag && by?.releaseGroup) {
+            upsertReleaseGroup(db, filenameTag, by.releaseGroup);
           }
           try { trackStmt.run(row.rowNum, row.demozooUrl, filename); } catch {}
         });
