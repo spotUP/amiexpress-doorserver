@@ -427,6 +427,21 @@ function fileExistsUnderRoot(basename: string, archivesRoot: string): string | n
   return walk(archivesRoot);
 }
 
+/**
+ * Split a demozoo title into (name, version). Version is vN or vN.N...
+ * followed by a non-digit, non-dot boundary so "Slt!ReAdd v1.o" (literal
+ * letter o) is NOT misread as v1.0. Returns just the trimmed name when
+ * no version is present.
+ */
+const VERSION_RE = /\s+v(\d+(?:\.\d+)*)(?!\d|\.)/i;
+function splitNameAndVersion(title: string, fallbackBasename?: string): { name: string; version: string | null } {
+  const m = title.match(VERSION_RE);
+  const version = m ? `v${m[1]}` : null;
+  const name = (title || fallbackBasename || '')
+    .replace(VERSION_RE, '').replace(/\s+$/, '').trim();
+  return { name, version };
+}
+
 interface RegisterArgs {
   candidate: NewDoorCandidate;
   where: string;
@@ -465,11 +480,10 @@ async function registerExistingFile(args: RegisterArgs): Promise<void> {
     return;
   }
   // Extract version from title and strip it from the name.
-  const VERSION_RE = /\s+v(\d+(?:\.\d+)*)\b/i;
-  const m = detail.title.match(VERSION_RE);
-  const versionFromTitle = m ? `v${m[1]}` : null;
-  const name = (detail.title || path.basename(filename, path.extname(filename)))
-    .replace(VERSION_RE, '').replace(/\s+$/, '').trim();
+  const { name, version: versionFromTitle } = splitNameAndVersion(
+    detail.title,
+    path.basename(filename, path.extname(filename))
+  );
   const group = extractReleaseGroup(detail);
   if (group) {
     db.prepare(
@@ -949,12 +963,13 @@ async function main() {
       const catalogId = crypto.randomUUID();
       // Demozoo titles usually look like "Door Name v1.0" or "Door v1.2.3".
       // Split out the trailing version so it goes into the version column
-      // rather than being part of the name.
-      const VERSION_RE = /\s+v(\d+(?:\.\d+)*)\b/i;
-      const m = detail.title.match(VERSION_RE);
-      const versionFromTitle = m ? `v${m[1]}` : null;
-      const name = (detail.title || path.basename(destBasename, path.extname(destBasename)))
-        .replace(VERSION_RE, '').replace(/\s+$/, '').trim();
+      // rather than being part of the name. The version must be vN or
+      // vN.N or vN.N.N — followed by a non-digit, non-dot boundary so
+      // "v1.o" (literal letter o) is NOT misread as "v1.0".
+      const { name, version: versionFromTitle } = splitNameAndVersion(
+        detail.title,
+        path.basename(destBasename, path.extname(destBasename))
+      );
       const group = extractReleaseGroup(detail);
       if (group) {
         db.prepare(
