@@ -329,10 +329,15 @@ export function useReleaseGroups(enabled: boolean) {
   });
 }
 
+export interface ReleaseGroupUpdate {
+  fullName: string | null;
+  newAbbreviation?: string;
+}
+
 export function useUpdateReleaseGroup() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (updates: Record<string, string | null>) =>
+    mutationFn: (updates: Record<string, string | null | ReleaseGroupUpdate>) =>
       api.patch<{ ok: boolean; groups: string[] }>('/admin/release-groups', updates),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: releaseGroupKeys.all });

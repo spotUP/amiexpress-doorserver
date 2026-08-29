@@ -960,7 +960,17 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
-  /** Set the full name for one or more release groups. */
+  /**
+   * Set the full name for one or more release groups, or rename the
+   * abbreviation itself.
+   *
+   * Body shape: `{ "<abbreviation>": { fullName: string|null, newAbbreviation?: string } }`
+   *
+   * - `fullName`: string sets the full name; `null` or `""` removes the group.
+   * - `newAbbreviation`: if present and different from the current key,
+   *   the row is renamed and every door_catalog row that referenced the
+   *   old abbreviation is updated to point at the new one.
+   */
   router.patch('/release-groups', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const entries = Object.entries(body);
@@ -968,19 +978,41 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       res.status(400).json({ error: 'no groups given' });
       return;
     }
-    for (const [abbr, name] of entries) {
+
+    const parsed: { oldAbbr: string; fullName: string | null; newAbbr: string }[] = [];
+    for (const [abbr, raw] of entries) {
       if (typeof abbr !== 'string' || abbr.length === 0) {
         res.status(400).json({ error: 'every key must be a non-empty abbreviation' });
         return;
       }
-      if (name !== null && typeof name !== 'string') {
-        res.status(400).json({ error: 'every value must be a string or null' });
+      const value = raw as { fullName?: unknown; newAbbreviation?: unknown } | null | string;
+      let fullName: unknown;
+      let newAbbr: unknown;
+      if (value === null) {
+        fullName = null;
+      } else if (typeof value === 'string') {
+        fullName = value;
+      } else if (typeof value === 'object' && value !== null) {
+        fullName = value.fullName;
+        newAbbr = value.newAbbreviation;
+      } else {
+        res.status(400).json({ error: 'every value must be a string, null, or an object' });
         return;
       }
+      if (fullName !== null && typeof fullName !== 'string') {
+        res.status(400).json({ error: 'fullName must be a string or null' });
+        return;
+      }
+      if (newAbbr !== undefined && (typeof newAbbr !== 'string' || newAbbr.length === 0)) {
+        res.status(400).json({ error: 'newAbbreviation must be a non-empty string' });
+        return;
+      }
+      parsed.push({ oldAbbr: abbr, fullName: fullName as string | null, newAbbr: (newAbbr as string | undefined) ?? abbr });
     }
 
     const db = openDb(cfg);
     try {
+      const lookup = db.prepare('SELECT full_name FROM release_groups WHERE abbreviation = ?');
       const upsert = db.prepare(
         `INSERT INTO release_groups (abbreviation, full_name, updated_at)
          VALUES (?, ?, strftime('%s','now'))
@@ -988,18 +1020,45 @@ export function createAdminRouter(cfg: ServerConfig): Router {
            full_name = excluded.full_name, updated_at = excluded.updated_at`
       );
       const del = db.prepare('DELETE FROM release_groups WHERE abbreviation = ?');
+      const renameDoors = db.prepare(
+        `UPDATE door_catalog SET release_group = ?, indexed_at = strftime('%s','now')
+         WHERE release_group = ? COLLATE NOCASE`
+      );
       const write = db.transaction(() => {
-        for (const [abbr, name] of entries) {
-          if (name === null || name === '') {
-            del.run(abbr);
-          } else {
-            upsert.run(abbr, name);
+        for (const { oldAbbr, fullName, newAbbr } of parsed) {
+          if (fullName === null || fullName === '') {
+            del.run(oldAbbr);
+            renameDoors.run(null, oldAbbr);
+            recordAudit(db, req.admin?.id ?? null, 'edit-release-group', oldAbbr, { removed: true });
+            continue;
           }
-          recordAudit(db, req.admin?.id ?? null, 'edit-release-group', abbr, { full_name: name });
+          const renamed = newAbbr !== oldAbbr;
+          if (renamed) {
+            const existing = lookup.get(newAbbr) as { full_name: string } | undefined;
+            if (existing) {
+              res.status(409).json({ error: `a group called "${newAbbr}" already exists` });
+              throw new Error('abbreviation-collision');
+            }
+            const oldRow = lookup.get(oldAbbr) as { full_name: string } | undefined;
+            if (oldRow) {
+              del.run(oldAbbr);
+              renameDoors.run(newAbbr, oldAbbr);
+            }
+            upsert.run(newAbbr, fullName);
+            recordAudit(db, req.admin?.id ?? null, 'edit-release-group', oldAbbr, { renamed_to: newAbbr, full_name: fullName });
+          } else {
+            upsert.run(oldAbbr, fullName);
+            recordAudit(db, req.admin?.id ?? null, 'edit-release-group', oldAbbr, { full_name: fullName });
+          }
         }
       });
-      write();
-      res.json({ ok: true, groups: Object.keys(body) });
+      try {
+        write();
+      } catch (e) {
+        if ((e as Error).message === 'abbreviation-collision') return;
+        throw e;
+      }
+      res.json({ ok: true, groups: parsed.map((p) => p.newAbbr) });
     } finally {
       db.close();
     }

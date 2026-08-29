@@ -28,10 +28,10 @@ export function ReleaseGroupsPanel({
     : groups;
 
   const scheduleSave = useCallback(
-    (abbr: string, value: string) => {
+    (abbr: string, value: { fullName: string | null; newAbbreviation?: string }) => {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        update.mutate({ [abbr]: value || null });
+        update.mutate({ [abbr]: value });
       }, 600);
     },
     [update],
@@ -39,7 +39,7 @@ export function ReleaseGroupsPanel({
 
   const handleDelete = useCallback(
     (abbr: string) => {
-      update.mutate({ [abbr]: null });
+      update.mutate({ [abbr]: { fullName: null } });
     },
     [update],
   );
@@ -70,13 +70,20 @@ export function ReleaseGroupsPanel({
           <ul className="flex-1 divide-y divide-line overflow-y-auto text-sm">
             {filtered.map((group) => (
               <li key={group.abbreviation} className="flex items-center gap-3 px-5 py-2">
-                <span className="w-16 shrink-0 font-mono text-[12px] font-medium text-accent">
-                  {group.abbreviation}
-                </span>
+                <input
+                  type="text"
+                  defaultValue={group.abbreviation}
+                  onChange={(e) => {
+                    const newAbbr = e.target.value.trim().toUpperCase();
+                    if (!newAbbr || newAbbr === group.abbreviation) return;
+                    scheduleSave(group.abbreviation, { fullName: group.full_name, newAbbreviation: newAbbr });
+                  }}
+                  className="w-16 shrink-0 rounded border border-line bg-bg px-2 py-1 font-mono text-[12px] font-medium text-accent focus:border-accent focus:outline-none"
+                />
                 <input
                   type="text"
                   defaultValue={group.full_name}
-                  onChange={(e) => scheduleSave(group.abbreviation, e.target.value)}
+                  onChange={(e) => scheduleSave(group.abbreviation, { fullName: e.target.value || null })}
                   className="flex-1 rounded border border-line bg-bg px-2 py-1 font-mono text-[12px] text-ink focus:border-accent focus:outline-none"
                 />
                 <button
