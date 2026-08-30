@@ -20,12 +20,7 @@ jobs:
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           command_timeout: 30m
-          # The SSH step's env block sets the shell variables for the
-          # remote script. The 'envs' field is for forwarding the
-          # GitHub Actions job's env into the SSH step - we don't need
-          # that here, we set the values directly below.
-          env:
-            DOORSERVER_JWT_SECRET: "${{ secrets.DOORSERVER_JWT_SECRET }}"
+          envs: DOORSERVER_JWT_SECRET
           script: |
             set -euo pipefail
             cd /app/doorserver
