@@ -80,9 +80,22 @@ UPDATE so it gets replicated to live.
   `door.fileIdDiz` is truthy, matching the existing pattern used for
   the Documentation tab (`door?.doc`). Previously the tab always
   showed, rendering an empty DizView for banner-only doors.
-- DIZ viewer uses ansi_up for SGR escape codes. PC-DOS FILE_ID.DIZ's
+- ~~DIZ viewer uses ansi_up for SGR escape codes. PC-DOS FILE_ID.DIZ's
   use CP437 box-drawing chars which work fine in TopazPlus; OSC
-  hyperlinks don't (CP437/ANSI mix). Not worth a fix right now.
+  hyperlinks don't (CP437/ANSI mix). Not worth a fix right now.~~
+  FIXED 2026-08-30. Root cause was different from what this note
+  guessed: ansi_up only understands SGR colour codes and silently
+  drops cursor movement/erase (CUU/CUD/CUF/CUB/CUP/ED/EL). Checked
+  all 75 ESC-bearing FILE_ID.DIZ rows in the live DB - 52+ use
+  `ESC[nC` alone for column indentation, several use `ESC[A` for
+  two-tone line-overwrite effects. Replaced ansi_up with a small
+  VT-lite interpreter (`web/src/components/ansiDiz.ts`) that plays
+  escapes into a 2-D cell grid before serialising to HTML - same CSS
+  classes as before. Also fixed a SAUCE-metadata-trailer leak found
+  along the way (Ctrl-Z/DOS-EOF + SAUCE record was rendering as
+  literal garbage text after the art). Verified against all 75 real
+  samples: no crashes, no leaked escape bytes, no SAUCE leakage.
+  Deployed, live.
 - ~~Strip preview leaves BBS-ad lines in the DIZ. The stripper has
   `stripDizLines()` but it's not wired into the strip-preview path.~~
   FIXED 2026-08-30. `analyzeArchive()` already computed `cleanedDiz`
@@ -107,6 +120,49 @@ The new `api_release_group` column makes the dialog more useful:
 it can show "this door was tagged '5D' from the filename, but
 demozoo.org says the group is actually '5th Dynasty'" so the admin
 can see both.
+
+## Release group backfill from filename (2026-08-30, LOCAL ONLY)
+
+1474 of 5891 doors had `release_group` unset (1329 scan + 144
+demozoo + 1 submission — never touched by demozoo-backfill.ts or
+demozoo-csv-import.ts, which only run against demozoo-sourced rows).
+`scripts/backfill-release-group-from-filename.ts` reuses the same
+`GROUP_TAG_RE` + known-abbreviation-whitelist those scripts already
+trust, applied to the previously-unprocessed rows. Run locally
+(commit 6e4b6c5):
+
+- **172/1474 filled**, 25 groups. Top: SAD 72, M 24, 5D 19, T 7, X 7,
+  $CP 5, F 5, MTS 5, L 4, TON 3, ULT 3 (+ 14 more with 1-2 each).
+- **NOT yet synced to live** — this only touched the local
+  `data/doors.db`. Needs an UPDATE SQL patch applied over SSH (same
+  shape as the manual JWT workaround, much lighter than the
+  demozoo-sync-bundle machinery since no archive files are involved)
+  or a deliberate decision to leave it local for now.
+
+Breakdown of the remaining 1302 (verified, not just asserted — rerun
+the dry-run query below to check):
+- 1090 rows: `GROUP_TAG_RE` finds no separator-delimited prefix at
+  all in the filename (no `-`/`_`/`^`/`!`/`.` after a 1-5 char lead).
+  Many of these are genuinely single-author BBS utilities with no
+  release-group affiliation, not a detection failure — plausible for
+  a door/utility library rather than a demoscene cracktro archive.
+- 212 rows: a separator-delimited prefix WAS found, but it isn't in
+  the 813-entry `release_groups` table — either a real group not yet
+  catalogued, or a coincidental non-group prefix.
+- 324 of the 1090 (a subset) are candidates where the tag is packed
+  directly against the content word with NO separator (`FOODCHAT.zip`,
+  `TOPBOZ.LHA`, `TRSIAN16.LHA`) — deliberately not auto-matched.
+  Confirmed real false positives in the current table if this were
+  blind-matched: `FILE`, `TOP`, `TEL`, `CAL`, `PRO`, `SUP`, `JOIN`
+  are legitimate group abbreviations that are ALSO common English
+  word prefixes for non-group utilities (`FILEDESC.LHA` -> "FILE",
+  `CALLERS.LHA` -> "CAL", `TELNETD.LHA` -> "TEL" are utilities, not
+  group releases). `TRSI`, `MDB`, `AFL`, `LSD`, `MST`, `FAME` look
+  safe (long, distinctive, no common-word collision) if a curated
+  subset is wanted later — needs a human pass, not a wider regex.
+
+To re-verify or extend: `npx tsx scripts/backfill-release-group-from-filename.ts --dry-run`
+prints the exact match counts per group without writing anything.
 
 ## Deploy workflow (FIXED 2026-08-30, commit e2cf278)
 
