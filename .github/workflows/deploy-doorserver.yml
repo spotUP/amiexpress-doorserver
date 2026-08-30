@@ -20,11 +20,16 @@ jobs:
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           command_timeout: 30m
-          envs: DOORSERVER_JWT_SECRET
+          # appleboy/ssh-action takes envs as a comma-separated list of
+          # NAMES. The values come from the env: block below. To pass a
+          # GitHub Actions secret through, interpolate it with ${{ }}.
+          envs: JWT
+          env:
+            JWT: ${{ secrets.DOORSERVER_JWT_SECRET }}
           script: |
             set -euo pipefail
             cd /app/doorserver
-            echo "DEBUG: env has DOORSERVER_JWT_SECRET length = ${#DOORSERVER_JWT_SECRET}"
+            echo "== env has JWT length = ${#JWT} =="
             echo "== disk before =="
             df -h / | tail -1
             echo "== git fetch + hard reset =="
