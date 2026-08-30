@@ -65,4 +65,4 @@ RUN apk add --no-cache p7zip zlib && \
     (echo "[FAIL] 7z not found" && exit 1)
 RUN unlzx 2>&1 || true
 EXPOSE 3010
-CMD ["sh", "-c", "echo DOORSERVER_JWT_SECRET=$DOORSERVER_JWT_SECRET > /tmp/env-check; node dist/src/index.js"]
+CMD ["node", "dist/src/index.js"]

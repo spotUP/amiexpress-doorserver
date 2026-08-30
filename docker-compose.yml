@@ -13,12 +13,6 @@ services:
       - "127.0.0.1:3010:3010"
     volumes:
       - doorserver-data:/data
-      # The .env file is written by the deploy workflow at
-      # /app/doorserver/.env on the host. We bind-mount it into the
-      # container so docker compose can read it via env_file. The
-      # production dist/ and node_modules/ are baked into the image
-      # so only the .env is needed at runtime.
-      - ./.env:/app/.env:ro
     networks:
       - default
       - doorserver-net
@@ -27,15 +21,12 @@ services:
       DOOR_ARCHIVES_ROOT: /data/Archives
       PORT: "3010"
       DOORSERVER_ADMIN_KEYS: ${DOORSERVER_ADMIN_KEYS:-}
-      # DOORSERVER_JWT_SECRET is supplied via the .env file that the
-      # deploy workflow writes on every run (see
-      # .github/workflows/deploy-doorserver.yml). Older docker-compose
-      # versions only support the long form env_file: below; newer
-      # versions also accept the inline `key: value` we use above as
-      # an override, which would shadow the file's value. To keep the
-      # .env value authoritative we omit JWT_SECRET from environment:.
-    env_file:
-      - .env
+      # The signing key is passed by the deploy workflow via
+      # `export DOORSERVER_JWT_SECRET; docker compose up` - the workflow
+      # writes the value from a GitHub Actions secret into its own
+      # shell env, then exports it before compose runs. compose then
+      # substitutes ${DOORSERVER_JWT_SECRET} in this block.
+      DOORSERVER_JWT_SECRET: ${DOORSERVER_JWT_SECRET:-}
       # Uploads wait in /data/quarantine (beside the database, never inside
       # the archive root); the server creates it at startup.
     healthcheck:
