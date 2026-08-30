@@ -2,29 +2,25 @@
  * A FILE_ID.DIZ verbatim.
  *
  * PC-DOS / demoscene FILE_ID.DIZ files are Latin-1 text that may carry
- * SGR ANSI escape codes (\\x1B[...m) for foreground/background colour and
- * bold/underline. Amiga DIZs are usually plain Latin-1, no escape codes.
- * ansi_up converts either form to inline-styled HTML; on plain text it
- * returns the text verbatim.
+ * ANSI escape codes: SGR for colour/bold/underline, but also cursor
+ * movement and erase codes used for column alignment and line-overwrite
+ * colour effects. Amiga DIZs are usually plain Latin-1, no escape codes.
+ * renderAnsiDiz plays any escapes into a small cell grid (like a real
+ * terminal) so positioned text lands where it was meant to; on plain
+ * text it's a verbatim passthrough.
  *
  * Every character matters: these are pictures drawn with text, in Latin-1,
  * on an 80-column screen. So: monospace, whitespace preserved, no wrapping,
  * and a horizontal scrollbar rather than a reflow that would break the art.
  */
 import * as ScrollArea from '@radix-ui/react-scroll-area';
-import { AnsiUp } from 'ansi_up';
-
-const ANSI = new AnsiUp();
-ANSI.use_classes = true;
+import { renderAnsiDiz } from './ansiDiz';
 
 export function DizView({ text, label }: { text: string; label: string }) {
   if (!text) {
     return <p className="text-sm text-muted">No {label} in this archive.</p>;
   }
-  // ansi_to_html returns sanitised HTML. For text without escape codes
-  // it is a verbatim passthrough; for DIZs with SGR codes it wraps
-  // spans around the colour runs.
-  const html = ANSI.ansi_to_html(text);
+  const html = renderAnsiDiz(text);
   return (
     <ScrollArea.Root className="overflow-hidden rounded-md border border-line bg-bg">
       <ScrollArea.Viewport className="max-h-[26rem] w-full">

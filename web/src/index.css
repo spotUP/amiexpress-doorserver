@@ -34,7 +34,7 @@
   }
 }
 
-/* ansi_up renders colour via these class names when use_classes: true.
+/* renderAnsiDiz (ansiDiz.ts) emits these class names for SGR colour runs.
    The 8 standard SGR foregrounds and 8 backgrounds, plus bright variants
    and the bold/underline/italic attribute styles. PC-DOS FILE_ID.DIZ
    files are drawn against a black background in the original - we keep
@@ -77,3 +77,4 @@
 .ansi-diz .ansi-italic     { font-style: italic; }
 .ansi-diz .ansi-underline  { text-decoration: underline; }
 .ansi-diz .ansi-faint      { opacity: 0.7; }
+.ansi-diz .ansi-diz-link   { color: inherit; text-decoration: underline dotted; }
