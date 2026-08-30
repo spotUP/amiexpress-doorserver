@@ -74,8 +74,12 @@ UPDATE so it gets replicated to live.
 
 ### Lower priority
 
-- `analyseDoor` in `src/describe.ts` already returns null description
-  for banner-only DIZs. Tested locally. Live.
+- ~~`analyseDoor` in `src/describe.ts` already returns null description
+  for banner-only DIZs. Tested locally. Live.~~ FIXED 2026-08-30:
+  DoorDetail.tsx's FILE_ID.DIZ tab now only appears when
+  `door.fileIdDiz` is truthy, matching the existing pattern used for
+  the Documentation tab (`door?.doc`). Previously the tab always
+  showed, rendering an empty DizView for banner-only doors.
 - DIZ viewer uses ansi_up for SGR escape codes. PC-DOS FILE_ID.DIZ's
   use CP437 box-drawing chars which work fine in TopazPlus; OSC
   hyperlinks don't (CP437/ANSI mix). Not worth a fix right now.

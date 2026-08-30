@@ -661,7 +661,7 @@ export function DoorDetailDialog({
             <Tabs.List className="flex gap-1 border-b border-line px-4">
               {[
                 ['about', 'About'],
-                ['diz', 'FILE_ID.DIZ'],
+                ...(door?.fileIdDiz ? [['diz', 'FILE_ID.DIZ'] as const] : []),
                 ['files', `Files${door ? ` (${door.files.length})` : ''}`],
                 ...(door?.doc
                   ? [['doc', door.docFormat === 'amigaguide' ? 'Guide' : 'Documentation'] as const]
