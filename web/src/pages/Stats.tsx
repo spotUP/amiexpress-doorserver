@@ -86,7 +86,7 @@ export function StatsPanel({
                 </div>
 
                 <section>
-                  <h3 className="mb-2 text-sm font-medium text-ink">By System</h3>
+                  <h3 className="mb-2 text-sm font-medium text-ink">By Collection</h3>
                   <BarChart data={data.bySystem} />
                 </section>
 

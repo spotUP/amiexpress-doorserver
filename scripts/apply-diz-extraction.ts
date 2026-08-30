@@ -96,6 +96,9 @@ function main() {
       }
 
       if (touched) rowsTouched++;
+      if (!dryRun) {
+        recordAudit.run(r.id, JSON.stringify({ attempted: true, touched, source: 'diz-extraction-workflow' }));
+      }
     }
   });
   tx();

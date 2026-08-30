@@ -200,8 +200,8 @@ export function Browse() {
             </summary>
             <div className="absolute right-0 z-30 mt-1 flex flex-wrap gap-2 rounded-lg border border-line bg-surface p-2 shadow-lg">
               <Select
-                ariaLabel="Filter by system"
-                placeholder="Any system"
+                ariaLabel="Filter by collection"
+                placeholder="Any collection"
                 value={system}
                 onChange={(v) => { setSystem(v); setPage(1); }}
                 options={(facets?.systems ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
@@ -224,8 +224,8 @@ export function Browse() {
           </details>
           <div className="hidden items-center gap-2 md:flex">
             <Select
-              ariaLabel="Filter by system"
-              placeholder="Any system"
+              ariaLabel="Filter by collection"
+              placeholder="Any collection"
               value={system}
               onChange={(value) => { setSystem(value); setPage(1); }}
               options={(facets?.systems ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}

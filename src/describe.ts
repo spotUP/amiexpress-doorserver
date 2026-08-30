@@ -441,8 +441,9 @@ export function normaliseRequirement(name: string, ver: string): string {
   let version = ver.replace(/,/g, '.');
   const dot = version.indexOf('.');
   if (dot !== -1) {
-    // 4.X and 4.x are one thing
-    version = version.slice(0, dot + 1) + version.slice(dot + 1).replace(/X/g, 'x');
+    // 4.X and 4.x are one thing, and so are 4.x and 4.xx: the run of x's is
+    // a wildcard for "any point release", not a more/less precise version.
+    version = version.slice(0, dot + 1) + version.slice(dot + 1).replace(/X+/gi, 'x');
   }
   return `${bbs} ${version}`;
 }
