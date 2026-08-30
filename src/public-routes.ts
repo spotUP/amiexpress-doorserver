@@ -528,7 +528,15 @@ export function createPublicRouter(cfg: ServerConfig): Router {
            FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
       );
 
-      const authorCond = `author IS NOT NULL AND author != ''`;
+      // A DIZ credit line ("coded by X" / "X Presents") names the RELEASE
+      // GROUP at least as often as it names an individual - the scene's
+      // convention is group credit, not solo attribution - and free text
+      // gives no structural way to tell the two apart. release_groups.full_name
+      // is a curated list of known group names (from release_group lookups
+      // elsewhere in the pipeline), so anything on it here is a group that
+      // leaked into `author`, not a real "top author".
+      const authorCond = `author IS NOT NULL AND author != ''
+        AND NOT EXISTS (SELECT 1 FROM release_groups rg WHERE rg.full_name = author COLLATE NOCASE)`;
       const byAuthor = all(
         `SELECT author AS value, COUNT(*) AS n
            FROM door_catalog ${visible ? `${visible} AND ${authorCond}` : `WHERE ${authorCond}`}
