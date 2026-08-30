@@ -24,6 +24,7 @@ jobs:
           script: |
             set -euo pipefail
             cd /app/doorserver
+            echo "DEBUG: env has DOORSERVER_JWT_SECRET length = ${#DOORSERVER_JWT_SECRET}"
             echo "== disk before =="
             df -h / | tail -1
             echo "== git fetch + hard reset =="
