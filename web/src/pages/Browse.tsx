@@ -140,6 +140,9 @@ export function Browse() {
             <Button variant="ghost" onClick={() => setSubmitOpen(true)}>
               <Upload size={14} /> <span className="hidden sm:inline">Send in a door</span><span className="sm:hidden">Send</span>
             </Button>
+            <Button variant="ghost" onClick={() => setStatsOpen(true)}>
+              <BarChart3 size={14} /> <span className="hidden sm:inline">Stats</span>
+            </Button>
             {admin ? (
               <>
                 <span className="hidden text-xs text-muted sm:inline">
@@ -153,9 +156,6 @@ export function Browse() {
                 </Button>
                 <Button variant="ghost" onClick={() => setGroupsOpen(true)} className="hidden sm:inline-flex">
                   Groups
-                </Button>
-                <Button variant="ghost" onClick={() => setStatsOpen(true)}>
-                  <BarChart3 size={14} /> <span className="hidden sm:inline">Stats</span>
                 </Button>
                 <Button variant="ghost" onClick={() => setAuditOpen(true)} className="hidden sm:inline-flex">
                   <Shield size={14} /> Audit
