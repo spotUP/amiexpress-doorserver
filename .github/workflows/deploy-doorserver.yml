@@ -49,13 +49,17 @@ jobs:
             # Dangling layers only: -a would remove all unused images, dangerous on unattended live host
             docker image prune -f
             echo "== build + up =="
-            # Export the secret into docker compose's env so the container
-            # sees it directly. The env_file: - .env in docker-compose.yml
-            # would also work but requires the volume to be mounted, which
-            # is fragile when the project root contains files compose
-            # needs to skip (node_modules, .git). Passing the env here is
-            # one less moving part.
-            export DOORSERVER_JWT_SECRET
+            # The deploy workflow wrote /app/doorserver/.env earlier
+            # in this script. Source it into the shell env so the
+            # subsequent docker compose invocation can see the values.
+            # (Per-process exports from earlier `export FOO=bar` are not
+            # visible in the subshell that runs compose, but a sourced
+            # file puts the variables into the current shell directly.)
+            if [ -f .env ]; then
+              set -a
+              . ./.env
+              set +a
+            fi
             GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
             echo "== health =="
             sleep 10
