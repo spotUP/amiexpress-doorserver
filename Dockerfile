@@ -65,10 +65,4 @@ RUN apk add --no-cache p7zip zlib && \
     (echo "[FAIL] 7z not found" && exit 1)
 RUN unlzx 2>&1 || true
 EXPOSE 3010
-# Wrap node in a small shell entrypoint that sources the host-mounted
-# .env file. docker compose's env_file support varies by version and
-# compose-config interpolation rules can silently drop our secret.
-# Sourcing from .env at the start of CMD sidesteps all of that — the
-# .env file is bind-mounted by docker compose and exists by the time
-# the CMD runs.
-CMD ["sh", "-c", "set -a && . /app/.env && set +a && exec node dist/src/index.js"]
+CMD ["node", "dist/src/index.js"]

@@ -13,6 +13,12 @@ services:
       - "127.0.0.1:3010:3010"
     volumes:
       - doorserver-data:/data
+      # The .env file is written by the deploy workflow at
+      # /app/doorserver/.env on the host. We bind-mount it into the
+      # container so docker compose can read it via env_file. The
+      # production dist/ and node_modules/ are baked into the image
+      # so only the .env is needed at runtime.
+      - ./.env:/app/.env:ro
     networks:
       - default
       - doorserver-net
