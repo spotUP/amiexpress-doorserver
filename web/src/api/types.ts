@@ -212,6 +212,8 @@ export interface StripPreview {
   reason: Record<string, 'pattern' | 'md5' | 'content-scan'>;
   /** Paths the admin has marked as explicitly not junk — always kept. */
   notJunk?: string[];
+  /** FILE_ID.DIZ with ad-phrase lines stripped; null if nothing survives (or no DIZ). */
+  cleanedDiz?: string | null;
 }
 
 export interface StripResult {

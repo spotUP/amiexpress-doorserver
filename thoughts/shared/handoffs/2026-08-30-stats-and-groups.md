@@ -79,8 +79,16 @@ UPDATE so it gets replicated to live.
 - DIZ viewer uses ansi_up for SGR escape codes. PC-DOS FILE_ID.DIZ's
   use CP437 box-drawing chars which work fine in TopazPlus; OSC
   hyperlinks don't (CP437/ANSI mix). Not worth a fix right now.
-- Strip preview leaves BBS-ad lines in the DIZ. The stripper has
-  `stripDizLines()` but it's not wired into the strip-preview path.
+- ~~Strip preview leaves BBS-ad lines in the DIZ. The stripper has
+  `stripDizLines()` but it's not wired into the strip-preview path.~~
+  FIXED 2026-08-30. `analyzeArchive()` already computed `cleanedDiz`
+  (used by the real `stripArchive()` write path) but `/strip-preview`
+  dropped it from the JSON response, so the admin never saw ad lines
+  would also be stripped from the DIZ until after committing. Added
+  `cleanedDiz` to the response + `StripPreview` type, and a
+  `DizView` block in `StripAds` (DoorDetail.tsx) that shows the
+  cleaned DIZ only when it actually differs from `door.fileIdDiz`.
+  Typechecked (server + web), not yet deployed.
 
 ### The groups dialog (user-built, untested in this session)
 
@@ -96,12 +104,21 @@ it can show "this door was tagged '5D' from the filename, but
 demozoo.org says the group is actually '5th Dynasty'" so the admin
 can see both.
 
-## Deploy workflow (CRITICAL - still broken)
+## Deploy workflow (FIXED 2026-08-30, commit e2cf278)
 
-The deploy workflow's `envs:` field passes the literal string name
-`DOORSERVER_JWT_SECRET` to the SSH step, NOT its value. So the .env
-on the VPS got written empty on every push. The fix: use the `env:`
-block on the SSH step:
+Root cause confirmed: `envs:` only forwards a var that already exists
+in the runner env - nothing set it, so `DOORSERVER_JWT_SECRET` was
+empty on every deploy. Fix: added a step-level `env:` block (sibling
+of `with:`, not nested inside it) to populate the var before `envs:`
+forwards it, and dropped a dead `$JWT` fallback in the script (the
+forwarded var keeps its original name, not `JWT`). Pushed, deploy
+ran green, verified live: `/admin/login` and `/admin/me` return
+401/400 instead of the old `503 admin API disabled`, confirming
+`cfg.jwtSecret` is loaded from the real secret on every deploy now.
+No more manual SSH restart needed after a push.
+
+Previous (WRONG) attempt, for reference - putting `env:` nested
+inside `with:` instead of as a step sibling:
 
 ```yaml
 - name: Deploy to Hetzner VPS

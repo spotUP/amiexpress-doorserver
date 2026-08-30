@@ -944,6 +944,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         stripped: result.stripped,
         reason: result.reason,
         notJunk: Array.from(preservePaths ?? new Set<string>()),
+        cleanedDiz: result.cleanedDiz ?? null,
       });
     } finally {
       db.close();

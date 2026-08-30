@@ -258,11 +258,13 @@ function StripAds({
   preview,
   setPreview,
   stripPreviewQuery,
+  originalDiz,
 }: {
   archiveName: string;
   preview: StripPreview | null;
   setPreview: React.Dispatch<React.SetStateAction<StripPreview | null>>;
   stripPreviewQuery: ReturnType<typeof import('../api/queries').useStripPreview>;
+  originalDiz: string;
 }) {
   const stripArchive = useStripArchive(archiveName);
   const learnPattern = useLearnPattern();
@@ -440,6 +442,12 @@ function StripAds({
                 );
               })}
             </ul>
+          </div>
+        )}
+        {preview.cleanedDiz != null && preview.cleanedDiz.trim() !== originalDiz.trim() && (
+          <div className="space-y-1 border-t border-line pt-2">
+            <p className="text-xs text-muted">FILE_ID.DIZ ad lines will also be stripped:</p>
+            <DizView text={preview.cleanedDiz} label="FILE_ID.DIZ after strip" />
           </div>
         )}
       </div>
@@ -773,7 +781,7 @@ export function DoorDetailDialog({
                     )}
                   </div>
                   {archiveName && (
-                    <StripAds archiveName={archiveName} preview={stripPreview} setPreview={setStripPreview} stripPreviewQuery={stripPreviewQuery} />
+                    <StripAds archiveName={archiveName} preview={stripPreview} setPreview={setStripPreview} stripPreviewQuery={stripPreviewQuery} originalDiz={door?.fileIdDiz ?? ''} />
                   )}
                   {adminDoor &&
                     Object.entries(adminDoor.fields).map(([field, state]) => (
