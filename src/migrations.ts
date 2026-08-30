@@ -268,6 +268,24 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 13,
+    name: 'door_catalog.api_release_group',
+    // demozoo.org's production detail has an `author_nicks` array that
+    // lists every group/individual who contributed, with the canonical
+    // scene-style short tag (e.g. "5D" for 5th Dynasty) and full name.
+    // The CSV-imported `release_group` is whatever the file's filename
+    // tag looked like, which is often wrong (a scene.org mirror that
+    // renamed the file, or a member of a group releasing under their own
+    // subdir). We store the API's authoritative group here and use it
+    // to reconcile the live `release_group` field.
+    up: (db) => {
+      if (!hasColumn(db, 'door_catalog', 'api_release_group')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN api_release_group TEXT');
+        db.exec('ALTER TABLE door_catalog ADD COLUMN api_release_group_full TEXT');
+      }
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {
