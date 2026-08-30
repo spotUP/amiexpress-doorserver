@@ -501,15 +501,26 @@ export function createPublicRouter(cfg: ServerConfig): Router {
            FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
       );
 
+      // Group / category / author stats: drop the empty-string and NULL
+      // buckets. They crowd the top of the chart ('None' / 'Unknown' is
+      // usually 30%+ of the catalog because the scan pipeline doesn't
+      // always fill these in). A real value the admin can act on
+      // (top 20 named groups) is more useful than the missing-data
+      // placeholder. `visible` is either '' or a 'WHERE <hidden-excl>'
+      // clause, so we add the non-null check as an AND clause when it's
+      // present and as WHERE otherwise.
+      const groupCond = `release_group IS NOT NULL AND release_group != ''`;
       const byGroup = all(
-        `SELECT COALESCE(d.release_group, 'None') AS value, COUNT(*) AS n
-           FROM door_catalog d ${visible ? `WHERE ${hidden.replace('id', 'd.id')}` : ''}
+        `SELECT d.release_group AS value, COUNT(*) AS n
+           FROM door_catalog d ${visible ? `${visible} AND d.${groupCond}` : `WHERE d.${groupCond}`}
            GROUP BY value ORDER BY n DESC LIMIT 20`
       );
 
+      const categoryCond = `category IS NOT NULL AND category != ''`;
       const byCategory = all(
-        `SELECT COALESCE(category, 'None') AS value, COUNT(*) AS n
-           FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
+        `SELECT category AS value, COUNT(*) AS n
+           FROM door_catalog ${visible ? `${visible} AND ${categoryCond}` : `WHERE ${categoryCond}`}
+           GROUP BY value ORDER BY n DESC`
       );
 
       const byType = all(
@@ -517,9 +528,11 @@ export function createPublicRouter(cfg: ServerConfig): Router {
            FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC`
       );
 
+      const authorCond = `author IS NOT NULL AND author != ''`;
       const byAuthor = all(
-        `SELECT COALESCE(author, 'Unknown') AS value, COUNT(*) AS n
-           FROM door_catalog ${visible} GROUP BY value ORDER BY n DESC LIMIT 20`
+        `SELECT author AS value, COUNT(*) AS n
+           FROM door_catalog ${visible ? `${visible} AND ${authorCond}` : `WHERE ${authorCond}`}
+           GROUP BY value ORDER BY n DESC LIMIT 20`
       );
 
       const sizeDistribution = all(
