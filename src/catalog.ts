@@ -19,6 +19,7 @@ import { applyOverrides, hiddenExclusion, isHidden, loadOverrides, overridesStam
 import type { ServerConfig } from './config';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
 import { getArchiveChecksums } from './checksums';
+import { deriveMetadata } from './submissions';
 
 export interface CatalogEntry {
   id: string;
@@ -288,13 +289,29 @@ export function stripArchiveOnServer(
       .get(row.id) as { n: number };
     const newJunkCount = junkRow.n;
 
+    // A stripped member may have been the file the catalog previously read
+    // as FILE_ID.DIZ or the documentation — re-read the now-modified archive
+    // so those columns don't keep pointing at deleted content.
+    const groupTags = buildGroupTags(
+      (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
+        (r) => r.archive_name
+      )
+    );
+    const freshBytes = fs.readFileSync(absPath);
+    const derived = deriveMetadata(freshBytes, archiveName, groupTags);
+
     // Update the catalog row
     db.prepare(
       `UPDATE door_catalog SET
         archive_size = ?, md5 = ?, sha256 = ?,
-        junk_count = ?, ads_stripped = 1, indexed_at = strftime('%s','now')
+        junk_count = ?, ads_stripped = 1, indexed_at = strftime('%s','now'),
+        file_id_diz = ?, doc_filename = ?, doc_raw = ?
        WHERE id = ?`
-    ).run(stat.size, checksums.md5, checksums.sha256, newJunkCount, row.id);
+    ).run(
+      stat.size, checksums.md5, checksums.sha256, newJunkCount,
+      derived.fileIdDiz, derived.docFilename, derived.doc,
+      row.id
+    );
 
     return { ok: true, removed: members.length, newJunkCount };
   } finally {
