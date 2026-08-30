@@ -29,7 +29,6 @@ jobs:
           script: |
             set -euo pipefail
             cd /app/doorserver
-            echo "== env has JWT length = ${#JWT} =="
             echo "== disk before =="
             df -h / | tail -1
             echo "== git fetch + hard reset =="
@@ -42,10 +41,18 @@ jobs:
             # what's in the file. If the secret isn't set, the script
             # writes a placeholder and the admin API will return 503 - the
             # public site keeps working.
+            #
+            # The secret arrives in the SSH step as $JWT (see envs: JWT
+            # in the action config above). We translate to the canonical
+            # name DOORSERVER_JWT_SECRET so the rest of the script can
+            # use a stable variable name.
+            if [ -n "${JWT:-}" ]; then
+              export DOORSERVER_JWT_SECRET="$JWT"
+            fi
             if [ -n "${DOORSERVER_JWT_SECRET:-}" ]; then
               printf 'DOORSERVER_JWT_SECRET=%s\n' "${DOORSERVER_JWT_SECRET}" > .env
               chmod 600 .env
-              echo "[OK] .env written from secret"
+              echo "[OK] .env written from secret (length ${#DOORSERVER_JWT_SECRET})"
             elif [ ! -f .env ]; then
               printf 'DOORSERVER_JWT_SECRET=\n' > .env
               echo "[WARN] DOORSERVER_JWT_SECRET not set in workflow; admin API will be disabled"
@@ -55,16 +62,6 @@ jobs:
             # Dangling layers only: -a would remove all unused images, dangerous on unattended live host
             docker image prune -f
             echo "== build + up =="
-            # The deploy workflow wrote /app/doorserver/.env earlier
-            # in this script. Source it into the shell env so the
-            # subsequent docker compose invocation can see the values.
-            if [ -f .env ]; then
-              set -a
-              . ./.env
-              set +a
-              echo "DEBUG: after sourcing .env, DOORSERVER_JWT_SECRET length = ${#DOORSERVER_JWT_SECRET}"
-              echo "DEBUG: after sourcing .env, DOORSERVER_JWT_SECRET first 8 chars = ${DOORSERVER_JWT_SECRET:0:8}"
-            fi
             GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
             echo "== health =="
             sleep 10
