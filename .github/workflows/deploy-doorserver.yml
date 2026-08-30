@@ -52,13 +52,12 @@ jobs:
             # The deploy workflow wrote /app/doorserver/.env earlier
             # in this script. Source it into the shell env so the
             # subsequent docker compose invocation can see the values.
-            # (Per-process exports from earlier `export FOO=bar` are not
-            # visible in the subshell that runs compose, but a sourced
-            # file puts the variables into the current shell directly.)
             if [ -f .env ]; then
               set -a
               . ./.env
               set +a
+              echo "DEBUG: after sourcing .env, DOORSERVER_JWT_SECRET length = ${#DOORSERVER_JWT_SECRET}"
+              echo "DEBUG: after sourcing .env, DOORSERVER_JWT_SECRET first 8 chars = ${DOORSERVER_JWT_SECRET:0:8}"
             fi
             GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
             echo "== health =="
