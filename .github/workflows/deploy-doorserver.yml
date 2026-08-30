@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Deploy to Hetzner VPS
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOORSERVER_JWT_SECRET: ${{ secrets.DOORSERVER_JWT_SECRET }}
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
@@ -37,13 +39,6 @@ jobs:
             # writes a placeholder and the admin API will return 503 - the
             # public site keeps working.
             #
-            # The secret arrives in the SSH step as $JWT (see envs: JWT
-            # in the action config above). We translate to the canonical
-            # name DOORSERVER_JWT_SECRET so the rest of the script can
-            # use a stable variable name.
-            if [ -n "${JWT:-}" ]; then
-              export DOORSERVER_JWT_SECRET="$JWT"
-            fi
             if [ -n "${DOORSERVER_JWT_SECRET:-}" ]; then
               printf 'DOORSERVER_JWT_SECRET=%s\n' "${DOORSERVER_JWT_SECRET}" > .env
               chmod 600 .env
