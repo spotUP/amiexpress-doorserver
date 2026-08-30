@@ -131,13 +131,22 @@ demozoo-csv-import.ts, which only run against demozoo-sourced rows).
 trust, applied to the previously-unprocessed rows. Run locally
 (commit 6e4b6c5):
 
-- **172/1474 filled**, 25 groups. Top: SAD 72, M 24, 5D 19, T 7, X 7,
-  $CP 5, F 5, MTS 5, L 4, TON 3, ULT 3 (+ 14 more with 1-2 each).
-- **NOT yet synced to live** — this only touched the local
-  `data/doors.db`. Needs an UPDATE SQL patch applied over SSH (same
-  shape as the manual JWT workaround, much lighter than the
-  demozoo-sync-bundle machinery since no archive files are involved)
-  or a deliberate decision to leave it local for now.
+- **172/1474 filled locally**, 25 groups. Top: SAD 72, M 24, 5D 19, T 7,
+  X 7, $CP 5, F 5, MTS 5, L 4, TON 3, ULT 3 (+ 14 more with 1-2 each).
+- **SYNCED TO LIVE 2026-08-30.** Local and live had already drifted
+  (live: 5932 raw / 214 hidden vs local: 5891 raw / 204 hidden at time
+  of sync — independent admin edits on both sides), so the patch is a
+  guarded per-archive-name UPDATE (`WHERE archive_name = ? AND
+  (release_group IS NULL OR release_group = '')`), never a blind
+  overwrite — it can't clobber a value an admin already set directly
+  on live. Applied via `sqlite3` inside the `doorserver-doorserver-1`
+  container (installed with `apk add sqlite` — not baked into the
+  image, reinstall if the container gets recreated). Verified:
+  `release_group` filled count 2703 -> 2922 (+219, more than the local
+  172 because the guard also self-healed live's own still-empty rows
+  for the same 25 tags), `release_groups` table 670 -> 675 (+5 new:
+  T, TON, M!DS1, MOVER, V). Live byGroup confirmed: SAD 74 -> 143,
+  5D 108 -> 131.
 
 Breakdown of the remaining 1302 (verified, not just asserted — rerun
 the dry-run query below to check):
