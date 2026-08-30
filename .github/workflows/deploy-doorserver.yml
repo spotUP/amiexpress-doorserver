@@ -25,7 +25,7 @@ jobs:
           # GitHub Actions job's env into the SSH step - we don't need
           # that here, we set the values directly below.
           env:
-            DOORSERVER_JWT_SECRET: ${{ secrets.DOORSERVER_JWT_SECRET }}
+            DOORSERVER_JWT_SECRET: "${{ secrets.DOORSERVER_JWT_SECRET }}"
           script: |
             set -euo pipefail
             cd /app/doorserver
