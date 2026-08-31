@@ -395,6 +395,57 @@ describe('POST /admin/doors/batch-strip-preview', () => {
   });
 });
 
+describe('POST /admin/doors/batch-strip-apply', () => {
+  it('strips only the confirmed members per archive, skipping an empty selection', async () => {
+    // stripArchiveOnServer's empty-members branch still requires the
+    // catalog row's archive file to exist on disk and a real lha/lzh
+    // extension before it reaches the "0 members = mark reviewed, don't
+    // touch the file" shortcut - see src/catalog.ts's stripArchiveOnServer.
+    const archiveAbsPath = path.join(dir, 'AmiExpress', 'ACC-V103.LHA');
+    fs.mkdirSync(path.dirname(archiveAbsPath), { recursive: true });
+    fs.writeFileSync(archiveAbsPath, Buffer.alloc(0));
+
+    const start = await request(app())
+      .post(admin('/doors/batch-strip-apply'))
+      .set(auth())
+      .send({ selections: [{ archiveName: 'ACC-V103.LHA', members: [] }] });
+    expect(start.status).toBe(200);
+    const { jobId } = start.body;
+
+    let job;
+    for (let i = 0; i < 20; i++) {
+      job = (await request(app()).get(admin(`/jobs/${jobId}`)).set(auth())).body;
+      if (job.status === 'done') break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(job.status).toBe('done');
+    expect(job.items[0]).toMatchObject({ archiveName: 'ACC-V103.LHA', status: 'ok' });
+
+    // The empty selection must be a genuine skip, not a silent strip: the
+    // door is marked reviewed (ads_stripped = 1) but the on-disk file is
+    // untouched, and no members were deleted from door_catalog_files.
+    const db = openDb(cfg);
+    const row = db.prepare('SELECT ads_stripped FROM door_catalog WHERE archive_name = ?').get('ACC-V103.LHA') as { ads_stripped: number };
+    expect(row.ads_stripped).toBe(1);
+    db.close();
+    expect(fs.statSync(archiveAbsPath).size).toBe(0);
+
+    // The audit log records the archive with an empty members list and
+    // zero removed, not a re-derived classifier result.
+    const auditRes = await request(app()).get(admin('/audit')).set(auth());
+    const stripEntry = auditRes.body.rows.find((e: { action: string }) => e.action === 'strip');
+    expect(stripEntry).toMatchObject({ target: 'ACC-V103.LHA' });
+    expect(stripEntry.detail).toMatchObject({ members: [], removed: 0 });
+  });
+
+  it('answers 400 when selections is missing or empty', async () => {
+    const res = await request(app()).post(admin('/doors/batch-strip-apply')).set(auth()).send({});
+    expect(res.status).toBe(400);
+    const res2 = await request(app()).post(admin('/doors/batch-strip-apply')).set(auth()).send({ selections: [] });
+    expect(res2.status).toBe(400);
+  });
+});
+
 describe('POST /admin/doors/batch-tags', () => {
   it('adds and removes tags across multiple doors, skipping an unknown archive', async () => {
     await request(app()).patch(admin('/doors/ACC-V103.LHA/tags')).set(auth()).send({ tags: ['keep-me'] });

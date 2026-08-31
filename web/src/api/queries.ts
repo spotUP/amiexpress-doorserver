@@ -331,6 +331,19 @@ export function useBatchStripPreview() {
   });
 }
 
+/** Phase 2 of batch strip: applies exactly the member lists the admin
+ *  confirmed in the review screen (an archive with `members: []` is
+ *  skipped, not force-stripped). Kicks off a tracked job; the caller
+ *  polls /admin/jobs/:id for progress. */
+export function useBatchStripApply() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (selections: { archiveName: string; members: string[] }[]) =>
+      api.post<{ jobId: string }>('/admin/doors/batch-strip-apply', { selections }),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
 export function useFileInfo(archiveName: string) {
   return (path: string) =>
     api.get<{ path: string; size: number; isText: boolean }>(

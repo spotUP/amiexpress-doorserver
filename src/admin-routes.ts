@@ -1170,6 +1170,36 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     res.json({ jobId });
   });
 
+  /** Phase 2 of batch strip: apply exactly the member lists the admin
+   *  confirmed in the review screen. Never re-derives from the classifier -
+   *  each selection's `members` array is the only source of what gets
+   *  deleted. An entry with `members: []` is a genuine skip (matches
+   *  stripArchiveOnServer's own empty-members behavior: it marks the door
+   *  reviewed via ads_stripped=1 without touching the archive on disk). */
+  router.post('/doors/batch-strip-apply', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { selections?: { archiveName: string; members: string[] }[] };
+    if (!Array.isArray(body.selections) || body.selections.length === 0) {
+      res.status(400).json({ error: 'selections array required' });
+      return;
+    }
+    const archiveNames = body.selections.map((s) => s.archiveName);
+    const membersByArchive = new Map(body.selections.map((s) => [s.archiveName, s.members ?? []]));
+    const jobId = createJob(cfg, 'strip-apply', archiveNames, req.admin?.id ?? null);
+    void runJobSequentially(cfg, jobId, archiveNames, (archiveName) => {
+      const members = membersByArchive.get(archiveName) ?? [];
+      const result = stripArchiveOnServer(cfg, archiveName, members, req.admin?.id ?? null);
+      if (!result.ok) return { error: result.reason ?? 'strip failed' };
+      const auditDb = openDb(cfg);
+      try {
+        recordAudit(auditDb, req.admin?.id ?? null, 'strip', archiveName, { members, removed: result.removed });
+      } finally {
+        auditDb.close();
+      }
+      return { ok: true };
+    });
+    res.json({ jobId });
+  });
+
   /**
    * Strip junk members from a catalog archive in place. The archive must
    * be LHA/LZH (LZX cannot be rewritten). After deletion the catalog row
