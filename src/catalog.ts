@@ -218,6 +218,10 @@ export interface StripOnServerResult {
   removed?: number;
   newJunkCount?: number;
   reason?: string;
+  /** Requested members the archiver refused to touch (see deleteMembers) -
+   *  present on a partial success, so the catalog's file list is never
+   *  updated for a member that's still physically in the archive. */
+  skipped?: string[];
 }
 
 /**
@@ -266,8 +270,13 @@ export function stripArchiveOnServer(
 
     const deleteResult = deleteMembers(absPath, members, { binary });
     if (!deleteResult.ok) {
-      return { ok: false, reason: deleteResult.reason };
+      return { ok: false, reason: deleteResult.reason, skipped: deleteResult.skipped };
     }
+    // Only the members the archiver actually removed - a skipped wildcard
+    // name (see deleteMembers) is still physically in the archive, so
+    // dropping its door_catalog_files row here would desync the catalog's
+    // file list from the real archive contents.
+    const actuallyRemoved = members.filter((m) => !(deleteResult.skipped ?? []).includes(m));
 
     // Re-describe the archive after modification
     const checksums = getArchiveChecksums(absPath);
@@ -275,7 +284,7 @@ export function stripArchiveOnServer(
 
     // Delete catalog file rows for removed members
     const deleteFiles = db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ? AND path = ?');
-    for (const member of members) {
+    for (const member of actuallyRemoved) {
       deleteFiles.run(row.id, member);
     }
 
@@ -309,7 +318,12 @@ export function stripArchiveOnServer(
       row.id
     );
 
-    return { ok: true, removed: members.length, newJunkCount };
+    return {
+      ok: true,
+      removed: actuallyRemoved.length,
+      newJunkCount,
+      ...(deleteResult.skipped?.length ? { reason: deleteResult.reason, skipped: deleteResult.skipped } : {}),
+    };
   } finally {
     db.close();
   }

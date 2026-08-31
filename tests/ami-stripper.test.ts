@@ -377,4 +377,54 @@ describe('lha-member-delete', () => {
     expect(result.ok).toBe(true);
     expect(result.removed).toBe(1);
   });
+
+  // Regression for a live incident: the classifier's illegal-filename-char
+  // rule (# ? * @ |) deliberately catches obfuscated ad files literally
+  // named things like "*" - passing that straight to `lha dq`/`7z d`
+  // deletes EVERY member (both tools do their own glob matching on delete
+  // args, independent of argv/shell quoting), and since lha auto-deletes
+  // an archive once it's empty, this destroyed real catalog archives in
+  // production. Reproduced against the real lha binary before writing
+  // this fix: `lha dq test.lha '*'` on a 2-member archive left "Cannot
+  // open archive" - the file was gone.
+  it('refuses to delete a member named with a bare wildcard character', () => {
+    const mockRunner: ArchiveRunner = () => {
+      throw new Error('must not invoke the archiver for a wildcard-only member list');
+    };
+    const result = deleteMembers('/tmp/test.lha', ['*'], {
+      binary: '/usr/bin/lha',
+      runner: mockRunner,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.removed).toBe(0);
+    expect(result.skipped).toEqual(['*']);
+    expect(result.reason).toContain('wildcard');
+  });
+
+  it('deletes the safe members and skips only the wildcard-named one', () => {
+    const mockRunner: ArchiveRunner = (bin, args) => {
+      expect(args).toContain('mastrb8.txt');
+      expect(args).not.toContain('*');
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const result = deleteMembers('/tmp/test.lha', ['*', 'mastrb8.txt'], {
+      binary: '/usr/bin/lha',
+      runner: mockRunner,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.removed).toBe(1);
+    expect(result.skipped).toEqual(['*']);
+  });
+
+  it('also refuses a bare ? member name', () => {
+    const mockRunner: ArchiveRunner = () => {
+      throw new Error('must not invoke the archiver for a wildcard-only member list');
+    };
+    const result = deleteMembers('/tmp/test.lha', ['?'], {
+      binary: '/usr/bin/lha',
+      runner: mockRunner,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.skipped).toEqual(['?']);
+  });
 });

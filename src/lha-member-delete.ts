@@ -98,6 +98,10 @@ export interface MemberDeleteResult {
   ok: boolean;
   removed: number;
   reason?: string;
+  /** Requested members refused because their name is a bare wildcard
+   *  character the archiver would match against every member instead of
+   *  just that file - present whenever any were skipped, success or not. */
+  skipped?: string[];
 }
 
 /**
@@ -119,10 +123,36 @@ export function deleteMembers(
     return { ok: true, removed: 0 };
   }
 
+  // Both `lha` and `7z` do their OWN glob matching on delete arguments -
+  // spawnSync's argv bypasses the shell, but the archiver itself still
+  // treats a bare '*' or '?' as a wildcard against every member name, not
+  // a literal filename. The ad-classifier's whole "illegal filename chars"
+  // rule (# ? * @ |) exists to catch obfuscated ad files literally named
+  // things like "*" - passing that straight through deleted EVERY member
+  // of the archive instead of just that one file, and since lha deletes an
+  // archive outright once it's empty, this silently destroyed the archive
+  // (reproduced live: `lha dq archive.lha '*'` on a 2-member archive left
+  // "Cannot open archive" - the file was gone). Neither `./name` nor a
+  // backslash/bracket escape gets lha to match it as a literal name either
+  // (tested against the real binary) - there's no safe way to target a
+  // member whose name IS a wildcard character via this CLI, so it's
+  // refused rather than guessed at.
+  const WILDCARD_CHARS = /[*?]/;
+  const wildcardMembers = members.filter((m) => WILDCARD_CHARS.test(m));
+  const literalMembers = members.filter((m) => !WILDCARD_CHARS.test(m));
+  if (literalMembers.length === 0) {
+    return {
+      ok: false,
+      removed: 0,
+      reason: `refusing to delete ${wildcardMembers.map((m) => `"${m}"`).join(', ')}: filename contains a wildcard character (*, ?) the archiver would match against every member instead of this one file`,
+      skipped: wildcardMembers,
+    };
+  }
+
   // 7z uses "d" to delete, just like lha. Filenames starting with `-` would
   // be parsed by lha as options (exit 2 + usage message); prefix with `./`
   // to force positional interpretation.
-  const safeMembers = members.map((m) => (m.startsWith('-') ? `./${m}` : m));
+  const safeMembers = literalMembers.map((m) => (m.startsWith('-') ? `./${m}` : m));
   const useLha = binary!.endsWith('lha') || binary!.includes('/lha');
   // 7z needs a different syntax for zip: `7z d archive.zip member` works
   // for lha, but for zip 7z needs `-bb` to print byte-level detail and
@@ -152,5 +182,14 @@ export function deleteMembers(
     };
   }
 
-  return { ok: true, removed: members.length };
+  return {
+    ok: true,
+    removed: literalMembers.length,
+    ...(wildcardMembers.length > 0
+      ? {
+          reason: `removed ${literalMembers.length} file(s); refused to delete ${wildcardMembers.map((m) => `"${m}"`).join(', ')} - filename contains a wildcard character (*, ?) the archiver would match against every member instead of this one file`,
+          skipped: wildcardMembers,
+        }
+      : {}),
+  };
 }
