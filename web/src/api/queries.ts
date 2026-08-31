@@ -189,7 +189,15 @@ export function useBatchTags() {
   return useMutation({
     mutationFn: (args: { archiveNames: string[]; add: string[]; remove: string[] }) =>
       api.post<{ ok: boolean; results: BatchResult[] }>('/admin/doors/batch-tags', args),
-    onSuccess: () => invalidateEverything(client),
+    onSuccess: (_data, variables) => {
+      invalidateEverything(client);
+      // invalidateEverything doesn't cover the door-detail tags panel - it
+      // lives under its own tagKeys namespace, not doorKeys.
+      void client.invalidateQueries({ queryKey: tagKeys.all });
+      for (const archiveName of variables.archiveNames) {
+        void client.invalidateQueries({ queryKey: tagKeys.door(archiveName) });
+      }
+    },
   });
 }
 
