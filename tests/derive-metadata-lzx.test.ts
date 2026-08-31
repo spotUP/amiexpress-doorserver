@@ -33,6 +33,6 @@ describe('deriveMetadata with an LZX archive', () => {
 
     expect(readLzxContents).toHaveBeenCalledWith(lzxBytes);
     expect(derived.fileIdDiz).toBe('MyDoor v1.0\nRequires /X 4.x\n');
-    expect(derived.requiresBbs).toBe('/X 4.x');
+    expect(derived.requiresBbs).toBe('AmiExpress');
   });
 });

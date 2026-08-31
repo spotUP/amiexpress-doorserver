@@ -82,7 +82,7 @@ describe('GET /admin/doors/:archiveName', () => {
     expect(res.body.fields.description.scanned).toBe('__ ART __');
     expect(res.body.fields.description.derived).toContain('edits user accounts');
     expect(res.body.fields.description.isEdited).toBe(false);
-    expect(res.body.fields.requires_bbs.derived).toBe('/X 3.38+');
+    expect(res.body.fields.requires_bbs.derived).toBe('AmiExpress');
     expect(res.body.fileIdDiz).toContain('Account Editor v1.0');
   });
 
@@ -211,7 +211,7 @@ describe('POST /admin/doors/:archiveName/redescribe', () => {
     const res = await request(app()).post(admin('/doors/ACC-V103.LHA/redescribe')).set(auth());
     expect(res.status).toBe(200);
     expect(res.body.description).toContain('edits user accounts');
-    expect(res.body.requiresBbs).toBe('/X 3.38+');
+    expect(res.body.requiresBbs).toBe('AmiExpress');
     // The human's text is still what the public API serves.
     expect((await request(app()).get('/api/door-repo/doors?q=ACC')).body.rows[0].description).toBe('mine');
   });

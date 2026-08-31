@@ -438,6 +438,13 @@ const BBS_REQ_RE =
 export function normaliseRequirement(name: string, ver: string): string {
   const key = name.toLowerCase().replace(/-/g, '');
   const bbs = BBS_NAMES[key] ?? name;
+  // "/X" is the AmiExpress door-interface standard, not a different BBS -
+  // every "/X n.x" mention and every "AmiExpress n.x" mention names the same
+  // software. Filtering by "which BBS" doesn't need the specific point
+  // release (unlike the door's own version, which stays exact elsewhere) -
+  // collapsing to the bare BBS name is what makes "Any BBS version" a
+  // useful filter instead of a wall of near-duplicate versions of one entry.
+  if (bbs === '/X' || bbs === 'AmiExpress') return 'AmiExpress';
   let version = ver.replace(/,/g, '.');
   const dot = version.indexOf('.');
   if (dot !== -1) {

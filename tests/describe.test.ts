@@ -249,19 +249,19 @@ describe('CP437 box art is not a description', () => {
 describe('which BBS the door needs', () => {
   it('moves the requirement into its own field and leaves the description behind', () => {
     const { description, requiresBbs } = read(CL0T0, null, 'Callers Lottery', 'AECL0T0.LHA');
-    expect(requiresBbs).toBe('/X 3.x+');
+    expect(requiresBbs).toBe('AmiExpress');
     expect(description).toContain('Byte Bonus');
     expect(description).not.toContain('/X 3.x');
   });
 
   it('finds a requirement stamped in the box border', () => {
     const { requiresBbs } = read(JC40, 'JoinCnf', 'JoinCnf', 'MST-JC40.LHA');
-    expect(requiresBbs).toBe('/X 3.38+');
+    expect(requiresBbs).toBe('AmiExpress');
   });
 
-  it('normalises the BBS name and the wildcard case', () => {
-    expect(normaliseRequirement('AE', '3,30')).toBe('/X 3.30');
-    expect(normaliseRequirement('AmiExpress', '4.X')).toBe('AmiExpress 4.x');
+  it('normalises "/X" and "AmiExpress" to the same bare name - they are the same BBS', () => {
+    expect(normaliseRequirement('AE', '3,30')).toBe('AmiExpress');
+    expect(normaliseRequirement('AmiExpress', '4.X')).toBe('AmiExpress');
   });
 });
 
