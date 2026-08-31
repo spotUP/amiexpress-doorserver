@@ -3,8 +3,23 @@
  * asked for on this path - the corpus is public, and reading it is the point.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eraser, Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
-import { useBatchHide, useBatchPatch, useBatchRestore, useDoors, useFacets, useLiveRevision } from '../api/queries';
+import { Eraser, Inbox, LogIn, LogOut, RefreshCw, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
+import {
+  useBatchDelete,
+  useBatchHide,
+  useBatchPatch,
+  useBatchReextract,
+  useBatchRestore,
+  useBatchStripApply,
+  useBatchStripPreview,
+  useBatchTags,
+  useDoors,
+  useFacets,
+  useJobProgress,
+  useLiveRevision,
+  useMatchingArchiveNames,
+  type StripPreviewResult,
+} from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
 import type { AdminUser, Door } from '../api/types';
@@ -18,6 +33,7 @@ import { ReleaseGroupsPanel } from './ReleaseGroups';
 import { StatsPanel } from './Stats';
 import { SubmitDialog } from '../components/SubmitDialog';
 import { BatchToolbar } from '../components/BatchToolbar';
+import { BatchStripReview } from '../components/BatchStripReview';
 import { SavedSearches } from '../components/SavedSearches';
 import { Button, Input, Select } from '../components/ui';
 
@@ -44,6 +60,16 @@ export function Browse() {
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  // Snapshot of `selected` taken at the moment the anchor was set by a plain
+  // click. Shift-clicks union range cells onto this base (not onto whatever
+  // is currently selected), so repeated shift-clicks from the same anchor
+  // are idempotent relative to the base and can both grow and shrink the
+  // visible range.
+  const [rangeBase, setRangeBase] = useState<Set<string> | null>(null);
+  // True once the "select all N matching" fetch has replaced the page-only
+  // selection with every archive name matching the current filters.
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
 
   useLiveRevision();
 
@@ -88,6 +114,50 @@ export function Browse() {
   const batchHide = useBatchHide();
   const batchRestore = useBatchRestore();
   const batchPatch = useBatchPatch();
+  const batchTags = useBatchTags();
+  const batchDelete = useBatchDelete();
+  const batchReextract = useBatchReextract();
+  const [reextractJobId, setReextractJobId] = useState<string | null>(null);
+  const batchStripPreview = useBatchStripPreview();
+  const batchStripApply = useBatchStripApply();
+  const [stripPreviewJobId, setStripPreviewJobId] = useState<string | null>(null);
+  const [stripApplyJobId, setStripApplyJobId] = useState<string | null>(null);
+  const [stripCandidates, setStripCandidates] = useState<StripPreviewResult[] | null>(null);
+  const stripPreviewProgress = useJobProgress(stripPreviewJobId);
+  const stripApplyProgress = useJobProgress(stripApplyJobId);
+  const matchingNames = useMatchingArchiveNames();
+  // Once a strip-apply job finishes with failures, keep a summary visible
+  // instead of reverting straight to the normal toolbar/review screen and
+  // discarding failedCount. Reset whenever a new apply job starts.
+  const [stripApplySummaryDismissed, setStripApplySummaryDismissed] = useState(false);
+  useEffect(() => {
+    setStripApplySummaryDismissed(false);
+  }, [stripApplyJobId]);
+
+  // Once the preview job finishes, fetch its resultJson and hand the parsed
+  // candidates to the review screen. stripPreviewJobId is cleared in the same
+  // update so this effect doesn't refire once the fetch lands (useJobProgress
+  // returns null once its jobId argument goes null, so the guard holds even
+  // across the render where the clear takes effect). A 'failed' job (see
+  // batch-jobs.ts's top-level backstop) has no review screen to show - drop
+  // back to the toolbar rather than leaving the progress indicator spinning
+  // on a status it never expects to move on from.
+  useEffect(() => {
+    if (!stripPreviewJobId || !stripPreviewProgress) return;
+    if (stripPreviewProgress.status === 'done') {
+      const jobId = stripPreviewJobId;
+      // resultJson is a nullable TEXT column; setJobResult should always
+      // have been called by the time a strip-preview job reaches 'done', but
+      // guard the type-lie anyway rather than calling JSON.parse(null).
+      api.get<{ resultJson: string | null }>(`/admin/jobs/${jobId}`).then((job) => {
+        const candidates = job.resultJson ? (JSON.parse(job.resultJson) as StripPreviewResult[]) : [];
+        setStripCandidates(candidates);
+        setStripPreviewJobId(null);
+      });
+    } else if (stripPreviewProgress.status === 'failed') {
+      setStripPreviewJobId(null);
+    }
+  }, [stripPreviewProgress, stripPreviewJobId]);
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1;
 
@@ -102,6 +172,7 @@ export function Browse() {
   }
 
   const toggle = useCallback((name: string) => {
+    setSelectAllMatching(false);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
@@ -110,7 +181,35 @@ export function Browse() {
     });
   }, []);
 
+  const toggleRange = useCallback((index: number, event: React.MouseEvent) => {
+    setSelectAllMatching(false);
+    const rows = data?.rows ?? [];
+    const name = rows[index]?.archiveName;
+    if (!name) return;
+    if (event.shiftKey && anchorIndex !== null) {
+      const [lo, hi] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex];
+      const next = new Set(rangeBase ?? []);
+      for (let i = lo; i <= hi; i++) {
+        const n = rows[i]?.archiveName;
+        if (n) next.add(n);
+      }
+      setSelected(next);
+      // Anchor and rangeBase stay put on a shift-click, so repeated
+      // shift-clicks against the same origin are idempotent relative to the
+      // base snapshot and can both extend and shrink the range.
+      return;
+    }
+    const next = new Set(selected);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setSelected(next);
+    setRangeBase(next);
+    setAnchorIndex(index);
+  }, [data, anchorIndex, rangeBase, selected]);
+
   const toggleAll = useCallback(() => {
+    setSelectAllMatching(false);
+    setRangeBase(null);
     setSelected((prev) => {
       const rows = data?.rows ?? [];
       if (rows.every((d) => prev.has(d.archiveName))) return new Set();
@@ -118,7 +217,31 @@ export function Browse() {
     });
   }, [data]);
 
-  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  const clearSelection = useCallback(() => {
+    setSelectAllMatching(false);
+    setSelected(new Set());
+    setAnchorIndex(null);
+    setRangeBase(null);
+  }, []);
+
+  const selectAllFiltered = useCallback(() => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (system) params.set('system', system);
+    if (type) params.set('type', type);
+    if (requires) params.set('requires', requires);
+    if (latestOnly) params.set('latest', '1');
+    if (guessedOnly) params.set('name_source', 'archive');
+    if (unstrippedOnly) params.set('unstripped', '1');
+    // NOTE: keep this param list in sync with toSearch() in api/queries.ts,
+    // which is what useDoors() itself sends for the current filter state.
+    matchingNames.mutate(params, {
+      onSuccess: (res) => {
+        setSelected(new Set(res.archiveNames));
+        setSelectAllMatching(true);
+      },
+    });
+  }, [q, system, type, requires, latestOnly, guessedOnly, unstrippedOnly, matchingNames]);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[86rem] flex-col gap-4 px-4 py-6">
@@ -298,36 +421,91 @@ export function Browse() {
       </div>
       </div>
 
-      {admin && selected.size > 0 && (
+      {admin && stripApplyJobId && stripApplyProgress && stripApplyProgress.status === 'running' ? (
+        <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <RefreshCw size={14} className="animate-spin text-accent" />
+          <span>Stripping {stripApplyProgress.completed} / {stripApplyProgress.total}</span>
+          {stripApplyProgress.failedCount > 0 && <span className="text-danger">{stripApplyProgress.failedCount} failed</span>}
+        </div>
+      ) : admin && stripApplyJobId && stripApplyProgress &&
+          (stripApplyProgress.failedCount > 0 || stripApplyProgress.status === 'failed') &&
+          !stripApplySummaryDismissed ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <span>
+            {stripApplyProgress.status === 'failed' ? 'Strip stopped unexpectedly: ' : 'Strip finished: '}
+            {stripApplyProgress.completed - stripApplyProgress.failedCount} succeeded,{' '}
+            <span className="text-danger">{stripApplyProgress.failedCount} failed</span>
+          </span>
+          <Button variant="ghost" onClick={() => setStripApplySummaryDismissed(true)}>Dismiss</Button>
+        </div>
+      ) : admin && stripPreviewJobId && stripPreviewProgress && stripPreviewProgress.status === 'running' ? (
+        <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <RefreshCw size={14} className="animate-spin text-accent" />
+          <span>Previewing strip candidates {stripPreviewProgress.completed} / {stripPreviewProgress.total}</span>
+        </div>
+      ) : admin && stripCandidates ? (
+        <BatchStripReview
+          candidates={stripCandidates}
+          onCancel={() => setStripCandidates(null)}
+          onConfirm={(selections) => {
+            setStripCandidates(null);
+            batchStripApply.mutate(selections, { onSuccess: (res) => setStripApplyJobId(res.jobId) });
+          }}
+        />
+      ) : admin && selected.size > 0 ? (
         <BatchToolbar
           count={selected.size}
           onHide={() => {
             const names = [...selected];
             batchHide.mutate(names.map((archiveName) => ({ archiveName, reason: 'batch hide' })), {
-              onSuccess: () => setSelected(new Set()),
+              onSuccess: () => clearSelection(),
             });
           }}
           onRestore={() => {
             batchRestore.mutate([...selected], {
-              onSuccess: () => setSelected(new Set()),
+              onSuccess: () => clearSelection(),
             });
           }}
-          onRecategorize={(category) => {
+          onSetField={(field, value) => {
             batchPatch.mutate(
-              { archiveNames: [...selected], fields: { category } },
-              { onSuccess: () => setSelected(new Set()) },
+              { archiveNames: [...selected], fields: { [field]: value } },
+              { onSuccess: () => clearSelection() },
             );
           }}
           onFixCasing={() => {
             batchPatch.mutate(
               { archiveNames: [...selected], fields: { description: '__FIX_CASING__', name: '__FIX_TITLE_CASING__' } },
-              { onSuccess: () => setSelected(new Set()) },
+              { onSuccess: () => clearSelection() },
             );
           }}
+          onTagsChange={(add, remove) => {
+            batchTags.mutate({ archiveNames: [...selected], add, remove });
+          }}
+          onDelete={(confirm) => {
+            batchDelete.mutate(
+              { archiveNames: [...selected], confirm },
+              { onSuccess: () => clearSelection() },
+            );
+          }}
+          onReextract={() => {
+            batchReextract.mutate([...selected], { onSuccess: (res) => setReextractJobId(res.jobId) });
+          }}
+          reextractJobId={reextractJobId}
+          onStripPreview={() => {
+            batchStripPreview.mutate([...selected], { onSuccess: (res) => setStripPreviewJobId(res.jobId) });
+          }}
           onClear={clearSelection}
-          isPending={batchHide.isPending || batchRestore.isPending || batchPatch.isPending}
+          isPending={
+            batchHide.isPending ||
+            batchRestore.isPending ||
+            batchPatch.isPending ||
+            batchTags.isPending ||
+            batchDelete.isPending ||
+            batchReextract.isPending ||
+            batchStripPreview.isPending
+          }
         />
-      )}
+      ) : null}
 
       <DoorTable
         rows={data?.rows ?? []}
@@ -337,6 +515,18 @@ export function Browse() {
         selected={admin ? selected : undefined}
         onToggle={admin ? toggle : undefined}
         onToggleAll={admin ? toggleAll : undefined}
+        onToggleRange={admin ? toggleRange : undefined}
+        // "Needs a name" (guessedOnly) filters name_source in-process on the
+        // main listing, so data.total IS correctly filtered by it - but
+        // GET /doors?fields=archiveName (what "select all N matching" fetches)
+        // does NOT apply name_source (see src/public-routes.ts). Showing the
+        // count here while hiding it from the button's actual query would let
+        // "Select all N matching" report a number it doesn't select. Hide the
+        // button under this filter rather than show a lying count; page-only
+        // multi-select still works fine.
+        totalMatching={guessedOnly ? undefined : data?.total}
+        onSelectAllMatching={selectAllFiltered}
+        selectAllMatchingActive={selectAllMatching}
       />
 
       <footer className="flex items-center justify-between gap-4 text-sm text-muted">

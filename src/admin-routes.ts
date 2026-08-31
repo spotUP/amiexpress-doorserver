@@ -23,10 +23,11 @@ import { analyseDoor, buildGroupTags, fixCasing, fixTitleCasing, tidyCase } from
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides, type OverrideMap } from './effective';
 import { UploadError, approveSubmission, rejectSubmission, deriveMetadata } from './submissions';
 import type { ServerConfig } from './config';
-import { analyzeArchive, isMatchAllGlob } from './ami-stripper';
+import { analyzeArchive, isMatchAllGlob, type StripEntry } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
+import { createJob, runJobSequentially, getJob, setJobResult, markJobFailed } from './batch-jobs';
 import * as fs from 'fs';
 
 /**
@@ -91,6 +92,94 @@ function resolveFixCasingSentinel(
     return fixCasing(String(currentVal));
   }
   return value;
+}
+
+/**
+ * Re-read one archive's DIZ/file list and write it back to the catalog.
+ * Shared by the single-door /reextract route and the batch job runner -
+ * previously this logic lived only inline in the single-door route. The
+ * single-door route's response is richer than the batch route needs, so
+ * this returns the full `derived` object on success and each caller picks
+ * what it needs from it.
+ *
+ * The whole body is wrapped in try/catch (rather than just try/finally
+ * around db.close()) so that an exception thrown mid-extraction - e.g.
+ * deriveMetadata() or an archive reader choking on a corrupt file - comes
+ * back as a clean `{ error }` result instead of propagating uncaught. The
+ * single-door route used to have its own outer try/catch around this exact
+ * body for that reason; that catch is now unreachable dead code and has
+ * been removed from the route, since this function can no longer throw.
+ * The batch route doesn't need its own catch either: runJobSequentially()
+ * already treats a returned `{ error }` as a normal failed-item outcome.
+ */
+function reextractOneDoor(cfg: ServerConfig, archiveName: string, adminId: number | null): { ok: true; fileCount: number; derived: ReturnType<typeof deriveMetadata> } | { error: string } {
+  const db = openDb(cfg);
+  try {
+    const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string; archive_path: string } | undefined;
+    if (!entry) return { error: 'no such door' };
+
+    const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
+    if (!fs.existsSync(archivePath)) return { error: 'archive file missing' };
+
+    const bytes = fs.readFileSync(archivePath);
+    const groupTags = buildGroupTags(
+      (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map((r) => r.archive_name)
+    );
+    const derived = deriveMetadata(bytes, archiveName, groupTags);
+
+    // Pull the file list directly from the archive reader, which now
+    // falls back to the system `lha` binary when the JS reader fails.
+    const ext = path.extname(archivePath).toLowerCase();
+    let files: { path: string; size: number }[] = [];
+    if (ext === '.lha' || ext === '.lzh') files = readLhaContents(bytes, archivePath).files;
+    else if (ext === '.zip') files = readZipContents(bytes).files;
+    else if (ext === '.lzx') files = readLzxContents(bytes).files;
+
+    const write = db.transaction(() => {
+      // Update catalog metadata from the freshly-read archive.
+      db.prepare(`UPDATE door_catalog SET
+          name = ?, version = ?, author = ?, description = ?,
+          requires_bbs = ?, binary_name = ?, file_id_diz = ?,
+          doc_filename = ?, doc_raw = ?, indexed_at = strftime('%s','now')
+          WHERE id = ?`).run(
+        derived.name, derived.version, derived.author, derived.description,
+        derived.requiresBbs, derived.binaryName, derived.fileIdDiz,
+        derived.docFilename, derived.doc, entry.id
+      );
+      // Wipe and rewrite the file list - overwrites any previous junk
+      // flagging, which is what a full re-extract means.
+      db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ?').run(entry.id);
+      if (files.length > 0) {
+        const ins = db.prepare('INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)');
+        for (const f of files) ins.run(entry.id, f.path, f.size);
+      }
+      recordAudit(db, adminId, 'reextract', archiveName, { fileCount: files.length, dizFound: Boolean(derived.fileIdDiz), docFound: Boolean(derived.doc) });
+    });
+    write();
+    return { ok: true, fileCount: files.length, derived };
+  } catch (e) {
+    return { error: String(e) };
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Defense-in-depth backstop for the three `void runJobSequentially(...)`
+ * fire-and-forget call sites below. runJobSequentially itself now never
+ * throws (see its top-level try/catch in batch-jobs.ts) - this exists for
+ * anything that could still escape from outside it, e.g. a callback passed
+ * into it throwing after runJobSequentially's own promise has resolved.
+ * Reads the job's last-known progress so the terminal 'failed' event reports
+ * real numbers instead of zeros.
+ */
+function failJobOnEscape(cfg: ServerConfig, jobId: string, total: number): (e: unknown) => void {
+  return (e: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error(`[door-repo] job ${jobId} escaped with an unhandled error:`, e);
+    const job = getJob(cfg, jobId);
+    markJobFailed(cfg, jobId, job?.completed ?? 0, total, job?.failedCount ?? 0);
+  };
 }
 
 export function createAdminRouter(cfg: ServerConfig): Router {
@@ -351,83 +440,39 @@ export function createAdminRouter(cfg: ServerConfig): Router {
    */
   router.post('/doors/:archiveName/reextract', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[req.params.archiveName.length - 1] : req.params.archiveName;
-    const db = openDb(cfg);
-    try {
-      const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string; archive_path: string } | undefined;
-      if (!entry) { res.status(404).json({ error: 'no such door' }); return; }
-
-      const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
-      if (!fs.existsSync(archivePath)) { res.status(404).json({ error: 'archive file missing' }); return; }
-
-      const bytes = fs.readFileSync(archivePath);
-      const groupTags = buildGroupTags(
-        (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
-          (r) => r.archive_name
-        )
-      );
-
-      const derived = deriveMetadata(bytes, archiveName, groupTags);
-
-      // Pull the file list directly from the archive reader, which now
-      // falls back to the system `lha` binary when the JS reader fails.
-      const ext = path.extname(archivePath).toLowerCase();
-      let files: { path: string; size: number }[] = [];
-      if (ext === '.lha' || ext === '.lzh') {
-        const contents = readLhaContents(bytes, archivePath);
-        files = contents.files;
-      } else if (ext === '.zip') {
-        const contents = readZipContents(bytes);
-        files = contents.files;
-      } else if (ext === '.lzx') {
-        const contents = readLzxContents(bytes);
-        files = contents.files;
-      }
-
-      const write = db.transaction(() => {
-        // Update catalog metadata from the freshly-read archive.
-        db.prepare(`UPDATE door_catalog SET 
-            name = ?, version = ?, author = ?, description = ?, 
-            requires_bbs = ?, binary_name = ?, file_id_diz = ?, 
-            doc_filename = ?, doc_raw = ?, indexed_at = strftime('%s','now')
-            WHERE id = ?`).run(
-                derived.name, derived.version, derived.author, derived.description,
-                derived.requiresBbs, derived.binaryName, derived.fileIdDiz,
-                derived.docFilename, derived.doc, entry.id
-            );
-        // Wipe and rewrite the file list — overwrites any previous junk
-        // flagging, which is what a full re-extract means.
-        db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ?').run(entry.id);
-        if (files.length > 0) {
-          const ins = db.prepare(
-            'INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)'
-          );
-          for (const f of files) ins.run(entry.id, f.path, f.size);
-        }
-        recordAudit(db, req.admin?.id ?? null, 'reextract', archiveName, {
-          fileCount: files.length,
-          dizFound: Boolean(derived.fileIdDiz),
-          docFound: Boolean(derived.doc),
-        });
-      });
-      write();
-
-      res.json({
-        ok: true,
-        archiveName,
-        fileCount: files.length,
-        name: derived.name,
-        version: derived.version,
-        author: derived.author,
-        description: derived.description,
-        binaryName: derived.binaryName,
-        fileIdDiz: derived.fileIdDiz,
-        docFilename: derived.docFilename,
-      });
-    } catch (e) {
-      res.status(500).json({ error: String(e) });
-    } finally {
-      db.close();
+    const result = reextractOneDoor(cfg, archiveName, req.admin?.id ?? null);
+    if ('error' in result) {
+      res.status(result.error === 'no such door' || result.error === 'archive file missing' ? 404 : 500).json({ error: result.error });
+      return;
     }
+    res.json({
+      ok: true,
+      archiveName,
+      fileCount: result.fileCount,
+      name: result.derived.name,
+      version: result.derived.version,
+      author: result.derived.author,
+      description: result.derived.description,
+      binaryName: result.derived.binaryName,
+      fileIdDiz: result.derived.fileIdDiz,
+      docFilename: result.derived.docFilename,
+    });
+  });
+
+  /** Re-extract many doors as a tracked background job. */
+  router.post('/doors/batch-reextract', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[] };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const jobId = createJob(cfg, 'reextract', body.archiveNames, req.admin?.id ?? null);
+    const adminId = req.admin?.id ?? null;
+    void runJobSequentially(cfg, jobId, body.archiveNames, (archiveName) => {
+      const result = reextractOneDoor(cfg, archiveName, adminId);
+      return 'error' in result ? { error: result.error } : { ok: true };
+    }).catch(failJobOnEscape(cfg, jobId, body.archiveNames.length));
+    res.json({ jobId });
   });
 
   /** Re-extract the file list for every door that currently has zero files.
@@ -656,6 +701,17 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /** Current state of a bulk job - for a client reconnecting after a refresh. */
+  router.get('/jobs/:id', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const id = Array.isArray(req.params.id) ? '' : req.params.id;
+    const job = getJob(cfg, id);
+    if (!job) {
+      res.status(404).json({ error: 'no such job' });
+      return;
+    }
+    res.json(job);
+  });
+
   // ─── batch operations ────────────────────────────────────────────────
 
   /** Hide multiple doors at once. */
@@ -722,6 +778,133 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       });
       write();
       res.json({ ok: true, results });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Add/remove tags across multiple doors at once (additive, unlike the
+   *  single-door PATCH which replaces the whole tag set). */
+  router.post('/doors/batch-tags', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[]; add?: string[]; remove?: string[] };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const add = (body.add ?? []).filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+    const remove = (body.remove ?? []).filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+    const db = openDb(cfg);
+    try {
+      const lookup = db.prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE');
+      const insTag = db.prepare('INSERT OR IGNORE INTO door_tags (catalog_id, tag, added_by) VALUES (?, ?, ?)');
+      const delTag = db.prepare('DELETE FROM door_tags WHERE catalog_id = ? AND tag = ?');
+      const results: { archiveName: string; ok: boolean; error?: string }[] = [];
+      const write = db.transaction(() => {
+        for (const archiveName of body.archiveNames!) {
+          const row = lookup.get(archiveName) as { id: string } | undefined;
+          if (!row) {
+            results.push({ archiveName, ok: false, error: 'not found' });
+            continue;
+          }
+          for (const tag of add) insTag.run(row.id, tag.trim().toLowerCase(), req.admin?.id ?? null);
+          for (const tag of remove) delTag.run(row.id, tag.trim().toLowerCase());
+          recordAudit(db, req.admin?.id ?? null, 'edit-tags', row.id, { archiveName, add, remove });
+          results.push({ archiveName, ok: true });
+        }
+      });
+      write();
+      res.json({ ok: true, results });
+    } finally {
+      db.close();
+    }
+  });
+
+  /** Permanently remove multiple doors: catalog row, every child row keyed
+   *  to it, and the archive file on disk. No single-door equivalent exists
+   *  today (DELETE /doors/:archiveName is a soft hide) - this defines the
+   *  real delete for the first time, so it enumerates every table itself
+   *  rather than reusing something that doesn't do this. */
+  router.post('/doors/batch-delete', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[]; confirm?: string };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    if (body.archiveNames.some((n) => typeof n !== 'string')) {
+      res.status(400).json({ error: 'archiveNames must all be strings' });
+      return;
+    }
+    if (body.archiveNames.length > 200) {
+      res.status(400).json({ error: 'batch too large - split into requests of 200 or fewer' });
+      return;
+    }
+    if (body.confirm !== String(body.archiveNames.length)) {
+      res.status(400).json({ error: `confirm must equal the archive count (${body.archiveNames.length})` });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const lookup = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE');
+      const cleanupByCatalogId = [
+        'DELETE FROM door_catalog_files WHERE catalog_id = ?',
+        'DELETE FROM door_catalog_overrides WHERE catalog_id = ?',
+        'DELETE FROM door_hidden WHERE catalog_id = ?',
+        'DELETE FROM door_tags WHERE catalog_id = ?',
+        'DELETE FROM door_votes WHERE catalog_id = ?',
+      ].map((sql) => db.prepare(sql));
+      const cleanupNotJunk = db.prepare('DELETE FROM door_not_junk WHERE archive_name = ? COLLATE NOCASE');
+      const deleteCatalogRow = db.prepare('DELETE FROM door_catalog WHERE id = ?');
+      const results: { archiveName: string; ok: boolean; error?: string }[] = [];
+      // Absolute paths to unlink AFTER the DB transaction below has
+      // committed - see the phase-2 comment for why the filesystem must
+      // not be touched while the transaction is still open.
+      const toUnlink: string[] = [];
+
+      // Phase 1: every catalog-side DELETE for the whole batch runs inside
+      // one transaction, and nothing here touches the filesystem. If a
+      // later archive's statement throws (e.g. SQLITE_BUSY from a
+      // concurrent writer), db.transaction() rolls back everything done so
+      // far in this call - including the catalog rows for archives already
+      // processed earlier in the loop. As long as no file has been deleted
+      // yet, that rollback is safe: the catalog rows come back and the
+      // files are still on disk. Deleting a file inside this block would
+      // make that rollback resurrect a catalog row whose file is already
+      // gone forever.
+      const write = db.transaction(() => {
+        for (const archiveName of body.archiveNames!) {
+          const row = lookup.get(archiveName) as { id: string; archive_path: string } | undefined;
+          if (!row) {
+            results.push({ archiveName, ok: false, error: 'not found' });
+            continue;
+          }
+          for (const stmt of cleanupByCatalogId) stmt.run(row.id);
+          cleanupNotJunk.run(archiveName);
+          deleteCatalogRow.run(row.id);
+          recordAudit(db, req.admin?.id ?? null, 'delete', archiveName, {});
+          results.push({ archiveName, ok: true });
+          toUnlink.push(resolveArchivePath(cfg, row.archive_path));
+        }
+      });
+      write();
+
+      // Phase 2: write() has returned, so the transaction above has
+      // COMMITTED - every catalog row deleted above is durably gone. Only
+      // now do we mutate the filesystem, each unlink in its own try/catch:
+      // a missing file or a permission error here leaves an orphan on
+      // disk, not a reason to report an already-committed catalog delete
+      // as failed.
+      for (const absPath of toUnlink) {
+        try {
+          if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+        } catch {
+          // Orphaned file on disk; the catalog row is already gone and
+          // committed, so this is not reported as a failure.
+        }
+      }
+
+      res.json({ ok: true, results });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
     } finally {
       db.close();
     }
@@ -885,27 +1068,30 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   // ─── archive stripping ───────────────────────────────────────────
 
   /**
-   * Preview what the ad stripper would flag in this archive, without
-   * modifying anything. The response includes every file with its
-   * classification verdict so the UI can show a checklist.
+   * Runs strip-preview's classification for one archive: resolves the
+   * catalog row, loads the admin's "not junk" corrections and any learned
+   * patterns, and runs analyzeArchive(). Shared by the single-door
+   * '/strip-preview' route and the batch-strip-preview job below.
+   *
+   * Returns everything the single-door route needs to reconstruct its
+   * response unchanged - the full StripEntry[] (path+size+md5, not
+   * narrowed), the full reason map, and the real preserved paths. The
+   * batch route builds its own compact {path,reason}[] shape from
+   * `stripped`+`reason`; this function does not pre-narrow that for it,
+   * so the single-door route's response never has to change to serve the
+   * batch caller's convenience.
    */
-  router.post('/doors/:archiveName/strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
-    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+  function previewStripOne(cfg: ServerConfig, archiveName: string):
+    | { ok: true; archivePath: string; kept: StripEntry[]; stripped: StripEntry[]; reason: Record<string, string>; notJunk: string[]; cleanedDiz: string | null; isEmptyLzx: boolean }
+    | { error: string } {
     const db = openDb(cfg, { readonly: true });
     try {
       const row = db
         .prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
         .get(archiveName) as { archive_path: string } | undefined;
-      if (!row) {
-        res.status(404).json({ error: 'no such door' });
-        return;
-      }
+      if (!row) return { error: 'no such door' };
       const absPath = resolveArchivePath(cfg, row.archive_path);
-      const fs = require('fs');
-      if (!fs.existsSync(absPath)) {
-        res.status(404).json({ error: 'archive file not found on disk' });
-        return;
-      }
+      if (!fs.existsSync(absPath)) return { error: 'archive file not found on disk' };
 
       // Files the admin has marked as "not junk" are always kept, even
       // when the auto-stripper would flag them. This is the feedback
@@ -926,29 +1112,144 @@ export function createAdminRouter(cfg: ServerConfig): Router {
           extraPatterns.length > 0 ? extraPatterns : undefined,
           preservePaths.size > 0 ? preservePaths : undefined,
         );
-      } catch (e: any) {
-        res.status(400).json({ error: `cannot read archive: ${e?.message ?? String(e)}` });
-        return;
+      } catch (e: unknown) {
+        return { error: `cannot read archive: ${(e as Error)?.message ?? String(e)}` };
       }
-      if (result.kept.length === 0 && result.stripped.length === 0) {
-        const ext = require('path').extname(absPath).toLowerCase();
-        if (ext === '.lzx') {
-          res.status(400).json({ error: 'LZX archives cannot be read by this server' });
-          return;
-        }
-      }
-      res.json({
-        archiveName,
+      const isEmptyLzx = result.kept.length === 0 && result.stripped.length === 0
+        && path.extname(absPath).toLowerCase() === '.lzx';
+      return {
+        ok: true,
         archivePath: absPath,
         kept: result.kept,
         stripped: result.stripped,
         reason: result.reason,
-        notJunk: Array.from(preservePaths ?? new Set<string>()),
+        notJunk: Array.from(preservePaths),
         cleanedDiz: result.cleanedDiz ?? null,
-      });
+        isEmptyLzx,
+      };
     } finally {
       db.close();
     }
+  }
+
+  /**
+   * Preview what the ad stripper would flag in this archive, without
+   * modifying anything. The response includes every file with its
+   * classification verdict so the UI can show a checklist.
+   */
+  router.post('/doors/:archiveName/strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const result = previewStripOne(cfg, archiveName);
+    if ('error' in result) {
+      res.status(result.error === 'no such door' || result.error === 'archive file not found on disk' ? 404 : 400).json({ error: result.error });
+      return;
+    }
+    if (result.isEmptyLzx) {
+      res.status(400).json({ error: 'LZX archives cannot be read by this server' });
+      return;
+    }
+    res.json({
+      archiveName,
+      archivePath: result.archivePath,
+      kept: result.kept,
+      stripped: result.stripped,
+      reason: result.reason,
+      notJunk: result.notJunk,
+      cleanedDiz: result.cleanedDiz,
+    });
+  });
+
+  /** Preview strip candidates across many doors as a tracked job - phase 1
+   *  of batch strip. Never deletes anything; a later batch-strip-apply
+   *  needs the admin's reviewed selection first. The job's resultJson is
+   *  the review UI's own compact shape:
+   *  {archiveName, stripped:{path,reason}[], error?: string}[], built here
+   *  (not by previewStripOne) from the full stripped+reason it returns -
+   *  archives with zero flagged files are included, not omitted, so the UI
+   *  can show "0 flagged" instead of silently skipping them, and an archive
+   *  that failed to preview (e.g. its file is missing) gets an `error` entry
+   *  instead of vanishing from the review screen entirely.
+   *
+   *  `results` is written to `result_json` via runJobSequentially's
+   *  `onBeforeComplete` hook rather than a `.then()` chained onto its
+   *  returned promise - that guarantees the write lands BEFORE the terminal
+   *  'done' SSE event fires, so a client that reacts to 'done' by fetching
+   *  the job can never race the write (see Minor fix 2 in the fix-wave
+   *  spec: this used to work only because the microtask always beat the
+   *  client's HTTP round-trip).
+   */
+  router.post('/doors/batch-strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[] };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const jobId = createJob(cfg, 'strip-preview', body.archiveNames, req.admin?.id ?? null);
+    const results: { archiveName: string; stripped: { path: string; reason: string }[]; error?: string }[] = [];
+    void runJobSequentially(
+      cfg,
+      jobId,
+      body.archiveNames,
+      (archiveName) => {
+        const result = previewStripOne(cfg, archiveName);
+        if ('error' in result) {
+          results.push({ archiveName, stripped: [], error: result.error });
+          return { error: result.error };
+        }
+        results.push({
+          archiveName,
+          stripped: result.stripped.map((e) => ({ path: e.path, reason: result.reason[e.path] ?? 'pattern' })),
+        });
+        return { ok: true };
+      },
+      () => setJobResult(cfg, jobId, JSON.stringify(results))
+    ).catch(failJobOnEscape(cfg, jobId, body.archiveNames.length));
+    res.json({ jobId });
+  });
+
+  /** Phase 2 of batch strip: apply exactly the member lists the admin
+   *  confirmed in the review screen. Never re-derives from the classifier -
+   *  each selection's `members` array is the only source of what gets
+   *  deleted. An entry with `members: []` is a genuine skip (matches
+   *  stripArchiveOnServer's own empty-members behavior: it marks the door
+   *  reviewed via ads_stripped=1 without touching the archive on disk). */
+  router.post('/doors/batch-strip-apply', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { selections?: unknown };
+    if (!Array.isArray(body.selections) || body.selections.length === 0) {
+      res.status(400).json({ error: 'selections array required' });
+      return;
+    }
+    // Same defensive shape-check the single-door '/strip' route applies to
+    // `members`: reject anything that isn't {archiveName: string, members:
+    // string[]} per entry rather than letting a malformed selection flow
+    // straight into stripArchiveOnServer/deleteMembers.
+    const selections = body.selections as unknown[];
+    for (const s of selections) {
+      const entry = s as { archiveName?: unknown; members?: unknown };
+      if (typeof entry?.archiveName !== 'string' || !Array.isArray(entry?.members)) {
+        res.status(400).json({ error: 'each selection needs an archiveName string and a members array' });
+        return;
+      }
+    }
+    const validSelections = selections as { archiveName: string; members: unknown[] }[];
+    const archiveNames = validSelections.map((s) => s.archiveName);
+    const membersByArchive = new Map(
+      validSelections.map((s) => [s.archiveName, s.members.filter((m): m is string => typeof m === 'string')])
+    );
+    const jobId = createJob(cfg, 'strip-apply', archiveNames, req.admin?.id ?? null);
+    void runJobSequentially(cfg, jobId, archiveNames, (archiveName) => {
+      const members = membersByArchive.get(archiveName) ?? [];
+      const result = stripArchiveOnServer(cfg, archiveName, members, req.admin?.id ?? null);
+      if (!result.ok) return { error: result.reason ?? 'strip failed' };
+      const auditDb = openDb(cfg);
+      try {
+        recordAudit(auditDb, req.admin?.id ?? null, 'strip', archiveName, { members, removed: result.removed });
+      } finally {
+        auditDb.close();
+      }
+      return { ok: true };
+    }).catch(failJobOnEscape(cfg, jobId, archiveNames.length));
+    res.json({ jobId });
   });
 
   /**

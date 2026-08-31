@@ -186,6 +186,15 @@ describe('read API', () => {
   });
 });
 
+describe('/api/door-repo/doors list API', () => {
+  it('returns every matching archive name, unpaged, when fields=archiveName', async () => {
+    const res = await request(app).get('/api/door-repo/doors?fields=archiveName&q=Account');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ archiveNames: expect.arrayContaining(['ACC-V103.LHA']) });
+    expect(res.body.rows).toBeUndefined();
+  });
+});
+
 describe('index.tsv', () => {
   it('serves the TSV index with the revision header and LF endings', async () => {
     const res = await request(app).get('/api/door-repo/index.tsv');

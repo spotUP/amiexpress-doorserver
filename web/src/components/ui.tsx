@@ -99,15 +99,21 @@ export function Select({
   options,
   placeholder,
   ariaLabel,
+  required,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
   placeholder: string;
   ariaLabel: string;
+  /** When true, omit the synthetic "clear" item - the picker always represents a mandatory choice. */
+  required?: boolean;
 }) {
   return (
-    <RadixSelect.Root value={value || '__all__'} onValueChange={(v) => onChange(v === '__all__' ? '' : v)}>
+    <RadixSelect.Root
+      value={required ? value : value || '__all__'}
+      onValueChange={(v) => onChange(required ? v : v === '__all__' ? '' : v)}
+    >
       <RadixSelect.Trigger
         aria-label={ariaLabel}
         className="inline-flex min-w-[9rem] items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
@@ -120,7 +126,7 @@ export function Select({
       <RadixSelect.Portal>
         <RadixSelect.Content className="z-50 overflow-hidden rounded-md border border-line bg-raised shadow-xl">
           <RadixSelect.Viewport className="max-h-72 p-1">
-            <Item value="__all__">{placeholder}</Item>
+            {!required && <Item value="__all__">{placeholder}</Item>}
             {options.map((option) => (
               <Item key={option.value} value={option.value}>
                 {option.label}

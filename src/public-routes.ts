@@ -312,6 +312,13 @@ export function createPublicRouter(cfg: ServerConfig): Router {
         where.push(`d.indexed_at = (SELECT MAX(d2.indexed_at) FROM door_catalog d2 WHERE d2.name = d.name AND COALESCE(d2.author, '') = COALESCE(d.author, ''))`);
       }
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+      if (strParam(req.query.fields) === 'archiveName') {
+        const names = (
+          db.prepare(`SELECT archive_name FROM door_catalog d ${whereSql} ORDER BY archive_name COLLATE NOCASE ASC`).all(...params) as { archive_name: string }[]
+        ).map((r) => r.archive_name);
+        res.json({ archiveNames: names });
+        return;
+      }
       const SELECT_ROW = `SELECT d.id, archive_name, archive_path, binary_name, door_type, name, version, author,
                   d.release_group, ${releaseGroupsTable ? 'rg.full_name' : 'NULL'} AS release_group_full_name,
                   category, description, requires_bbs, file_id_diz, archive_size,
@@ -746,6 +753,23 @@ export function createPublicRouter(cfg: ServerConfig): Router {
 const clients = new Set<Response>();
 let poller: NodeJS.Timeout | null = null;
 let lastRevision: string | null = null;
+
+/**
+ * Pushes a bulk-job progress update over the same SSE connections the
+ * catalog-revision broadcast already uses - one open connection per
+ * browser tab, not a second stream per job.
+ */
+export function broadcastJobEvent(payload: {
+  jobId: string;
+  status: string;
+  completed: number;
+  total: number;
+  failedCount: number;
+}): void {
+  for (const client of clients) {
+    client.write(`event: job\ndata: ${JSON.stringify(payload)}\n\n`);
+  }
+}
 
 const POLL_MS = 2000;
 const KEEPALIVE_MS = 25000;
