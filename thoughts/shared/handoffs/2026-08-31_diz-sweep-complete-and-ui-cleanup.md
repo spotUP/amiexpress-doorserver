@@ -155,6 +155,19 @@ pushed individually, and **each deploy watched to completion**
 
 ## Learnings
 
+- **Don't push a whole DB-file swap when a targeted SQL patch will do.**
+  Earlier rounds of the main DIZ sweep pushed the entire local
+  `data/doors.db` to live (WAL-checkpoint → scp → swap). For a 26-row
+  fix that carries real clobber risk if live picked up any independent
+  admin edit since the local copy was last pulled — a full swap can't
+  tell "live changed this row after I copied it" from "my copy is
+  correct". Generated the exact `INSERT ... ON CONFLICT` statements for
+  just the 26 `door_catalog_overrides` rows + their `admin_audit` rows
+  instead, applied over SSH via `sqlite3` inside the container — same
+  approach the release-group backfill used in the prior session. Row
+  counts were compared before pushing (`door_catalog` 5932/5932 match,
+  `door_catalog_overrides` diff was exactly the expected ~26) to confirm
+  no drift either way.
 - **`backfill-requires.ts` is not safe for a targeted fix.** Its own doc
   comment says "safe to re-run" and that's true for its *intended* purpose
   (bulk re-derive), but it blindly overwrites `requires_bbs` for every row
@@ -190,8 +203,31 @@ pushed individually, and **each deploy watched to completion**
 
 ## Next Steps (ordered)
 
-1. **Garbage-description sweep (the TON-VCV1.LHA bug).** High-confidence
-   query for the tightest, safest first pass:
+1. **Garbage-description sweep (the TON-VCV1.LHA bug). DONE 2026-08-31.**
+   Ran the narrow verbatim-prefix query below: got 30 rows, hand-reviewed
+   each DIZ. 5 were false positives (already-correct short descriptions
+   that happen to equal the whole DIZ text — `iurem`, `mst_fr10`,
+   `t_enigma`, `thrashtp`, `tstat` — left untouched). The other 25, plus
+   `ton_vcv1` itself (confirmed NOT actually matched by this query — its
+   garbage fragment starts mid-DIZ after a banner header, not at offset 0,
+   so the "verbatim prefix" heuristic has a blind spot for garbage that
+   isn't anchored at the start; only caught it because the user had
+   already named it), got real name+description extracted from their DIZ
+   text and applied as `name`/`description` overrides (52 fields, 26
+   rows) via `apply-diz-extraction.ts` locally, then pushed directly to
+   the live container as raw `INSERT ... ON CONFLICT` SQL (not a full
+   DB-file swap — see Learnings) after reinstalling `sqlite3` in the
+   container (`apk add --no-cache sqlite`, lost again on next container
+   recreate, same as the prior session's note). Verified live via
+   `/api/door-repo/doors/TON-VCV1.LHA` (now shows `"name":"VirusClean"`)
+   and `PRAGMA integrity_check` (ok). `author`/`version`/`requiresBbs`/
+   `releaseGroup` were deliberately left untouched on all 26 rows — those
+   fields weren't garbage (base columns already had reasonable values),
+   only `name`/`description` were.
+   Did **not** widen the net beyond this query + the one manually-flagged
+   exception — the ~2695-row fuzzy heuristic mentioned below is still
+   unverified and untouched.
+   Original query, for reference:
    ```sql
    SELECT id, archive_name, description, file_id_diz
    FROM door_catalog
