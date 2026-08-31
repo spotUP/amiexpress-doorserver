@@ -1,4 +1,4 @@
-import { inferRequiresBbs, inferDoorType, extractReleaseGroup, BBS_TAGS } from '../src/demozoo-bbs';
+import { inferRequiresBbs, inferDoorType, extractReleaseGroup, inferCategory, BBS_TAGS } from '../src/demozoo-bbs';
 
 describe('inferRequiresBbs', () => {
   it('matches a known release-group name before falling back to tags', () => {
@@ -60,5 +60,20 @@ describe('extractReleaseGroup', () => {
   it('returns null for an empty or missing author_nicks list', () => {
     expect(extractReleaseGroup([])).toBeNull();
     expect(extractReleaseGroup(undefined)).toBeNull();
+  });
+});
+
+describe('inferCategory', () => {
+  it('returns the first production type name', () => {
+    expect(inferCategory([{ name: 'BBS Door' }, { name: 'Tool' }])).toBe('BBS Door');
+  });
+
+  it('returns null for an empty or missing types list', () => {
+    expect(inferCategory([])).toBeNull();
+    expect(inferCategory(undefined)).toBeNull();
+  });
+
+  it('returns null rather than an empty string for a blank type name', () => {
+    expect(inferCategory([{ name: '   ' }])).toBeNull();
   });
 });

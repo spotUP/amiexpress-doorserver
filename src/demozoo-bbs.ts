@@ -93,6 +93,22 @@ export function inferDoorType(tags: string[]): string | null {
   return null;
 }
 
+export interface DemozooProductionType {
+  name: string;
+}
+
+/**
+ * `door_catalog.category` from demozoo's own production `types` list
+ * (e.g. "BBS Door", "Tool") — most of this catalog is BBS doors by
+ * definition, but a demozoo-linked production can genuinely be
+ * something else (a general utility, not door-specific), which this
+ * surfaces instead of leaving every row's category the same guess.
+ * Demozoo lists the most specific type first; take that one.
+ */
+export function inferCategory(types: DemozooProductionType[] | undefined): string | null {
+  return types?.[0]?.name?.trim() || null;
+}
+
 // Group-name signal: most release crews only release for one BBS. This map
 // covers all the well-known Amiga BBS scene groups.
 const GROUP_TO_BBS: { match: RegExp; bbs: string }[] = [

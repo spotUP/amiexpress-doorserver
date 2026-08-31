@@ -25,7 +25,7 @@ import { loadConfig } from '../src/config';
 import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
 import { recordAudit } from '../src/auth';
-import { inferDoorType as inferDoorTypeFromTags, inferRequiresBbs as inferRequiresBbsFromTags, extractReleaseGroup } from '../src/demozoo-bbs';
+import { inferDoorType as inferDoorTypeFromTags, inferRequiresBbs as inferRequiresBbsFromTags, extractReleaseGroup, inferCategory } from '../src/demozoo-bbs';
 
 // The tag->BBS mapping, the group-name->BBS mapping, and the door-type
 // inference all live in src/demozoo-bbs.ts, shared with any later backfill
@@ -62,6 +62,7 @@ interface DemozooDetail {
     releaser: { id: number; name: string; is_group: boolean };
   }[];
   tags: string[];
+  types: { id: number; name: string; url: string }[];
 }
 
 interface ExistingDoor {
@@ -435,6 +436,7 @@ async function registerExistingFile(args: RegisterArgs): Promise<void> {
       'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
     ).run(group.abbrev, group.fullName);
   }
+  const category = inferCategory(detail.types);
   process.stderr.write(`[demozoo] id=${id} registering local ${where} (${stats.size} bytes)\n`);
   if (dryRun) {
     process.stderr.write(`[demozoo] DRY: would INSERT ${basename} (${relPath}) — name="${name}" version="${versionFromTitle ?? '(none)'}"\n`);
@@ -444,8 +446,8 @@ async function registerExistingFile(args: RegisterArgs): Promise<void> {
       `INSERT INTO door_catalog
          (id, archive_name, archive_path, name, door_type, version, author,
           description, release_date, platform, download_url, credits,
-          external_links, screenshots, release_group, archive_size, md5, sha256, source, indexed_at)
-       VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
+          external_links, screenshots, release_group, category, archive_size, md5, sha256, source, indexed_at)
+       VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
     ).run(
       catalogId,
       basename,
@@ -461,6 +463,7 @@ async function registerExistingFile(args: RegisterArgs): Promise<void> {
       parseLinks(detail.external_links ?? []),
       parseScreenshots(detail.screenshots ?? []),
       group?.abbrev ?? null,
+      category,
       stats.size,
       stats.md5,
       stats.sha256
@@ -773,6 +776,11 @@ async function main() {
         // Door executable type: "xim" → XIM, "arexx" → ARexx, etc.
         const doorType = inferDoorType(detail!);
         if (doorType) patch.door_type = doorType;
+        // Demozoo's own production type ("BBS Door", "Tool", ...) - most of
+        // this catalog is BBS doors by definition, but a linked production
+        // can genuinely be something else.
+        const category = inferCategory(detail!.types);
+        if (category) patch.category = category;
 
         if (Object.keys(patch).length > 0) {
           const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
@@ -934,14 +942,15 @@ async function main() {
           'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
         ).run(group.abbrev, group.fullName);
       }
+      const category = inferCategory(detail.types);
 
       try {
         db.prepare(
           `INSERT INTO door_catalog
              (id, archive_name, archive_path, name, door_type, version, author,
               description, release_date, platform, download_url, credits,
-              external_links, screenshots, release_group, archive_size, md5, sha256, source, indexed_at)
-           VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
+              external_links, screenshots, release_group, category, archive_size, md5, sha256, source, indexed_at)
+           VALUES (?, ?, ?, ?, 'XIM', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demozoo', strftime('%s','now'))`
         ).run(
           catalogId,
           destBasename,
@@ -957,6 +966,7 @@ async function main() {
           parseLinks(detail.external_links ?? []),
           parseScreenshots(detail.screenshots ?? []),
           group?.abbrev ?? null,
+          category,
           dlResult.size,
           dlResult.md5,
           dlResult.sha256
