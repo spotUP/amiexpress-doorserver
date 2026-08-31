@@ -27,7 +27,7 @@ import { analyzeArchive, isMatchAllGlob } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
-import { getJob } from './batch-jobs';
+import { createJob, runJobSequentially, getJob } from './batch-jobs';
 import * as fs from 'fs';
 
 /**
@@ -92,6 +92,76 @@ function resolveFixCasingSentinel(
     return fixCasing(String(currentVal));
   }
   return value;
+}
+
+/**
+ * Re-read one archive's DIZ/file list and write it back to the catalog.
+ * Shared by the single-door /reextract route and the batch job runner -
+ * previously this logic lived only inline in the single-door route. The
+ * single-door route's response is richer than the batch route needs, so
+ * this returns the full `derived` object on success and each caller picks
+ * what it needs from it.
+ *
+ * The whole body is wrapped in try/catch (rather than just try/finally
+ * around db.close()) so that an exception thrown mid-extraction - e.g.
+ * deriveMetadata() or an archive reader choking on a corrupt file - comes
+ * back as a clean `{ error }` result instead of propagating uncaught. The
+ * single-door route used to have its own outer try/catch around this exact
+ * body for that reason; that catch is now unreachable dead code and has
+ * been removed from the route, since this function can no longer throw.
+ * The batch route doesn't need its own catch either: runJobSequentially()
+ * already treats a returned `{ error }` as a normal failed-item outcome.
+ */
+function reextractOneDoor(cfg: ServerConfig, archiveName: string): { ok: true; fileCount: number; derived: ReturnType<typeof deriveMetadata> } | { error: string } {
+  const db = openDb(cfg);
+  try {
+    const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string; archive_path: string } | undefined;
+    if (!entry) return { error: 'no such door' };
+
+    const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
+    if (!fs.existsSync(archivePath)) return { error: 'archive file missing' };
+
+    const bytes = fs.readFileSync(archivePath);
+    const groupTags = buildGroupTags(
+      (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map((r) => r.archive_name)
+    );
+    const derived = deriveMetadata(bytes, archiveName, groupTags);
+
+    // Pull the file list directly from the archive reader, which now
+    // falls back to the system `lha` binary when the JS reader fails.
+    const ext = path.extname(archivePath).toLowerCase();
+    let files: { path: string; size: number }[] = [];
+    if (ext === '.lha' || ext === '.lzh') files = readLhaContents(bytes, archivePath).files;
+    else if (ext === '.zip') files = readZipContents(bytes).files;
+    else if (ext === '.lzx') files = readLzxContents(bytes).files;
+
+    const write = db.transaction(() => {
+      // Update catalog metadata from the freshly-read archive.
+      db.prepare(`UPDATE door_catalog SET
+          name = ?, version = ?, author = ?, description = ?,
+          requires_bbs = ?, binary_name = ?, file_id_diz = ?,
+          doc_filename = ?, doc_raw = ?, indexed_at = strftime('%s','now')
+          WHERE id = ?`).run(
+        derived.name, derived.version, derived.author, derived.description,
+        derived.requiresBbs, derived.binaryName, derived.fileIdDiz,
+        derived.docFilename, derived.doc, entry.id
+      );
+      // Wipe and rewrite the file list - overwrites any previous junk
+      // flagging, which is what a full re-extract means.
+      db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ?').run(entry.id);
+      if (files.length > 0) {
+        const ins = db.prepare('INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)');
+        for (const f of files) ins.run(entry.id, f.path, f.size);
+      }
+      recordAudit(db, null, 'reextract', archiveName, { fileCount: files.length, dizFound: Boolean(derived.fileIdDiz), docFound: Boolean(derived.doc) });
+    });
+    write();
+    return { ok: true, fileCount: files.length, derived };
+  } catch (e) {
+    return { error: String(e) };
+  } finally {
+    db.close();
+  }
 }
 
 export function createAdminRouter(cfg: ServerConfig): Router {
@@ -352,83 +422,38 @@ export function createAdminRouter(cfg: ServerConfig): Router {
    */
   router.post('/doors/:archiveName/reextract', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[req.params.archiveName.length - 1] : req.params.archiveName;
-    const db = openDb(cfg);
-    try {
-      const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string; archive_path: string } | undefined;
-      if (!entry) { res.status(404).json({ error: 'no such door' }); return; }
-
-      const archivePath = path.join(cfg.archivesRoot, entry.archive_path);
-      if (!fs.existsSync(archivePath)) { res.status(404).json({ error: 'archive file missing' }); return; }
-
-      const bytes = fs.readFileSync(archivePath);
-      const groupTags = buildGroupTags(
-        (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
-          (r) => r.archive_name
-        )
-      );
-
-      const derived = deriveMetadata(bytes, archiveName, groupTags);
-
-      // Pull the file list directly from the archive reader, which now
-      // falls back to the system `lha` binary when the JS reader fails.
-      const ext = path.extname(archivePath).toLowerCase();
-      let files: { path: string; size: number }[] = [];
-      if (ext === '.lha' || ext === '.lzh') {
-        const contents = readLhaContents(bytes, archivePath);
-        files = contents.files;
-      } else if (ext === '.zip') {
-        const contents = readZipContents(bytes);
-        files = contents.files;
-      } else if (ext === '.lzx') {
-        const contents = readLzxContents(bytes);
-        files = contents.files;
-      }
-
-      const write = db.transaction(() => {
-        // Update catalog metadata from the freshly-read archive.
-        db.prepare(`UPDATE door_catalog SET 
-            name = ?, version = ?, author = ?, description = ?, 
-            requires_bbs = ?, binary_name = ?, file_id_diz = ?, 
-            doc_filename = ?, doc_raw = ?, indexed_at = strftime('%s','now')
-            WHERE id = ?`).run(
-                derived.name, derived.version, derived.author, derived.description,
-                derived.requiresBbs, derived.binaryName, derived.fileIdDiz,
-                derived.docFilename, derived.doc, entry.id
-            );
-        // Wipe and rewrite the file list — overwrites any previous junk
-        // flagging, which is what a full re-extract means.
-        db.prepare('DELETE FROM door_catalog_files WHERE catalog_id = ?').run(entry.id);
-        if (files.length > 0) {
-          const ins = db.prepare(
-            'INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)'
-          );
-          for (const f of files) ins.run(entry.id, f.path, f.size);
-        }
-        recordAudit(db, req.admin?.id ?? null, 'reextract', archiveName, {
-          fileCount: files.length,
-          dizFound: Boolean(derived.fileIdDiz),
-          docFound: Boolean(derived.doc),
-        });
-      });
-      write();
-
-      res.json({
-        ok: true,
-        archiveName,
-        fileCount: files.length,
-        name: derived.name,
-        version: derived.version,
-        author: derived.author,
-        description: derived.description,
-        binaryName: derived.binaryName,
-        fileIdDiz: derived.fileIdDiz,
-        docFilename: derived.docFilename,
-      });
-    } catch (e) {
-      res.status(500).json({ error: String(e) });
-    } finally {
-      db.close();
+    const result = reextractOneDoor(cfg, archiveName);
+    if ('error' in result) {
+      res.status(result.error === 'no such door' || result.error === 'archive file missing' ? 404 : 500).json({ error: result.error });
+      return;
     }
+    res.json({
+      ok: true,
+      archiveName,
+      fileCount: result.fileCount,
+      name: result.derived.name,
+      version: result.derived.version,
+      author: result.derived.author,
+      description: result.derived.description,
+      binaryName: result.derived.binaryName,
+      fileIdDiz: result.derived.fileIdDiz,
+      docFilename: result.derived.docFilename,
+    });
+  });
+
+  /** Re-extract many doors as a tracked background job. */
+  router.post('/doors/batch-reextract', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[] };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const jobId = createJob(cfg, 'reextract', body.archiveNames, req.admin?.id ?? null);
+    void runJobSequentially(cfg, jobId, body.archiveNames, (archiveName) => {
+      const result = reextractOneDoor(cfg, archiveName);
+      return 'error' in result ? { error: result.error } : { ok: true };
+    });
+    res.json({ jobId });
   });
 
   /** Re-extract the file list for every door that currently has zero files.

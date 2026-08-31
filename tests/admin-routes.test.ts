@@ -244,6 +244,37 @@ describe('GET /admin/jobs/:id', () => {
   });
 });
 
+describe('POST /admin/doors/batch-reextract', () => {
+  it('starts a job that reextracts every named door', async () => {
+    // reextractOneDoor() reads the real archive file off disk - the
+    // catalog row's archive_path is 'AmiExpress/ACC-V103.LHA' but nothing
+    // in beforeEach() writes that file, so it must exist here or the job
+    // item would come back 'error' with 'archive file missing'. Content is
+    // irrelevant: the LHA reader returns an empty file list gracefully on
+    // unparsable bytes rather than throwing (see archive-reader.ts).
+    const archiveAbsPath = path.join(dir, 'AmiExpress', 'ACC-V103.LHA');
+    fs.mkdirSync(path.dirname(archiveAbsPath), { recursive: true });
+    fs.writeFileSync(archiveAbsPath, 'not a real archive, just needs to exist');
+
+    const start = await request(app()).post(admin('/doors/batch-reextract')).set(auth()).send({ archiveNames: ['ACC-V103.LHA'] });
+    expect(start.status).toBe(200);
+    const { jobId } = start.body;
+    expect(jobId).toBeTruthy();
+
+    // The job runs across event-loop turns; poll briefly for completion.
+    let job;
+    for (let i = 0; i < 20; i++) {
+      job = (await request(app()).get(admin(`/jobs/${jobId}`)).set(auth())).body;
+      if (job.status === 'done') break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(job.status).toBe('done');
+    expect(job.completed).toBe(1);
+    expect(job.failedCount).toBe(0);
+    expect(job.items).toEqual([{ archiveName: 'ACC-V103.LHA', status: 'ok', error: null }]);
+  });
+});
+
 describe('POST /admin/doors/batch-tags', () => {
   it('adds and removes tags across multiple doors, skipping an unknown archive', async () => {
     await request(app()).patch(admin('/doors/ACC-V103.LHA/tags')).set(auth()).send({ tags: ['keep-me'] });

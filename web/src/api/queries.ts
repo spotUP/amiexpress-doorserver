@@ -195,6 +195,14 @@ export function useBatchDelete() {
   });
 }
 
+export function useBatchReextract() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (archiveNames: string[]) => api.post<{ jobId: string }>('/admin/doors/batch-reextract', { archiveNames }),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
 export function useBatchPatch() {
   const client = useQueryClient();
   return useMutation({
