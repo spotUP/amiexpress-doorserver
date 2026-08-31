@@ -418,12 +418,12 @@ export function splitVersion(desc: string, catalogVersion?: string | null): { te
 // it, and it is NOT the door's own version.
 
 const BBS_NAMES: Record<string, string> = {
-  '/x': '/X',
-  x: '/X',
+  '/x': 'AmiExpress',
+  x: 'AmiExpress',
   amiexpress: 'AmiExpress',
-  ae: '/X',
-  's!x': 'S!X',
-  sx: 'S!X',
+  ae: 'AmiExpress',
+  's!x': 'System-X',
+  sx: 'System-X',
   fame: 'FAME',
   daydream: 'DayDream',
   dd: 'DayDream',
@@ -446,24 +446,18 @@ const BBS_REQ_RE =
  */
 const BARE_BBS_RE = /\/X\b|\bAmi-?Express\b|\bS!X\b|\bFAME\b|\bDayDream\b|\bTempest\b|\bCNet\b/i;
 
-export function normaliseRequirement(name: string, ver: string): string {
+/**
+ * `ver` is accepted (and ignored) for backward compatibility with callers
+ * that still extract a version alongside the name - filtering by "which
+ * BBS" never needs the specific point release (unlike the door's own
+ * version, which stays exact elsewhere): "/X 3.x", "/X 4.x" and bare
+ * "AmiExpress" are all the same requirement, and fragmenting the "Any BBS
+ * version" filter by point release just turns it into a wall of
+ * near-duplicates of the same handful of entries.
+ */
+export function normaliseRequirement(name: string, _ver: string): string {
   const key = name.toLowerCase().replace(/-/g, '');
-  const bbs = BBS_NAMES[key] ?? name;
-  // "/X" is the AmiExpress door-interface standard, not a different BBS -
-  // every "/X n.x" mention and every "AmiExpress n.x" mention names the same
-  // software. Filtering by "which BBS" doesn't need the specific point
-  // release (unlike the door's own version, which stays exact elsewhere) -
-  // collapsing to the bare BBS name is what makes "Any BBS version" a
-  // useful filter instead of a wall of near-duplicate versions of one entry.
-  if (bbs === '/X' || bbs === 'AmiExpress') return 'AmiExpress';
-  let version = ver.replace(/,/g, '.');
-  const dot = version.indexOf('.');
-  if (dot !== -1) {
-    // 4.X and 4.x are one thing, and so are 4.x and 4.xx: the run of x's is
-    // a wildcard for "any point release", not a more/less precise version.
-    version = version.slice(0, dot + 1) + version.slice(dot + 1).replace(/X+/gi, 'x');
-  }
-  return version ? `${bbs} ${version}` : bbs;
+  return BBS_NAMES[key] ?? name;
 }
 
 function stripBbsMatch(
