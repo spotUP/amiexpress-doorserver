@@ -25,76 +25,12 @@ import { loadConfig } from '../src/config';
 import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
 import { recordAudit } from '../src/auth';
+import { inferDoorType as inferDoorTypeFromTags, inferRequiresBbs as inferRequiresBbsFromTags } from '../src/demozoo-bbs';
 
-// Each tag entry knows what demozoo calls it AND what it implies about
-// requires_bbs. The tag itself is descriptive (e.g. "mystic-bbs");
-// the implies field is the value to write into door_catalog.requires_bbs
-// for any production found under that tag. All of these are Amiga BBS
-// systems — PC-only ones are kept below, commented out, so the curator
-// can opt in to PC doors later by removing the //.
-//
-// Source: https://demozoo.org/pages/bbs-related-tags/  (curated by
-// Demozoo — covers all known scene-BBS software).
-const TAGS: { tag: string; implies: string }[] = [
-  // ── Amiga BBS software ──────────────────────────────────────────────────
-  { tag: 'amiex',         implies: 'AmiExpress' },        // 50+ productions
-  { tag: 'ami-express-web',implies: 'AmiExpress-Web' },   // new web port
-  { tag: 'amiex-web',     implies: 'AmiExpress-Web' },   // alt slug
-  { tag: 's!x',           implies: 'S!X' },               // predecessor
-  { tag: 'maxs',          implies: 'Maxs' },              // predecessor of S!X
-  { tag: 'daydream-amiga',implies: 'DayDream' },          // 50+
-  { tag: 'fame',          implies: 'FAME' },              // 47
-  { tag: 'cnet-bbs',      implies: 'CNet' },              // 41
-  { tag: 'mystic-bbs',    implies: 'Mystic' },            // 50+
-  { tag: 'tempest-bbs',   implies: 'Tempest' },
-  { tag: 'descent',       implies: 'Descent' },
-  { tag: 'lame',          implies: 'Lame' },
-  { tag: 'obbs',          implies: 'OBBS' },
-  { tag: 's!x-bbs',       implies: 'S!X' },               // alt slug
-  { tag: 'aquila-bbs-ripoff', implies: 'Aquila' },
-  { tag: 'celerity-bbs',  implies: 'Celerity' },
-  { tag: 'hysteria-bbs',  implies: 'Hysteria' },
-  { tag: 'illusion-bbs',  implies: 'Illusion' },
-  { tag: 'impulse-bbs',   implies: 'Impulse' },
-  { tag: 'insanity-bbs',  implies: 'Insanity' },
-  { tag: 'major-bbs',     implies: 'Major' },
-  { tag: 'metro-bbs',     implies: 'Metro' },
-  { tag: 'monarch-bbs',   implies: 'Monarch' },
-  { tag: 'narcosys-bbs',  implies: 'Narcosys' },
-  { tag: 'oblivion2',     implies: 'Oblivion' },
-  { tag: 'opus-bbs',      implies: 'Opus' },
-  { tag: 'original-bbs',  implies: 'Original' },
-  { tag: 'paragon-bbs',   implies: 'Paragon' },
-  { tag: 'pipeline-bbs',  implies: 'Pipeline' },
-  { tag: 'revelation-bbs',implies: 'Revelation' },
-  { tag: 'sentinel-bbs',  implies: 'Sentinel' },
-  { tag: 'skylight-bbs-ripoff', implies: 'Skylight' },
-  { tag: 'solarium-bbs-ripoff', implies: 'Solarium' },
-  { tag: 'squid-bbs-ripoff', implies: 'Squid' },
-  { tag: 'starport2-ripoff', implies: 'Starport' },
-  { tag: 'vision-x',      implies: 'Vision-X' },
-  { tag: 'vision2',      implies: 'Vision 2' },
-  { tag: 'waffle-bbs',    implies: 'Waffle' },
-  { tag: 'warning-bbs-ripoff', implies: 'Warning' },
-
-  // ── PC BBS software (disabled — uncomment to enable) ──────────────────
-  // { tag: 'pcboard',         implies: 'PCBoard' },
-  // { tag: 'qbbs',            implies: 'QBBS' },
-  // { tag: 'wildcat',         implies: 'WildCat' },
-  // { tag: 'wwiv',            implies: 'WWIV' },
-  // { tag: 'renegade-bbs',    implies: 'Renegade' },
-  // { tag: 'remoteaccess',    implies: 'RemoteAccess' },
-  // { tag: 'telegard',        implies: 'Telegard' },
-  // { tag: 'synchronet',      implies: 'Synchronet' },
-  // { tag: 'elebbs',          implies: 'EleBBS' },
-  // { tag: 'flash-bbs',       implies: 'Flash' },
-  // { tag: 'genesis-deluxe',  implies: 'Genesis' },
-  // { tag: 'iniquity',        implies: 'Iniquity' },
-  // { tag: 'proboard',        implies: 'ProBoard' },
-  // { tag: 'smbx',            implies: 'SMBX' },
-  // { tag: 'superbbs',        implies: 'SuperBBS' },
-  // { tag: 'tbbs',            implies: 'TBBS' },
-];
+// The tag->BBS mapping, the group-name->BBS mapping, and the door-type
+// inference all live in src/demozoo-bbs.ts, shared with any later backfill
+// over already-catalogued rows that only ever got a demozoo_url attached,
+// never this inference.
 const DEMOZOO_API = 'https://demozoo.org/api/v1';
 // Demozoo's rate limit is 1 request per second per IP. With MAX_CONCURRENT=3
 // in flight, we need at least a 3s pause between batches to stay under it.
@@ -342,74 +278,13 @@ function extractReleaseGroup(detail: DemozooDetail): { abbrev: string; fullName:
   return null;
 }
 
-/**
- * Best-effort `door_type` from demozoo's tags. The "xim" tag means the
- * archive contains an Amiga executable; "arexx" means it's an ARexx
- * script; "cli" is a CLI command. Returns null if no signal.
- */
-const DOOR_TYPE_FROM_TAG: { match: RegExp; doorType: string }[] = [
-  { match: /^xim$/i,    doorType: 'XIM' },
-  { match: /^arexx$/i,  doorType: 'ARexx' },
-  { match: /^cli$/i,    doorType: 'CLI' },
-  { match: /^sim$/i,    doorType: 'SIM' },
-  { match: /^rexx$/i,   doorType: 'REXX' },
-  { match: /^cmd$/i,    doorType: 'CMD' },
-];
 function inferDoorType(detail: DemozooDetail): string | null {
-  for (const tag of detail.tags ?? []) {
-    for (const { match, doorType } of DOOR_TYPE_FROM_TAG) {
-      if (match.test(tag)) return doorType;
-    }
-  }
-  return null;
+  return inferDoorTypeFromTags(detail.tags ?? []);
 }
 
-/**
- * Best-effort `requires_bbs` for a production, based on the production
- * data we have. Tries group-name match first, then falls back to the
- * known tag→BBS mapping. Returns null if no signal.
- */
 function inferRequiresBbs(detail: DemozooDetail): string | null {
   const groupName = detail.author_nicks?.find((n) => n.releaser?.is_group)?.releaser.name ?? '';
-  const lcGroup = groupName.toLowerCase();
-  // Group-name signal: most release crews only release for one BBS.
-  // This map covers all the well-known Amiga BBS scene groups.
-  const GROUP_TO_BBS: { match: RegExp; bbs: string }[] = [
-    { match: /up rough|amiexpress|\/x innovation/, bbs: 'AmiExpress' },
-    { match: /ami-?express-?web|amiexweb/,         bbs: 'AmiExpress-Web' },
-    { match: /quantum|hoodlum|tcs/,             bbs: 'S!X' },
-    { match: /daydream/,                         bbs: 'DayDream' },
-    { match: /^fame$|fame.*design/,              bbs: 'FAME' },
-    { match: /demonic|phenom/,                  bbs: 'Mystic' },
-    { match: /medellin|phenom productions/,     bbs: 'CNet' },
-    { match: /sceptic|^scp$|sad-file/,           bbs: 'AmiExpress' }, // Sceptic/SAD = textadder crew
-    { match: /shelter/,                          bbs: 'AmiExpress' }, // SLT! = Shelter, AmiExpress ad-tools
-    { match: /outlaws|otl/,                     bbs: 'AmiExpress' }, // OTL = Outlaws, AmiExpress ad-tools
-    { match: /decade|dcd/,                       bbs: 'AmiExpress' }, // Decade = AmiExpress ad-tools
-    { match: /delta|logic|expose/,              bbs: 'Aquila' },
-    { match: /insanity/,                         bbs: 'Insanity' },
-  ];
-  for (const { match, bbs } of GROUP_TO_BBS) {
-    if (match.test(lcGroup)) return bbs;
-  }
-  // Tag-based signal. Many ami-express-* tags imply AmiExpress even
-  // when the group isn't in the map above.
-  const tags = detail.tags ?? [];
-  for (const tag of tags) {
-    if (/^amiex(?!-web)/i.test(tag)) return 'AmiExpress';
-    if (/^amiex-?web/i.test(tag)) return 'AmiExpress-Web';
-    if (/^s!x/i.test(tag)) return 'S!X';
-    if (/^daydream/i.test(tag)) return 'DayDream';
-    if (/^fame/i.test(tag)) return 'FAME';
-    if (/^mystic/i.test(tag)) return 'Mystic';
-    if (/^cnet/i.test(tag)) return 'CNet';
-    if (/^tempest/i.test(tag)) return 'Tempest';
-  }
-  // Tag fallback: check if any tag matches the known TAGS list.
-  for (const { tag, implies } of TAGS) {
-    if (tags.includes(tag)) return implies;
-  }
-  return null;
+  return inferRequiresBbsFromTags(detail.tags ?? [], groupName);
 }
 
 interface DownloadResult {
