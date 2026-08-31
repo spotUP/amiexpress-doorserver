@@ -208,3 +208,48 @@ it('serves a missing archive from the stored rows rather than failing', async ()
   expect(res.status).toBe(200);
   expect(filesOf(res.text)).toHaveLength(2);
 });
+
+it('re-stats and re-digests the archive, so the door stops warning about the digest', async () => {
+  // The half this fix adds. freshArchiveFiles healed the file list and
+  // junk_count and left archive_size, md5 and sha256 exactly as indexed -
+  // so an archive changed outside the tracked path kept its old digest, the
+  // door printed "the catalog digest is probably stale" on every download
+  // and fell back to SHA-256. The listing was corrected and the numbers
+  // describing the same file were not.
+  const d0 = openDb(cfg);
+  const before = d0
+    .prepare('SELECT archive_size, md5, sha256 FROM door_catalog WHERE id = ?')
+    .get('id1') as { archive_size: number; md5: string | null; sha256: string | null };
+  d0.close();
+  expect(before.archive_size).toBe(5);          // the stale value the row was seeded with
+  expect(before.md5).toBeNull();
+
+  await request(app).get('/api/door-repo/files/ADDOOR.ZIP');
+
+  const d1 = openDb(cfg);
+  const after = d1
+    .prepare('SELECT archive_size, md5, sha256 FROM door_catalog WHERE id = ?')
+    .get('id1') as { archive_size: number; md5: string; sha256: string };
+  d1.close();
+
+  const real = fs.statSync(path.join(cfg.archivesRoot, 'ADDOOR.ZIP'));
+  expect(after.archive_size).toBe(real.size);
+  expect(after.md5).toMatch(/^[0-9a-f]{32}$/);
+  expect(after.sha256).toMatch(/^[0-9a-f]{64}$/);
+});
+
+it('sets ads_stripped only when nothing is left to strip', async () => {
+  // ads_stripped means "there is nothing in here to remove", so it follows
+  // from the count rather than being a flag somebody sets and forgets.
+  // This archive HAS an ad, so it must stay 0 after a reclassify.
+  await request(app).get('/api/door-repo/files/ADDOOR.ZIP');
+
+  const d = openDb(cfg);
+  const row = d
+    .prepare('SELECT junk_count, ads_stripped FROM door_catalog WHERE id = ?')
+    .get('id1') as { junk_count: number; ads_stripped: number };
+  d.close();
+
+  expect(row.junk_count).toBe(1);
+  expect(row.ads_stripped).toBe(0);
+});
