@@ -71,6 +71,7 @@ export function BatchToolbar({
           value={field}
           onChange={setField}
           options={OVERRIDABLE_FIELDS.map((f) => ({ value: f, label: f }))}
+          required
         />
         <input
           type="text"
@@ -143,7 +144,11 @@ export function BatchToolbar({
           >
             Confirm delete
           </Button>
-          <Button variant="ghost" onClick={() => { setDeleteConfirmOpen(false); setDeleteConfirmText(''); }}>
+          <Button
+            variant="ghost"
+            onClick={() => { setDeleteConfirmOpen(false); setDeleteConfirmText(''); }}
+            disabled={isPending}
+          >
             Cancel
           </Button>
         </div>
