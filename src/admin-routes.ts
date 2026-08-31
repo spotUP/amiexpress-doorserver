@@ -1177,13 +1177,28 @@ export function createAdminRouter(cfg: ServerConfig): Router {
    *  stripArchiveOnServer's own empty-members behavior: it marks the door
    *  reviewed via ads_stripped=1 without touching the archive on disk). */
   router.post('/doors/batch-strip-apply', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
-    const body = (req.body ?? {}) as { selections?: { archiveName: string; members: string[] }[] };
+    const body = (req.body ?? {}) as { selections?: unknown };
     if (!Array.isArray(body.selections) || body.selections.length === 0) {
       res.status(400).json({ error: 'selections array required' });
       return;
     }
-    const archiveNames = body.selections.map((s) => s.archiveName);
-    const membersByArchive = new Map(body.selections.map((s) => [s.archiveName, s.members ?? []]));
+    // Same defensive shape-check the single-door '/strip' route applies to
+    // `members`: reject anything that isn't {archiveName: string, members:
+    // string[]} per entry rather than letting a malformed selection flow
+    // straight into stripArchiveOnServer/deleteMembers.
+    const selections = body.selections as unknown[];
+    for (const s of selections) {
+      const entry = s as { archiveName?: unknown; members?: unknown };
+      if (typeof entry?.archiveName !== 'string' || !Array.isArray(entry?.members)) {
+        res.status(400).json({ error: 'each selection needs an archiveName string and a members array' });
+        return;
+      }
+    }
+    const validSelections = selections as { archiveName: string; members: unknown[] }[];
+    const archiveNames = validSelections.map((s) => s.archiveName);
+    const membersByArchive = new Map(
+      validSelections.map((s) => [s.archiveName, s.members.filter((m): m is string => typeof m === 'string')])
+    );
     const jobId = createJob(cfg, 'strip-apply', archiveNames, req.admin?.id ?? null);
     void runJobSequentially(cfg, jobId, archiveNames, (archiveName) => {
       const members = membersByArchive.get(archiveName) ?? [];

@@ -396,11 +396,34 @@ describe('POST /admin/doors/batch-strip-preview', () => {
 });
 
 describe('POST /admin/doors/batch-strip-apply', () => {
+  // stripArchiveOnServer's empty-members branch still calls
+  // findArchiverBinary() and fails with ok:false before it ever reaches
+  // the "0 members = mark reviewed, don't touch the file" shortcut - see
+  // src/catalog.ts's stripArchiveOnServer. findArchiverFor() only checks
+  // hardcoded absolute paths or $ARCHIVER_COMMAND, never PATH, so CI
+  // runners without a real lha/7z binary installed would fail here. Point
+  // ARCHIVER_COMMAND at a stub script instead of depending on the host -
+  // deleteMembers() is never actually invoked when members.length===0, so
+  // the stub just needs to exist on disk for existsSync() to find it.
+  let prevArchiverCommand: string | undefined;
+  let stubBinPath: string;
+
+  beforeEach(() => {
+    prevArchiverCommand = process.env.ARCHIVER_COMMAND;
+    stubBinPath = path.join(dir, 'stub-archiver.sh');
+    fs.writeFileSync(stubBinPath, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    process.env.ARCHIVER_COMMAND = stubBinPath;
+  });
+
+  afterEach(() => {
+    if (prevArchiverCommand === undefined) {
+      delete process.env.ARCHIVER_COMMAND;
+    } else {
+      process.env.ARCHIVER_COMMAND = prevArchiverCommand;
+    }
+  });
+
   it('strips only the confirmed members per archive, skipping an empty selection', async () => {
-    // stripArchiveOnServer's empty-members branch still requires the
-    // catalog row's archive file to exist on disk and a real lha/lzh
-    // extension before it reaches the "0 members = mark reviewed, don't
-    // touch the file" shortcut - see src/catalog.ts's stripArchiveOnServer.
     const archiveAbsPath = path.join(dir, 'AmiExpress', 'ACC-V103.LHA');
     fs.mkdirSync(path.dirname(archiveAbsPath), { recursive: true });
     fs.writeFileSync(archiveAbsPath, Buffer.alloc(0));
@@ -422,8 +445,11 @@ describe('POST /admin/doors/batch-strip-apply', () => {
     expect(job.items[0]).toMatchObject({ archiveName: 'ACC-V103.LHA', status: 'ok' });
 
     // The empty selection must be a genuine skip, not a silent strip: the
-    // door is marked reviewed (ads_stripped = 1) but the on-disk file is
-    // untouched, and no members were deleted from door_catalog_files.
+    // door is marked reviewed (ads_stripped = 1) and the on-disk archive
+    // is untouched (still 0 bytes - a real strip would have run the
+    // archiver against it). The audit detail below confirms 0 members
+    // were reported removed, matching stripArchiveOnServer's own
+    // empty-members shortcut in src/catalog.ts.
     const db = openDb(cfg);
     const row = db.prepare('SELECT ads_stripped FROM door_catalog WHERE archive_name = ?').get('ACC-V103.LHA') as { ads_stripped: number };
     expect(row.ads_stripped).toBe(1);
