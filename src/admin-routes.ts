@@ -112,7 +112,7 @@ function resolveFixCasingSentinel(
  * The batch route doesn't need its own catch either: runJobSequentially()
  * already treats a returned `{ error }` as a normal failed-item outcome.
  */
-function reextractOneDoor(cfg: ServerConfig, archiveName: string): { ok: true; fileCount: number; derived: ReturnType<typeof deriveMetadata> } | { error: string } {
+function reextractOneDoor(cfg: ServerConfig, archiveName: string, adminId: number | null): { ok: true; fileCount: number; derived: ReturnType<typeof deriveMetadata> } | { error: string } {
   const db = openDb(cfg);
   try {
     const entry = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE').get(archiveName) as { id: string; archive_path: string } | undefined;
@@ -153,7 +153,7 @@ function reextractOneDoor(cfg: ServerConfig, archiveName: string): { ok: true; f
         const ins = db.prepare('INSERT INTO door_catalog_files (catalog_id, path, size, is_junk, junk_reason) VALUES (?, ?, ?, 0, NULL)');
         for (const f of files) ins.run(entry.id, f.path, f.size);
       }
-      recordAudit(db, null, 'reextract', archiveName, { fileCount: files.length, dizFound: Boolean(derived.fileIdDiz), docFound: Boolean(derived.doc) });
+      recordAudit(db, adminId, 'reextract', archiveName, { fileCount: files.length, dizFound: Boolean(derived.fileIdDiz), docFound: Boolean(derived.doc) });
     });
     write();
     return { ok: true, fileCount: files.length, derived };
@@ -422,7 +422,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
    */
   router.post('/doors/:archiveName/reextract', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const archiveName = Array.isArray(req.params.archiveName) ? req.params.archiveName[req.params.archiveName.length - 1] : req.params.archiveName;
-    const result = reextractOneDoor(cfg, archiveName);
+    const result = reextractOneDoor(cfg, archiveName, req.admin?.id ?? null);
     if ('error' in result) {
       res.status(result.error === 'no such door' || result.error === 'archive file missing' ? 404 : 500).json({ error: result.error });
       return;
@@ -449,8 +449,9 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       return;
     }
     const jobId = createJob(cfg, 'reextract', body.archiveNames, req.admin?.id ?? null);
+    const adminId = req.admin?.id ?? null;
     void runJobSequentially(cfg, jobId, body.archiveNames, (archiveName) => {
-      const result = reextractOneDoor(cfg, archiveName);
+      const result = reextractOneDoor(cfg, archiveName, adminId);
       return 'error' in result ? { error: result.error } : { ok: true };
     });
     res.json({ jobId });
