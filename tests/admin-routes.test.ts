@@ -261,6 +261,43 @@ describe('POST /admin/doors/batch-tags', () => {
   });
 });
 
+describe('POST /admin/doors/batch-delete', () => {
+  it('rejects a request whose confirm count does not match', async () => {
+    const res = await request(app())
+      .post(admin('/doors/batch-delete'))
+      .set(auth())
+      .send({ archiveNames: ['ACC-V103.LHA'], confirm: '2' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a batch over 200 archives', async () => {
+    const names = Array.from({ length: 201 }, (_, i) => `F${i}.LHA`);
+    const res = await request(app())
+      .post(admin('/doors/batch-delete'))
+      .set(auth())
+      .send({ archiveNames: names, confirm: '201' });
+    expect(res.status).toBe(400);
+  });
+
+  it('permanently removes the catalog row, its child rows, and the archive file', async () => {
+    const before = await request(app()).get('/api/door-repo/doors?q=ACC-V103').set(auth());
+    expect(before.body.rows).toHaveLength(1);
+
+    const res = await request(app())
+      .post(admin('/doors/batch-delete'))
+      .set(auth())
+      .send({ archiveNames: ['ACC-V103.LHA', 'NOPE.LHA'], confirm: '2' });
+    expect(res.status).toBe(200);
+    expect(res.body.results).toEqual([
+      { archiveName: 'ACC-V103.LHA', ok: true },
+      { archiveName: 'NOPE.LHA', ok: false, error: 'not found' },
+    ]);
+
+    const after = await request(app()).get('/api/door-repo/doors?q=ACC-V103').set(auth());
+    expect(after.body.rows).toHaveLength(0);
+  });
+});
+
 describe('POST /admin/tidy-case', () => {
   it('normalises eLi7e casing to sentence case', async () => {
     const res = await request(app())

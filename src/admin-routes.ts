@@ -775,6 +775,67 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /** Permanently remove multiple doors: catalog row, every child row keyed
+   *  to it, and the archive file on disk. No single-door equivalent exists
+   *  today (DELETE /doors/:archiveName is a soft hide) - this defines the
+   *  real delete for the first time, so it enumerates every table itself
+   *  rather than reusing something that doesn't do this. */
+  router.post('/doors/batch-delete', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[]; confirm?: string };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    if (body.archiveNames.length > 200) {
+      res.status(400).json({ error: 'batch too large - split into requests of 200 or fewer' });
+      return;
+    }
+    if (body.confirm !== String(body.archiveNames.length)) {
+      res.status(400).json({ error: `confirm must equal the archive count (${body.archiveNames.length})` });
+      return;
+    }
+    const db = openDb(cfg);
+    try {
+      const lookup = db.prepare('SELECT id, archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE');
+      const cleanupByCatalogId = [
+        'DELETE FROM door_catalog_files WHERE catalog_id = ?',
+        'DELETE FROM door_catalog_overrides WHERE catalog_id = ?',
+        'DELETE FROM door_hidden WHERE catalog_id = ?',
+        'DELETE FROM door_tags WHERE catalog_id = ?',
+        'DELETE FROM door_votes WHERE catalog_id = ?',
+      ].map((sql) => db.prepare(sql));
+      const cleanupNotJunk = db.prepare('DELETE FROM door_not_junk WHERE archive_name = ? COLLATE NOCASE');
+      const deleteCatalogRow = db.prepare('DELETE FROM door_catalog WHERE id = ?');
+      const results: { archiveName: string; ok: boolean; error?: string }[] = [];
+      const write = db.transaction(() => {
+        for (const archiveName of body.archiveNames!) {
+          const row = lookup.get(archiveName) as { id: string; archive_path: string } | undefined;
+          if (!row) {
+            results.push({ archiveName, ok: false, error: 'not found' });
+            continue;
+          }
+          for (const stmt of cleanupByCatalogId) stmt.run(row.id);
+          cleanupNotJunk.run(archiveName);
+          deleteCatalogRow.run(row.id);
+          try {
+            const absPath = resolveArchivePath(cfg, row.archive_path);
+            if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+          } catch {
+            // The catalog row is already gone; a file that can't be
+            // unlinked is an orphan on disk, not a reason to fail the
+            // batch or leave a half-deleted catalog row.
+          }
+          recordAudit(db, req.admin?.id ?? null, 'delete', archiveName, {});
+          results.push({ archiveName, ok: true });
+        }
+      });
+      write();
+      res.json({ ok: true, results });
+    } finally {
+      db.close();
+    }
+  });
+
   /** Edit fields on multiple doors at once. */
   router.post('/doors/batch-patch', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const body = (req.body ?? {}) as { archiveNames?: string[]; fields?: Record<string, unknown> };

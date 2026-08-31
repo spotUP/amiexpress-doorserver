@@ -186,6 +186,15 @@ export function useBatchTags() {
   });
 }
 
+export function useBatchDelete() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { archiveNames: string[]; confirm: string }) =>
+      api.post<{ ok: boolean; results: BatchResult[] }>('/admin/doors/batch-delete', args),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
 export function useBatchPatch() {
   const client = useQueryClient();
   return useMutation({
