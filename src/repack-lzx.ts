@@ -59,9 +59,13 @@ export function repackLzxToLha(archivePath: string): RepackResult {
     const base = path.basename(archivePath, path.extname(archivePath));
     const outputPath = path.join(path.dirname(archivePath), `${base}.lha`);
 
-    // Repack as LHA — shell expansion handles non-UTF8 filenames
-    const quoted = fileList.map((f) => `"${f.replace(/"/g, '\\"')}"`).join(' ');
-    const pack = run('sh', ['-c', `${LHA} c "${outputPath}" ${quoted}`], tmpDir);
+    // Straight to `lha`, no shell in between: Amiga filenames from a 1990s
+    // archive can contain almost any byte - backticks, `$`, quotes - and a
+    // shell string built by concatenating them (the previous approach here)
+    // corrupts the command or, worse, lets one execute as a substitution.
+    // spawnSync with an argv array never invokes a shell, so every name
+    // reaches `lha` as a literal argument regardless of what it contains.
+    const pack = run(LHA, ['c', outputPath, ...fileList], tmpDir);
     if (!pack.ok || !fs.existsSync(outputPath)) {
       return { ok: false, error: `lha failed: ${(pack.stderr || pack.stdout).trim().slice(0, 200)}` };
     }
