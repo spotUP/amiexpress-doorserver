@@ -385,7 +385,10 @@ export function useStripPreview(archiveName: string) {
 }
 
 export interface StripCandidate { path: string; reason: string }
-export interface StripPreviewResult { archiveName: string; stripped: StripCandidate[] }
+/** `error` is set instead of `stripped` being meaningful when the archive
+ *  could not be previewed at all (e.g. its file is missing on disk) - the
+ *  review screen renders that distinctly rather than showing "0 flagged". */
+export interface StripPreviewResult { archiveName: string; stripped: StripCandidate[]; error?: string }
 
 /** Kicks off the batch-strip-preview job (phase 1 of batch strip); the
  *  caller polls /admin/jobs/:id and JSON.parses resultJson into

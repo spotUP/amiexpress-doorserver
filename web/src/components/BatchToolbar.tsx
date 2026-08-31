@@ -1,6 +1,6 @@
 /** Toolbar shown when doors are selected for batch operations. */
 import { Eraser, Eye, EyeOff, Tag, Trash2, Wand2, RefreshCw, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Select } from './ui';
 import { useJobProgress } from '../api/queries';
 
@@ -44,15 +44,38 @@ export function BatchToolbar({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const reextractProgress = useJobProgress(reextractJobId);
+  // Once a re-extract job finishes with failures, keep a summary visible
+  // instead of reverting straight to the normal toolbar and discarding
+  // failedCount - the admin needs at least a count of what failed. Reset
+  // whenever a new job starts so the next run's summary isn't pre-dismissed.
+  const [summaryDismissed, setSummaryDismissed] = useState(false);
+  useEffect(() => {
+    setSummaryDismissed(false);
+  }, [reextractJobId]);
 
-  if (reextractJobId && reextractProgress && reextractProgress.status !== 'done') {
-    return (
-      <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
-        <RefreshCw size={14} className="animate-spin text-accent" />
-        <span>Re-extracting {reextractProgress.completed} / {reextractProgress.total}</span>
-        {reextractProgress.failedCount > 0 && <span className="text-danger">{reextractProgress.failedCount} failed</span>}
-      </div>
-    );
+  if (reextractJobId && reextractProgress) {
+    if (reextractProgress.status === 'running') {
+      return (
+        <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <RefreshCw size={14} className="animate-spin text-accent" />
+          <span>Re-extracting {reextractProgress.completed} / {reextractProgress.total}</span>
+          {reextractProgress.failedCount > 0 && <span className="text-danger">{reextractProgress.failedCount} failed</span>}
+        </div>
+      );
+    }
+    const hadFailures = reextractProgress.failedCount > 0 || reextractProgress.status === 'failed';
+    if (hadFailures && !summaryDismissed) {
+      return (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <span>
+            {reextractProgress.status === 'failed' ? 'Re-extract stopped unexpectedly: ' : 'Re-extract finished: '}
+            {reextractProgress.completed - reextractProgress.failedCount} succeeded,{' '}
+            <span className="text-danger">{reextractProgress.failedCount} failed</span>
+          </span>
+          <Button variant="ghost" onClick={() => setSummaryDismissed(true)}>Dismiss</Button>
+        </div>
+      );
+    }
   }
 
   return (

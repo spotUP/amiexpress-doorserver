@@ -48,7 +48,9 @@ export function BatchStripReview({
         {candidates.map((c) => (
           <div key={c.archiveName} className="rounded border border-line bg-bg p-2">
             <div className="mb-1 font-mono text-xs text-accent">{c.archiveName}</div>
-            {c.stripped.length === 0 ? (
+            {c.error ? (
+              <div className="text-xs text-danger">Could not be read: {c.error}</div>
+            ) : c.stripped.length === 0 ? (
               <div className="text-xs text-muted">Nothing flagged.</div>
             ) : (
               c.stripped.map((f) => (

@@ -126,19 +126,36 @@ export function Browse() {
   const stripPreviewProgress = useJobProgress(stripPreviewJobId);
   const stripApplyProgress = useJobProgress(stripApplyJobId);
   const matchingNames = useMatchingArchiveNames();
+  // Once a strip-apply job finishes with failures, keep a summary visible
+  // instead of reverting straight to the normal toolbar/review screen and
+  // discarding failedCount. Reset whenever a new apply job starts.
+  const [stripApplySummaryDismissed, setStripApplySummaryDismissed] = useState(false);
+  useEffect(() => {
+    setStripApplySummaryDismissed(false);
+  }, [stripApplyJobId]);
 
   // Once the preview job finishes, fetch its resultJson and hand the parsed
   // candidates to the review screen. stripPreviewJobId is cleared in the same
   // update so this effect doesn't refire once the fetch lands (useJobProgress
   // returns null once its jobId argument goes null, so the guard holds even
-  // across the render where the clear takes effect).
+  // across the render where the clear takes effect). A 'failed' job (see
+  // batch-jobs.ts's top-level backstop) has no review screen to show - drop
+  // back to the toolbar rather than leaving the progress indicator spinning
+  // on a status it never expects to move on from.
   useEffect(() => {
-    if (stripPreviewProgress?.status === 'done' && stripPreviewJobId) {
+    if (!stripPreviewJobId || !stripPreviewProgress) return;
+    if (stripPreviewProgress.status === 'done') {
       const jobId = stripPreviewJobId;
-      api.get<{ resultJson: string }>(`/admin/jobs/${jobId}`).then((job) => {
-        setStripCandidates(JSON.parse(job.resultJson) as StripPreviewResult[]);
+      // resultJson is a nullable TEXT column; setJobResult should always
+      // have been called by the time a strip-preview job reaches 'done', but
+      // guard the type-lie anyway rather than calling JSON.parse(null).
+      api.get<{ resultJson: string | null }>(`/admin/jobs/${jobId}`).then((job) => {
+        const candidates = job.resultJson ? (JSON.parse(job.resultJson) as StripPreviewResult[]) : [];
+        setStripCandidates(candidates);
         setStripPreviewJobId(null);
       });
+    } else if (stripPreviewProgress.status === 'failed') {
+      setStripPreviewJobId(null);
     }
   }, [stripPreviewProgress, stripPreviewJobId]);
 
@@ -404,11 +421,27 @@ export function Browse() {
       </div>
       </div>
 
-      {admin && stripApplyJobId && stripApplyProgress && stripApplyProgress.status !== 'done' ? (
+      {admin && stripApplyJobId && stripApplyProgress && stripApplyProgress.status === 'running' ? (
         <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
           <RefreshCw size={14} className="animate-spin text-accent" />
           <span>Stripping {stripApplyProgress.completed} / {stripApplyProgress.total}</span>
           {stripApplyProgress.failedCount > 0 && <span className="text-danger">{stripApplyProgress.failedCount} failed</span>}
+        </div>
+      ) : admin && stripApplyJobId && stripApplyProgress &&
+          (stripApplyProgress.failedCount > 0 || stripApplyProgress.status === 'failed') &&
+          !stripApplySummaryDismissed ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <span>
+            {stripApplyProgress.status === 'failed' ? 'Strip stopped unexpectedly: ' : 'Strip finished: '}
+            {stripApplyProgress.completed - stripApplyProgress.failedCount} succeeded,{' '}
+            <span className="text-danger">{stripApplyProgress.failedCount} failed</span>
+          </span>
+          <Button variant="ghost" onClick={() => setStripApplySummaryDismissed(true)}>Dismiss</Button>
+        </div>
+      ) : admin && stripPreviewJobId && stripPreviewProgress && stripPreviewProgress.status === 'running' ? (
+        <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <RefreshCw size={14} className="animate-spin text-accent" />
+          <span>Previewing strip candidates {stripPreviewProgress.completed} / {stripPreviewProgress.total}</span>
         </div>
       ) : admin && stripCandidates ? (
         <BatchStripReview
@@ -483,7 +516,15 @@ export function Browse() {
         onToggle={admin ? toggle : undefined}
         onToggleAll={admin ? toggleAll : undefined}
         onToggleRange={admin ? toggleRange : undefined}
-        totalMatching={data?.total}
+        // "Needs a name" (guessedOnly) filters name_source in-process on the
+        // main listing, so data.total IS correctly filtered by it - but
+        // GET /doors?fields=archiveName (what "select all N matching" fetches)
+        // does NOT apply name_source (see src/public-routes.ts). Showing the
+        // count here while hiding it from the button's actual query would let
+        // "Select all N matching" report a number it doesn't select. Hide the
+        // button under this filter rather than show a lying count; page-only
+        // multi-select still works fine.
+        totalMatching={guessedOnly ? undefined : data?.total}
         onSelectAllMatching={selectAllFiltered}
         selectAllMatchingActive={selectAllMatching}
       />
