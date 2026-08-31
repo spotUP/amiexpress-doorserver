@@ -42,6 +42,9 @@ export function DoorTable({
   onToggle,
   onToggleAll,
   onToggleRange,
+  totalMatching,
+  onSelectAllMatching,
+  selectAllMatchingActive,
 }: {
   rows: Door[];
   sortState: SortState;
@@ -51,6 +54,9 @@ export function DoorTable({
   onToggle?: (name: string) => void;
   onToggleAll?: () => void;
   onToggleRange?: (index: number, event: React.MouseEvent) => void;
+  totalMatching?: number;
+  onSelectAllMatching?: () => void;
+  selectAllMatchingActive?: boolean;
 }) {
   const hasSelection = selected && onToggle && onToggleAll;
   const allSelected = hasSelection && rows.length > 0 && rows.every((d) => selected!.has(d.archiveName));
@@ -70,6 +76,15 @@ export function DoorTable({
                     onChange={onToggleAll}
                     className="h-3.5 w-3.5 rounded border-line accent-accent"
                   />
+                  {allSelected && totalMatching && totalMatching > rows.length && !selectAllMatchingActive && (
+                    <button
+                      type="button"
+                      onClick={onSelectAllMatching}
+                      className="ml-2 text-xs text-accent underline"
+                    >
+                      Select all {totalMatching} matching
+                    </button>
+                  )}
                 </th>
               )}
               {COLUMNS.map((column) => (
@@ -163,6 +178,15 @@ export function DoorTable({
               className="h-3.5 w-3.5 rounded border-line accent-accent"
             />
             <span className="text-muted">Select all ({rows.length})</span>
+            {allSelected && totalMatching && totalMatching > rows.length && !selectAllMatchingActive && (
+              <button
+                type="button"
+                onClick={onSelectAllMatching}
+                className="ml-2 text-xs text-accent underline"
+              >
+                Select all {totalMatching} matching
+              </button>
+            )}
           </label>
         )}
         {rows.map((door) => (

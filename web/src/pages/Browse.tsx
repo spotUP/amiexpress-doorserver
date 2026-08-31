@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Eraser, Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
-import { useBatchHide, useBatchPatch, useBatchRestore, useDoors, useFacets, useLiveRevision } from '../api/queries';
+import { useBatchHide, useBatchPatch, useBatchRestore, useDoors, useFacets, useLiveRevision, useMatchingArchiveNames } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
 import type { AdminUser, Door } from '../api/types';
@@ -51,6 +51,9 @@ export function Browse() {
   // are idempotent relative to the base and can both grow and shrink the
   // visible range.
   const [rangeBase, setRangeBase] = useState<Set<string> | null>(null);
+  // True once the "select all N matching" fetch has replaced the page-only
+  // selection with every archive name matching the current filters.
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
 
   useLiveRevision();
 
@@ -95,6 +98,7 @@ export function Browse() {
   const batchHide = useBatchHide();
   const batchRestore = useBatchRestore();
   const batchPatch = useBatchPatch();
+  const matchingNames = useMatchingArchiveNames();
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1;
 
@@ -109,6 +113,7 @@ export function Browse() {
   }
 
   const toggle = useCallback((name: string) => {
+    setSelectAllMatching(false);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
@@ -118,6 +123,7 @@ export function Browse() {
   }, []);
 
   const toggleRange = useCallback((index: number, event: React.MouseEvent) => {
+    setSelectAllMatching(false);
     const rows = data?.rows ?? [];
     const name = rows[index]?.archiveName;
     if (!name) return;
@@ -152,10 +158,30 @@ export function Browse() {
   }, [data]);
 
   const clearSelection = useCallback(() => {
+    setSelectAllMatching(false);
     setSelected(new Set());
     setAnchorIndex(null);
     setRangeBase(null);
   }, []);
+
+  const selectAllFiltered = useCallback(() => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (system) params.set('system', system);
+    if (type) params.set('type', type);
+    if (requires) params.set('requires', requires);
+    if (latestOnly) params.set('latest', '1');
+    if (guessedOnly) params.set('name_source', 'archive');
+    if (unstrippedOnly) params.set('unstripped', '1');
+    // NOTE: keep this param list in sync with toSearch() in api/queries.ts,
+    // which is what useDoors() itself sends for the current filter state.
+    matchingNames.mutate(params, {
+      onSuccess: (res) => {
+        setSelected(new Set(res.archiveNames));
+        setSelectAllMatching(true);
+      },
+    });
+  }, [q, system, type, requires, latestOnly, guessedOnly, unstrippedOnly, matchingNames]);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[86rem] flex-col gap-4 px-4 py-6">
@@ -375,6 +401,9 @@ export function Browse() {
         onToggle={admin ? toggle : undefined}
         onToggleAll={admin ? toggleAll : undefined}
         onToggleRange={admin ? toggleRange : undefined}
+        totalMatching={data?.total}
+        onSelectAllMatching={selectAllFiltered}
+        selectAllMatchingActive={selectAllMatching}
       />
 
       <footer className="flex items-center justify-between gap-4 text-sm text-muted">
