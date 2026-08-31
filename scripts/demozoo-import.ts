@@ -25,7 +25,7 @@ import { loadConfig } from '../src/config';
 import { applySchema } from '../src/db';
 import { runMigrations } from '../src/migrations';
 import { recordAudit } from '../src/auth';
-import { inferDoorType as inferDoorTypeFromTags, inferRequiresBbs as inferRequiresBbsFromTags } from '../src/demozoo-bbs';
+import { inferDoorType as inferDoorTypeFromTags, inferRequiresBbs as inferRequiresBbsFromTags, extractReleaseGroup } from '../src/demozoo-bbs';
 
 // The tag->BBS mapping, the group-name->BBS mapping, and the door-type
 // inference all live in src/demozoo-bbs.ts, shared with any later backfill
@@ -265,19 +265,6 @@ function parseScreenshots(screenshots: string[]): string | null {
   return JSON.stringify(screenshots);
 }
 
-/** Demozoo's `author_nicks` lists everyone who contributed. The first one
- *  with `is_group: true` is the release crew — that's what we want for
- *  `door_catalog.release_group` (abbreviation) and
- *  `release_groups.full_name` (e.g. "Up Rough /X Innovations"). */
-function extractReleaseGroup(detail: DemozooDetail): { abbrev: string; fullName: string } | null {
-  for (const nick of detail.author_nicks ?? []) {
-    if (nick.releaser?.is_group && nick.abbreviation) {
-      return { abbrev: nick.abbreviation, fullName: nick.releaser.name };
-    }
-  }
-  return null;
-}
-
 function inferDoorType(detail: DemozooDetail): string | null {
   return inferDoorTypeFromTags(detail.tags ?? []);
 }
@@ -442,7 +429,7 @@ async function registerExistingFile(args: RegisterArgs): Promise<void> {
     detail.title,
     path.basename(filename, path.extname(filename))
   );
-  const group = extractReleaseGroup(detail);
+  const group = extractReleaseGroup(detail.author_nicks);
   if (group) {
     db.prepare(
       'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'
@@ -773,7 +760,7 @@ async function main() {
         if (links) patch.external_links = links;
         const shots = parseScreenshots(detail!.screenshots ?? []);
         if (shots) patch.screenshots = shots;
-        const group = extractReleaseGroup(detail!);
+        const group = extractReleaseGroup(detail!.author_nicks);
         if (group) {
           patch.release_group = group.abbrev;
           db.prepare(
@@ -941,7 +928,7 @@ async function main() {
         detail.title,
         path.basename(destBasename, path.extname(destBasename))
       );
-      const group = extractReleaseGroup(detail);
+      const group = extractReleaseGroup(detail.author_nicks);
       if (group) {
         db.prepare(
           'INSERT INTO release_groups (abbreviation, full_name) VALUES (?, ?) ON CONFLICT(abbreviation) DO UPDATE SET full_name = excluded.full_name'

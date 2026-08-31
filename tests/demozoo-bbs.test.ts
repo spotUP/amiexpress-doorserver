@@ -1,4 +1,4 @@
-import { inferRequiresBbs, inferDoorType, BBS_TAGS } from '../src/demozoo-bbs';
+import { inferRequiresBbs, inferDoorType, extractReleaseGroup, BBS_TAGS } from '../src/demozoo-bbs';
 
 describe('inferRequiresBbs', () => {
   it('matches a known release-group name before falling back to tags', () => {
@@ -31,5 +31,34 @@ describe('inferDoorType', () => {
 
   it('returns null with no recognised tag', () => {
     expect(inferDoorType(['demo'])).toBeNull();
+  });
+});
+
+describe('extractReleaseGroup', () => {
+  it('returns the abbreviation and full name of a nick flagged as a group', () => {
+    const result = extractReleaseGroup([
+      { abbreviation: 'LI', releaser: { name: 'Lord of Illusion', is_group: false } },
+      { abbreviation: 'SOI', releaser: { name: 'Sphere of Illusions', is_group: true } },
+    ]);
+    expect(result).toEqual({ abbrev: 'SOI', fullName: 'Sphere of Illusions' });
+  });
+
+  it('skips a group nick with no abbreviation - demozoo has real groups with none set', () => {
+    const result = extractReleaseGroup([
+      { abbreviation: '', releaser: { name: 'Some Group', is_group: true } },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('returns null for a solo releaser (is_group: false)', () => {
+    const result = extractReleaseGroup([
+      { abbreviation: '', releaser: { name: 'Grymmjack', is_group: false } },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('returns null for an empty or missing author_nicks list', () => {
+    expect(extractReleaseGroup([])).toBeNull();
+    expect(extractReleaseGroup(undefined)).toBeNull();
   });
 });

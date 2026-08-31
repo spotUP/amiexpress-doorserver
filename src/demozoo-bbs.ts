@@ -111,6 +111,28 @@ const GROUP_TO_BBS: { match: RegExp; bbs: string }[] = [
   { match: /insanity/,                         bbs: 'Insanity' },
 ];
 
+export interface DemozooAuthorNick {
+  abbreviation: string;
+  releaser: { name: string; is_group: boolean };
+}
+
+/**
+ * A demozoo production's `author_nicks` lists everyone who contributed. The
+ * first one flagged `is_group` with a real abbreviation is the release
+ * group's abbreviation/full-name pair for `door_catalog.release_group` and
+ * `release_groups.full_name`. Returns null if no nick is both a group and
+ * carries an abbreviation (demozoo itself sometimes leaves the abbreviation
+ * blank even for a real group, and a solo releaser has none to find).
+ */
+export function extractReleaseGroup(authorNicks: DemozooAuthorNick[] | undefined): { abbrev: string; fullName: string } | null {
+  for (const nick of authorNicks ?? []) {
+    if (nick.releaser?.is_group && nick.abbreviation) {
+      return { abbrev: nick.abbreviation, fullName: nick.releaser.name };
+    }
+  }
+  return null;
+}
+
 /**
  * Best-effort `requires_bbs` for a production, based on its release-group
  * name and tags. Tries the group-name match first, then falls back to the
