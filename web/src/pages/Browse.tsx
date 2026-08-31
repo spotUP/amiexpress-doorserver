@@ -619,7 +619,12 @@ export function Browse() {
       </footer>
 
       <DoorDetailDialog archiveName={open} admin={admin} onClose={() => setOpen(null)} />
-      <JobResultsDialog jobId={stripApplyJobId} open={stripApplyResultsOpen} onOpenChange={setStripApplyResultsOpen} />
+      <JobResultsDialog
+        jobId={stripApplyJobId}
+        open={stripApplyResultsOpen}
+        onOpenChange={setStripApplyResultsOpen}
+        onOpenDoor={(archiveName) => setOpen(archiveName)}
+      />
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} onSignedIn={setAdmin} />
       <AuditPanel open={auditOpen} onOpenChange={setAuditOpen} enabled={Boolean(admin)} />
       <HiddenPanel open={hiddenOpen} onOpenChange={setHiddenOpen} enabled={Boolean(admin)} />
