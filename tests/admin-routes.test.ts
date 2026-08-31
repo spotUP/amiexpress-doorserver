@@ -16,6 +16,7 @@ import { bootstrapAdmins } from '../src/auth';
 import { _clearLoginFailuresForTests } from '../src/admin-routes';
 import { _clearIndexTsvCacheForTests } from '../src/index-tsv';
 import { _clearListCacheForTests } from '../src/manifest';
+import { createJob } from '../src/batch-jobs';
 import type { ServerConfig } from '../src/config';
 
 const SECRET = 'a-test-secret-that-is-long-enough-to-pass';
@@ -71,6 +72,7 @@ describe('every admin route needs a token', () => {
     expect((await request(app()).post(admin('/doors/ACC-V103.LHA/redescribe'))).status).toBe(401);
     expect((await request(app()).post(admin('/tidy-case'))).status).toBe(401);
     expect((await request(app()).get(admin('/audit'))).status).toBe(401);
+    expect((await request(app()).get(admin('/jobs/some-id'))).status).toBe(401);
   });
 });
 
@@ -214,6 +216,31 @@ describe('POST /admin/doors/:archiveName/redescribe', () => {
     expect(res.body.requiresBbs).toBe('AmiExpress');
     // The human's text is still what the public API serves.
     expect((await request(app()).get('/api/door-repo/doors?q=ACC')).body.rows[0].description).toBe('mine');
+  });
+});
+
+describe('GET /admin/jobs/:id', () => {
+  it('returns the job at 200 with its expected shape', async () => {
+    const jobId = createJob(cfg, 'reextract', ['A.LHA', 'B.LHA'], null);
+    const res = await request(app()).get(admin(`/jobs/${jobId}`)).set(auth());
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      id: jobId,
+      kind: 'reextract',
+      status: 'running',
+      total: 2,
+      completed: 0,
+      failedCount: 0,
+    });
+    expect(res.body.items).toEqual([
+      { archiveName: 'A.LHA', status: 'pending', error: null },
+      { archiveName: 'B.LHA', status: 'pending', error: null },
+    ]);
+  });
+
+  it('404s for a job that does not exist', async () => {
+    const res = await request(app()).get(admin('/jobs/no-such-job')).set(auth());
+    expect(res.status).toBe(404);
   });
 });
 

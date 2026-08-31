@@ -46,6 +46,28 @@ describe('batch-jobs', () => {
     ]);
   });
 
+  it('never runs two items concurrently, and calls processOne in archiveName order', async () => {
+    const archiveNames = ['A.LHA', 'B.LHA', 'C.LHA'];
+    const jobId = createJob(cfg, 'reextract', archiveNames, null);
+    const callOrder: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    await runJobSequentially(cfg, jobId, archiveNames, async (name) => {
+      callOrder.push(name);
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      // A real window in which a concurrent implementation (Promise.all /
+      // .map(async ...)) would show more than one item in flight at once.
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return { ok: true };
+    });
+
+    expect(callOrder).toEqual(archiveNames);
+    expect(maxInFlight).toBe(1);
+  });
+
   it('stores an arbitrary result payload for a job', () => {
     const jobId = createJob(cfg, 'strip-preview', ['A.LHA'], null);
     setJobResult(cfg, jobId, JSON.stringify({ hello: 'world' }));
