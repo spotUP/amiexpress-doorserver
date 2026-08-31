@@ -24,10 +24,17 @@ in `src/admin-routes.ts`) but is unusable in practice:
    but `BatchToolbar.tsx` hardcodes exactly one of them (category) plus a
    fixed fix-casing sentinel. Ten of eleven fields are batch-editable
    server-side today and unreachable from the UI.
-3. **No batch delete, tag, strip, or re-extract.** Each of these exists as a
-   single-door route (`DELETE /doors/:archiveName`, `PATCH
-   /doors/:archiveName/tags`, `POST /doors/:archiveName/strip`, `POST
-   /doors/:archiveName/reextract`) with no plural counterpart.
+3. **No batch tag, strip, or re-extract.** Each of these exists as a
+   single-door route (`PATCH /doors/:archiveName/tags`, `POST
+   /doors/:archiveName/strip`, `POST /doors/:archiveName/reextract`) with
+   no plural counterpart.
+4. **No permanent delete at all, single or batch.** `DELETE
+   /doors/:archiveName` (`src/admin-routes.ts:590`) is a soft hide - it
+   writes to `door_hidden`, exactly what `POST .../restore` and the
+   existing `batch-hide`/`batch-restore` routes already cover. There is no
+   route anywhere that removes a `door_catalog` row and its archive file
+   for good. "Bulk delete" therefore needs new single-item semantics
+   defined from scratch, not a plural wrapper around something that exists.
 
 ## What is being built
 
@@ -107,7 +114,9 @@ is a no-op) and removes each in `remove`, reusing the same `door_tags`
 table writes `PATCH /doors/:archiveName/tags` already does. One audit-log
 entry per archive, `action: 'edit-tags'`, matching the single-door route.
 
-**`POST /admin/doors/batch-delete`**
+**`POST /admin/doors/batch-delete`** - genuinely permanent, no
+single-door precedent to reuse (see problem statement, point 4), so this
+defines that behavior for the first time:
 ```
 { archiveNames: string[], confirm: string }
 ```
@@ -115,12 +124,16 @@ entry per archive, `action: 'edit-tags'`, matching the single-door route.
 - 400 if `confirm !== String(archiveNames.length)` - a server-side
   backstop, not merely a client-side dialog: the count must be typed back
   correctly regardless of what UI sent the request.
-- Otherwise, deletes each archive with the exact same per-item logic as
-  today's single-door `DELETE /doors/:archiveName` (removes the catalog
-  row, the archive file, associated `door_catalog_files`/`door_hidden`/
-  `door_catalog_overrides` rows), inside one transaction. Reports
-  `{ deleted: string[], failed: { archiveName, error }[] }` - a missing
-  file or an already-deleted row fails that one item, not the batch.
+- Otherwise, per archive, inside one transaction: delete its rows from
+  `door_catalog_files`, `door_catalog_overrides`, `door_hidden`,
+  `door_tags`, `door_votes` (all keyed by `catalog_id`) and
+  `door_not_junk` (keyed by `archive_name`), then the `door_catalog` row
+  itself, then `fs.unlinkSync` the archive file at its resolved
+  `archive_path`. `admin_audit` and `learned_junk_patterns` are NOT
+  touched - an audit trail and a corpus-wide pattern list both outlive
+  the row that happened to trigger them. Reports `{ deleted: string[],
+  failed: { archiveName, error }[] }` - a missing file or an
+  already-deleted row fails that one item, not the batch.
 
 Both new routes: transaction-wrapped, per-item try/catch so one bad name
 in a large batch doesn't fail the rest, response shape `{ ok: true,
