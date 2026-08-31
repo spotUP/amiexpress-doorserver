@@ -4,7 +4,7 @@ import * as path from 'path';
 import { openDb, applySchema } from '../src/db';
 import {
   resolveArchivePath, getCatalogEntryByArchive, getArchiveFiles,
-  getCatalogRevision, getDoorCount,
+  getCatalogRevision, getDoorCount, stripArchiveOnServer,
 } from '../src/catalog';
 import type { ServerConfig } from '../src/config';
 
@@ -76,5 +76,73 @@ describe('catalog reads', () => {
     const broken: ServerConfig = { ...cfg, dbPath: path.join(dir, 'missing.db') };
     fs.writeFileSync(broken.dbPath, '');
     expect(getCatalogRevision(broken)).toBe('unknown');
+  });
+});
+
+describe('stripArchiveOnServer', () => {
+  // stripArchiveOnServer used to hardcode "only .lha/.lzh" and call the
+  // always-lha-biased findArchiverBinary() regardless of the archive's own
+  // format - a real, present 7z (which supports .zip natively) was never
+  // even considered. ARCHIVER_COMMAND stubs the binary so this doesn't
+  // depend on a real 7z/lha being on the CI host - deleteMembers() is never
+  // actually invoked for an empty members list, so the stub only needs to
+  // exist on disk for existsSync() to find it.
+  let prevArchiverCommand: string | undefined;
+
+  beforeEach(() => {
+    prevArchiverCommand = process.env.ARCHIVER_COMMAND;
+    const stubBinPath = path.join(dir, 'stub-archiver.sh');
+    fs.writeFileSync(stubBinPath, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    process.env.ARCHIVER_COMMAND = stubBinPath;
+
+    fs.writeFileSync(path.join(dir, 'Archives', 'FAME', 'ZTEST.zip'), 'x');
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES ('id2', 'ZTEST.zip', 'FAME/ZTEST.zip', 'Zip Test', 'XIM', 1700000000)`
+    ).run();
+    db.close();
+  });
+
+  afterEach(() => {
+    if (prevArchiverCommand === undefined) delete process.env.ARCHIVER_COMMAND;
+    else process.env.ARCHIVER_COMMAND = prevArchiverCommand;
+  });
+
+  it('accepts a .zip archive instead of rejecting it as an unsupported format', () => {
+    // canDeleteMembers recognises a 7z-capable binary by its filename
+    // ending in "7z" - the shared beforeEach stub is named generically
+    // (it stands in for lha in the other tests below), so this test needs
+    // its own stub with a 7z-shaped name to exercise the .zip-via-7z path.
+    const stub7zPath = path.join(dir, 'stub7z');
+    fs.writeFileSync(stub7zPath, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    process.env.ARCHIVER_COMMAND = stub7zPath;
+
+    const result = stripArchiveOnServer(cfg, 'ZTEST.zip', [], null);
+    expect(result).toEqual({ ok: true, removed: 0, newJunkCount: 0 });
+  });
+
+  it('still rejects a genuinely unsupported format', () => {
+    fs.writeFileSync(path.join(dir, 'Archives', 'FAME', 'DTEST.dms'), 'x');
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES ('id3', 'DTEST.dms', 'FAME/DTEST.dms', 'DMS Test', 'XIM', 1700000000)`
+    ).run();
+    db.close();
+    const result = stripArchiveOnServer(cfg, 'DTEST.dms', [], null);
+    expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('Unsupported archive format') });
+  });
+
+  it('still rejects LZX with its own explanatory reason', () => {
+    fs.writeFileSync(path.join(dir, 'Archives', 'FAME', 'LTEST.lzx'), 'x');
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES ('id4', 'LTEST.lzx', 'FAME/LTEST.lzx', 'LZX Test', 'XIM', 1700000000)`
+    ).run();
+    db.close();
+    const result = stripArchiveOnServer(cfg, 'LTEST.lzx', [], null);
+    expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('LZX') });
   });
 });

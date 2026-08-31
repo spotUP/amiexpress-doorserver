@@ -40,7 +40,7 @@ const defaultRunner: ArchiveRunner = (bin, args) => {
  * 7z for the formats lha doesn't understand. The ARCHIVER_COMMAND env
  * override forces a specific binary and skips the preference logic.
  */
-function findArchiverFor(archivePath: string, existsSync: (p: string) => boolean = fs.existsSync): string | null {
+export function findArchiverFor(archivePath: string, existsSync: (p: string) => boolean = fs.existsSync): string | null {
   const override = process.env.ARCHIVER_COMMAND;
   if (override && existsSync(override)) return override;
   const ext = path.extname(archivePath).toLowerCase();

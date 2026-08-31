@@ -17,7 +17,7 @@ import { openDb } from './db';
 import { buildGroupTags } from './describe';
 import { applyOverrides, hiddenExclusion, isHidden, loadOverrides, overridesStamp, hiddenStamp } from './effective';
 import type { ServerConfig } from './config';
-import { deleteMembers, findArchiverBinary } from './lha-member-delete';
+import { deleteMembers, canDeleteMembers, findArchiverFor } from './lha-member-delete';
 import { getArchiveChecksums } from './checksums';
 import { deriveMetadata } from './submissions';
 
@@ -245,18 +245,14 @@ export function stripArchiveOnServer(
       return { ok: false, reason: `archive file not found on disk: ${path.basename(absPath)}` };
     }
 
-    const binary = findArchiverBinary();
-    const ext = path.extname(absPath).toLowerCase();
-    if (ext !== '.lha' && ext !== '.lzh') {
-      return {
-        ok: false,
-        reason: ext === '.lzx'
-          ? 'LZX archives cannot be rewritten: no LZX writer exists.'
-          : `Unsupported archive format: ${ext || '(none)'}`,
-      };
-    }
-    if (!binary) {
-      return { ok: false, reason: 'No lha binary available on this server.' };
+    // findArchiverFor picks per-archive: lha for .lha/.lzh, 7z for
+    // .zip/.7z (7z can both read and write those formats natively; lha
+    // cannot, and used to be the only binary this function ever tried,
+    // rejecting .zip outright even when a working 7z was installed).
+    const binary = findArchiverFor(absPath);
+    const capability = canDeleteMembers(absPath, binary);
+    if (!capability.ok) {
+      return { ok: false, reason: capability.reason };
     }
 
     // Empty members list: the stripper found 0 ads. Mark the door as reviewed
