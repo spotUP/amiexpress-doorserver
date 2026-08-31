@@ -78,8 +78,13 @@ export function BatchStripReview({
           }
           // Every previewed archive is included, even with an empty
           // members list - batch-strip-apply treats that as "skip", not
-          // "error", per the spec.
-          const selections = candidates.map((c) => ({ archiveName: c.archiveName, members: byArchive.get(c.archiveName) ?? [] }));
+          // "error", per the spec. An archive whose PREVIEW failed to read
+          // is excluded outright: sending it with members: [] would make
+          // stripArchiveOnServer treat it as "reviewed, nothing to strip"
+          // and mark ads_stripped=1 on an archive nothing actually checked.
+          const selections = candidates
+            .filter((c) => !c.error)
+            .map((c) => ({ archiveName: c.archiveName, members: byArchive.get(c.archiveName) ?? [] }));
           onConfirm(selections);
         }}
         disabled={totalFiles === 0}
