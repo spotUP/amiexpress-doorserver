@@ -85,9 +85,34 @@ async function requestText(path: string, init?: RequestInit): Promise<string> {
   return res.text();
 }
 
+// A plain <a href> navigation can't carry an Authorization header, so an
+// admin-gated binary download has to be fetched (with the header) and saved
+// from a blob URL instead of linked to directly.
+async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const token = getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  });
+
+  if (res.status === 401 && token) {
+    setToken(null);
+    onUnauthorized?.();
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(body.error ?? `${res.status} ${res.statusText}`, res.status);
+  }
+  return res.blob();
+}
+
 export const api = {
   get: <T,>(path: string, init?: RequestInit) => request<T>(path, init),
   getText: (path: string, init?: RequestInit) => requestText(path, init),
+  getBlob: (path: string, init?: RequestInit) => requestBlob(path, init),
   post: <T,>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T,>(path: string, body: unknown) =>

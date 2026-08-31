@@ -13,6 +13,7 @@ import type { AdminUser, DoorFacts, DoorFile, StripPreview } from '../api/types'
 import { DizView } from './DizView';
 import { GuideView } from './GuideView';
 import { FieldEditor } from './FieldEditor';
+import { FileViewerDialog } from './FileViewerDialog';
 import { RemoveDoor } from './RemoveDoor';
 import { Badge, Button, formatSize } from './ui';
 
@@ -270,11 +271,9 @@ function StripAds({
   const learnPattern = useLearnPattern();
   const markNotJunk = useMarkNotJunk();
   const unmarkNotJunk = useUnmarkNotJunk();
-  const fetchFileInfo = useFileInfo(archiveName);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ removed: number; newJunkCount: number } | null>(null);
-  const [viewingFile, setViewingFile] = useState<{ path: string; content: string } | null>(null);
-  const [viewingLoading, setViewingLoading] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<{ archiveName: string; path: string } | null>(null);
 
   async function loadPreview() {
     const p = await stripPreviewQuery.mutateAsync();
@@ -302,32 +301,6 @@ function StripAds({
     const p = await stripPreviewQuery.mutateAsync();
     setPreview(p);
     setSelected(new Set(p.stripped.map((f) => f.path)));
-  }
-
-  async function viewKeptFile(path: string) {
-    // Sniff text-vs-binary on the server rather than guessing from the
-    // extension — .Dox, .nfo, .readme etc. are all valid text and the
-    // extension list is brittle.
-    const info = await fetchFileInfo(path);
-    if (!info.isText) {
-      // Binary: trigger a download with a sane filename.
-      const link = document.createElement('a');
-      link.href = `/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`;
-      link.download = path.split('/').pop() ?? path;
-      link.click();
-      return;
-    }
-    setViewingLoading(path);
-    try {
-      const res = await fetch(`/api/door-repo/admin/doors/${encodeURIComponent(archiveName)}/files/${encodeURIComponent(path)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('doorrepo.admin.token') ?? ''}` },
-      });
-      if (!res.ok) return;
-      const text = await res.text();
-      setViewingFile({ path, content: text });
-    } finally {
-      setViewingLoading(null);
-    }
   }
 
   function toggle(path: string) {
@@ -399,7 +372,7 @@ function StripAds({
                 className="accent-accent"
               />
               <span className="flex-1 truncate font-mono">{f.path}</span>
-              <button onClick={() => viewKeptFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
+              <button onClick={() => setViewing({ archiveName, path: f.path })} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
               <span className="text-muted">{preview.reason[f.path]}</span>
               <button
                 onClick={() => markKeptNotJunk(f.path)}
@@ -420,7 +393,7 @@ function StripAds({
                 return (
                   <li key={f.path} className="flex items-center gap-2 text-xs">
                     <span className="flex-1 truncate font-mono text-muted">{f.path}</span>
-                    <button onClick={() => viewKeptFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
+                    <button onClick={() => setViewing({ archiveName, path: f.path })} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
                     {isMarkedNotJunk ? (
                       <button
                         onClick={() => unmarkKeptNotJunk(f.path)}
@@ -458,29 +431,7 @@ function StripAds({
           </div>
         )}
       </div>
-      {viewingFile && (
-        <Dialog.Root open={true} onOpenChange={(open) => !open && setViewingFile(null)}>
-          <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
-            <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[min(60rem,94vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
-              <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-2">
-                <Dialog.Title className="truncate font-mono text-sm text-ink">{viewingFile.path}</Dialog.Title>
-                <Dialog.Close className="rounded p-1 text-muted hover:text-ink" aria-label="Close">
-                  <X size={16} />
-                </Dialog.Close>
-              </header>
-              <pre className="flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs text-ink">
-                {viewingFile.content}
-              </pre>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
-      )}
-      {viewingLoading && (
-        <div className="fixed bottom-4 right-4 rounded-md border border-line bg-surface px-3 py-2 text-xs text-muted shadow-lg">
-          Loading {viewingLoading}...
-        </div>
-      )}
+      <FileViewerDialog target={viewing} onClose={() => setViewing(null)} />
     </>
   );
   }

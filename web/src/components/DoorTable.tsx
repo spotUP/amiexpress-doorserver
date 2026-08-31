@@ -64,7 +64,12 @@ export function DoorTable({
   return (
     <>
       {/* Desktop table */}
-      <div className="hidden overflow-x-auto rounded-lg border border-line md:block">
+      {/* overflow-y-clip stops the CSS overflow spec from silently forcing
+          overflow-y to auto here (any non-'visible' overflow-x does that) -
+          without it this div becomes its own scroll container and the
+          thead's sticky top-0 sticks to ITS inert viewport instead of the
+          page's, so it never visibly sticks while scrolling the page. */}
+      <div className="hidden overflow-x-auto overflow-y-clip rounded-lg border border-line md:block">
         <table className="w-full min-w-[60rem] border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-surface text-left text-xs tracking-wide text-muted">
             <tr>

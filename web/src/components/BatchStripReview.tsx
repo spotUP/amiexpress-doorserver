@@ -2,8 +2,9 @@
  *  every candidate archive's flagged files, pre-checked, with per-file
  *  uncheck before the admin commits to stripping them. */
 import { useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { Eye, ShieldCheck } from 'lucide-react';
 import { Button } from './ui';
+import { FileViewerDialog } from './FileViewerDialog';
 import { useMarkNotJunk } from '../api/queries';
 import type { StripPreviewResult } from '../api/queries';
 
@@ -31,6 +32,7 @@ export function BatchStripReview({
   // from the checked set so they're never sent to batch-strip-apply.
   const [notJunk, setNotJunk] = useState<Set<string>>(new Set());
   const markNotJunk = useMarkNotJunk();
+  const [viewing, setViewing] = useState<{ archiveName: string; path: string } | null>(null);
 
   const toggle = (archiveName: string, path: string) => {
     setChecked((prev) => {
@@ -85,6 +87,13 @@ export function BatchStripReview({
                     />
                     <span className={`min-w-0 flex-1 break-all font-mono ${isNotJunk ? 'text-muted line-through' : ''}`}>{f.path}</span>
                     <span className="shrink-0 text-muted">({f.reason})</span>
+                    <button
+                      onClick={() => setViewing({ archiveName: c.archiveName, path: f.path })}
+                      className="shrink-0 rounded p-1 text-muted hover:bg-raised hover:text-accent"
+                      title="View file"
+                    >
+                      <Eye size={12} />
+                    </button>
                     {isNotJunk ? (
                       <span className="inline-flex shrink-0 items-center gap-0.5 rounded border border-success/40 bg-success/10 px-1 py-0.5 text-[10px] font-medium text-success">
                         <ShieldCheck size={10} /> not junk
@@ -127,6 +136,7 @@ export function BatchStripReview({
       >
         Confirm and strip {totalFiles} files across {totalArchives} archives
       </Button>
+      <FileViewerDialog target={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 }
