@@ -4,7 +4,18 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Eraser, Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
-import { useBatchHide, useBatchPatch, useBatchRestore, useDoors, useFacets, useLiveRevision, useMatchingArchiveNames } from '../api/queries';
+import {
+  useBatchDelete,
+  useBatchHide,
+  useBatchPatch,
+  useBatchReextract,
+  useBatchRestore,
+  useBatchTags,
+  useDoors,
+  useFacets,
+  useLiveRevision,
+  useMatchingArchiveNames,
+} from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
 import type { AdminUser, Door } from '../api/types';
@@ -98,6 +109,10 @@ export function Browse() {
   const batchHide = useBatchHide();
   const batchRestore = useBatchRestore();
   const batchPatch = useBatchPatch();
+  const batchTags = useBatchTags();
+  const batchDelete = useBatchDelete();
+  const batchReextract = useBatchReextract();
+  const [reextractJobId, setReextractJobId] = useState<string | null>(null);
   const matchingNames = useMatchingArchiveNames();
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1;
@@ -376,9 +391,9 @@ export function Browse() {
               onSuccess: () => clearSelection(),
             });
           }}
-          onRecategorize={(category) => {
+          onSetField={(field, value) => {
             batchPatch.mutate(
-              { archiveNames: [...selected], fields: { category } },
+              { archiveNames: [...selected], fields: { [field]: value } },
               { onSuccess: () => clearSelection() },
             );
           }}
@@ -388,8 +403,28 @@ export function Browse() {
               { onSuccess: () => clearSelection() },
             );
           }}
+          onTagsChange={(add, remove) => {
+            batchTags.mutate({ archiveNames: [...selected], add, remove });
+          }}
+          onDelete={(confirm) => {
+            batchDelete.mutate(
+              { archiveNames: [...selected], confirm },
+              { onSuccess: () => clearSelection() },
+            );
+          }}
+          onReextract={() => {
+            batchReextract.mutate([...selected], { onSuccess: (res) => setReextractJobId(res.jobId) });
+          }}
+          reextractJobId={reextractJobId}
           onClear={clearSelection}
-          isPending={batchHide.isPending || batchRestore.isPending || batchPatch.isPending}
+          isPending={
+            batchHide.isPending ||
+            batchRestore.isPending ||
+            batchPatch.isPending ||
+            batchTags.isPending ||
+            batchDelete.isPending ||
+            batchReextract.isPending
+          }
         />
       )}
 
