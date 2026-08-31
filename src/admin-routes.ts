@@ -27,7 +27,7 @@ import { analyzeArchive, isMatchAllGlob, type StripEntry } from './ami-stripper'
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
-import { createJob, runJobSequentially, getJob, setJobResult } from './batch-jobs';
+import { createJob, runJobSequentially, getJob, setJobResult, markJobFailed } from './batch-jobs';
 import * as fs from 'fs';
 
 /**
@@ -162,6 +162,24 @@ function reextractOneDoor(cfg: ServerConfig, archiveName: string, adminId: numbe
   } finally {
     db.close();
   }
+}
+
+/**
+ * Defense-in-depth backstop for the three `void runJobSequentially(...)`
+ * fire-and-forget call sites below. runJobSequentially itself now never
+ * throws (see its top-level try/catch in batch-jobs.ts) - this exists for
+ * anything that could still escape from outside it, e.g. a callback passed
+ * into it throwing after runJobSequentially's own promise has resolved.
+ * Reads the job's last-known progress so the terminal 'failed' event reports
+ * real numbers instead of zeros.
+ */
+function failJobOnEscape(cfg: ServerConfig, jobId: string, total: number): (e: unknown) => void {
+  return (e: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error(`[door-repo] job ${jobId} escaped with an unhandled error:`, e);
+    const job = getJob(cfg, jobId);
+    markJobFailed(cfg, jobId, job?.completed ?? 0, total, job?.failedCount ?? 0);
+  };
 }
 
 export function createAdminRouter(cfg: ServerConfig): Router {
@@ -453,7 +471,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     void runJobSequentially(cfg, jobId, body.archiveNames, (archiveName) => {
       const result = reextractOneDoor(cfg, archiveName, adminId);
       return 'error' in result ? { error: result.error } : { ok: true };
-    });
+    }).catch(failJobOnEscape(cfg, jobId, body.archiveNames.length));
     res.json({ jobId });
   });
 
@@ -1144,10 +1162,22 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   /** Preview strip candidates across many doors as a tracked job - phase 1
    *  of batch strip. Never deletes anything; a later batch-strip-apply
    *  needs the admin's reviewed selection first. The job's resultJson is
-   *  the review UI's own compact shape: {archiveName, stripped:{path,reason}[]}[],
-   *  built here (not by previewStripOne) from the full stripped+reason it
-   *  returns - archives with zero flagged files are included, not omitted,
-   *  so the UI can show "0 flagged" instead of silently skipping them. */
+   *  the review UI's own compact shape:
+   *  {archiveName, stripped:{path,reason}[], error?: string}[], built here
+   *  (not by previewStripOne) from the full stripped+reason it returns -
+   *  archives with zero flagged files are included, not omitted, so the UI
+   *  can show "0 flagged" instead of silently skipping them, and an archive
+   *  that failed to preview (e.g. its file is missing) gets an `error` entry
+   *  instead of vanishing from the review screen entirely.
+   *
+   *  `results` is written to `result_json` via runJobSequentially's
+   *  `onBeforeComplete` hook rather than a `.then()` chained onto its
+   *  returned promise - that guarantees the write lands BEFORE the terminal
+   *  'done' SSE event fires, so a client that reacts to 'done' by fetching
+   *  the job can never race the write (see Minor fix 2 in the fix-wave
+   *  spec: this used to work only because the microtask always beat the
+   *  client's HTTP round-trip).
+   */
   router.post('/doors/batch-strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const body = (req.body ?? {}) as { archiveNames?: string[] };
     if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
@@ -1155,18 +1185,25 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       return;
     }
     const jobId = createJob(cfg, 'strip-preview', body.archiveNames, req.admin?.id ?? null);
-    const results: { archiveName: string; stripped: { path: string; reason: string }[] }[] = [];
-    void runJobSequentially(cfg, jobId, body.archiveNames, (archiveName) => {
-      const result = previewStripOne(cfg, archiveName);
-      if ('error' in result) return { error: result.error };
-      results.push({
-        archiveName,
-        stripped: result.stripped.map((e) => ({ path: e.path, reason: result.reason[e.path] ?? 'pattern' })),
-      });
-      return { ok: true };
-    }).then(() => {
-      setJobResult(cfg, jobId, JSON.stringify(results));
-    });
+    const results: { archiveName: string; stripped: { path: string; reason: string }[]; error?: string }[] = [];
+    void runJobSequentially(
+      cfg,
+      jobId,
+      body.archiveNames,
+      (archiveName) => {
+        const result = previewStripOne(cfg, archiveName);
+        if ('error' in result) {
+          results.push({ archiveName, stripped: [], error: result.error });
+          return { error: result.error };
+        }
+        results.push({
+          archiveName,
+          stripped: result.stripped.map((e) => ({ path: e.path, reason: result.reason[e.path] ?? 'pattern' })),
+        });
+        return { ok: true };
+      },
+      () => setJobResult(cfg, jobId, JSON.stringify(results))
+    ).catch(failJobOnEscape(cfg, jobId, body.archiveNames.length));
     res.json({ jobId });
   });
 
@@ -1211,7 +1248,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         auditDb.close();
       }
       return { ok: true };
-    });
+    }).catch(failJobOnEscape(cfg, jobId, archiveNames.length));
     res.json({ jobId });
   });
 
