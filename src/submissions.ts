@@ -29,7 +29,7 @@ import * as path from 'path';
 import type { Request } from 'express';
 import Busboy from 'busboy';
 import type Database from 'better-sqlite3';
-import { readLhaContents, readZipContents } from './archive-reader';
+import { readLhaContents, readZipContents, readLzxContents } from './archive-reader';
 import { repackLzxToLha } from './repack-lzx';
 import {
   analyseDoor,
@@ -345,13 +345,14 @@ export function mergeOverrides(derived: DerivedMetadata, overrides: SubmitterOve
  * Author already filled in rather than as an empty row waiting for the next
  * corpus scan.
  *
- * LHA and ZIP can be read here (see ./archive-reader). For anything else
- * the fields come back empty and a curator fills them in.
+ * LHA, ZIP, and LZX can be read here (see ./archive-reader). For anything
+ * else the fields come back empty and a curator fills them in.
  */
 export function deriveMetadata(bytes: Buffer, archiveName: string, groupTags: ReadonlySet<string>): DerivedMetadata {
   const kind = sniffArchive(bytes.subarray(0, 16));
   const contents = kind === 'lha' ? readLhaContents(bytes)
     : kind === 'zip' ? readZipContents(bytes)
+    : kind === 'lzx' ? readLzxContents(bytes)
     : { files: [], fileIdDiz: null, docFilename: null, doc: null };
 
   const binaryName = pickProgram(contents.files, contents.fileIdDiz);
