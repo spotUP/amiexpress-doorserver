@@ -23,7 +23,7 @@ import { analyseDoor, buildGroupTags, fixCasing, fixTitleCasing, tidyCase } from
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides, type OverrideMap } from './effective';
 import { UploadError, approveSubmission, rejectSubmission, deriveMetadata } from './submissions';
 import type { ServerConfig } from './config';
-import { analyzeArchive } from './ami-stripper';
+import { analyzeArchive, isMatchAllGlob } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
@@ -1000,7 +1000,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     // pattern whose compiled form is anchored on both ends and contains
     // only wildcards. Without this guard, learning a single '*' file
     // would mark every future door as junk.
-    if (/^[*?]+$/.test(pattern) || /^\.\*(\.\*)*$/.test(pattern)) {
+    if (isMatchAllGlob(pattern)) {
       res.status(400).json({ error: `pattern '${pattern}' would match every file - refuse to learn` });
       return;
     }

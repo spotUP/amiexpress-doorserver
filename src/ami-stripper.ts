@@ -64,17 +64,28 @@ export interface FingerprintDb {
   [md5: string]: { filename: string; archiveCount: number };
 }
 
+/**
+ * A glob that would match every filename: bare '*'/'?' runs, or a compiled
+ * regex of only '.*' groups. Ad-randomizers frequently name their payload
+ * a single '*' (see ILLEGAL_FILENAME_CHARS below) — "learning" that literal
+ * filename as a junk pattern must never be allowed to reach the classifier,
+ * or every future archive's preview turns into "everything is junk".
+ * The single source of truth: called both where patterns are written
+ * (the /learn routes, so a bad pattern can't get into the DB) and where
+ * they're read for classification (analyzeArchive, so any pattern that
+ * slipped in some other way — old data, a future new call site — still
+ * can't nuke every archive in the catalog).
+ */
+export function isMatchAllGlob(pattern: string): boolean {
+  return /^[*?]+$/.test(pattern) || /^\.\*(\.\*)*$/.test(pattern);
+}
+
 function loadPatterns(): PatternDb {
   if (!fs.existsSync(PATTERNS_JSON)) {
     return { filenamePatterns: [], dizPatterns: [] };
   }
   const loaded = JSON.parse(fs.readFileSync(PATTERNS_JSON, 'utf-8')) as PatternDb;
-  // Filter out patterns that would match every file. A glob of just '*'
-  // or '?' or '.*.*.*...' would mark every archive member as junk on
-  // the next preview. The POST /learn route already refuses to insert
-  // these, so this is a belt-and-suspenders for data the file might
-  // have picked up before that guard was added.
-  const safeGlobs = (loaded.filenamePatterns ?? []).filter((p) => !/^[*?]+$/.test(p) && !/^\.\*(\.\*)*$/.test(p));
+  const safeGlobs = (loaded.filenamePatterns ?? []).filter((p) => !isMatchAllGlob(p));
   return { filenamePatterns: safeGlobs, dizPatterns: loaded.dizPatterns ?? [] };
 }
 
@@ -415,8 +426,9 @@ function extractZipMember(bytes: Buffer, targetPath: string): Buffer | null {
 export function analyzeArchive(archivePath: string, extraPatterns?: string[], preservePaths?: Set<string>): StripResult {
   const patterns = loadPatterns();
   const fingerprints = loadFingerprints();
-  const allPatterns = extraPatterns
-    ? [...patterns.filenamePatterns, ...extraPatterns]
+  const safeExtra = extraPatterns?.filter((p) => !isMatchAllGlob(p));
+  const allPatterns = safeExtra && safeExtra.length > 0
+    ? [...patterns.filenamePatterns, ...safeExtra]
     : patterns.filenamePatterns;
   const files = readArchiveFiles(archivePath);
   const plan = deriveStripPlan(files, allPatterns, fingerprints, patterns.dizPatterns);

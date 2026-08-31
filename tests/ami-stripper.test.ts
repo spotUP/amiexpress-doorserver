@@ -191,6 +191,26 @@ describe('analyzeArchive', () => {
     fs.writeFileSync(rarPath, Buffer.from('not really RAR'));
     expect(() => analyzeArchive(rarPath)).toThrow(/unsupported/i);
   });
+
+  it('ignores a bare "*" extra pattern instead of flagging every file as junk', () => {
+    // Ad-randomizers often name their payload a literal '*'. If that
+    // filename is ever "learned" as a junk pattern (e.g. a bad row already
+    // in learned_junk_patterns, or a future call site that forgets to
+    // guard on write), analyzeArchive must not let it nuke every member of
+    // every other archive it previews.
+    const zipPath = writeZip([
+      { name: 'DOOR.FIM', content: 'binary door bytes' },
+      { name: 'TOTALLY_SAFE_FILE.TXT', content: 'legit door documentation' },
+      { name: '*', content: 'the ad-randomizer payload itself' },
+    ]);
+
+    const result = analyzeArchive(zipPath, ['*']);
+    expect(result.kept.map((e) => e.path)).toContain('DOOR.FIM');
+    expect(result.kept.map((e) => e.path)).toContain('TOTALLY_SAFE_FILE.TXT');
+    // The literal '*' member is still caught on its own merits
+    // (ILLEGAL_FILENAME_CHARS), just not via the poisoned glob.
+    expect(result.stripped.map((e) => e.path)).toEqual(['*']);
+  });
 });
 
 // ─── stripArchive (ZIP repack) ────────────────────────────────────────────────

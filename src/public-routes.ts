@@ -18,6 +18,7 @@ import { analyseDoor, buildGroupTags, readName, type NameSource } from './descri
 import { applyOverrides, hiddenExclusion, isOverridden, loadOverrides, type OverrideMap } from './effective';
 import { AmigaGuideParser } from './amigaguide-parser';
 import { UploadError, discardBody, receiveUpload, storeSubmission } from './submissions';
+import { isMatchAllGlob } from './ami-stripper';
 import type { ServerConfig } from './config';
 
 const DEFAULT_PER_PAGE = 50;
@@ -814,6 +815,12 @@ export function mountLearnRoute(router: Router, cfg: ServerConfig): void {
     const pattern = typeof body.pattern === 'string' ? body.pattern.trim() : '';
     if (!pattern) {
       res.status(400).json({ error: 'pattern is required' });
+      return;
+    }
+    // Same guard as the admin /learn route: a bare '*'/'?' pattern would
+    // mark every future archive's preview as all-junk.
+    if (isMatchAllGlob(pattern)) {
+      res.status(400).json({ error: `pattern '${pattern}' would match every file - refuse to learn` });
       return;
     }
     const archiveName = typeof body.archiveName === 'string' ? body.archiveName : null;
