@@ -4,7 +4,7 @@
  * reloads to show new data loses the reader's place.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './client';
 import type {
   AdminDoor,
@@ -294,6 +294,27 @@ export function useTidyCase() {
   });
 }
 
+// Module-level singleton: one EventSource for the whole app, opened by
+// whichever of useLiveRevision/useJobProgress mounts first, closed when
+// the last one unmounts. Avoids a second SSE connection per browser tab.
+let sharedSource: EventSource | null = null;
+let sharedSourceRefCount = 0;
+
+function acquireEventSource(): EventSource {
+  if (!sharedSource) sharedSource = new EventSource('/api/door-repo/events');
+  sharedSourceRefCount++;
+  return sharedSource;
+}
+
+function releaseEventSource(): void {
+  sharedSourceRefCount--;
+  if (sharedSourceRefCount <= 0 && sharedSource) {
+    sharedSource.close();
+    sharedSource = null;
+    sharedSourceRefCount = 0;
+  }
+}
+
 /**
  * The catalog announces its own revision over SSE. When it changes - someone
  * else edited a door, a submission was approved, a re-scan landed - every
@@ -303,18 +324,55 @@ export function useLiveRevision(): void {
   const client = useQueryClient();
   useEffect(() => {
     let seen: string | null = null;
-    const source = new EventSource('/api/door-repo/events');
-    source.addEventListener('revision', (event) => {
+    const source = acquireEventSource();
+    const handler = (event: Event) => {
       const { revision } = JSON.parse((event as MessageEvent<string>).data) as { revision: string };
       if (seen !== null && revision !== seen) {
         void client.invalidateQueries({ queryKey: doorKeys.all });
         void client.invalidateQueries({ queryKey: doorKeys.facets });
       }
       seen = revision;
-    });
+    };
+    source.addEventListener('revision', handler);
     // EventSource reconnects on its own; nothing to do on error but let it.
-    return () => source.close();
+    return () => {
+      source.removeEventListener('revision', handler);
+      releaseEventSource();
+    };
   }, [client]);
+}
+
+export interface JobProgress {
+  status: 'running' | 'done' | 'failed';
+  completed: number;
+  total: number;
+  failedCount: number;
+}
+
+/**
+ * Live progress for a single background job (batch-reextract, batch-strip,
+ * ...), backed by the same shared SSE connection useLiveRevision uses.
+ */
+export function useJobProgress(jobId: string | null): JobProgress | null {
+  const [progress, setProgress] = useState<JobProgress | null>(null);
+  useEffect(() => {
+    if (!jobId) {
+      setProgress(null);
+      return;
+    }
+    const source = acquireEventSource();
+    const handler = (event: Event) => {
+      const data = JSON.parse((event as MessageEvent<string>).data) as JobProgress & { jobId: string };
+      if (data.jobId !== jobId) return;
+      setProgress({ status: data.status as JobProgress['status'], completed: data.completed, total: data.total, failedCount: data.failedCount });
+    };
+    source.addEventListener('job', handler);
+    return () => {
+      source.removeEventListener('job', handler);
+      releaseEventSource();
+    };
+  }, [jobId]);
+  return progress;
 }
 
 // ─── archive stripping ─────────────────────────────────────────────────
