@@ -27,6 +27,7 @@ import { analyzeArchive, isMatchAllGlob } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
+import { getJob } from './batch-jobs';
 import * as fs from 'fs';
 
 /**
@@ -654,6 +655,17 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     } finally {
       db.close();
     }
+  });
+
+  /** Current state of a bulk job - for a client reconnecting after a refresh. */
+  router.get('/jobs/:id', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const id = Array.isArray(req.params.id) ? '' : req.params.id;
+    const job = getJob(cfg, id);
+    if (!job) {
+      res.status(404).json({ error: 'no such job' });
+      return;
+    }
+    res.json(job);
   });
 
   // ─── batch operations ────────────────────────────────────────────────

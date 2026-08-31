@@ -726,6 +726,23 @@ const clients = new Set<Response>();
 let poller: NodeJS.Timeout | null = null;
 let lastRevision: string | null = null;
 
+/**
+ * Pushes a bulk-job progress update over the same SSE connections the
+ * catalog-revision broadcast already uses - one open connection per
+ * browser tab, not a second stream per job.
+ */
+export function broadcastJobEvent(payload: {
+  jobId: string;
+  status: string;
+  completed: number;
+  total: number;
+  failedCount: number;
+}): void {
+  for (const client of clients) {
+    client.write(`event: job\ndata: ${JSON.stringify(payload)}\n\n`);
+  }
+}
+
 const POLL_MS = 2000;
 const KEEPALIVE_MS = 25000;
 
