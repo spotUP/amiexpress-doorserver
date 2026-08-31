@@ -38,6 +38,8 @@ import {
   getDoorCount,
   resolveArchivePath,
 } from './catalog';
+import { openDb } from './db';
+import { freshArchiveFiles } from './classify';
 import type { ServerConfig } from './config';
 
 function parseManifestQuery(req: Request): { type?: string; q?: string } {
@@ -387,7 +389,19 @@ export function createRouter(cfg: ServerConfig): express.Router {
       return;
     }
 
-    const files = getArchiveFiles(cfg, entry.id);
+    // Classified through classify.ts, the same path the admin strip preview
+    // uses - learned patterns and the per-archive keep-list included. Before
+    // this, the door read is_junk as stored at index time while the admin UI
+    // showed a live answer, so the two disagreed about what was an ad and
+    // the door's ad-stripping left files behind that the operator had been
+    // told were ads.
+    let files;
+    const wdb = openDb(cfg);
+    try {
+      files = freshArchiveFiles(wdb, entry.id, entry.archive_name, resolveArchivePath(cfg, entry.archive_path));
+    } finally {
+      wdb.close();
+    }
     const junk = files.filter((f) => f.is_junk).length;
 
     const lines: string[] = [`FILES|${files.length}|${junk}`];

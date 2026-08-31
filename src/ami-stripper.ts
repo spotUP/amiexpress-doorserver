@@ -89,6 +89,27 @@ function loadPatterns(): PatternDb {
   return { filenamePatterns: safeGlobs, dizPatterns: loaded.dizPatterns ?? [] };
 }
 
+/**
+ * A stamp that changes whenever the seed rule files change.
+ *
+ * classify.ts folds this into the per-archive classification fingerprint,
+ * so growing the pattern set re-classifies every archive on next read
+ * rather than leaving old rows saying what they said in whatever week they
+ * were indexed. Size and mtime, not a content hash: these files are a few
+ * hundred KB and this is called on every /files request.
+ */
+export function patternSetStamp(): string {
+  const stamp = (file: string): string => {
+    try {
+      const st = fs.statSync(file);
+      return `${st.size}:${Math.floor(st.mtimeMs)}`;
+    } catch {
+      return 'absent';
+    }
+  };
+  return `${stamp(PATTERNS_JSON)}/${stamp(FINGERPRINTS_JSON)}`;
+}
+
 function loadFingerprints(): FingerprintDb {
   if (!fs.existsSync(FINGERPRINTS_JSON)) return {};
   return JSON.parse(fs.readFileSync(FINGERPRINTS_JSON, 'utf-8'));

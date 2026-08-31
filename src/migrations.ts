@@ -286,6 +286,24 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 14,
+    name: 'door_catalog.classified_fp',
+    up: (db) => {
+      // Fingerprint of everything that fed the last ad/junk classification
+      // for this archive: its own size and mtime, the seed rule files, the
+      // learned patterns and the per-archive keep-list. classify.ts
+      // re-classifies whenever it stops matching, which is what stops the
+      // door and the admin UI disagreeing about what is an ad.
+      //
+      // NULL on every existing row deliberately: nothing has been verified
+      // against the current rules, so the first read of each archive
+      // re-classifies it once and then settles.
+      if (!hasColumn(db, 'door_catalog', 'classified_fp')) {
+        db.exec('ALTER TABLE door_catalog ADD COLUMN classified_fp TEXT');
+      }
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {

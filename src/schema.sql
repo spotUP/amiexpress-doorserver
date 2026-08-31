@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS door_catalog (
   archive_size        INTEGER DEFAULT 0,
   junk_count          INTEGER DEFAULT 0,
   ads_stripped        INTEGER DEFAULT 0,
+  -- Fingerprint of the inputs behind the last ad/junk classification; see
+  -- classify.ts. NULL means "never verified against the current rules".
+  classified_fp       TEXT,
   corpus_id           TEXT,
   source              TEXT DEFAULT 'scan',
   indexed_at          INTEGER DEFAULT (strftime('%s','now')),

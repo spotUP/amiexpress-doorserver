@@ -13,7 +13,8 @@ import express, { type Request, type Response, type Router } from 'express';
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import { openDb } from './db';
-import { getCatalogRevision, getArchiveFiles, getCatalogEntryByArchive } from './catalog';
+import { getCatalogRevision, getCatalogEntryByArchive, resolveArchivePath } from './catalog';
+import { freshArchiveFiles } from './classify';
 import { analyseDoor, buildGroupTags, readName, type NameSource } from './describe';
 import { applyOverrides, hiddenExclusion, isOverridden, loadOverrides, type OverrideMap } from './effective';
 import { AmigaGuideParser } from './amigaguide-parser';
@@ -437,7 +438,12 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       suggestedTooltypes: entry.suggested_tooltypes,
       docFormat: isAmigaGuide(entry.doc_raw) ? 'amigaguide' : 'text',
       guide: parseGuide(entry.doc_raw),
-      files: getArchiveFiles(cfg, entry.id).map((f) => ({
+      // classify.ts, not the stored rows: this list sits beside the strip
+      // preview in the admin UI, and the preview has always classified live.
+      // Reading is_junk as written at index time made the two disagree on
+      // the same screen - the preview offering to strip a file the list
+      // above it showed as ordinary.
+      files: freshFilesFor(cfg, entry.id, entry.archive_name, entry.archive_path).map((f) => ({
         path: f.path,
         size: f.size,
         isJunk: f.is_junk === 1,
@@ -445,6 +451,21 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       })),
     });
   });
+
+  /** One archive's files, classified against the CURRENT rules. */
+  function freshFilesFor(
+    c: ServerConfig,
+    catalogId: string,
+    archiveName: string,
+    archivePath: string
+  ) {
+    const wdb = openDb(c);
+    try {
+      return freshArchiveFiles(wdb, catalogId, archiveName, resolveArchivePath(c, archivePath));
+    } finally {
+      wdb.close();
+    }
+  }
 
   /** What the filter dropdowns offer, with counts. */
   router.get('/facets', (_req: Request, res: Response) => {
