@@ -74,6 +74,13 @@ export function useDoors(query: DoorQuery) {
   });
 }
 
+export function useMatchingArchiveNames() {
+  return useMutation({
+    mutationFn: (params: URLSearchParams) =>
+      api.get<{ archiveNames: string[] }>(`/doors?${params.toString()}&fields=archiveName`),
+  });
+}
+
 export function useDoor(archiveName: string | null) {
   return useQuery({
     queryKey: doorKeys.detail(archiveName ?? ''),
