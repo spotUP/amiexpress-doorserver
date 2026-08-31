@@ -457,10 +457,14 @@ export function Browse() {
           </span>
           <Button variant="ghost" onClick={() => setStripApplySummaryDismissed(true)}>Dismiss</Button>
         </div>
-      ) : admin && stripPreviewJobId && stripPreviewProgress && stripPreviewProgress.status === 'running' ? (
+      ) : admin && (batchStripPreview.isPending || (stripPreviewJobId && (!stripPreviewProgress || stripPreviewProgress.status === 'running'))) ? (
         <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
           <RefreshCw size={14} className="animate-spin text-accent" />
-          <span>Previewing strip candidates {stripPreviewProgress.completed} / {stripPreviewProgress.total}</span>
+          <span>
+            {stripPreviewProgress
+              ? `Previewing strip candidates ${stripPreviewProgress.completed} / ${stripPreviewProgress.total}`
+              : 'Starting strip preview...'}
+          </span>
         </div>
       ) : admin && stripCandidates ? (
         <BatchStripReview
