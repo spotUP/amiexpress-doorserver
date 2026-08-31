@@ -177,6 +177,15 @@ export function useBatchRestore() {
   });
 }
 
+export function useBatchTags() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { archiveNames: string[]; add: string[]; remove: string[] }) =>
+      api.post<{ ok: boolean; results: BatchResult[] }>('/admin/doors/batch-tags', args),
+    onSuccess: () => invalidateEverything(client),
+  });
+}
+
 export function useBatchPatch() {
   const client = useQueryClient();
   return useMutation({

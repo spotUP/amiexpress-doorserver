@@ -739,6 +739,42 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
   });
 
+  /** Add/remove tags across multiple doors at once (additive, unlike the
+   *  single-door PATCH which replaces the whole tag set). */
+  router.post('/doors/batch-tags', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[]; add?: string[]; remove?: string[] };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const add = (body.add ?? []).filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+    const remove = (body.remove ?? []).filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+    const db = openDb(cfg);
+    try {
+      const lookup = db.prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE');
+      const insTag = db.prepare('INSERT OR IGNORE INTO door_tags (catalog_id, tag, added_by) VALUES (?, ?, ?)');
+      const delTag = db.prepare('DELETE FROM door_tags WHERE catalog_id = ? AND tag = ?');
+      const results: { archiveName: string; ok: boolean; error?: string }[] = [];
+      const write = db.transaction(() => {
+        for (const archiveName of body.archiveNames!) {
+          const row = lookup.get(archiveName) as { id: string } | undefined;
+          if (!row) {
+            results.push({ archiveName, ok: false, error: 'not found' });
+            continue;
+          }
+          for (const tag of add) insTag.run(row.id, tag.trim().toLowerCase(), req.admin?.id ?? null);
+          for (const tag of remove) delTag.run(row.id, tag.trim().toLowerCase());
+          recordAudit(db, req.admin?.id ?? null, 'edit-tags', row.id, { archiveName, add, remove });
+          results.push({ archiveName, ok: true });
+        }
+      });
+      write();
+      res.json({ ok: true, results });
+    } finally {
+      db.close();
+    }
+  });
+
   /** Edit fields on multiple doors at once. */
   router.post('/doors/batch-patch', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
     const body = (req.body ?? {}) as { archiveNames?: string[]; fields?: Record<string, unknown> };

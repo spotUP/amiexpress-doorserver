@@ -244,6 +244,23 @@ describe('GET /admin/jobs/:id', () => {
   });
 });
 
+describe('POST /admin/doors/batch-tags', () => {
+  it('adds and removes tags across multiple doors, skipping an unknown archive', async () => {
+    await request(app()).patch(admin('/doors/ACC-V103.LHA/tags')).set(auth()).send({ tags: ['keep-me'] });
+    const res = await request(app())
+      .post(admin('/doors/batch-tags'))
+      .set(auth())
+      .send({ archiveNames: ['ACC-V103.LHA', 'NOPE.LHA'], add: ['fresh'], remove: ['keep-me'] });
+    expect(res.status).toBe(200);
+    expect(res.body.results).toEqual([
+      { archiveName: 'ACC-V103.LHA', ok: true },
+      { archiveName: 'NOPE.LHA', ok: false, error: 'not found' },
+    ]);
+    const tagsRes = await request(app()).get(admin('/doors/ACC-V103.LHA/tags')).set(auth());
+    expect(tagsRes.body.tags).toEqual(['fresh']);
+  });
+});
+
 describe('POST /admin/tidy-case', () => {
   it('normalises eLi7e casing to sentence case', async () => {
     const res = await request(app())
