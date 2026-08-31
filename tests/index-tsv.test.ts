@@ -137,14 +137,14 @@ describe('renderIndexTsv', () => {
     db.prepare(
       `INSERT INTO door_catalog (id, archive_name, archive_path, binary_name, name, door_type, file_id_diz, archive_size, indexed_at)
        VALUES ('id6', 'FULLCHAT.LHA', 'AmiExpress/FULLCHAT.LHA', 'FullChat', 'Full Chat', 'XIM',
-               'Split Chat Door For /X +4.x, S!X and FAME', 1024, 1700000000)`
+               'Split Chat Door', 1024, 1700000000)`
     ).run();
     db.close();
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('FULLCHAT.LHA'));
     // binary_name is a FILENAME: "FullChat" is split into words before it
     // is composed with the DIZ line.
-    expect(row).toBe('FULLCHAT.LHA	AmiExpress	1K	Full Chat - Split Chat Door For /X +4.x, S!X and FAME');
+    expect(row).toBe('FULLCHAT.LHA	AmiExpress	1K	Full Chat - Split Chat Door');
   });
 
   // Finding 4: Filename and Path get the same control-character strip

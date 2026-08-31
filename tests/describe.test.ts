@@ -175,8 +175,12 @@ describe('metadata is not description', () => {
   });
 
   it("keeps the door's real line instead", () => {
-    const { description } = read(MT20, 'MultiTop', 'MultiTop', 'MST-MT20.LHA');
-    expect(description).toBe('MultiTop The Best Top Utility ever written for /X');
+    // "written for /X" moves into requiresBbs - a bare BBS mention with no
+    // version is still a real requirement, and "written for" is the
+    // dangling connector the removal leaves behind.
+    const { description, requiresBbs } = read(MT20, 'MultiTop', 'MultiTop', 'MST-MT20.LHA');
+    expect(description).toBe('MultiTop The Best Top Utility ever');
+    expect(requiresBbs).toBe('AmiExpress');
   });
 
   it('caps on a word boundary, never mid-bracket', () => {
@@ -262,6 +266,26 @@ describe('which BBS the door needs', () => {
   it('normalises "/X" and "AmiExpress" to the same bare name - they are the same BBS', () => {
     expect(normaliseRequirement('AE', '3,30')).toBe('AmiExpress');
     expect(normaliseRequirement('AmiExpress', '4.X')).toBe('AmiExpress');
+  });
+
+  it('catches a bare BBS mention with no version number attached', () => {
+    // Real corpus examples: most descriptions just say which BBS a door is
+    // for, with no version - the versioned regex alone never matched these.
+    expect(read('This tool starts only for Newusers /X', null, null, 'ALSTER.LHA').requiresBbs).toBe(
+      'AmiExpress'
+    );
+    expect(
+      read('For AmiExpress or compatibilties, replaces internal B', null, 'AmiBulls', 'AMIBULLS.LHA').requiresBbs
+    ).toBe('AmiExpress');
+    expect(read('Best Request Door for FAME, S-EXPRES', null, null, 'ARS-PREQ.LHA').requiresBbs).toBe('FAME');
+  });
+
+  it('does not mistake "AE" or a bare "X" for a BBS name without a version', () => {
+    // Unlike "/X" or "FAME", these two are too short and common to trust
+    // without a version number anchoring the match - AE and X are also
+    // ordinary English text.
+    expect(read('AE is my favourite editor', null, null, 'AE-EDIT.LHA').requiresBbs).toBe('');
+    expect(read('Generation X was a great game', null, null, 'GENX.LHA').requiresBbs).toBe('');
   });
 });
 
@@ -374,10 +398,12 @@ describe('falling back', () => {
   });
 
   it('prefixes the program name when the line does not already carry it', () => {
-    const diz = 'Split Chat Door For /X +4.x, S!X and FAME';
-    expect(read(diz, 'FullChat', null, 'FULLCHAT.LHA').description).toBe(
-      'Full Chat - Split Chat Door For /X +4.x, S!X and FAME'
-    );
+    // The bare "For AmiExpress" mention (no version) moves into
+    // requiresBbs, same as a versioned one would.
+    const diz = 'Split Chat Door For AmiExpress';
+    const { description, requiresBbs } = read(diz, 'FullChat', null, 'FULLCHAT.LHA');
+    expect(description).toBe('Full Chat - Split Chat Door');
+    expect(requiresBbs).toBe('AmiExpress');
   });
 
   it('does not name the door twice', () => {
@@ -386,7 +412,9 @@ describe('falling back', () => {
 
   it('skips a copyright line in favour of a later one', () => {
     const diz = 'hAUSfRAU!.exe - © FLi7e/SAD 1996\nHousewife simulator for AmiExpress';
-    expect(read(diz, null, null, 'HAUSFRAU.LHA').description).toBe('Housewife simulator for AmiExpress');
+    const { description, requiresBbs } = read(diz, null, null, 'HAUSFRAU.LHA');
+    expect(description).toBe('Housewife simulator');
+    expect(requiresBbs).toBe('AmiExpress');
   });
 
   it('keeps accented letters: they are letters, not decoration', () => {

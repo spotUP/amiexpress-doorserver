@@ -435,6 +435,17 @@ const BBS_NAMES: Record<string, string> = {
 const BBS_REQ_RE =
   /(?:\b(?:for|only\s+for|requires?|required|needs?|works?\s+(?:only\s+)?(?:with|on)|coded\s+for|written\s+for|compatible\s+with)\b\s*[:-]?\s*)?(?<![A-Za-zÀ-ÿ0-9])(\/X|Ami-?Express|S!X|FAME|DayDream|Tempest|CNet|AE|X)\s*(?:v(?:er(?:sion)?)?\.?\s*)?(\d{1,2}(?:[.,](?:[0-9]{1,3}[a-z]?|[xX]{1,3}))?\+?)/i;
 
+/**
+ * A bare BBS-name mention with no version attached - "for /X", "AmiExpress
+ * or compatibilities", "col Dor for /X, S-EXPRES". BBS_REQ_RE needs a
+ * trailing version number to anchor a match, which most such mentions
+ * never give it, but the mention alone is enough to know which BBS a door
+ * targets (the version simply isn't stated). "AE" and bare "X" are left
+ * out here - both are common short tokens with no distinctive shape when
+ * unversioned, so unlike "/X" or "FAME" they would false-positive constantly.
+ */
+const BARE_BBS_RE = /\/X\b|\bAmi-?Express\b|\bS!X\b|\bFAME\b|\bDayDream\b|\bTempest\b|\bCNet\b/i;
+
 export function normaliseRequirement(name: string, ver: string): string {
   const key = name.toLowerCase().replace(/-/g, '');
   const bbs = BBS_NAMES[key] ?? name;
@@ -452,19 +463,28 @@ export function normaliseRequirement(name: string, ver: string): string {
     // a wildcard for "any point release", not a more/less precise version.
     version = version.slice(0, dot + 1) + version.slice(dot + 1).replace(/X+/gi, 'x');
   }
-  return `${bbs} ${version}`;
+  return version ? `${bbs} ${version}` : bbs;
 }
 
-export function splitBbsRequirement(desc: string): { text: string; requires: string } {
-  if (!desc) return { text: desc, requires: '' };
-  const m = BBS_REQ_RE.exec(desc);
-  if (!m) return { text: desc, requires: '' };
-  const requires = normaliseRequirement(m[1], m[2]);
+function stripBbsMatch(
+  desc: string,
+  m: RegExpExecArray,
+  requires: string
+): { text: string; requires: string } {
   const rest = stripFrameBoth(collapse(`${desc.slice(0, m.index)} ${desc.slice(m.index + m[0].length)}`)).trim();
   // A row that says nothing BUT which BBS it needs keeps saying it: the
   // requirement is then all the description has.
   if (!/[A-Za-zÀ-ÿ]{3}/.test(rest)) return { text: desc, requires };
   return { text: rest, requires };
+}
+
+export function splitBbsRequirement(desc: string): { text: string; requires: string } {
+  if (!desc) return { text: desc, requires: '' };
+  const m = BBS_REQ_RE.exec(desc);
+  if (m) return stripBbsMatch(desc, m, normaliseRequirement(m[1], m[2]));
+  const bare = BARE_BBS_RE.exec(desc);
+  if (bare) return stripBbsMatch(desc, bare, normaliseRequirement(bare[0], ''));
+  return { text: desc, requires: '' };
 }
 
 /**
@@ -474,14 +494,25 @@ export function splitBbsRequirement(desc: string): { text: string; requires: str
  */
 export function bbsRequirementFromDiz(diz: string | null): string {
   if (!diz) return '';
-  for (const raw of diz.replace(/\r/g, '').split('\n')) {
-    // Raw, minus control codes only: every tidy-up in this module strips
-    // frame characters off the ends, and "/X 3.38+" sits flush against the
-    // box border - so the "+", the whole difference between "3.38" and
-    // "3.38 or later", would be stripped as decoration.
-    const line = raw.replace(ANSI_RE, '').replace(/[\x00-\x1f\x7f]/g, ' ');
+  // Raw, minus control codes only: every tidy-up in this module strips
+  // frame characters off the ends, and "/X 3.38+" sits flush against the
+  // box border - so the "+", the whole difference between "3.38" and
+  // "3.38 or later", would be stripped as decoration.
+  const lines = diz
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((raw) => raw.replace(ANSI_RE, '').replace(/[\x00-\x1f\x7f]/g, ' '));
+  for (const line of lines) {
     const m = BBS_REQ_RE.exec(line);
     if (m) return normaliseRequirement(m[1], m[2]);
+  }
+  // Versioned match failed for every line - try a bare mention before
+  // giving up. A second pass, not folded into the loop above, so a late
+  // bare "/X" never wins over an earlier versioned "FAME 1.30" elsewhere
+  // in the same DIZ.
+  for (const line of lines) {
+    const bare = BARE_BBS_RE.exec(line);
+    if (bare) return normaliseRequirement(bare[0], '');
   }
   return '';
 }
