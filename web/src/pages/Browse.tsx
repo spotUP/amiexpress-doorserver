@@ -341,24 +341,24 @@ export function Browse() {
           onHide={() => {
             const names = [...selected];
             batchHide.mutate(names.map((archiveName) => ({ archiveName, reason: 'batch hide' })), {
-              onSuccess: () => setSelected(new Set()),
+              onSuccess: () => clearSelection(),
             });
           }}
           onRestore={() => {
             batchRestore.mutate([...selected], {
-              onSuccess: () => setSelected(new Set()),
+              onSuccess: () => clearSelection(),
             });
           }}
           onRecategorize={(category) => {
             batchPatch.mutate(
               { archiveNames: [...selected], fields: { category } },
-              { onSuccess: () => setSelected(new Set()) },
+              { onSuccess: () => clearSelection() },
             );
           }}
           onFixCasing={() => {
             batchPatch.mutate(
               { archiveNames: [...selected], fields: { description: '__FIX_CASING__', name: '__FIX_TITLE_CASING__' } },
-              { onSuccess: () => setSelected(new Set()) },
+              { onSuccess: () => clearSelection() },
             );
           }}
           onClear={clearSelection}
