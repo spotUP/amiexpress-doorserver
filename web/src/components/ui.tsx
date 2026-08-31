@@ -5,7 +5,7 @@
 import * as React from 'react';
 import * as RadixTooltip from '@radix-ui/react-tooltip';
 import * as RadixSelect from '@radix-ui/react-select';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, X } from 'lucide-react';
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ');
@@ -156,4 +156,48 @@ function Item({ value, children }: { value: string; children: React.ReactNode })
 /** Bytes as a door listing shows them: whole KB, or bytes under 1 KB. */
 export function formatSize(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} K`;
+}
+
+// ─── toasts ───────────────────────────────────────────────────────────
+// Transient feedback for actions that have no other visible result (a
+// batch mutation that doesn't open a job/progress panel would otherwise
+// succeed or fail in total silence).
+
+export interface ToastMessage {
+  id: number;
+  text: string;
+  variant?: 'success' | 'error';
+}
+
+export function ToastStack({
+  toasts,
+  onDismiss,
+}: {
+  toasts: ToastMessage[];
+  onDismiss: (id: number) => void;
+}) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={cx(
+            'pointer-events-auto flex items-center gap-2 rounded-md border bg-raised px-3 py-2 text-sm shadow-lg',
+            t.variant === 'error' ? 'border-danger text-danger' : 'border-line text-ink'
+          )}
+        >
+          <span>{t.text}</span>
+          <button
+            type="button"
+            onClick={() => onDismiss(t.id)}
+            className="text-muted hover:text-ink"
+            aria-label="Dismiss"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }

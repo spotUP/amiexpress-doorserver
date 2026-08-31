@@ -35,9 +35,11 @@ import { SubmitDialog } from '../components/SubmitDialog';
 import { BatchToolbar } from '../components/BatchToolbar';
 import { BatchStripReview } from '../components/BatchStripReview';
 import { SavedSearches } from '../components/SavedSearches';
-import { Button, Input, Select } from '../components/ui';
+import { Button, Input, Select, ToastStack, type ToastMessage } from '../components/ui';
 
 const PER_PAGE = 50;
+
+let toastIdCounter = 0;
 
 export function Browse() {
   const [search, setSearch] = useState('');
@@ -110,6 +112,23 @@ export function Browse() {
   );
   const { data, isLoading } = useDoors(query);
   const { data: facets } = useFacets();
+
+  // Transient feedback for the batch actions that have no other visible
+  // result (no progress bar, no job) - they used to succeed or fail in
+  // total silence.
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const pushToast = useCallback((text: string, variant: ToastMessage['variant'] = 'success') => {
+    const id = toastIdCounter++;
+    setToasts((prev) => [...prev, { id, text, variant }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  }, []);
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+  const toastOnError = useCallback(
+    (verb: string) => (err: unknown) => pushToast(`${verb} failed: ${err instanceof Error ? err.message : String(err)}`, 'error'),
+    [pushToast]
+  );
 
   const batchHide = useBatchHide();
   const batchRestore = useBatchRestore();
@@ -458,33 +477,55 @@ export function Browse() {
           onHide={() => {
             const names = [...selected];
             batchHide.mutate(names.map((archiveName) => ({ archiveName, reason: 'batch hide' })), {
-              onSuccess: () => clearSelection(),
+              onSuccess: () => { clearSelection(); pushToast(`Hid ${names.length} door${names.length === 1 ? '' : 's'}`); },
+              onError: toastOnError('Hide'),
             });
           }}
           onRestore={() => {
-            batchRestore.mutate([...selected], {
-              onSuccess: () => clearSelection(),
+            const names = [...selected];
+            batchRestore.mutate(names, {
+              onSuccess: () => { clearSelection(); pushToast(`Restored ${names.length} door${names.length === 1 ? '' : 's'}`); },
+              onError: toastOnError('Restore'),
             });
           }}
           onSetField={(field, value) => {
+            const names = [...selected];
             batchPatch.mutate(
-              { archiveNames: [...selected], fields: { [field]: value } },
-              { onSuccess: () => clearSelection() },
+              { archiveNames: names, fields: { [field]: value } },
+              {
+                onSuccess: () => { clearSelection(); pushToast(`Set ${field} on ${names.length} door${names.length === 1 ? '' : 's'}`); },
+                onError: toastOnError('Field update'),
+              },
             );
           }}
           onFixCasing={() => {
+            const names = [...selected];
             batchPatch.mutate(
-              { archiveNames: [...selected], fields: { description: '__FIX_CASING__', name: '__FIX_TITLE_CASING__' } },
-              { onSuccess: () => clearSelection() },
+              { archiveNames: names, fields: { description: '__FIX_CASING__', name: '__FIX_TITLE_CASING__' } },
+              {
+                onSuccess: () => { clearSelection(); pushToast(`Fixed casing on ${names.length} door${names.length === 1 ? '' : 's'}`); },
+                onError: toastOnError('Fix casing'),
+              },
             );
           }}
           onTagsChange={(add, remove) => {
-            batchTags.mutate({ archiveNames: [...selected], add, remove });
+            const names = [...selected];
+            batchTags.mutate(
+              { archiveNames: names, add, remove },
+              {
+                onSuccess: () => pushToast(`Tags updated on ${names.length} door${names.length === 1 ? '' : 's'}`),
+                onError: toastOnError('Tag update'),
+              },
+            );
           }}
           onDelete={(confirm) => {
+            const names = [...selected];
             batchDelete.mutate(
-              { archiveNames: [...selected], confirm },
-              { onSuccess: () => clearSelection() },
+              { archiveNames: names, confirm },
+              {
+                onSuccess: () => { clearSelection(); pushToast(`Deleted ${names.length} door${names.length === 1 ? '' : 's'}`); },
+                onError: toastOnError('Delete'),
+              },
             );
           }}
           onReextract={() => {
@@ -551,6 +592,7 @@ export function Browse() {
       <ReleaseGroupsPanel open={groupsOpen} onOpenChange={setGroupsOpen} enabled={Boolean(admin)} />
       <StatsPanel open={statsOpen} onOpenChange={setStatsOpen} />
       <SubmitDialog open={submitOpen} onOpenChange={setSubmitOpen} />
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

@@ -136,7 +136,7 @@ export function BatchToolbar({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && tagInput.trim()) {
               const parts = tagInput.split(',').map((t) => t.trim()).filter(Boolean);
-              const add = parts.filter((t) => !t.startsWith('-'));
+              const add = parts.filter((t) => !t.startsWith('-')).map((t) => (t.startsWith('+') ? t.slice(1) : t));
               const remove = parts.filter((t) => t.startsWith('-')).map((t) => t.slice(1));
               onTagsChange(add, remove);
               setTagInput('');
