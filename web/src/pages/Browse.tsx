@@ -44,6 +44,7 @@ export function Browse() {
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
 
   useLiveRevision();
 
@@ -110,6 +111,28 @@ export function Browse() {
     });
   }, []);
 
+  const toggleRange = useCallback((index: number, event: React.MouseEvent) => {
+    const rows = data?.rows ?? [];
+    const name = rows[index]?.archiveName;
+    if (!name) return;
+    if (event.shiftKey && anchorIndex !== null) {
+      const [lo, hi] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex];
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (let i = lo; i <= hi; i++) {
+          const n = rows[i]?.archiveName;
+          if (n) next.add(n);
+        }
+        return next;
+      });
+      // Anchor stays put on a shift-click, so repeated shift-clicks extend
+      // or shrink from the same origin.
+      return;
+    }
+    toggle(name);
+    setAnchorIndex(index);
+  }, [data, anchorIndex, toggle]);
+
   const toggleAll = useCallback(() => {
     setSelected((prev) => {
       const rows = data?.rows ?? [];
@@ -118,7 +141,10 @@ export function Browse() {
     });
   }, [data]);
 
-  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  const clearSelection = useCallback(() => {
+    setSelected(new Set());
+    setAnchorIndex(null);
+  }, []);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[86rem] flex-col gap-4 px-4 py-6">
@@ -337,6 +363,7 @@ export function Browse() {
         selected={admin ? selected : undefined}
         onToggle={admin ? toggle : undefined}
         onToggleAll={admin ? toggleAll : undefined}
+        onToggleRange={admin ? toggleRange : undefined}
       />
 
       <footer className="flex items-center justify-between gap-4 text-sm text-muted">

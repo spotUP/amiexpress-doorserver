@@ -41,6 +41,7 @@ export function DoorTable({
   selected,
   onToggle,
   onToggleAll,
+  onToggleRange,
 }: {
   rows: Door[];
   sortState: SortState;
@@ -49,6 +50,7 @@ export function DoorTable({
   selected?: Set<string>;
   onToggle?: (name: string) => void;
   onToggleAll?: () => void;
+  onToggleRange?: (index: number, event: React.MouseEvent) => void;
 }) {
   const hasSelection = selected && onToggle && onToggleAll;
   const allSelected = hasSelection && rows.length > 0 && rows.every((d) => selected!.has(d.archiveName));
@@ -79,7 +81,7 @@ export function DoorTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((door) => (
+            {rows.map((door, index) => (
               <tr
                 key={door.archiveName}
                 className={cx(
@@ -93,7 +95,11 @@ export function DoorTable({
                     <input
                       type="checkbox"
                       checked={selected!.has(door.archiveName)}
-                      onChange={() => onToggle!(door.archiveName)}
+                      onChange={() => {}}
+                      onClick={(e) => {
+                        if (onToggleRange) onToggleRange(index, e);
+                        else onToggle!(door.archiveName);
+                      }}
                       className="h-3.5 w-3.5 rounded border-line accent-accent"
                     />
                   </td>
