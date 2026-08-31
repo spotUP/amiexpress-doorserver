@@ -65,7 +65,12 @@ export function repackLzxToLha(archivePath: string): RepackResult {
     // corrupts the command or, worse, lets one execute as a substitution.
     // spawnSync with an argv array never invokes a shell, so every name
     // reaches `lha` as a literal argument regardless of what it contains.
-    const pack = run(LHA, ['c', outputPath, ...fileList], tmpDir);
+    //
+    // A name starting with '-' ("-BRD-.TXT") still needs the same guard
+    // lha-member-delete.ts uses for the same binary: lha's own argument
+    // parser reads a leading '-' as an option flag, not a filename.
+    const safeFileList = fileList.map((f) => (f.startsWith('-') ? `./${f}` : f));
+    const pack = run(LHA, ['c', outputPath, ...safeFileList], tmpDir);
     if (!pack.ok || !fs.existsSync(outputPath)) {
       return { ok: false, error: `lha failed: ${(pack.stderr || pack.stdout).trim().slice(0, 200)}` };
     }

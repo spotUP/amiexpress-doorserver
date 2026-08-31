@@ -1,11 +1,12 @@
 /**
- * repackLzxToLha() used to build a shell command string by concatenating
- * extracted filenames into `sh -c "lha c ... <names>"`, escaping only
- * double-quotes. Amiga filenames from a 1990s archive can contain almost
- * any byte - a backtick or `$(...)` in one would corrupt the command or
- * execute as a shell substitution. Verifies `lha` is now invoked directly
- * (spawnSync with an argv array, no shell), so such a filename reaches it
- * as a literal argument instead.
+ * Two bugs in how repackLzxToLha() invoked `lha` on the extracted file
+ * list, both found while repacking real archives:
+ *  - it built a shell command string by concatenating filenames into
+ *    `sh -c "lha c ... <names>"`, escaping only double-quotes - a 1990s
+ *    Amiga filename can contain almost any byte, and a backtick or
+ *    `$(...)` corrupts the command or executes as a shell substitution;
+ *  - even after that fix, a filename starting with '-' ("-BRD-.TXT") gets
+ *    read by lha's own argument parser as an option flag, not a name.
  */
 import * as fs from 'fs';
 import * as childProcess from 'child_process';
@@ -54,5 +55,24 @@ describe('repackLzxToLha', () => {
     expect(childProcess.spawnSync).not.toHaveBeenCalledWith('sh', expect.anything(), expect.anything());
     expect(args).toContain(DANGEROUS_NAME);
     expect(args.some((a: string) => a.includes('lha c'))).toBe(false);
+  });
+
+  it('prefixes a filename starting with "-" so lha does not read it as an option', () => {
+    // Same guard lha-member-delete.ts already needs for the same binary:
+    // a leading '-' makes lha's own argument parser treat "-BRD-.TXT" as
+    // a flag, not a filename, and the whole invocation fails with a
+    // usage error - the archive genuinely has a member named that.
+    (childProcess.spawnSync as jest.Mock).mockImplementation((bin: string) => {
+      if (bin.endsWith('unlzx')) return { status: 0, stdout: '', stderr: '' };
+      if (bin === 'find') return { status: 0, stdout: './-BRD-.TXT\n', stderr: '' };
+      if (bin.endsWith('lha')) return { status: 0, stdout: '', stderr: '' };
+      throw new Error(`unexpected spawnSync call: ${bin}`);
+    });
+
+    repackLzxToLha('/data/Archives/AmiExpress/AHEVSTAT.LZX');
+
+    const [, args] = (childProcess.spawnSync as jest.Mock).mock.calls.find(([bin]) => bin.endsWith('lha'));
+    expect(args).not.toContain('-BRD-.TXT');
+    expect(args).toContain('./-BRD-.TXT');
   });
 });
