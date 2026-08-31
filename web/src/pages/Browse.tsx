@@ -45,6 +45,12 @@ export function Browse() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  // Snapshot of `selected` taken at the moment the anchor was set by a plain
+  // click. Shift-clicks union range cells onto this base (not onto whatever
+  // is currently selected), so repeated shift-clicks from the same anchor
+  // are idempotent relative to the base and can both grow and shrink the
+  // visible range.
+  const [rangeBase, setRangeBase] = useState<Set<string> | null>(null);
 
   useLiveRevision();
 
@@ -117,23 +123,27 @@ export function Browse() {
     if (!name) return;
     if (event.shiftKey && anchorIndex !== null) {
       const [lo, hi] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex];
-      setSelected((prev) => {
-        const next = new Set(prev);
-        for (let i = lo; i <= hi; i++) {
-          const n = rows[i]?.archiveName;
-          if (n) next.add(n);
-        }
-        return next;
-      });
-      // Anchor stays put on a shift-click, so repeated shift-clicks extend
-      // or shrink from the same origin.
+      const next = new Set(rangeBase ?? []);
+      for (let i = lo; i <= hi; i++) {
+        const n = rows[i]?.archiveName;
+        if (n) next.add(n);
+      }
+      setSelected(next);
+      // Anchor and rangeBase stay put on a shift-click, so repeated
+      // shift-clicks against the same origin are idempotent relative to the
+      // base snapshot and can both extend and shrink the range.
       return;
     }
-    toggle(name);
+    const next = new Set(selected);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setSelected(next);
+    setRangeBase(next);
     setAnchorIndex(index);
-  }, [data, anchorIndex, toggle]);
+  }, [data, anchorIndex, rangeBase, selected]);
 
   const toggleAll = useCallback(() => {
+    setRangeBase(null);
     setSelected((prev) => {
       const rows = data?.rows ?? [];
       if (rows.every((d) => prev.has(d.archiveName))) return new Set();
@@ -144,6 +154,7 @@ export function Browse() {
   const clearSelection = useCallback(() => {
     setSelected(new Set());
     setAnchorIndex(null);
+    setRangeBase(null);
   }, []);
 
   return (
