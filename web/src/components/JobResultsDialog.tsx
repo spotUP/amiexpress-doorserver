@@ -51,8 +51,8 @@ export function JobResultsDialog({
                   >
                     <XCircle size={16} className="mt-0.5 shrink-0 text-danger" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-xs text-ink">{item.archiveName}</p>
-                      <p className="mt-0.5 text-xs text-danger">{item.error}</p>
+                      <p className="break-all font-mono text-xs text-ink">{item.archiveName}</p>
+                      <p className="mt-0.5 break-all text-xs text-danger">{item.error}</p>
                     </div>
                     <Eye size={14} className="mt-0.5 shrink-0 text-muted" />
                   </button>
@@ -66,7 +66,7 @@ export function JobResultsDialog({
                     className="flex w-full items-center gap-2 px-5 py-3 text-left hover:bg-raised"
                   >
                     <CheckCircle2 size={16} className="shrink-0 text-muted" />
-                    <p className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{item.archiveName}</p>
+                    <p className="min-w-0 flex-1 break-all font-mono text-xs text-muted">{item.archiveName}</p>
                     <Eye size={14} className="shrink-0 text-muted" />
                   </button>
                 </li>

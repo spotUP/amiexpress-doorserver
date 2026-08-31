@@ -65,9 +65,9 @@ export function BatchStripReview({
       <div className="max-h-96 space-y-3 overflow-y-auto">
         {candidates.map((c) => (
           <div key={c.archiveName} className="rounded border border-line bg-bg p-2">
-            <div className="mb-1 font-mono text-xs text-accent">{c.archiveName}</div>
+            <div className="mb-1 break-all font-mono text-xs text-accent">{c.archiveName}</div>
             {c.error ? (
-              <div className="text-xs text-danger">Could not be read: {c.error}</div>
+              <div className="break-all text-xs text-danger">Could not be read: {c.error}</div>
             ) : c.stripped.length === 0 ? (
               <div className="text-xs text-muted">Nothing flagged.</div>
             ) : (
@@ -75,24 +75,24 @@ export function BatchStripReview({
                 const k = key(c.archiveName, f.path);
                 const isNotJunk = notJunk.has(k);
                 return (
-                  <div key={f.path} className="flex items-center gap-2 py-0.5 text-xs">
+                  <div key={f.path} className="flex items-start gap-2 py-0.5 text-xs">
                     <input
                       type="checkbox"
                       checked={checked.has(k)}
                       onChange={() => toggle(c.archiveName, f.path)}
                       disabled={isNotJunk}
-                      className="h-3.5 w-3.5 rounded border-line accent-accent"
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-line accent-accent"
                     />
-                    <span className={`font-mono ${isNotJunk ? 'text-muted line-through' : ''}`}>{f.path}</span>
-                    <span className="text-muted">({f.reason})</span>
+                    <span className={`min-w-0 flex-1 break-all font-mono ${isNotJunk ? 'text-muted line-through' : ''}`}>{f.path}</span>
+                    <span className="shrink-0 text-muted">({f.reason})</span>
                     {isNotJunk ? (
-                      <span className="inline-flex items-center gap-0.5 rounded border border-success/40 bg-success/10 px-1 py-0.5 text-[10px] font-medium text-success">
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded border border-success/40 bg-success/10 px-1 py-0.5 text-[10px] font-medium text-success">
                         <ShieldCheck size={10} /> not junk
                       </span>
                     ) : (
                       <button
                         onClick={() => markFalsePositive(c.archiveName, f.path)}
-                        className="rounded p-1 text-muted hover:bg-raised hover:text-success"
+                        className="shrink-0 rounded p-1 text-muted hover:bg-raised hover:text-success"
                         title="False positive - mark as not junk (kept from now on in this door)"
                       >
                         <ShieldCheck size={12} />

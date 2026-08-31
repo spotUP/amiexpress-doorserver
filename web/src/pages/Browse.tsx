@@ -580,7 +580,7 @@ export function Browse() {
         selectAllMatchingActive={selectAllMatching}
       />
 
-      <footer className="flex items-center justify-between gap-4 text-sm text-muted">
+      <footer className="sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t border-line bg-bg py-3 text-sm text-muted">
         <span>
           {isLoading ? 'Loading...' : data ? `Page ${data.page} of ${pages}` : ''}
         </span>

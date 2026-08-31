@@ -66,7 +66,7 @@ export function DoorTable({
       {/* Desktop table */}
       <div className="hidden overflow-x-auto rounded-lg border border-line md:block">
         <table className="w-full min-w-[60rem] border-collapse text-sm">
-          <thead className="bg-surface text-left text-xs tracking-wide text-muted">
+          <thead className="sticky top-0 z-10 bg-surface text-left text-xs tracking-wide text-muted">
             <tr>
               {hasSelection && (
                 <th scope="col" className="w-10 px-3 py-2">
