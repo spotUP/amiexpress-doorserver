@@ -6,3 +6,4 @@ dist/
 *.sqlite
 .DS_Store
 tests/tmp/
+db-backups/
