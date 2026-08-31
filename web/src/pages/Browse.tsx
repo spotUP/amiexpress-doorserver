@@ -149,6 +149,7 @@ export function Browse() {
   }, [data, anchorIndex, rangeBase, selected]);
 
   const toggleAll = useCallback(() => {
+    setSelectAllMatching(false);
     setRangeBase(null);
     setSelected((prev) => {
       const rows = data?.rows ?? [];
