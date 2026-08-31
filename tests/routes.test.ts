@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import request from 'supertest';
 import { openDb, applySchema } from '../src/db';
+import { runMigrations } from '../src/migrations';
 import { createApp } from '../src/app';
 import { candidateArchiveNames } from '../src/routes';
 import { _clearListCacheForTests } from '../src/manifest';
@@ -149,6 +150,39 @@ describe('read API', () => {
     db.close();
     expect((await request(app).get('/api/door-repo/diz/BARE.LHA')).status).toBe(404);
     expect((await request(app).get('/api/door-repo/doc/BARE.LHA')).status).toBe(404);
+  });
+
+  // The web guide viewer renders node content in a plain <pre>, with no
+  // ANSI interpreter - raw AmigaGuide markup like `@{"text" link target}`
+  // must never reach it. The stripping logic itself already existed
+  // (AmigaGuideParser.processInlineFormatting), it just wasn't wired into
+  // this route at all, so this asserts the actual reachable behavior.
+  it('strips AmigaGuide inline markup from a guide node before serving it', async () => {
+    const db = openDb(cfg);
+    runMigrations(db);
+    const guideDoc = [
+      '@database "Test"',
+      '@node MAIN "Main"',
+      'Welcome. @{"Read this" link Intro} for more.',
+      '@{b}Bold@{ub} text and @{i}italic@{ui} text.',
+      '@endnode',
+      '@node Intro "Intro"',
+      'Some intro text.',
+      '@endnode',
+    ].join('\n');
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, doc_raw, doc_filename, indexed_at)
+       VALUES ('id3', 'GUIDE.LHA', 'GUIDE.LHA', 'Guide Door', 'XIM', ?, 'guide.guide', 1700000000)`
+    ).run(guideDoc);
+    db.close();
+    fs.writeFileSync(path.join(dir, 'Archives', 'GUIDE.LHA'), ARCHIVE_BYTES);
+
+    const res = await request(app).get('/api/door-repo/doors/GUIDE.LHA');
+    expect(res.status).toBe(200);
+    const mainNode = res.body.guide.nodes.find((n: { name: string }) => n.name === 'MAIN');
+    expect(mainNode.content).not.toContain('@{');
+    expect(mainNode.content).toContain('Read this');
+    expect(mainNode.content).toContain('Bold text and italic text.');
   });
 });
 

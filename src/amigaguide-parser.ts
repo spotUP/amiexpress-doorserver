@@ -283,6 +283,40 @@ export class AmigaGuideParser {
   }
 
   /**
+   * A node's content with AmigaGuide inline markup removed, for a plain-text
+   * reader that isn't a terminal - the doorserver's own web guide viewer,
+   * which has no ANSI interpreter and already renders every node's links as
+   * separate buttons below the content (so an inline link becomes just its
+   * display text, not a "[n]" marker pointing at a button elsewhere).
+   *
+   * Deliberately NOT part of renderNode()/renderContent()/
+   * processInlineFormatting() below - those three are the ported-from-
+   * amiexpress-web ANSI terminal renderer (see the file's header comment:
+   * "keep the two in step"), and this doorserver has no terminal consumer
+   * for them. Adding new, separate logic here avoids ever touching that
+   * shared, ANSI-shaped code for a need it was never meant to serve.
+   */
+  public stripInlineMarkup(content: string): string {
+    let text = content;
+    // Bold/underline/italic: no rendering distinction in plain text.
+    text = text.replace(/@\{\/?u?b\}/gi, '');
+    text = text.replace(/@\{\/?uu?\}/gi, '');
+    text = text.replace(/@\{\/?u?i\}/gi, '');
+    // Links with display text: @{"text" link target [line]} -> text.
+    text = text.replace(/@\{([^}]+)\s+link\s+([^}\s]+)(?:\s+\d+)?\}/gi, (_match, linkText: string) =>
+      linkText.trim().replace(/^["']|["']$/g, '')
+    );
+    // Colors and alignment: no plain-text equivalent, drop the tag.
+    text = text.replace(/@\{fg\s+\w+\}/gi, '');
+    text = text.replace(/@\{bg\s+\w+\}/gi, '');
+    text = text.replace(/@\{j(left|right|center)\}/gi, '');
+    // Bare links: @{target} -> target, once every non-link tag above is
+    // already gone (this would otherwise also swallow "@{jleft}" etc.).
+    text = text.replace(/@\{([^}\s]+)\}/g, (_match, target: string) => target);
+    return text;
+  }
+
+  /**
    * Render a node as ANSI text with link markers
    */
   public renderNode(nodeName: string, width: number = 80, maxLines: number = 20, scrollOffset: number = 0): {

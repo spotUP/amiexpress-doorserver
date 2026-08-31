@@ -234,7 +234,7 @@ function parseGuide(doc: string | null): GuideJson | null {
       nodes: Array.from(parsed.nodes.values()).map((node) => ({
         name: node.name,
         title: node.title,
-        content: node.content,
+        content: parser.stripInlineMarkup(node.content),
         links: node.links.map((link) => ({ text: link.text, target: link.target })),
       })),
     };
