@@ -383,6 +383,35 @@ export function useJobProgress(jobId: string | null): JobProgress | null {
   return progress;
 }
 
+export interface JobItem {
+  archiveName: string;
+  status: 'pending' | 'ok' | 'error';
+  error: string | null;
+}
+
+export interface JobDetail {
+  id: string;
+  kind: string;
+  status: 'running' | 'done' | 'failed';
+  total: number;
+  completed: number;
+  failedCount: number;
+  resultJson: string | null;
+  items: JobItem[];
+}
+
+/** Full per-archive detail for a finished (or in-progress) job - the
+ *  "N succeeded, M failed" summaries only show a count; this backs the
+ *  "View results" screen so an admin can see exactly which archives failed
+ *  and why. */
+export function useJobDetail(jobId: string | null) {
+  return useQuery({
+    queryKey: ['jobs', 'detail', jobId],
+    queryFn: () => api.get<JobDetail>(`/admin/jobs/${jobId}`),
+    enabled: Boolean(jobId),
+  });
+}
+
 // ─── archive stripping ─────────────────────────────────────────────────
 
 export function useStripPreview(archiveName: string) {

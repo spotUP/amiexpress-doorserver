@@ -34,6 +34,7 @@ import { StatsPanel } from './Stats';
 import { SubmitDialog } from '../components/SubmitDialog';
 import { BatchToolbar } from '../components/BatchToolbar';
 import { BatchStripReview } from '../components/BatchStripReview';
+import { JobResultsDialog } from '../components/JobResultsDialog';
 import { SavedSearches } from '../components/SavedSearches';
 import { Button, Input, Select, ToastStack, type ToastMessage } from '../components/ui';
 
@@ -152,6 +153,7 @@ export function Browse() {
   useEffect(() => {
     setStripApplySummaryDismissed(false);
   }, [stripApplyJobId]);
+  const [stripApplyResultsOpen, setStripApplyResultsOpen] = useState(false);
 
   // Once the preview job finishes, fetch its resultJson and hand the parsed
   // candidates to the review screen. stripPreviewJobId is cleared in the same
@@ -455,7 +457,10 @@ export function Browse() {
             {stripApplyProgress.completed - stripApplyProgress.failedCount} succeeded,{' '}
             <span className="text-danger">{stripApplyProgress.failedCount} failed</span>
           </span>
-          <Button variant="ghost" onClick={() => setStripApplySummaryDismissed(true)}>Dismiss</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => setStripApplyResultsOpen(true)}>View results</Button>
+            <Button variant="ghost" onClick={() => setStripApplySummaryDismissed(true)}>Dismiss</Button>
+          </div>
         </div>
       ) : admin && (batchStripPreview.isPending || (stripPreviewJobId && (!stripPreviewProgress || stripPreviewProgress.status === 'running'))) ? (
         <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
@@ -589,6 +594,7 @@ export function Browse() {
       </footer>
 
       <DoorDetailDialog archiveName={open} admin={admin} onClose={() => setOpen(null)} />
+      <JobResultsDialog jobId={stripApplyJobId} open={stripApplyResultsOpen} onOpenChange={setStripApplyResultsOpen} />
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} onSignedIn={setAdmin} />
       <AuditPanel open={auditOpen} onOpenChange={setAuditOpen} enabled={Boolean(admin)} />
       <HiddenPanel open={hiddenOpen} onOpenChange={setHiddenOpen} enabled={Boolean(admin)} />
