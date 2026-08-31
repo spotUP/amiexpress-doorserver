@@ -3,18 +3,22 @@
  * asked for on this path - the corpus is public, and reading it is the point.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eraser, Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
+import { Eraser, Inbox, LogIn, LogOut, RefreshCw, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
 import {
   useBatchDelete,
   useBatchHide,
   useBatchPatch,
   useBatchReextract,
   useBatchRestore,
+  useBatchStripApply,
+  useBatchStripPreview,
   useBatchTags,
   useDoors,
   useFacets,
+  useJobProgress,
   useLiveRevision,
   useMatchingArchiveNames,
+  type StripPreviewResult,
 } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
@@ -29,6 +33,7 @@ import { ReleaseGroupsPanel } from './ReleaseGroups';
 import { StatsPanel } from './Stats';
 import { SubmitDialog } from '../components/SubmitDialog';
 import { BatchToolbar } from '../components/BatchToolbar';
+import { BatchStripReview } from '../components/BatchStripReview';
 import { SavedSearches } from '../components/SavedSearches';
 import { Button, Input, Select } from '../components/ui';
 
@@ -113,7 +118,29 @@ export function Browse() {
   const batchDelete = useBatchDelete();
   const batchReextract = useBatchReextract();
   const [reextractJobId, setReextractJobId] = useState<string | null>(null);
+  const batchStripPreview = useBatchStripPreview();
+  const batchStripApply = useBatchStripApply();
+  const [stripPreviewJobId, setStripPreviewJobId] = useState<string | null>(null);
+  const [stripApplyJobId, setStripApplyJobId] = useState<string | null>(null);
+  const [stripCandidates, setStripCandidates] = useState<StripPreviewResult[] | null>(null);
+  const stripPreviewProgress = useJobProgress(stripPreviewJobId);
+  const stripApplyProgress = useJobProgress(stripApplyJobId);
   const matchingNames = useMatchingArchiveNames();
+
+  // Once the preview job finishes, fetch its resultJson and hand the parsed
+  // candidates to the review screen. stripPreviewJobId is cleared in the same
+  // update so this effect doesn't refire once the fetch lands (useJobProgress
+  // returns null once its jobId argument goes null, so the guard holds even
+  // across the render where the clear takes effect).
+  useEffect(() => {
+    if (stripPreviewProgress?.status === 'done' && stripPreviewJobId) {
+      const jobId = stripPreviewJobId;
+      api.get<{ resultJson: string }>(`/admin/jobs/${jobId}`).then((job) => {
+        setStripCandidates(JSON.parse(job.resultJson) as StripPreviewResult[]);
+        setStripPreviewJobId(null);
+      });
+    }
+  }, [stripPreviewProgress, stripPreviewJobId]);
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1;
 
@@ -377,7 +404,22 @@ export function Browse() {
       </div>
       </div>
 
-      {admin && selected.size > 0 && (
+      {admin && stripApplyJobId && stripApplyProgress && stripApplyProgress.status !== 'done' ? (
+        <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
+          <RefreshCw size={14} className="animate-spin text-accent" />
+          <span>Stripping {stripApplyProgress.completed} / {stripApplyProgress.total}</span>
+          {stripApplyProgress.failedCount > 0 && <span className="text-danger">{stripApplyProgress.failedCount} failed</span>}
+        </div>
+      ) : admin && stripCandidates ? (
+        <BatchStripReview
+          candidates={stripCandidates}
+          onCancel={() => setStripCandidates(null)}
+          onConfirm={(selections) => {
+            setStripCandidates(null);
+            batchStripApply.mutate(selections, { onSuccess: (res) => setStripApplyJobId(res.jobId) });
+          }}
+        />
+      ) : admin && selected.size > 0 ? (
         <BatchToolbar
           count={selected.size}
           onHide={() => {
@@ -416,6 +458,9 @@ export function Browse() {
             batchReextract.mutate([...selected], { onSuccess: (res) => setReextractJobId(res.jobId) });
           }}
           reextractJobId={reextractJobId}
+          onStripPreview={() => {
+            batchStripPreview.mutate([...selected], { onSuccess: (res) => setStripPreviewJobId(res.jobId) });
+          }}
           onClear={clearSelection}
           isPending={
             batchHide.isPending ||
@@ -423,10 +468,11 @@ export function Browse() {
             batchPatch.isPending ||
             batchTags.isPending ||
             batchDelete.isPending ||
-            batchReextract.isPending
+            batchReextract.isPending ||
+            batchStripPreview.isPending
           }
         />
-      )}
+      ) : null}
 
       <DoorTable
         rows={data?.rows ?? []}

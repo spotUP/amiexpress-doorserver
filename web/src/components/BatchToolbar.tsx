@@ -1,5 +1,5 @@
 /** Toolbar shown when doors are selected for batch operations. */
-import { Eye, EyeOff, Tag, Trash2, Wand2, RefreshCw, X } from 'lucide-react';
+import { Eraser, Eye, EyeOff, Tag, Trash2, Wand2, RefreshCw, X } from 'lucide-react';
 import { useState } from 'react';
 import { Button, Select } from './ui';
 import { useJobProgress } from '../api/queries';
@@ -21,6 +21,7 @@ export function BatchToolbar({
   onDelete,
   onReextract,
   reextractJobId,
+  onStripPreview,
   onClear,
   isPending,
 }: {
@@ -33,6 +34,7 @@ export function BatchToolbar({
   onDelete: (confirm: string) => void;
   onReextract: () => void;
   reextractJobId: string | null;
+  onStripPreview: () => void;
   onClear: () => void;
   isPending: boolean;
 }) {
@@ -122,6 +124,10 @@ export function BatchToolbar({
 
       <Button variant="ghost" onClick={onReextract} disabled={isPending}>
         <RefreshCw size={14} /> Re-extract
+      </Button>
+
+      <Button variant="ghost" onClick={onStripPreview} disabled={isPending}>
+        <Eraser size={14} /> Strip ads
       </Button>
 
       {!deleteConfirmOpen ? (
