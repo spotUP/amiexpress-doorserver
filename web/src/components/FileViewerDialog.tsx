@@ -90,7 +90,7 @@ export function FileViewerDialog({
             </Dialog.Close>
           </div>
           <Dialog.Description className="sr-only">File content preview</Dialog.Description>
-          <pre className="flex-1 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-xs text-ink">
+          <pre className="flex-1 overflow-auto whitespace-pre-wrap break-all p-4 font-amiga text-[15px] leading-[1.2] text-ink">
             {content}
           </pre>
         </Dialog.Content>

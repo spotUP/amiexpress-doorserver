@@ -175,7 +175,7 @@ function FileList({ archiveName, files }: { archiveName: string; files: DoorFile
           {contentBinary ? (
             <p className="text-xs text-muted">This file is binary — no text viewer.</p>
           ) : (
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] text-ink">{content ?? 'Loading...'}</pre>
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all font-amiga text-[15px] leading-[1.2] text-ink">{content ?? 'Loading...'}</pre>
           )}
         </div>
       )}
