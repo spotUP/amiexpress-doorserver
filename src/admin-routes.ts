@@ -786,6 +786,10 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       res.status(400).json({ error: 'archiveNames array required' });
       return;
     }
+    if (body.archiveNames.some((n) => typeof n !== 'string')) {
+      res.status(400).json({ error: 'archiveNames must all be strings' });
+      return;
+    }
     if (body.archiveNames.length > 200) {
       res.status(400).json({ error: 'batch too large - split into requests of 200 or fewer' });
       return;
@@ -807,6 +811,21 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       const cleanupNotJunk = db.prepare('DELETE FROM door_not_junk WHERE archive_name = ? COLLATE NOCASE');
       const deleteCatalogRow = db.prepare('DELETE FROM door_catalog WHERE id = ?');
       const results: { archiveName: string; ok: boolean; error?: string }[] = [];
+      // Absolute paths to unlink AFTER the DB transaction below has
+      // committed - see the phase-2 comment for why the filesystem must
+      // not be touched while the transaction is still open.
+      const toUnlink: string[] = [];
+
+      // Phase 1: every catalog-side DELETE for the whole batch runs inside
+      // one transaction, and nothing here touches the filesystem. If a
+      // later archive's statement throws (e.g. SQLITE_BUSY from a
+      // concurrent writer), db.transaction() rolls back everything done so
+      // far in this call - including the catalog rows for archives already
+      // processed earlier in the loop. As long as no file has been deleted
+      // yet, that rollback is safe: the catalog rows come back and the
+      // files are still on disk. Deleting a file inside this block would
+      // make that rollback resurrect a catalog row whose file is already
+      // gone forever.
       const write = db.transaction(() => {
         for (const archiveName of body.archiveNames!) {
           const row = lookup.get(archiveName) as { id: string; archive_path: string } | undefined;
@@ -817,20 +836,31 @@ export function createAdminRouter(cfg: ServerConfig): Router {
           for (const stmt of cleanupByCatalogId) stmt.run(row.id);
           cleanupNotJunk.run(archiveName);
           deleteCatalogRow.run(row.id);
-          try {
-            const absPath = resolveArchivePath(cfg, row.archive_path);
-            if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
-          } catch {
-            // The catalog row is already gone; a file that can't be
-            // unlinked is an orphan on disk, not a reason to fail the
-            // batch or leave a half-deleted catalog row.
-          }
           recordAudit(db, req.admin?.id ?? null, 'delete', archiveName, {});
           results.push({ archiveName, ok: true });
+          toUnlink.push(resolveArchivePath(cfg, row.archive_path));
         }
       });
       write();
+
+      // Phase 2: write() has returned, so the transaction above has
+      // COMMITTED - every catalog row deleted above is durably gone. Only
+      // now do we mutate the filesystem, each unlink in its own try/catch:
+      // a missing file or a permission error here leaves an orphan on
+      // disk, not a reason to report an already-committed catalog delete
+      // as failed.
+      for (const absPath of toUnlink) {
+        try {
+          if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+        } catch {
+          // Orphaned file on disk; the catalog row is already gone and
+          // committed, so this is not reported as a failure.
+        }
+      }
+
       res.json({ ok: true, results });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
     } finally {
       db.close();
     }

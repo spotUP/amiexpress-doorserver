@@ -279,9 +279,35 @@ describe('POST /admin/doors/batch-delete', () => {
     expect(res.status).toBe(400);
   });
 
-  it('permanently removes the catalog row, its child rows, and the archive file', async () => {
+  it('permanently removes the catalog row, every child-table row, and the archive file', async () => {
     const before = await request(app()).get('/api/door-repo/doors?q=ACC-V103').set(auth());
     expect(before.body.rows).toHaveLength(1);
+
+    // Seed one row in every catalog_id-keyed child table, plus the
+    // archive_name-keyed door_not_junk table, so a regression that drops
+    // any single DELETE statement is caught here instead of passing
+    // silently because the table was empty anyway.
+    const seedDb = openDb(cfg);
+    seedDb
+      .prepare('INSERT INTO door_catalog_files (catalog_id, path, size) VALUES (?, ?, ?)')
+      .run('id1', 'ACCED.DOC', 100);
+    seedDb
+      .prepare('INSERT INTO door_catalog_overrides (catalog_id, field, value) VALUES (?, ?, ?)')
+      .run('id1', 'name', 'Override Name');
+    seedDb.prepare('INSERT INTO door_hidden (catalog_id, reason) VALUES (?, ?)').run('id1', 'test');
+    seedDb.prepare('INSERT INTO door_tags (catalog_id, tag) VALUES (?, ?)').run('id1', 'keep-me');
+    seedDb.prepare('INSERT INTO door_votes (catalog_id, voter_id, vote) VALUES (?, ?, ?)').run('id1', 'voter1', 1);
+    seedDb
+      .prepare('INSERT INTO door_not_junk (archive_name, file_path) VALUES (?, ?)')
+      .run('ACC-V103.LHA', 'ACCED.DOC');
+    seedDb.close();
+
+    // A real file at the resolved archive path, so fs.unlinkSync is
+    // actually exercised rather than being dead code that never throws.
+    const archiveAbsPath = path.join(dir, 'AmiExpress', 'ACC-V103.LHA');
+    fs.mkdirSync(path.dirname(archiveAbsPath), { recursive: true });
+    fs.writeFileSync(archiveAbsPath, 'not a real archive, just needs to exist');
+    expect(fs.existsSync(archiveAbsPath)).toBe(true);
 
     const res = await request(app())
       .post(admin('/doors/batch-delete'))
@@ -295,6 +321,19 @@ describe('POST /admin/doors/batch-delete', () => {
 
     const after = await request(app()).get('/api/door-repo/doors?q=ACC-V103').set(auth());
     expect(after.body.rows).toHaveLength(0);
+
+    expect(fs.existsSync(archiveAbsPath)).toBe(false);
+
+    const checkDb = openDb(cfg);
+    expect(checkDb.prepare('SELECT * FROM door_catalog_files WHERE catalog_id = ?').all('id1')).toEqual([]);
+    expect(checkDb.prepare('SELECT * FROM door_catalog_overrides WHERE catalog_id = ?').all('id1')).toEqual([]);
+    expect(checkDb.prepare('SELECT * FROM door_hidden WHERE catalog_id = ?').all('id1')).toEqual([]);
+    expect(checkDb.prepare('SELECT * FROM door_tags WHERE catalog_id = ?').all('id1')).toEqual([]);
+    expect(checkDb.prepare('SELECT * FROM door_votes WHERE catalog_id = ?').all('id1')).toEqual([]);
+    expect(
+      checkDb.prepare('SELECT * FROM door_not_junk WHERE archive_name = ?').all('ACC-V103.LHA')
+    ).toEqual([]);
+    checkDb.close();
   });
 });
 
