@@ -31,6 +31,11 @@ function formatDetail(entry: AuditEntry): string | null {
       const { removed } = d as { removed?: number };
       return removed ? `stripped ${removed} file${removed !== 1 ? 's' : ''}` : null;
     }
+    case 'strip-failed':
+    case 'strip-preview-failed': {
+      const { error } = d as { error?: string };
+      return error ? `error: ${error}` : null;
+    }
     case 'delete-files': {
       const { members, removed } = d as { members?: string[]; removed?: number };
       if (members?.length) {

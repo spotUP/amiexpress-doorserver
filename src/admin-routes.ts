@@ -1194,6 +1194,12 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         const result = previewStripOne(cfg, archiveName);
         if ('error' in result) {
           results.push({ archiveName, stripped: [], error: result.error });
+          const auditDb = openDb(cfg);
+          try {
+            recordAudit(auditDb, req.admin?.id ?? null, 'strip-preview-failed', archiveName, { error: result.error });
+          } finally {
+            auditDb.close();
+          }
           return { error: result.error };
         }
         results.push({
@@ -1240,9 +1246,12 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     void runJobSequentially(cfg, jobId, archiveNames, (archiveName) => {
       const members = membersByArchive.get(archiveName) ?? [];
       const result = stripArchiveOnServer(cfg, archiveName, members, req.admin?.id ?? null);
-      if (!result.ok) return { error: result.reason ?? 'strip failed' };
       const auditDb = openDb(cfg);
       try {
+        if (!result.ok) {
+          recordAudit(auditDb, req.admin?.id ?? null, 'strip-failed', archiveName, { members, error: result.reason ?? 'strip failed' });
+          return { error: result.reason ?? 'strip failed' };
+        }
         recordAudit(auditDb, req.admin?.id ?? null, 'strip', archiveName, { members, removed: result.removed });
       } finally {
         auditDb.close();

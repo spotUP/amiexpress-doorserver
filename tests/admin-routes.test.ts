@@ -393,6 +393,26 @@ describe('POST /admin/doors/batch-strip-preview', () => {
     const result = JSON.parse(job.resultJson);
     expect(result).toEqual([{ archiveName: 'ACC-V103.LHA', stripped: [] }]);
   });
+
+  it('records a strip-preview-failed audit entry when an item errors', async () => {
+    const start = await request(app()).post(admin('/doors/batch-strip-preview')).set(auth()).send({ archiveNames: ['NOPE.LHA'] });
+    expect(start.status).toBe(200);
+    const { jobId } = start.body;
+
+    let job;
+    for (let i = 0; i < 20; i++) {
+      job = (await request(app()).get(admin(`/jobs/${jobId}`)).set(auth())).body;
+      if (job.status === 'done') break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(job.status).toBe('done');
+    expect(job.items[0]).toMatchObject({ archiveName: 'NOPE.LHA', status: 'error', error: 'no such door' });
+
+    const auditRes = await request(app()).get(admin('/audit')).set(auth());
+    const failEntry = auditRes.body.rows.find((e: { action: string; target: string }) => e.action === 'strip-preview-failed' && e.target === 'NOPE.LHA');
+    expect(failEntry).toBeTruthy();
+    expect(failEntry.detail).toMatchObject({ error: 'no such door' });
+  });
 });
 
 describe('POST /admin/doors/batch-strip-apply', () => {
@@ -469,6 +489,29 @@ describe('POST /admin/doors/batch-strip-apply', () => {
     expect(res.status).toBe(400);
     const res2 = await request(app()).post(admin('/doors/batch-strip-apply')).set(auth()).send({ selections: [] });
     expect(res2.status).toBe(400);
+  });
+
+  it('records a strip-failed audit entry when an item errors', async () => {
+    const start = await request(app())
+      .post(admin('/doors/batch-strip-apply'))
+      .set(auth())
+      .send({ selections: [{ archiveName: 'NOPE.LHA', members: ['junk.txt'] }] });
+    expect(start.status).toBe(200);
+    const { jobId } = start.body;
+
+    let job;
+    for (let i = 0; i < 20; i++) {
+      job = (await request(app()).get(admin(`/jobs/${jobId}`)).set(auth())).body;
+      if (job.status === 'done') break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(job.status).toBe('done');
+    expect(job.items[0]).toMatchObject({ archiveName: 'NOPE.LHA', status: 'error', error: 'no such door' });
+
+    const auditRes = await request(app()).get(admin('/audit')).set(auth());
+    const failEntry = auditRes.body.rows.find((e: { action: string; target: string }) => e.action === 'strip-failed' && e.target === 'NOPE.LHA');
+    expect(failEntry).toBeTruthy();
+    expect(failEntry.detail).toMatchObject({ members: ['junk.txt'], error: 'no such door' });
   });
 });
 
