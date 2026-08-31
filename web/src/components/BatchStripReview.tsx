@@ -2,7 +2,9 @@
  *  every candidate archive's flagged files, pre-checked, with per-file
  *  uncheck before the admin commits to stripping them. */
 import { useState } from 'react';
+import { ShieldCheck } from 'lucide-react';
 import { Button } from './ui';
+import { useMarkNotJunk } from '../api/queries';
 import type { StripPreviewResult } from '../api/queries';
 
 // Archive names and paths can contain almost anything printable, but never a
@@ -24,6 +26,11 @@ export function BatchStripReview({
   const [checked, setChecked] = useState<Set<string>>(
     () => new Set(candidates.flatMap((c) => c.stripped.map((f) => key(c.archiveName, f.path))))
   );
+  // Files the admin has corrected as false positives in this review session.
+  // Marked via markNotJunk (persists per-archive server side) and excluded
+  // from the checked set so they're never sent to batch-strip-apply.
+  const [notJunk, setNotJunk] = useState<Set<string>>(new Set());
+  const markNotJunk = useMarkNotJunk();
 
   const toggle = (archiveName: string, path: string) => {
     setChecked((prev) => {
@@ -31,6 +38,17 @@ export function BatchStripReview({
       const k = key(archiveName, path);
       if (next.has(k)) next.delete(k);
       else next.add(k);
+      return next;
+    });
+  };
+
+  const markFalsePositive = async (archiveName: string, path: string) => {
+    await markNotJunk.mutateAsync({ archiveName, path });
+    const k = key(archiveName, path);
+    setNotJunk((prev) => new Set(prev).add(k));
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.delete(k);
       return next;
     });
   };
@@ -53,18 +71,36 @@ export function BatchStripReview({
             ) : c.stripped.length === 0 ? (
               <div className="text-xs text-muted">Nothing flagged.</div>
             ) : (
-              c.stripped.map((f) => (
-                <label key={f.path} className="flex items-center gap-2 py-0.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={checked.has(key(c.archiveName, f.path))}
-                    onChange={() => toggle(c.archiveName, f.path)}
-                    className="h-3.5 w-3.5 rounded border-line accent-accent"
-                  />
-                  <span className="font-mono">{f.path}</span>
-                  <span className="text-muted">({f.reason})</span>
-                </label>
-              ))
+              c.stripped.map((f) => {
+                const k = key(c.archiveName, f.path);
+                const isNotJunk = notJunk.has(k);
+                return (
+                  <div key={f.path} className="flex items-center gap-2 py-0.5 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={checked.has(k)}
+                      onChange={() => toggle(c.archiveName, f.path)}
+                      disabled={isNotJunk}
+                      className="h-3.5 w-3.5 rounded border-line accent-accent"
+                    />
+                    <span className={`font-mono ${isNotJunk ? 'text-muted line-through' : ''}`}>{f.path}</span>
+                    <span className="text-muted">({f.reason})</span>
+                    {isNotJunk ? (
+                      <span className="inline-flex items-center gap-0.5 rounded border border-success/40 bg-success/10 px-1 py-0.5 text-[10px] font-medium text-success">
+                        <ShieldCheck size={10} /> not junk
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => markFalsePositive(c.archiveName, f.path)}
+                        className="rounded p-1 text-muted hover:bg-raised hover:text-success"
+                        title="False positive - mark as not junk (kept from now on in this door)"
+                      >
+                        <ShieldCheck size={12} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         ))}

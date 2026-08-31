@@ -349,6 +349,32 @@ describe('POST /admin/doors/:archiveName/strip-preview', () => {
   });
 });
 
+describe('POST /admin/doors/:archiveName/not-junk', () => {
+  // recordAudit's `target` used to be the archive_name string for
+  // not-junk/learn/unlearn/strip actions, while every other action (and the
+  // per-door audit route's WHERE clause) uses the catalog id - so marking a
+  // false positive as not-junk never showed up in that door's own history
+  // panel, only in the global /admin/audit feed. This is the fix's actual
+  // user-visible contract: the correction must be findable from the door.
+  it('shows up in the door\'s own audit history, not just the global feed', async () => {
+    const res = await request(app())
+      .post(admin('/doors/ACC-V103.LHA/not-junk'))
+      .set(auth())
+      .send({ path: 'DOOR.FIM', reason: 'false positive' });
+    expect(res.status).toBe(200);
+
+    const perDoorRes = await request(app()).get(admin('/doors/ACC-V103.LHA/audit')).set(auth());
+    expect(perDoorRes.status).toBe(200);
+    const entry = perDoorRes.body.entries.find((e: { action: string }) => e.action === 'not-junk');
+    expect(entry).toBeDefined();
+    expect(entry.detail).toMatchObject({ filePath: 'DOOR.FIM', reason: 'false positive' });
+
+    const globalRes = await request(app()).get(admin('/audit')).set(auth());
+    const globalEntry = globalRes.body.rows.find((e: { action: string }) => e.action === 'not-junk');
+    expect(globalEntry.target).toBe('id1');
+  });
+});
+
 describe('POST /admin/doors/batch-strip-preview', () => {
   it('runs strip-preview for every archive and stores the aggregated result on the job', async () => {
     // previewStripOne() reads the real archive file off disk via
@@ -476,11 +502,13 @@ describe('POST /admin/doors/batch-strip-apply', () => {
     db.close();
     expect(fs.statSync(archiveAbsPath).size).toBe(0);
 
-    // The audit log records the archive with an empty members list and
-    // zero removed, not a re-derived classifier result.
+    // The audit log records the door's catalog id (not archive_name) as
+    // target - that's what the per-door audit-history route filters on -
+    // with an empty members list and zero removed, not a re-derived
+    // classifier result.
     const auditRes = await request(app()).get(admin('/audit')).set(auth());
     const stripEntry = auditRes.body.rows.find((e: { action: string }) => e.action === 'strip');
-    expect(stripEntry).toMatchObject({ target: 'ACC-V103.LHA' });
+    expect(stripEntry).toMatchObject({ target: 'id1' });
     expect(stripEntry.detail).toMatchObject({ members: [], removed: 0 });
   });
 

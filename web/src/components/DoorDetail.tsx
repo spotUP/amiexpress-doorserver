@@ -401,6 +401,13 @@ function StripAds({
               <span className="flex-1 truncate font-mono">{f.path}</span>
               <button onClick={() => viewKeptFile(f.path)} className="p-1 text-muted hover:text-accent" title="View file"><Eye size={12}/></button>
               <span className="text-muted">{preview.reason[f.path]}</span>
+              <button
+                onClick={() => markKeptNotJunk(f.path)}
+                className="rounded p-1 text-muted hover:bg-raised hover:text-success"
+                title="False positive - mark as not junk (kept from now on in this door)"
+              >
+                <ShieldCheck size={12} />
+              </button>
             </li>
           ))}
         </ul>

@@ -1068,6 +1068,20 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   // ─── archive stripping ───────────────────────────────────────────
 
   /**
+   * admin_audit.target is a catalog id everywhere else in this file (see
+   * the 'edit'/'hide'/'delete' routes above) - the per-door audit-history
+   * route filters on it. The strip/learn/not-junk routes below used to log
+   * archive_name instead, so those corrections silently never showed up
+   * in a door's own history. Resolves the id for a consistent target.
+   */
+  function catalogIdFor(db: ReturnType<typeof openDb>, archiveName: string): string {
+    const row = db
+      .prepare('SELECT id FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
+      .get(archiveName) as { id: string } | undefined;
+    return row?.id ?? archiveName;
+  }
+
+  /**
    * Runs strip-preview's classification for one archive: resolves the
    * catalog row, loads the admin's "not junk" corrections and any learned
    * patterns, and runs analyzeArchive(). Shared by the single-door
@@ -1196,7 +1210,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
           results.push({ archiveName, stripped: [], error: result.error });
           const auditDb = openDb(cfg);
           try {
-            recordAudit(auditDb, req.admin?.id ?? null, 'strip-preview-failed', archiveName, { error: result.error });
+            recordAudit(auditDb, req.admin?.id ?? null, 'strip-preview-failed', catalogIdFor(auditDb, archiveName), { error: result.error });
           } finally {
             auditDb.close();
           }
@@ -1249,10 +1263,10 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       const auditDb = openDb(cfg);
       try {
         if (!result.ok) {
-          recordAudit(auditDb, req.admin?.id ?? null, 'strip-failed', archiveName, { members, error: result.reason ?? 'strip failed' });
+          recordAudit(auditDb, req.admin?.id ?? null, 'strip-failed', catalogIdFor(auditDb, archiveName), { members, error: result.reason ?? 'strip failed' });
           return { error: result.reason ?? 'strip failed' };
         }
-        recordAudit(auditDb, req.admin?.id ?? null, 'strip', archiveName, { members, removed: result.removed });
+        recordAudit(auditDb, req.admin?.id ?? null, 'strip', catalogIdFor(auditDb, archiveName), { members, removed: result.removed });
       } finally {
         auditDb.close();
       }
@@ -1286,7 +1300,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
     }
     const auditDb = openDb(cfg);
     try {
-      recordAudit(auditDb, req.admin?.id ?? null, 'strip', archiveName, {
+      recordAudit(auditDb, req.admin?.id ?? null, 'strip', catalogIdFor(auditDb, archiveName), {
         members,
         removed: result.removed,
       });
@@ -1328,7 +1342,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       const info = db
         .prepare('INSERT INTO learned_junk_patterns (pattern, archive_name, file_path, learned_by) VALUES (?, ?, ?, ?)')
         .run(pattern, archiveName, filePath, req.admin?.username ?? 'admin');
-      recordAudit(db, req.admin?.id ?? null, 'learn', archiveName ?? '', { pattern, filePath });
+      recordAudit(db, req.admin?.id ?? null, 'learn', archiveName ? catalogIdFor(db, archiveName) : '', { pattern, filePath });
       res.json({ ok: true, id: Number(info.lastInsertRowid), duplicate: false });
     } finally {
       db.close();
@@ -1375,7 +1389,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         res.status(404).json({ error: 'no learned pattern for that file' });
         return;
       }
-      recordAudit(db, req.admin?.id ?? null, 'unlearn', archiveName, { filePath });
+      recordAudit(db, req.admin?.id ?? null, 'unlearn', catalogIdFor(db, archiveName), { filePath });
       res.json({ ok: true, removed: info.changes });
     } finally {
       db.close();
@@ -1428,7 +1442,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
            marked_by = excluded.marked_by,
            marked_at = strftime('%s','now')`
       ).run(archiveName, filePath, reason, req.admin?.username ?? 'admin');
-      recordAudit(db, req.admin?.id ?? null, 'not-junk', archiveName, { filePath, reason });
+      recordAudit(db, req.admin?.id ?? null, 'not-junk', catalogIdFor(db, archiveName), { filePath, reason });
       res.json({ ok: true, archiveName, filePath });
     } finally {
       db.close();
@@ -1452,7 +1466,7 @@ export function createAdminRouter(cfg: ServerConfig): Router {
         res.status(404).json({ error: 'no not-junk entry for that file' });
         return;
       }
-      recordAudit(db, req.admin?.id ?? null, 'not-junk-remove', archiveName, { filePath });
+      recordAudit(db, req.admin?.id ?? null, 'not-junk-remove', catalogIdFor(db, archiveName), { filePath });
       res.json({ ok: true, removed: info.changes });
     } finally {
       db.close();
