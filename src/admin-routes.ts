@@ -23,11 +23,11 @@ import { analyseDoor, buildGroupTags, fixCasing, fixTitleCasing, tidyCase } from
 import { OVERRIDABLE_FIELDS, isHidden, isOverridableField, loadOverrides, type OverrideMap } from './effective';
 import { UploadError, approveSubmission, rejectSubmission, deriveMetadata } from './submissions';
 import type { ServerConfig } from './config';
-import { analyzeArchive, isMatchAllGlob } from './ami-stripper';
+import { analyzeArchive, isMatchAllGlob, type StripEntry } from './ami-stripper';
 import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
-import { createJob, runJobSequentially, getJob } from './batch-jobs';
+import { createJob, runJobSequentially, getJob, setJobResult } from './batch-jobs';
 import * as fs from 'fs';
 
 /**
@@ -1050,27 +1050,30 @@ export function createAdminRouter(cfg: ServerConfig): Router {
   // ─── archive stripping ───────────────────────────────────────────
 
   /**
-   * Preview what the ad stripper would flag in this archive, without
-   * modifying anything. The response includes every file with its
-   * classification verdict so the UI can show a checklist.
+   * Runs strip-preview's classification for one archive: resolves the
+   * catalog row, loads the admin's "not junk" corrections and any learned
+   * patterns, and runs analyzeArchive(). Shared by the single-door
+   * '/strip-preview' route and the batch-strip-preview job below.
+   *
+   * Returns everything the single-door route needs to reconstruct its
+   * response unchanged - the full StripEntry[] (path+size+md5, not
+   * narrowed), the full reason map, and the real preserved paths. The
+   * batch route builds its own compact {path,reason}[] shape from
+   * `stripped`+`reason`; this function does not pre-narrow that for it,
+   * so the single-door route's response never has to change to serve the
+   * batch caller's convenience.
    */
-  router.post('/doors/:archiveName/strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
-    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+  function previewStripOne(cfg: ServerConfig, archiveName: string):
+    | { ok: true; archivePath: string; kept: StripEntry[]; stripped: StripEntry[]; reason: Record<string, string>; notJunk: string[]; cleanedDiz: string | null; isEmptyLzx: boolean }
+    | { error: string } {
     const db = openDb(cfg, { readonly: true });
     try {
       const row = db
         .prepare('SELECT archive_path FROM door_catalog WHERE archive_name = ? COLLATE NOCASE')
         .get(archiveName) as { archive_path: string } | undefined;
-      if (!row) {
-        res.status(404).json({ error: 'no such door' });
-        return;
-      }
+      if (!row) return { error: 'no such door' };
       const absPath = resolveArchivePath(cfg, row.archive_path);
-      const fs = require('fs');
-      if (!fs.existsSync(absPath)) {
-        res.status(404).json({ error: 'archive file not found on disk' });
-        return;
-      }
+      if (!fs.existsSync(absPath)) return { error: 'archive file not found on disk' };
 
       // Files the admin has marked as "not junk" are always kept, even
       // when the auto-stripper would flag them. This is the feedback
@@ -1091,29 +1094,80 @@ export function createAdminRouter(cfg: ServerConfig): Router {
           extraPatterns.length > 0 ? extraPatterns : undefined,
           preservePaths.size > 0 ? preservePaths : undefined,
         );
-      } catch (e: any) {
-        res.status(400).json({ error: `cannot read archive: ${e?.message ?? String(e)}` });
-        return;
+      } catch (e: unknown) {
+        return { error: `cannot read archive: ${(e as Error)?.message ?? String(e)}` };
       }
-      if (result.kept.length === 0 && result.stripped.length === 0) {
-        const ext = require('path').extname(absPath).toLowerCase();
-        if (ext === '.lzx') {
-          res.status(400).json({ error: 'LZX archives cannot be read by this server' });
-          return;
-        }
-      }
-      res.json({
-        archiveName,
+      const isEmptyLzx = result.kept.length === 0 && result.stripped.length === 0
+        && path.extname(absPath).toLowerCase() === '.lzx';
+      return {
+        ok: true,
         archivePath: absPath,
         kept: result.kept,
         stripped: result.stripped,
         reason: result.reason,
-        notJunk: Array.from(preservePaths ?? new Set<string>()),
+        notJunk: Array.from(preservePaths),
         cleanedDiz: result.cleanedDiz ?? null,
-      });
+        isEmptyLzx,
+      };
     } finally {
       db.close();
     }
+  }
+
+  /**
+   * Preview what the ad stripper would flag in this archive, without
+   * modifying anything. The response includes every file with its
+   * classification verdict so the UI can show a checklist.
+   */
+  router.post('/doors/:archiveName/strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const result = previewStripOne(cfg, archiveName);
+    if ('error' in result) {
+      res.status(result.error === 'no such door' || result.error === 'archive file not found on disk' ? 404 : 400).json({ error: result.error });
+      return;
+    }
+    if (result.isEmptyLzx) {
+      res.status(400).json({ error: 'LZX archives cannot be read by this server' });
+      return;
+    }
+    res.json({
+      archiveName,
+      archivePath: result.archivePath,
+      kept: result.kept,
+      stripped: result.stripped,
+      reason: result.reason,
+      notJunk: result.notJunk,
+      cleanedDiz: result.cleanedDiz,
+    });
+  });
+
+  /** Preview strip candidates across many doors as a tracked job - phase 1
+   *  of batch strip. Never deletes anything; a later batch-strip-apply
+   *  needs the admin's reviewed selection first. The job's resultJson is
+   *  the review UI's own compact shape: {archiveName, stripped:{path,reason}[]}[],
+   *  built here (not by previewStripOne) from the full stripped+reason it
+   *  returns - archives with zero flagged files are included, not omitted,
+   *  so the UI can show "0 flagged" instead of silently skipping them. */
+  router.post('/doors/batch-strip-preview', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const body = (req.body ?? {}) as { archiveNames?: string[] };
+    if (!Array.isArray(body.archiveNames) || body.archiveNames.length === 0) {
+      res.status(400).json({ error: 'archiveNames array required' });
+      return;
+    }
+    const jobId = createJob(cfg, 'strip-preview', body.archiveNames, req.admin?.id ?? null);
+    const results: { archiveName: string; stripped: { path: string; reason: string }[] }[] = [];
+    void runJobSequentially(cfg, jobId, body.archiveNames, (archiveName) => {
+      const result = previewStripOne(cfg, archiveName);
+      if ('error' in result) return { error: result.error };
+      results.push({
+        archiveName,
+        stripped: result.stripped.map((e) => ({ path: e.path, reason: result.reason[e.path] ?? 'pattern' })),
+      });
+      return { ok: true };
+    }).then(() => {
+      setJobResult(cfg, jobId, JSON.stringify(results));
+    });
+    res.json({ jobId });
   });
 
   /**

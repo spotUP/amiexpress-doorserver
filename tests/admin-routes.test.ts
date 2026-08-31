@@ -275,6 +275,126 @@ describe('POST /admin/doors/batch-reextract', () => {
   });
 });
 
+describe('POST /admin/doors/:archiveName/strip-preview', () => {
+  // Regression coverage for the previewStripOne() extraction (task 6): the
+  // route's response shape must stay byte-for-byte identical to what it was
+  // before the extraction. A narrower `previewStripOne` (stripped narrowed
+  // to {path,reason}, notJunk hardcoded to [], archivePath dropped) would
+  // silently break DoorDetail.tsx's live "Strip ads" review UI - nothing
+  // else in this suite exercised /strip-preview before this task.
+  function writeZip(zipPath: string, entries: Array<{ name: string; content: string }>): void {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const AdmZip = require('adm-zip');
+    const zip = new AdmZip();
+    for (const e of entries) zip.addFile(e.name, Buffer.from(e.content));
+    fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+    zip.writeZip(zipPath);
+  }
+
+  it('returns full StripEntry objects, a reason map, the real notJunk list, and archivePath', async () => {
+    // Point the catalog's archive_path at a real ZIP so analyzeArchive has
+    // something to classify (readArchiveFiles picks its reader by file
+    // extension, so the on-disk file must actually end in .zip).
+    const zipPath = path.join(dir, 'AmiExpress', 'ACC-V103.zip');
+    writeZip(zipPath, [
+      { name: 'DOOR.FIM', content: 'binary door bytes' },
+      { name: '!call_diz_now!', content: 'an ad payload' },
+    ]);
+    const db = openDb(cfg);
+    db.prepare('UPDATE door_catalog SET archive_path = ? WHERE archive_name = ?')
+      .run('AmiExpress/ACC-V103.zip', 'ACC-V103.LHA');
+    // A file the admin has already told the stripper to leave alone.
+    db.prepare('INSERT INTO door_not_junk (archive_name, file_path, reason) VALUES (?, ?, ?)')
+      .run('ACC-V103.LHA', 'DOOR.FIM', 'it is the door binary');
+    db.close();
+
+    const res = await request(app()).post(admin('/doors/ACC-V103.LHA/strip-preview')).set(auth());
+    expect(res.status).toBe(200);
+    expect(res.body.archiveName).toBe('ACC-V103.LHA');
+    expect(res.body.archivePath).toBe(zipPath);
+    // The literal brief text narrows stripped to {path,reason} - assert the
+    // real StripEntry shape (size + md5) survives the extraction instead.
+    expect(res.body.stripped.length).toBeGreaterThan(0);
+    for (const entry of res.body.stripped) {
+      expect(entry).toHaveProperty('path');
+      expect(entry).toHaveProperty('size');
+      expect(entry).toHaveProperty('md5');
+    }
+    // `reason` is a full map, separate from `stripped`, not folded into it.
+    expect(typeof res.body.reason).toBe('object');
+    expect(Object.keys(res.body.reason).length).toBeGreaterThan(0);
+    // The real admin-marked not-junk paths, not a hardcoded [].
+    expect(res.body.notJunk).toEqual(['DOOR.FIM']);
+  });
+
+  it('answers 400 with the LZX message when an LZX archive comes back with no members at all', async () => {
+    // A genuinely 0-byte file is the case that reaches the empty-result
+    // branch without throwing: ami-stripper's readArchiveContents() only
+    // throws "reader returned 0 files" for a *non-empty* buffer that fails
+    // to parse (garbage bytes) - a 0-byte file skips that guard entirely
+    // and analyzeArchive comes back with kept=[] and stripped=[] cleanly.
+    const lzxAbsPath = path.join(dir, 'AmiExpress', 'EMPTY.LZX');
+    fs.mkdirSync(path.dirname(lzxAbsPath), { recursive: true });
+    fs.writeFileSync(lzxAbsPath, Buffer.alloc(0));
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, archive_size, indexed_at)
+       VALUES ('id2', 'EMPTY.LZX', 'AmiExpress/EMPTY.LZX', 'Empty LZX', 23, 1700000000)`
+    ).run();
+    db.close();
+
+    const res = await request(app()).post(admin('/doors/EMPTY.LZX/strip-preview')).set(auth());
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'LZX archives cannot be read by this server' });
+  });
+});
+
+describe('POST /admin/doors/batch-strip-preview', () => {
+  it('runs strip-preview for every archive and stores the aggregated result on the job', async () => {
+    // previewStripOne() reads the real archive file off disk via
+    // analyzeArchive(), which (unlike reextractOneDoor's direct
+    // readLhaContents() call) throws on a *non-empty* file that fails to
+    // parse - see ami-stripper's readArchiveContents(). A 0-byte file
+    // skips that guard and comes back as a clean "nothing to strip" result.
+    const archiveAbsPath = path.join(dir, 'AmiExpress', 'ACC-V103.LHA');
+    fs.mkdirSync(path.dirname(archiveAbsPath), { recursive: true });
+    fs.writeFileSync(archiveAbsPath, Buffer.alloc(0));
+
+    const start = await request(app()).post(admin('/doors/batch-strip-preview')).set(auth()).send({ archiveNames: ['ACC-V103.LHA'] });
+    expect(start.status).toBe(200);
+    const { jobId } = start.body;
+
+    let job;
+    for (let i = 0; i < 20; i++) {
+      job = (await request(app()).get(admin(`/jobs/${jobId}`)).set(auth())).body;
+      if (job.status === 'done') break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(job.status).toBe('done');
+    const result = JSON.parse(job.resultJson);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveProperty('archiveName', 'ACC-V103.LHA');
+    expect(result[0]).toHaveProperty('stripped');
+  });
+
+  it('includes an archive with zero flagged files rather than omitting it', async () => {
+    const archiveAbsPath = path.join(dir, 'AmiExpress', 'ACC-V103.LHA');
+    fs.mkdirSync(path.dirname(archiveAbsPath), { recursive: true });
+    fs.writeFileSync(archiveAbsPath, Buffer.alloc(0));
+
+    const start = await request(app()).post(admin('/doors/batch-strip-preview')).set(auth()).send({ archiveNames: ['ACC-V103.LHA'] });
+    const { jobId } = start.body;
+    let job;
+    for (let i = 0; i < 20; i++) {
+      job = (await request(app()).get(admin(`/jobs/${jobId}`)).set(auth())).body;
+      if (job.status === 'done') break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    const result = JSON.parse(job.resultJson);
+    expect(result).toEqual([{ archiveName: 'ACC-V103.LHA', stripped: [] }]);
+  });
+});
+
 describe('POST /admin/doors/batch-tags', () => {
   it('adds and removes tags across multiple doors, skipping an unknown archive', async () => {
     await request(app()).patch(admin('/doors/ACC-V103.LHA/tags')).set(auth()).send({ tags: ['keep-me'] });

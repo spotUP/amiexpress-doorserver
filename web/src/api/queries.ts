@@ -319,6 +319,18 @@ export function useStripPreview(archiveName: string) {
   });
 }
 
+export interface StripCandidate { path: string; reason: string }
+export interface StripPreviewResult { archiveName: string; stripped: StripCandidate[] }
+
+/** Kicks off the batch-strip-preview job (phase 1 of batch strip); the
+ *  caller polls /admin/jobs/:id and JSON.parses resultJson into
+ *  StripPreviewResult[] once the job is done. */
+export function useBatchStripPreview() {
+  return useMutation({
+    mutationFn: (archiveNames: string[]) => api.post<{ jobId: string }>('/admin/doors/batch-strip-preview', { archiveNames }),
+  });
+}
+
 export function useFileInfo(archiveName: string) {
   return (path: string) =>
     api.get<{ path: string; size: number; isText: boolean }>(
