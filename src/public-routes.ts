@@ -254,6 +254,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     const requires = strParam(req.query.requires);
     const category = strParam(req.query.category);
     const latest = strParam(req.query.latest) === '1';
+    const unstripped = strParam(req.query.unstripped) === '1';
     const page = intParam(req.query.page, 1, 1, 100000);
     const perPage = intParam(req.query.per_page, DEFAULT_PER_PAGE, 1, MAX_PER_PAGE);
     const sortKey = strParam(req.query.sort) ?? 'indexed';
@@ -273,6 +274,9 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     if (requires) {
       where.push('requires_bbs = ?');
       params.push(requires);
+    }
+    if (unstripped) {
+      where.push('ads_stripped = 0');
     }
     if (system) {
       // The system is the first path segment; "Unsorted" means there is none.

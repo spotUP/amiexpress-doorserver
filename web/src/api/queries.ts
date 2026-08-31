@@ -28,6 +28,8 @@ export interface DoorQuery {
   latest?: boolean;
   /** 'archive' finds the doors whose name is a guess from the filename. */
   nameSource?: string;
+  /** Doors whose ads have not yet been reviewed/stripped. */
+  unstripped?: boolean;
   sort?: string;
   dir?: 'asc' | 'desc';
   page?: number;
@@ -43,6 +45,7 @@ function toSearch(query: DoorQuery): string {
   if (query.requires) params.set('requires', query.requires);
   if (query.latest) params.set('latest', '1');
   if (query.nameSource) params.set('name_source', query.nameSource);
+  if (query.unstripped) params.set('unstripped', '1');
   if (query.sort) params.set('sort', query.sort);
   if (query.dir) params.set('dir', query.dir);
   if (query.page && query.page > 1) params.set('page', String(query.page));

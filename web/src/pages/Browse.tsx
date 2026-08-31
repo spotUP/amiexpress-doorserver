@@ -3,7 +3,7 @@
  * asked for on this path - the corpus is public, and reading it is the point.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
+import { Eraser, Inbox, LogIn, LogOut, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
 import { useBatchHide, useBatchPatch, useBatchRestore, useDoors, useFacets, useLiveRevision } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
@@ -30,6 +30,7 @@ export function Browse() {
   const [type, setType] = useState('');
   const [requires, setRequires] = useState('');
   const [guessedOnly, setGuessedOnly] = useState(false);
+  const [unstrippedOnly, setUnstrippedOnly] = useState(false);
   const [latestOnly, setLatestOnly] = useState(false);
   const [sortState, setSortState] = useState<SortState>({ sort: 'indexed', dir: 'desc' });
   const [page, setPage] = useState(1);
@@ -73,12 +74,13 @@ export function Browse() {
       requires,
       latest: latestOnly || undefined,
       nameSource: guessedOnly ? 'archive' : undefined,
+      unstripped: unstrippedOnly || undefined,
       sort: sortState.sort,
       dir: sortState.dir,
       page,
       perPage: PER_PAGE,
     }),
-    [q, system, type, requires, guessedOnly, sortState, page]
+    [q, system, type, requires, guessedOnly, unstrippedOnly, sortState, page]
   );
   const { data, isLoading } = useDoors(query);
   const { data: facets } = useFacets();
@@ -255,6 +257,18 @@ export function Browse() {
             title="Doors whose name was guessed from the archive filename"
           >
             <Wand2 size={14} /> Needs a name
+          </Button>
+        )}
+        {admin && (
+          <Button
+            variant={unstrippedOnly ? 'primary' : 'ghost'}
+            onClick={() => {
+              setUnstrippedOnly((on) => !on);
+              setPage(1);
+            }}
+            title="Doors whose ads have not been reviewed/stripped yet"
+          >
+            <Eraser size={14} /> Needs ad review
           </Button>
         )}
         <Button
