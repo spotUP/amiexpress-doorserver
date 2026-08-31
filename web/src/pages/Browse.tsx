@@ -53,6 +53,7 @@ export function Browse() {
   const [latestOnly, setLatestOnly] = useState(false);
   const [sortState, setSortState] = useState<SortState>({ sort: 'indexed', dir: 'desc' });
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -583,10 +584,34 @@ export function Browse() {
         <span>
           {isLoading ? 'Loading...' : data ? `Page ${data.page} of ${pages}` : ''}
         </span>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
             Previous
           </Button>
+          <Select
+            value={String(page)}
+            onChange={(v) => setPage(Number(v))}
+            options={Array.from({ length: pages }, (_, i) => ({ value: String(i + 1), label: `Page ${i + 1}` }))}
+            placeholder="Page"
+            ariaLabel="Jump to page"
+            required
+          />
+          <input
+            type="number"
+            min={1}
+            max={pages}
+            value={pageInput}
+            onChange={(e) => setPageInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              const n = Number.parseInt(pageInput, 10);
+              if (Number.isFinite(n)) setPage(Math.min(Math.max(n, 1), pages));
+              setPageInput('');
+            }}
+            placeholder="Go to..."
+            className="w-20 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+            aria-label="Type a page number and press Enter"
+          />
           <Button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>
             Next
           </Button>
