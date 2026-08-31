@@ -92,4 +92,23 @@ describe('runMigrations', () => {
     expect(db.prepare('SELECT version FROM schema_migrations').all()).toEqual([]);
     db.close();
   });
+
+  it('creates batch_jobs and batch_job_items', () => {
+    const db = openDb(cfg);
+    runMigrations(db);
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('batch_jobs','batch_job_items')")
+      .all() as { name: string }[];
+    expect(tables.map((t) => t.name).sort()).toEqual(['batch_job_items', 'batch_jobs']);
+    db.prepare(
+      `INSERT INTO batch_jobs (id, kind, status, total, completed, failed_count, created_by, created_at, updated_at)
+       VALUES ('job1', 'reextract', 'running', 3, 0, 0, NULL, 1, 1)`
+    ).run();
+    db.prepare(
+      `INSERT INTO batch_job_items (job_id, archive_name, status) VALUES ('job1', 'FOO.LHA', 'pending')`
+    ).run();
+    const item = db.prepare('SELECT * FROM batch_job_items WHERE job_id = ?').get('job1');
+    expect(item).toMatchObject({ job_id: 'job1', archive_name: 'FOO.LHA', status: 'pending' });
+    db.close();
+  });
 });

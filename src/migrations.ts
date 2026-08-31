@@ -286,6 +286,39 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 14,
+    name: 'batch_jobs',
+    // Tracks a bulk background operation (reextract, strip preview/apply)
+    // so its progress survives a page refresh and can ride the existing
+    // live-revision SSE connection as a new event type.
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS batch_jobs (
+          id           TEXT PRIMARY KEY,
+          kind         TEXT NOT NULL CHECK (kind IN ('reextract', 'strip-preview', 'strip-apply')),
+          status       TEXT NOT NULL CHECK (status IN ('running', 'done', 'failed')),
+          total        INTEGER NOT NULL,
+          completed    INTEGER NOT NULL DEFAULT 0,
+          failed_count INTEGER NOT NULL DEFAULT 0,
+          result_json  TEXT,
+          created_by   INTEGER,
+          created_at   INTEGER NOT NULL,
+          updated_at   INTEGER NOT NULL
+        )
+      `);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS batch_job_items (
+          job_id       TEXT NOT NULL,
+          archive_name TEXT NOT NULL,
+          status       TEXT NOT NULL CHECK (status IN ('pending', 'ok', 'error')),
+          error        TEXT,
+          PRIMARY KEY (job_id, archive_name)
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_bji_job ON batch_job_items(job_id)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {
