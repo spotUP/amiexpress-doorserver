@@ -249,14 +249,32 @@ pushed individually, and **each deploy watched to completion**
    verbatim-prefix rows first (cheap, high-confidence), verify results look
    right, THEN decide whether/how to widen the net for the fuzzier
    population.
-2. **Top Authors residual noise** (optional, only if asked): Noisy, Splash,
-   PHUN, Quantum and a few junk single-character entries (`|`, `:`, `The`,
-   `[tHE`) still show in Top Authors. The clean fix for the real groups is
-   adding rows to `release_groups`, not more code heuristics. The junk
-   entries are a separate, smaller extraction-regex bug in `AUTHOR_RE`/
-   `splitBannerCredit` (`src/describe.ts` ~line 482) over-matching stray
-   banner punctuation as if it were a handle — not investigated this
-   session.
+2. **Top Authors residual noise — INVESTIGATED 2026-08-31, turned out NOT
+   to be the clean "add to release_groups" fix originally assumed.**
+   Checked each name's actual DIZ credit line:
+   - `Noisy` → real handle is "Noisy Belch" (`bv`/`lgb_bo16`/`lgc_bb02` etc.,
+     e.g. `"BelchVIEW v1.8b by Noisy Belch/LOGIC"`) — an individual scener,
+     truncated by the author-extraction regex at the first word boundary.
+     Not a group at all.
+   - `Splash` → real handle, `"GlobalDupe 1.4 ... By Splash"`, world-release
+     credited separately to group `MGS!` in the same banner. Not a group.
+   - `PHUN` → genuinely a group banner ("PHoney Underground Nation") that
+     got extracted as `author` instead of the real coder credited later in
+     the same DIZ ("Code by Rex"). This one IS the group-leak bug.
+   - `Quantum` → DIZ for this row (`q-clct_1.lha`, `q-daa_10.lha`) carries
+     no credit line at all; where `author = 'Quantum'` actually came from
+     is unclear (not the DIZ text) — unresolved.
+   Conclusion: this is at least two, probably three, distinct root causes
+   (handle-truncation regex bug, DIZ-banner-vs-real-coder confusion, and an
+   unknown non-DIZ source for at least one name), not one lookup-table gap.
+   Given the mixed causes, did **not** implement a fix — a real fix needs
+   per-row triage of `author`'s actual provenance, not a `release_groups`
+   INSERT. Left as-is; if revisited, start by checking whether `author` is
+   ever populated from something other than `analyseDoor()`'s DIZ parse
+   (e.g. a filename heuristic or demozoo import) for rows like `q-clct_1`.
+   The junk single-character entries (`|`, `:`, `The`, `[tHE`) are a
+   separate, still-unexamined regex bug in `AUTHOR_RE`/`splitBannerCredit`
+   (`src/describe.ts` ~line 482) over-matching stray banner punctuation.
 3. **`.env` and `logs/dev-server.log` are untracked** in the working tree
    (present at start of this session too, not created by me). Not committed,
    not touched — just flagging so a fresh session doesn't mistake them for
@@ -282,6 +300,44 @@ pushed individually, and **each deploy watched to completion**
    (b) an unrelated, pre-existing SSE/HTTP2 reconnect issue that was simply
    visible in the console at the time and has nothing to do with
    `INFINITE.IP` specifically.
+
+   **INVESTIGATED 2026-08-31 — leans strongly toward (b), could not
+   reproduce.**
+   - The live archive's own member listing (`lha l SS_CD13.LHA`) shows
+     `INFINITE.IP` as a genuine 0-byte member (ratio shows `******` —
+     division-by-zero in `lha`'s own display for a zero-size file, not
+     evidence of corruption beyond that).
+   - Calling `extractFile()` directly against the real archive for this
+     member returns instantly (2 ms, empty buffer) — no hang, no error.
+     Rules out "this member's extraction blocks the event loop long enough
+     to starve the SSE connection."
+   - More importantly: **the public Files tab only lists 9 members, not
+     10** — `INFINITE.IP` is silently dropped by the `lha.js` reader
+     (`LHA.read()` in `src/archive-reader.ts:140`, likely because of its
+     degenerate zero-length header) before `door_catalog_files` is ever
+     populated (`src/admin-routes.ts:399-404`). There is **no "View
+     contents" button for this file in the UI at all** — a user cannot
+     click their way into viewing it through the file-viewer action. This
+     substantially undercuts hypothesis (a): whatever the user saw, it
+     wasn't a click on a "view `INFINITE.IP`" button, because that button
+     doesn't exist.
+   - Live-reproduction attempt: opened the door's detail dialog on the
+     live site, cycled through About / Files / Guide tabs, and left an
+     idle SSE connection open past its 25s keepalive interval (40s+
+     wait). Console stayed clean throughout (`list_console_messages`
+     returned nothing for `error`/`warn`); the single `/api/door-repo/events`
+     connection (`reqid=7`) never reconnected or errored the whole time.
+   - Conclusion: couldn't reproduce, and the one lead that could have
+     explained it (this specific file's extraction) is ruled out. Most
+     likely a one-off client/network-layer blip (Chrome's h2 connection
+     churn, a mobile network handoff, a transient proxy hiccup) rather
+     than a reproducible server bug. Not spending further time on it
+     without a second occurrence to anchor on — if it recurs, the next
+     useful data point would be the Caddy access/error log
+     (`/etc/caddy/Caddyfile` on `doors.uprough.net`, bare
+     `reverse_proxy 127.0.0.1:3010` with no explicit `flush_interval`)
+     at the timestamp of the next occurrence, not more client-side
+     guessing.
    `door_catalog_files` has no row for `INFINITE.IP` under `ss_cd13` (checked
    directly — table may simply not enumerate every member, or the file
    listing works from a different mechanism at view-time). Start here: (1)
