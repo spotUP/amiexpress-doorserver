@@ -42,11 +42,20 @@ function firstPathSegment(archivePath: string): string {
   return slash === -1 ? 'Unsorted' : archivePath.slice(0, slash);
 }
 
-/** Integer KiB with a "K" suffix, or "NNNB" under 1024 bytes. No padding. */
+/** Integer KiB with a "K" suffix, or "NNNB" under 1024 bytes. */
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
   return `${Math.round(bytes / 1024)}K`;
 }
+
+/**
+ * Right-aligned width for the Size column, so a listing of these rows reads
+ * as a lined-up table (like aminetsearch's own Size column) instead of a
+ * ragged one. 6 covers the corpus's current widest value ("3641K") with a
+ * character of headroom; a size that ever exceeds it just widens the column
+ * by that row rather than breaking anything.
+ */
+const SIZE_COL_WIDTH = 6;
 
 /**
  * A tab or newline inside any field would break the format, so every
@@ -65,7 +74,7 @@ function tsvField(s: string): string {
 function renderRow(row: DoorCatalogRow, groupTags: ReadonlySet<string>): string {
   const filename = tsvField(row.archive_name);
   const pathCol = tsvField(firstPathSegment(row.archive_path));
-  const size = formatSize(row.archive_size ?? 0);
+  const size = formatSize(row.archive_size ?? 0).padStart(SIZE_COL_WIDTH);
   return `${filename}\t${pathCol}\t${size}\t${tsvField(describeRow(row, groupTags) ?? '')}`;
 }
 

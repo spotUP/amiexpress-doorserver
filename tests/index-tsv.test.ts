@@ -76,19 +76,19 @@ describe('renderIndexTsv', () => {
     // "v1.0" is the door's own version and now leaves the description for
     // its own field (src/describe.ts), so the Description column carries the
     // name alone.
-    expect(row).toBe('ACC-V103.LHA\tAmiExpress\t671K\tAccount Editor');
+    expect(row).toBe('ACC-V103.LHA\tAmiExpress\t  671K\tAccount Editor');
   });
 
   it('falls back to Unsorted when archive_path has no directory segment', () => {
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('LOOSE.LHA'));
-    expect(row).toBe('LOOSE.LHA\tUnsorted\t2K\tLoose');
+    expect(row).toBe('LOOSE.LHA\tUnsorted\t    2K\tLoose');
   });
 
   it('formats sizes under 1024 bytes as NNNB with no K suffix', () => {
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('TINY.LHA'));
-    expect(row).toBe('TINY.LHA\tAmiExpress\t512B\tTiny');
+    expect(row).toBe('TINY.LHA\tAmiExpress\t  512B\tTiny');
   });
 
   it('is ISO-8859-1 encoded: high-bit metadata becomes a single Latin-1 byte, not UTF-8', () => {
@@ -144,7 +144,7 @@ describe('renderIndexTsv', () => {
     const row = body.split('\n').find((l: string) => l.startsWith('FULLCHAT.LHA'));
     // binary_name is a FILENAME: "FullChat" is split into words before it
     // is composed with the DIZ line.
-    expect(row).toBe('FULLCHAT.LHA	AmiExpress	1K	Full Chat - Split Chat Door');
+    expect(row).toBe('FULLCHAT.LHA	AmiExpress	    1K	Full Chat - Split Chat Door');
   });
 
   // Finding 4: Filename and Path get the same control-character strip
@@ -158,7 +158,7 @@ describe('renderIndexTsv', () => {
     db.close();
     const body = renderIndexTsv(cfg).toString('latin1');
     const row = body.split('\n').find((l: string) => l.startsWith('CTRL.LHA'));
-    expect(row).toBe('CTRL.LHA	Ami Express	0B	Ctrl');
+    expect(row).toBe('CTRL.LHA	Ami Express	    0B	Ctrl');
   });
 
   // Encoding note: the DIZ text is UTF-8 in the database; the TSV is

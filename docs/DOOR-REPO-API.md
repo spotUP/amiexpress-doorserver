@@ -427,7 +427,7 @@ Filename	Path	Size	Description
 |---------------|---------------------------------------------------------------------------|
 | `Filename`    | The archive's filename, e.g. `ACC-V103.LHA`.                            |
 | `Path`        | The corpus system directory: the first path segment of the catalog's internal `archive_path` (`AmiExpress/ACC-V103.LHA` -> `AmiExpress`), or `Unsorted` when `archive_path` has no directory segment. Structural -- this is the piece `uhcsearch` concatenates into its download URL. |
-| `Size`        | Integer KiB with a `K` suffix (`671K`), or `NNNB` for anything under 1024 bytes (`512B`). No padding. |
+| `Size`        | Integer KiB with a `K` suffix (`671K`), or `NNNB` for anything under 1024 bytes (`512B`). Right-aligned with leading spaces to 6 characters, like aminetsearch's own Size column, so `uhcsearch` doesn't have to re-align it. |
 | `Description` | A short, human-readable one-liner. See below.                           |
 
 **There was a fifth column, `System`, and it is gone.** It repeated `Path`

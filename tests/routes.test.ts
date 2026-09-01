@@ -208,7 +208,7 @@ describe('index.tsv', () => {
   it('carries a row for the seeded archive with a description derived from its DIZ', async () => {
     const res = await request(app).get('/api/door-repo/index.tsv');
     const row = res.text.split('\n').find((l: string) => l.startsWith('ACC-V103.LHA'));
-    expect(row).toBe('ACC-V103.LHA\tUnsorted\t5B\tDIZ line');
+    expect(row).toBe('ACC-V103.LHA\tUnsorted\t    5B\tDIZ line');
   });
 
   it('honours ?type=', async () => {
