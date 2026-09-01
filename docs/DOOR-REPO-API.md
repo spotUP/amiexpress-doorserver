@@ -549,22 +549,23 @@ live catalog:
 
 ```
 Filename	Path	Size	Description
-!ALSTER.LHA	AmiExpress	39K	Children - This tool starts only for NEWUSERS /X
-$CP-BUß1.LZX	AmiExpress	15K	Bulletin Viewer
-$CP-PS12.LZX	AmiExpress	17K	Statusbbs - Status for the great /Press
-$CP-ST13.LZX	AmiExpress	21K	Status Door minor Update
-$CP-ST14.LZX	AmiExpress	25K	Coconut /Dee Sign released today
--D-CALC.LHA	AmiExpress	10K	Today Calculator
--D-DOR11.LHA	AmiExpress	7K	Today Door-Menu
--D-INF21.LHA	AmiExpress	70K	Avail - Today System Info
--J-LCV30.LHA	AmiExpress	91K	Stripp - Lastcaller
--L-OFFL.LHA	AmiExpress	34K	Offliner New /X Util
+!ALSTER.LHA	AmiExpress	   33K	Children - this tool starts only for newusers /X
+!newmail.zip	Submitted	    4K	New mail scanner for RA (Remote Access) BBS
+#t-up-dl.zip	Submitted	   13K	Tracks and displays top uploaders and downloaders on the BBS
+$CP-AR11.LHA	Phantasm	    4K	File_ID.dopusv1.1 full ZIP-file working
+$CP-BUß1.lha	AmiExpress	   15K	Bulletin viewer
+$CP-PS12.lha	AmiExpress	   17K	Statusbbs - status for the great /press
+$CP-ST13.lha	AmiExpress	   21K	Status door minor update
+$cp-st14.lha	Submitted	   46K	Displays BBS/system status information
+$CP-ST14_AmiExpress.lha	AmiExpress	   25K	Coconut /dee sign released today
+(r96)001.zip	Submitted	   22K	Logoff replacement PPE for PCBoard BBS
 ```
 
-(`!ALSTER.LHA` and `-D-INF21.LHA` show the banner-skip in action -- both
-DIZs open with a "<group> presents" line that is skipped in favor of the
-door's own description; `$CP-ST14.LZX`'s first candidate line contained
-`©` and was skipped for the same copyright reason.)
+(`!ALSTER.LHA` shows the banner-skip in action -- its DIZ opens with a
+"<group> presents" line that is skipped in favor of the door's own
+description. `Size` is right-aligned to 6 characters per Patrik's request,
+matching aminetsearch's own listing style, rather than emitted at its raw
+unpadded width.)
 
 `X-Door-Repo-Revision` is present on this response too, same as every other
 endpoint in this API.
