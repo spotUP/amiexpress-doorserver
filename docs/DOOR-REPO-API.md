@@ -427,7 +427,7 @@ Filename	Path	Size	Description
 |---------------|---------------------------------------------------------------------------|
 | `Filename`    | The archive's filename, e.g. `ACC-V103.LHA`.                            |
 | `Path`        | The corpus system directory: the first path segment of the catalog's internal `archive_path` (`AmiExpress/ACC-V103.LHA` -> `AmiExpress`), or `Unsorted` when `archive_path` has no directory segment. Structural -- this is the piece `uhcsearch` concatenates into its download URL. |
-| `Size`        | Integer KiB with a `K` suffix (`671K`), or `NNNB` for anything under 1024 bytes (`512B`). Right-aligned with leading spaces to 6 characters, like aminetsearch's own Size column, so `uhcsearch` doesn't have to re-align it. |
+| `Size`        | Integer KiB with a `K` suffix (`671K`), or `NNNB` for anything under 1024 bytes (`512B`). Right-aligned with leading spaces to 4 characters -- aminetsearch's own Size column width -- so `uhcsearch` doesn't have to re-align it. |
 | `Description` | A short, human-readable one-liner. See below.                           |
 
 **There was a fifth column, `System`, and it is gone.** It repeated `Path`
@@ -549,23 +549,23 @@ live catalog:
 
 ```
 Filename	Path	Size	Description
-!ALSTER.LHA	AmiExpress	   33K	Children - this tool starts only for newusers /X
-!newmail.zip	Submitted	    4K	New mail scanner for RA (Remote Access) BBS
-#t-up-dl.zip	Submitted	   13K	Tracks and displays top uploaders and downloaders on the BBS
-$CP-AR11.LHA	Phantasm	    4K	File_ID.dopusv1.1 full ZIP-file working
-$CP-BUß1.lha	AmiExpress	   15K	Bulletin viewer
-$CP-PS12.lha	AmiExpress	   17K	Statusbbs - status for the great /press
-$CP-ST13.lha	AmiExpress	   21K	Status door minor update
-$cp-st14.lha	Submitted	   46K	Displays BBS/system status information
-$CP-ST14_AmiExpress.lha	AmiExpress	   25K	Coconut /dee sign released today
-(r96)001.zip	Submitted	   22K	Logoff replacement PPE for PCBoard BBS
+!ALSTER.LHA	AmiExpress	 33K	Children - this tool starts only for newusers /X
+!newmail.zip	Submitted	  4K	New mail scanner for RA (Remote Access) BBS
+#t-up-dl.zip	Submitted	 13K	Tracks and displays top uploaders and downloaders on the BBS
+$CP-AR11.LHA	Phantasm	  4K	File_ID.dopusv1.1 full ZIP-file working
+$CP-BUß1.lha	AmiExpress	 15K	Bulletin viewer
+$CP-PS12.lha	AmiExpress	 17K	Statusbbs - status for the great /press
+$CP-ST13.lha	AmiExpress	 21K	Status door minor update
+$cp-st14.lha	Submitted	 46K	Displays BBS/system status information
+$CP-ST14_AmiExpress.lha	AmiExpress	 25K	Coconut /dee sign released today
+(r96)001.zip	Submitted	 22K	Logoff replacement PPE for PCBoard BBS
 ```
 
 (`!ALSTER.LHA` shows the banner-skip in action -- its DIZ opens with a
 "<group> presents" line that is skipped in favor of the door's own
-description. `Size` is right-aligned to 6 characters per Patrik's request,
-matching aminetsearch's own listing style, rather than emitted at its raw
-unpadded width.)
+description. `Size` is right-aligned to 4 characters per Patrik's request,
+matching aminetsearch's own Size column width, rather than emitted at its
+raw unpadded width.)
 
 `X-Door-Repo-Revision` is present on this response too, same as every other
 endpoint in this API.

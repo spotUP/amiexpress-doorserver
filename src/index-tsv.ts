@@ -51,11 +51,12 @@ function formatSize(bytes: number): string {
 /**
  * Right-aligned width for the Size column. Patrik asked for this explicitly:
  * uhcsearch's listing should line up the way aminetsearch's own Size column
- * does, not print raw-width values. 6 covers the corpus's current widest
- * value ("3641K") with a character of headroom; a size that ever exceeds it
- * just widens the column by that one row rather than breaking anything.
+ * does, not print raw-width values. 4 matches aminetsearch's own column
+ * width (its widest values, like "307K" or "2.1M", are 4 characters); a
+ * size that exceeds it just widens the column by that one row rather than
+ * breaking anything.
  */
-const SIZE_COL_WIDTH = 6;
+const SIZE_COL_WIDTH = 4;
 
 /**
  * A tab or newline inside any field would break the format, so every
