@@ -5,6 +5,7 @@ import { getDoorCount, getCatalogRevision } from './catalog';
 import { openDb } from './db';
 import { runMigrations } from './migrations';
 import { bootstrapAdmins } from './auth';
+import { initAchievementsDb } from './achievements/db';
 import { ensureQuarantine } from './submissions';
 
 /**
@@ -62,6 +63,25 @@ function main(): void {
   } catch (err) {
     console.error(`[ERROR] migrating ${cfg.dbPath} failed: ${(err as Error).message}`);
     process.exit(1);
+  }
+
+  // The achievements surface keeps its player data in a SECOND database
+  // file. Its own try/catch, and its own block after the door-repo one,
+  // because a failure here must name ACHIEVEMENTS_DB and not doors.db -
+  // the whole point of the second file is that the two never share a fate.
+  if (cfg.achievements) {
+    try {
+      for (const step of initAchievementsDb(cfg.achievements)) {
+        console.log(`[INFO] achievements migration ${step}`);
+      }
+    } catch (err) {
+      console.error(
+        `[ERROR] initialising ${cfg.achievements.dbPath} failed: ${(err as Error).message}`
+      );
+      process.exit(1);
+    }
+  } else {
+    console.log('[INFO] achievements surface disabled: ACHIEVEMENTS_DB is not set');
   }
 
   let doors: number;

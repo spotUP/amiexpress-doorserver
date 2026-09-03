@@ -7,6 +7,8 @@
  * poisons every client's cache. So: configured, or refuse to start.
  */
 import * as fs from 'fs';
+import { loadAchievementsConfig } from './achievements/config';
+import type { AchievementsConfig } from './achievements/config';
 
 export class ConfigError extends Error {}
 
@@ -23,6 +25,16 @@ export interface ServerConfig {
   jwtSecret: string | null;
   /** Shared secret for DOORMAN/external clients to POST learned patterns. */
   learnKey: string | null;
+  /**
+   * The achievements surface, or null when it is not mounted at all.
+   *
+   * null is the SUPPORTED state, not a degraded one: a door server whose
+   * sysop never configured achievements serves the door repo exactly as
+   * before. Half-configured is not a state - loadAchievementsConfig throws
+   * rather than returning something a /players endpoint could half-honour
+   * (D7).
+   */
+  achievements: AchievementsConfig | null;
 }
 
 const DEFAULT_PORT = 3010;
@@ -68,5 +80,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   if (jwtSecret !== null && jwtSecret.length < 32) {
     throw new ConfigError('DOORSERVER_JWT_SECRET is shorter than 32 characters; use a real random secret');
   }
-  return { dbPath, archivesRoot, port, adminKeys: parseAdminKeys(env.DOORSERVER_ADMIN_KEYS), jwtSecret, learnKey: env.DOORREPO_LEARN_KEY?.trim() || null };
+  return {
+    dbPath,
+    archivesRoot,
+    port,
+    adminKeys: parseAdminKeys(env.DOORSERVER_ADMIN_KEYS),
+    jwtSecret,
+    learnKey: env.DOORREPO_LEARN_KEY?.trim() || null,
+    achievements: loadAchievementsConfig(env),
+  };
 }

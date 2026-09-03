@@ -9,9 +9,11 @@
  * suite cannot accidentally prove something about a function that no request
  * ever reaches.
  *
- * AC-1 (RED) needs only the two paths, the config and the app. AC-2 extends
- * this file with the initialised achievements database and the recording
- * mailer; the shape of `makeAchievementsFixture()` does not change.
+ * AC-2 fills in the achievements half: the config that switches the surface
+ * on and an initialised `achievements.db`. The recording mailer arrives with
+ * AC-6, which is the task that introduces the `Mailer` seam - there is
+ * nothing to record until then, and a stub typed against an interface that
+ * does not exist yet would be a shape invented in a test file.
  */
 import * as fs from 'fs';
 import * as os from 'os';
@@ -19,7 +21,9 @@ import * as path from 'path';
 import Database from 'better-sqlite3';
 import { openDb, applySchema } from '../../src/db';
 import { createApp } from '../../src/app';
+import { initAchievementsDb } from '../../src/achievements/db';
 import type { ServerConfig } from '../../src/config';
+import type { AchievementsConfig } from '../../src/achievements/config';
 
 /** The board every suite reports as. The id is the ref prefix (D1). */
 export const TEST_BOARD_ID = 'uprough';
@@ -39,6 +43,8 @@ export interface AchievementsFixture {
   /** ACHIEVEMENTS_DB. */
   achievementsDbPath: string;
   cfg: ServerConfig;
+  /** The same object as `cfg.achievements`, non-null, for convenience. */
+  ach: AchievementsConfig;
   app: ReturnType<typeof createApp>;
   /**
    * The achievements database, for assertions about STORAGE that no
@@ -58,6 +64,16 @@ export function makeAchievementsFixture(): AchievementsFixture {
   const achievementsDbPath = path.join(dir, 'achievements.db');
   fs.writeFileSync(doorsDbPath, '');
 
+  // A configured surface, with an SMTP URL that points at a closed port:
+  // no suite may ever open a socket, and AC-6's tests drive the drain
+  // directly with an injected clock instead.
+  const ach: AchievementsConfig = {
+    dbPath: achievementsDbPath,
+    smtpUrl: 'smtp://127.0.0.1:1',
+    mailFrom: 'achievements@example.invalid',
+    publicBaseUrl: 'https://doors.example.invalid',
+  };
+
   const cfg: ServerConfig = {
     dbPath: doorsDbPath,
     archivesRoot: path.join(dir, 'Archives'),
@@ -65,6 +81,7 @@ export function makeAchievementsFixture(): AchievementsFixture {
     adminKeys: [],
     jwtSecret: null,
     learnKey: null,
+    achievements: ach,
   };
 
   // One door, so the catalog half of the server is usable and a test can
@@ -79,11 +96,16 @@ export function makeAchievementsFixture(): AchievementsFixture {
   ).run();
   db.close();
 
+  // Exactly what startup does: schema, then migrations, against a file that
+  // does not exist yet.
+  initAchievementsDb(ach);
+
   return {
     dir,
     doorsDbPath,
     achievementsDbPath,
     cfg,
+    ach,
     app: createApp(cfg),
     openAchievements: () => new Database(achievementsDbPath),
     cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),

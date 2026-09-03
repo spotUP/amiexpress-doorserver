@@ -13,7 +13,7 @@ describe('batch-jobs', () => {
 
   beforeEach(() => {
     dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'batch-jobs-')), 'test.db');
-    cfg = { dbPath, archivesRoot: '', port: 0, adminKeys: [], jwtSecret: 'x'.repeat(64), learnKey: null };
+    cfg = { dbPath, archivesRoot: '', port: 0, adminKeys: [], jwtSecret: 'x'.repeat(64), learnKey: null, achievements: null };
     const db = openDb(cfg);
     applySchema(db);
     runMigrations(db);

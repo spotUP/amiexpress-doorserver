@@ -33,6 +33,7 @@ beforeEach(() => {
     port: 3010,
     adminKeys: [{ label: 'spot', key: 'correct horse battery staple' }],
     jwtSecret: SECRET, learnKey: null,
+    achievements: null,
   };
   const db = openDb(cfg);
   applySchema(db);
@@ -190,7 +191,7 @@ describe('requireAdmin', () => {
 
 describe('a server with no signing secret', () => {
   it('has no admin surface at all, and still serves the public API', async () => {
-    const noSecret = { ...cfg, jwtSecret: null, learnKey: null };
+    const noSecret = { ...cfg, jwtSecret: null, learnKey: null, achievements: null };
     const app = createApp(noSecret);
     expect((await request(app).post('/api/door-repo/admin/login').send({ username: 'spot', password: 'x' })).status).toBe(503);
     expect((await request(app).get('/api/door-repo/admin/me')).status).toBe(503);

@@ -63,6 +63,7 @@ beforeEach(() => {
     adminKeys: [],
     jwtSecret: null,
     learnKey: null,
+    achievements: null,
   };
 
   const d = openDb(cfg);
