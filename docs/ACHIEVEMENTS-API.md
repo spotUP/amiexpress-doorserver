@@ -95,6 +95,11 @@ board on every request, on the hottest write path in the system.
 The three `401` cases are deliberately indistinguishable: the refusal never
 says which half of `<board-id>.<secret>` was wrong.
 
+A suspended board's WRITES are what the `403` refuses. Its reads still
+answer: suspension exists to stop a board reporting, not to break the
+catalog display in its door for callers who did nothing wrong, and a read
+returns only what that board could already see.
+
 A verified key is cached in-process for five minutes, but the board row is
 still read on every request and the cache entry is honoured only while that
 row's key hash is unchanged and the board is still not suspended. **A

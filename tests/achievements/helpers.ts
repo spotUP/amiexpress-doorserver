@@ -9,31 +9,41 @@
  * suite cannot accidentally prove something about a function that no request
  * ever reaches.
  *
- * AC-2 fills in the achievements half: the config that switches the surface
- * on and an initialised `achievements.db`. The recording mailer arrives with
- * AC-6, which is the task that introduces the `Mailer` seam - there is
- * nothing to record until then, and a stub typed against an interface that
- * does not exist yet would be a shape invented in a test file.
+ * AC-4 mints the board through `createBoard`, the same function the CLI and
+ * the curation route call, so every suite's key is a REAL key: a random
+ * secret, its scrypt hash in the row, and the plaintext returned once. A
+ * hand-written constant would have been a shape, not a key, and the first
+ * test to check `401` would have been testing the constant.
  */
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import Database from 'better-sqlite3';
+import request from 'supertest';
 import { openDb, applySchema } from '../../src/db';
+import { runMigrations } from '../../src/migrations';
+import { bootstrapAdmins } from '../../src/auth';
 import { createApp } from '../../src/app';
-import { initAchievementsDb } from '../../src/achievements/db';
+import { createBoard, _clearBoardKeyCacheForTests } from '../../src/achievements/boards';
+import { initAchievementsDb, openAchievementsDb } from '../../src/achievements/db';
 import type { ServerConfig } from '../../src/config';
 import type { AchievementsConfig } from '../../src/achievements/config';
 
 /** The board every suite reports as. The id is the ref prefix (D1). */
 export const TEST_BOARD_ID = 'uprough';
 
-/**
- * `Board <id>.<secret>` (D1): the id rides in the key so exactly one scrypt
- * runs per request. AC-4 mints real keys; until then this is the shape a
- * board author would present.
- */
-export const TEST_BOARD_KEY = `${TEST_BOARD_ID}.qeAtPnDs4Wv2Lm7xKcRb9TfHgJyZuNe3`;
+/** The admin account the curation routes are driven as, when they are on. */
+export const TEST_ADMIN = { username: 'spot', password: 'correct horse battery staple' };
+const TEST_JWT_SECRET = 'a-test-secret-that-is-long-enough-to-pass';
+
+export interface FixtureOptions {
+  /**
+   * Switch the admin API on: a signing secret and one bootstrapped account,
+   * so the curation routes under /achievements/v1/admin can be driven. Off
+   * by default - it costs two scrypt hashes, and most suites are board-facing.
+   */
+  admin?: boolean;
+}
 
 export interface AchievementsFixture {
   /** The temp directory both databases live in. */
@@ -46,6 +56,13 @@ export interface AchievementsFixture {
   /** The same object as `cfg.achievements`, non-null, for convenience. */
   ach: AchievementsConfig;
   app: ReturnType<typeof createApp>;
+  boardId: string;
+  /** A real minted key: `<id>.<secret>`, shown once, hashed in the row. */
+  boardKey: string;
+  /** `Board <id>.<secret>`, ready for an Authorization header. */
+  auth: string;
+  /** A signed admin token. Only with `{ admin: true }`. */
+  adminToken(): Promise<string>;
   /**
    * The achievements database, for assertions about STORAGE that no
    * endpoint exposes (the clamp flag, the player row count). Never used to
@@ -55,7 +72,12 @@ export interface AchievementsFixture {
   cleanup(): void;
 }
 
-export function makeAchievementsFixture(): AchievementsFixture {
+export function makeAchievementsFixture(opts: FixtureOptions = {}): AchievementsFixture {
+  // The verified-key cache is process state shared by every suite in this
+  // worker; a fixture that did not clear it could inherit another test's
+  // board and hide a missing verification.
+  _clearBoardKeyCacheForTests();
+
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-ach-'));
   fs.mkdirSync(path.join(dir, 'Archives'));
   fs.writeFileSync(path.join(dir, 'Archives', 'ACC-V103.LHA'), Buffer.from([0x4c, 0x5a, 0x00]));
@@ -78,8 +100,8 @@ export function makeAchievementsFixture(): AchievementsFixture {
     dbPath: doorsDbPath,
     archivesRoot: path.join(dir, 'Archives'),
     port: 3010,
-    adminKeys: [],
-    jwtSecret: null,
+    adminKeys: opts.admin ? [{ label: TEST_ADMIN.username, key: TEST_ADMIN.password }] : [],
+    jwtSecret: opts.admin ? TEST_JWT_SECRET : null,
     learnKey: null,
     achievements: ach,
   };
@@ -89,16 +111,28 @@ export function makeAchievementsFixture(): AchievementsFixture {
   // is broken".
   const db = openDb(cfg);
   applySchema(db);
+  runMigrations(db);
   db.prepare(
     `INSERT INTO door_catalog
        (id, archive_name, archive_path, name, door_type, archive_size, indexed_at)
      VALUES ('id1', 'ACC-V103.LHA', 'ACC-V103.LHA', 'Account Editor', 'XIM', 3, 1700000000)`
   ).run();
+  if (opts.admin) bootstrapAdmins(db, cfg);
   db.close();
 
   // Exactly what startup does: schema, then migrations, against a file that
   // does not exist yet.
   initAchievementsDb(ach);
+
+  const achDb = openAchievementsDb(ach);
+  let boardKey: string;
+  try {
+    boardKey = createBoard(achDb, TEST_BOARD_ID, 'Up Rough', null).key;
+  } finally {
+    achDb.close();
+  }
+
+  const app = createApp(cfg);
 
   return {
     dir,
@@ -106,7 +140,19 @@ export function makeAchievementsFixture(): AchievementsFixture {
     achievementsDbPath,
     cfg,
     ach,
-    app: createApp(cfg),
+    app,
+    boardId: TEST_BOARD_ID,
+    boardKey,
+    auth: `Board ${boardKey}`,
+    adminToken: async () => {
+      const res = await request(app)
+        .post('/api/door-repo/admin/login')
+        .send({ username: TEST_ADMIN.username, password: TEST_ADMIN.password });
+      if (typeof res.body.token !== 'string') {
+        throw new Error(`the fixture could not sign an admin token: ${JSON.stringify(res.body)}`);
+      }
+      return res.body.token as string;
+    },
     openAchievements: () => new Database(achievementsDbPath),
     cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
   };

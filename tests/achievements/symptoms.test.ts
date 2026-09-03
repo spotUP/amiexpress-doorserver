@@ -9,13 +9,16 @@
  * SYM-5, AC-9 takes SYM-6/7/8, AC-12 takes SYM-9, AC-13 takes SYM-10 and
  * AC-15 takes SYM-11 - and AC-20's ledger records which task closed which.
  *
+ * MOVED OUT SO FAR: SYM-2 and SYM-3 now live in
+ * tests/achievements/boards.test.ts, where they are GREEN (AC-4).
+ *
  * Every test drives the REAL app: `createApp(cfg)` over HTTP through
  * supertest, exactly as tests/routes.test.ts does. Never a router, never a
  * handler, never a function in isolation. A test that passes here is
  * mis-specified and is rewritten before AC-2 starts.
  */
 import request from 'supertest';
-import { makeAchievementsFixture, TEST_BOARD_KEY, TEST_BOARD_ID } from './helpers';
+import { makeAchievementsFixture, TEST_BOARD_ID } from './helpers';
 import type { AchievementsFixture } from './helpers';
 
 let fx: AchievementsFixture;
@@ -26,13 +29,11 @@ beforeEach(() => {
 
 afterEach(() => fx.cleanup());
 
-const AUTH = `Board ${TEST_BOARD_KEY}`;
-
 describe('the achievements surface, as a board author meets it', () => {
   it('SYM-1: a board with a valid key is told 404 by a server that never mounted the surface', async () => {
     const res = await request(fx.app)
       .post('/achievements/v1/events')
-      .set('Authorization', AUTH)
+      .set('Authorization', fx.auth)
       .send({ events: [] });
 
     // A 404 here is indistinguishable from "this host does not run
@@ -43,44 +44,14 @@ describe('the achievements surface, as a board author meets it', () => {
     expect(res.headers['x-achievements-contract']).toBe('1');
   });
 
-  it('SYM-2: a board with an unknown key can still read the catalog', async () => {
-    const res = await request(fx.app)
-      .get('/achievements/v1/catalog')
-      .set('Authorization', 'Board nosuchboard.wrongsecret');
-
-    // Must be 401: an unknown key reads nothing, and the refusal never says
-    // which half of `<id>.<secret>` was wrong.
-    expect(res.status).toBe(401);
-    expect(JSON.stringify(res.body)).not.toMatch(/nosuchboard|wrongsecret/);
-  });
-
-  it('SYM-3: a suspended board keeps reporting events', async () => {
-    const db = fx.openAchievements();
-    try {
-      db.prepare(
-        `INSERT INTO boards (id, name, contact, key_hash, created_at, suspended_at)
-         VALUES (?, 'Up Rough', NULL, 'scrypt$1$1$1$00$00', 1700000000, 1700000001)`
-      ).run(TEST_BOARD_ID);
-    } finally {
-      db.close();
-    }
-
-    const res = await request(fx.app)
-      .post('/achievements/v1/events')
-      .set('Authorization', AUTH)
-      .send({ events: [] });
-
-    expect(res.status).toBe(403);
-  });
-
   it('SYM-4: registering twice creates two players for one email', async () => {
     const first = await request(fx.app)
       .post('/achievements/v1/players')
-      .set('Authorization', AUTH)
+      .set('Authorization', fx.auth)
       .send({ email: 'caller@example.com', handle: 'Caller' });
     const second = await request(fx.app)
       .post('/achievements/v1/players')
-      .set('Authorization', AUTH)
+      .set('Authorization', fx.auth)
       .send({ email: 'CALLER@example.com', handle: 'SomeoneElse' });
 
     expect(first.status).toBe(202);
@@ -103,7 +74,7 @@ describe('the achievements surface, as a board author meets it', () => {
   it('SYM-5: a board reports for an email that never linked it and the events land', async () => {
     const res = await request(fx.app)
       .post('/achievements/v1/events')
-      .set('Authorization', AUTH)
+      .set('Authorization', fx.auth)
       .send({
         events: [
           {
@@ -132,7 +103,7 @@ describe('the achievements surface, as a board author meets it', () => {
     const post = () =>
       request(fx.app)
         .post('/achievements/v1/events')
-        .set('Authorization', AUTH)
+        .set('Authorization', fx.auth)
         .send({ events: [event] });
 
     const first = await post();
@@ -148,7 +119,7 @@ describe('the achievements surface, as a board author meets it', () => {
     const nextYear = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
     const res = await request(fx.app)
       .post('/achievements/v1/events')
-      .set('Authorization', AUTH)
+      .set('Authorization', fx.auth)
       .send({
         events: [
           {
@@ -183,7 +154,7 @@ describe('the achievements surface, as a board author meets it', () => {
   it('SYM-8: a board posts meta.unlock and mints itself an achievement', async () => {
     const res = await request(fx.app)
       .post('/achievements/v1/events')
-      .set('Authorization', AUTH)
+      .set('Authorization', fx.auth)
       .send({
         events: [
           {
@@ -205,7 +176,7 @@ describe('the achievements surface, as a board author meets it', () => {
   it('SYM-9: catalog.txt comes back as UTF-8 with LF line endings', async () => {
     const res = await request(fx.app)
       .get('/achievements/v1/catalog.txt')
-      .set('Authorization', AUTH)
+      .set('Authorization', fx.auth)
       .buffer(true);
 
     expect(res.status).toBe(200);
@@ -222,7 +193,7 @@ describe('the achievements surface, as a board author meets it', () => {
     const push = (name: string) =>
       request(fx.app)
         .put('/achievements/v1/catalog/doors/grandmaster')
-        .set('Authorization', AUTH)
+        .set('Authorization', fx.auth)
         .send({
           digest: name,
           achievements: [
@@ -250,7 +221,7 @@ describe('the achievements surface, as a board author meets it', () => {
 
     const catalog = await request(fx.app)
       .get('/achievements/v1/catalog')
-      .set('Authorization', AUTH);
+      .set('Authorization', fx.auth);
     const published = (catalog.body.achievements as { id: string; name: string }[]).find(
       (a) => a.id === 'door.grandmaster.first_win'
     );
@@ -274,7 +245,7 @@ describe('the achievements surface, as a board author meets it', () => {
 
     const res = await request(fx.app)
       .get('/achievements/v1/leaderboard?scope=global')
-      .set('Authorization', AUTH);
+      .set('Authorization', fx.auth);
 
     expect(res.status).toBe(200);
     const handles = (res.body.rows as { handle: string }[]).map((r) => r.handle);

@@ -24,6 +24,27 @@ export function openAchievementsDb(
 }
 
 /**
+ * Open, run, close - the shape every request-scoped read and write uses, so
+ * a handle can never be left open by an early return or a throw. This is the
+ * same per-request open src/auth.ts's requireAdmin already does against
+ * doors.db: opening a local SQLite file is cheap, and one long-lived shared
+ * handle would be a second thing to reason about across Express's async
+ * boundaries.
+ */
+export function withAchievementsDb<T>(
+  ach: AchievementsConfig,
+  fn: (db: Database.Database) => T,
+  opts?: { readonly?: boolean }
+): T {
+  const db = openAchievementsDb(ach, opts);
+  try {
+    return fn(db);
+  } finally {
+    db.close();
+  }
+}
+
+/**
  * schema.sql sits beside this module in BOTH layouts - src/achievements/ from
  * source, dist/src/achievements/ compiled - because tsc does not emit .sql
  * and package.json's build script copies it. Without that copy the container

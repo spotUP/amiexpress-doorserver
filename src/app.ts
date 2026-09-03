@@ -5,6 +5,7 @@ import { createRouter } from './routes';
 import { createAdminRouter } from './admin-routes';
 import { createPublicRouter } from './public-routes';
 import { doorRepoCors } from './cors';
+import { createAchievementsRouter } from './achievements/router';
 import type { ServerConfig } from './config';
 
 export function createApp(cfg: ServerConfig): express.Express {
@@ -23,6 +24,20 @@ export function createApp(cfg: ServerConfig): express.Express {
   // contract the AmigaDOS clients depend on.
   app.use('/api/door-repo', createPublicRouter(cfg));
   app.use('/api/door-repo', createRouter(cfg));
+  // The achievements surface: a sibling API, not a door-repo route. Mounted
+  // BEFORE mountWebUi because that catch-all only exempts /api/ - measured,
+  // not assumed: with this mount below it, GET /achievements/v1/catalog
+  // answered 200 carrying the single-page app's index.html. No CORS
+  // middleware in front of it, deliberately: every request here carries a
+  // board key, and a board key must never be inside a browser (see cors.ts
+  // for why the door repo is the opposite case).
+  //
+  // A null config means the surface was never configured, and then nothing
+  // is mounted at all - a sysop who never wanted achievements should not be
+  // serving half of one.
+  if (cfg.achievements) {
+    app.use('/achievements/v1', createAchievementsRouter(cfg, cfg.achievements));
+  }
   mountWebUi(app);
   return app;
 }
