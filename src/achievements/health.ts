@@ -27,18 +27,10 @@ import type { ServerConfig } from '../config';
 import type { AchievementsConfig } from './config';
 import { withAchievementsDb } from './db';
 import { catalogRevision } from './catalog';
+import { pendingMailCount } from './mail';
 
 function count(db: Database.Database, sql: string): number {
   return (db.prepare(sql).get() as { n: number }).n;
-}
-
-/**
- * The queue depth. AC-6 owns the drain and takes this over as
- * pendingMailCount(); until then the one query lives here, in the only place
- * that asks the question.
- */
-function pendingMail(db: Database.Database): number {
-  return count(db, 'SELECT COUNT(*) AS n FROM mail_queue WHERE sent_at IS NULL');
 }
 
 /**
@@ -67,7 +59,7 @@ export function achievementsHealth(
       revision: catalogRevision(db),
       players: count(db, 'SELECT COUNT(*) AS n FROM players'),
       boards: count(db, 'SELECT COUNT(*) AS n FROM boards'),
-      pendingMail: pendingMail(db),
+      pendingMail: pendingMailCount(db),
       season: currentSeason(db, now),
     }),
     { readonly: true }
@@ -86,7 +78,7 @@ export function achievementsHealthSummary(cfg: ServerConfig): AchievementsHealth
         enabled: true,
         contractVersion: ACHIEVEMENTS_CONTRACT_VERSION,
         players: count(db, 'SELECT COUNT(*) AS n FROM players'),
-        pendingMail: pendingMail(db),
+        pendingMail: pendingMailCount(db),
       }),
       { readonly: true }
     );

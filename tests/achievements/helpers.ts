@@ -28,6 +28,7 @@ import { createBoard, _clearBoardKeyCacheForTests } from '../../src/achievements
 import { initAchievementsDb, openAchievementsDb } from '../../src/achievements/db';
 import type { ServerConfig } from '../../src/config';
 import type { AchievementsConfig } from '../../src/achievements/config';
+import type { Mailer } from '../../src/achievements/mail';
 
 /** The board every suite reports as. The id is the ref prefix (D1). */
 export const TEST_BOARD_ID = 'uprough';
@@ -155,5 +156,67 @@ export function makeAchievementsFixture(opts: FixtureOptions = {}): Achievements
     },
     openAchievements: () => new Database(achievementsDbPath),
     cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+export interface SentMail {
+  to: string;
+  subject: string;
+  body: string;
+}
+
+export interface RecordingMailer extends Mailer {
+  /** Every mail this mailer accepted, in order. */
+  readonly sent: SentMail[];
+  /** How many times send() was called, refusals included. */
+  readonly calls: number;
+  /**
+   * Refuse the next sends. `Infinity` refuses for ever - an SMTP server that
+   * is down - and a finite count refuses that many and then recovers, which
+   * is how a test walks the backoff ladder and then proves the row is still
+   * deliverable at the end of it.
+   */
+  refuse(times: number, message?: string): void;
+  /** Refuse only mail addressed here, and deliver everything else. */
+  refuseAddress(to: string, message?: string): void;
+}
+
+/**
+ * The mailer every achievements suite injects.
+ *
+ * NO suite in this repo may open an SMTP socket: the fixture's
+ * ACHIEVEMENTS_SMTP_URL points at a closed port precisely so that a test
+ * that forgot to inject one fails loudly rather than hanging, and this is
+ * what it injects instead.
+ */
+export function recordingMailer(): RecordingMailer {
+  const sent: SentMail[] = [];
+  const refusedAddresses = new Map<string, string>();
+  let refusals = 0;
+  let refusalMessage = 'connect ECONNREFUSED 127.0.0.1:1';
+  let calls = 0;
+
+  return {
+    sent,
+    get calls() {
+      return calls;
+    },
+    refuse(times: number, message?: string) {
+      refusals = times;
+      if (message !== undefined) refusalMessage = message;
+    },
+    refuseAddress(to: string, message = 'mailbox unavailable') {
+      refusedAddresses.set(to, message);
+    },
+    async send(to: string, subject: string, body: string): Promise<void> {
+      calls += 1;
+      const perAddress = refusedAddresses.get(to);
+      if (perAddress !== undefined) throw new Error(perAddress);
+      if (refusals > 0) {
+        refusals -= 1;
+        throw new Error(refusalMessage);
+      }
+      sent.push({ to, subject, body });
+    },
   };
 }

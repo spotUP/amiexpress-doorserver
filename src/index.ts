@@ -6,6 +6,7 @@ import { openDb } from './db';
 import { runMigrations } from './migrations';
 import { bootstrapAdmins } from './auth';
 import { initAchievementsDb } from './achievements/db';
+import { smtpMailer, startMailDrain, MAIL_DRAIN_INTERVAL_MS } from './achievements/mail';
 import { ensureQuarantine } from './submissions';
 
 /**
@@ -102,6 +103,16 @@ function main(): void {
     console.log(`[OK] door server listening on ${cfg.port}`);
     console.log(`[INFO] catalog ${doors} doors, revision ${getCatalogRevision(cfg)}`);
   });
+
+  // The only timer this server starts, and only when the surface is on.
+  // Mail is QUEUED on the request path and posted here, so a registration
+  // never waits on an SMTP handshake and survives the mail server being
+  // down. The timer is unref'd inside startMailDrain, so it can never be
+  // the reason a process refuses to exit.
+  if (cfg.achievements) {
+    startMailDrain(cfg.achievements, smtpMailer(cfg.achievements));
+    console.log(`[INFO] mail drain every ${MAIL_DRAIN_INTERVAL_MS / 1000}s`);
+  }
 }
 
 // Guarded so importing this module (e.g. tests/startup.test.ts, to exercise

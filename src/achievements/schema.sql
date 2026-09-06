@@ -164,6 +164,19 @@ CREATE TABLE IF NOT EXISTS rarity (
   computed_at    INTEGER NOT NULL
 );
 
+-- A queue row has THREE states, not two: pending, sent, and given up on.
+-- failed_at is what makes the third one representable. Without it the only
+-- ways to stop retrying a dead address would be to set sent_at (a lie, and
+-- the column a sysop reads to see what went out) or to push next_at into
+-- the far future (a row that is pending for ever, inflating the one number
+-- - pendingMail - that tells a sysop mail is broken). See src/achievements/
+-- mail.ts for the backoff ladder and the three-day give-up.
+--
+-- This column is in schema.sql rather than in a migration because
+-- achievements.db has never been deployed anywhere (AC-21 is the deploy
+-- task) and no such file exists: there is no live database for a migration
+-- to alter, and src/schema.sql sets the same precedent - it is the ORIGINAL
+-- schema, and src/migrations.ts carries everything added after a deploy.
 CREATE TABLE IF NOT EXISTS mail_queue (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   to_addr    TEXT NOT NULL,
@@ -173,9 +186,11 @@ CREATE TABLE IF NOT EXISTS mail_queue (
   attempts   INTEGER NOT NULL DEFAULT 0,
   next_at    INTEGER NOT NULL,
   sent_at    INTEGER,
+  failed_at  INTEGER,                       -- gave up; never retried again
   last_error TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_mail_due ON mail_queue(sent_at, next_at);
+-- The drain's own WHERE clause, in order: pending, not given up on, due.
+CREATE INDEX IF NOT EXISTS idx_mail_due ON mail_queue(sent_at, failed_at, next_at);
 
 CREATE TABLE IF NOT EXISTS door_catalog_digests (
   door       TEXT PRIMARY KEY,
