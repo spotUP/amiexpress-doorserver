@@ -21,6 +21,7 @@ import type Database from 'better-sqlite3';
 import type { NextFunction, Request, Response } from 'express';
 import { hashPassword, verifyPassword } from '../auth';
 import { withAchievementsDb } from './db';
+import { SurfaceError } from './errors';
 import type { AchievementsConfig } from './config';
 
 /** The same slug shape the ref prefix and the URL segment use. */
@@ -46,28 +47,13 @@ export interface BoardRequest extends Request {
   board?: { id: string; name: string; suspended: boolean };
 }
 
-/**
- * A refusal a caller can be told about, carrying one of the contract's own
- * error codes so a route never invents a string of its own.
- */
-export class BoardError extends Error {
-  constructor(
-    readonly code: 'bad_request' | 'board_exists',
-    readonly status: 400 | 409,
-    message: string
-  ) {
-    super(message);
-    this.name = 'BoardError';
-  }
-}
-
 function newSecret(): string {
   return crypto.randomBytes(SECRET_BYTES).toString('base64url');
 }
 
 function requireBoardId(id: string): void {
   if (!BOARD_ID.test(id)) {
-    throw new BoardError(
+    throw new SurfaceError(
       'bad_request',
       400,
       `board id "${id}" is not a lowercase slug of 2 to 32 characters`
@@ -93,7 +79,7 @@ export function createBoard(
   if (db.prepare('SELECT id FROM boards WHERE id = ?').get(id)) {
     // Checked before the hash, not after: a duplicate must not cost 50 ms,
     // and the stored hash of the EXISTING board is never touched.
-    throw new BoardError('board_exists', 409, `board "${id}" already exists`);
+    throw new SurfaceError('board_exists', 409, `board "${id}" already exists`);
   }
   const secret = newSecret();
   db.prepare(
@@ -107,7 +93,7 @@ export function rotateBoardKey(db: Database.Database, id: string): { id: string;
   const secret = newSecret();
   const res = db.prepare('UPDATE boards SET key_hash = ? WHERE id = ?').run(hashPassword(secret), id);
   if (res.changes === 0) {
-    throw new BoardError('bad_request', 400, `board "${id}" does not exist`);
+    throw new SurfaceError('bad_request', 400, `board "${id}" does not exist`);
   }
   return { id, key: `${id}.${secret}` };
 }
@@ -117,7 +103,7 @@ export function setBoardSuspended(db: Database.Database, id: string, suspended: 
     .prepare('UPDATE boards SET suspended_at = ? WHERE id = ?')
     .run(suspended ? nowSeconds() : null, id);
   if (res.changes === 0) {
-    throw new BoardError('bad_request', 400, `board "${id}" does not exist`);
+    throw new SurfaceError('bad_request', 400, `board "${id}" does not exist`);
   }
 }
 

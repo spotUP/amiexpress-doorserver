@@ -251,3 +251,49 @@ export function startMailDrain(
   timer.unref();
   return timer;
 }
+
+/**
+ * The verification mail.
+ *
+ * Plain text, pure ASCII, and the code alone on its own line: it is read off
+ * a screen and typed on an Amiga keyboard, and every character of decoration
+ * around it is a character somebody can mistake for part of it. queueMail()
+ * enforces the ASCII half at the write point, so a template that ever grew a
+ * typographic dash fails in a test run rather than in an inbox.
+ *
+ * The board's name is deliberately absent. The mail comes from the
+ * achievement service, which is one thing for every board; naming the board
+ * a caller happened to be dialled into would suggest they have to go back to
+ * that one.
+ *
+ * The TTL is a parameter rather than a constant of this module: the number
+ * of minutes is owned by whoever issues the code (players.ts), and a second
+ * copy here is a second thing to forget to change.
+ */
+export function verificationMail(
+  ach: AchievementsConfig,
+  code: string,
+  ttlSeconds: number
+): { subject: string; body: string } {
+  const minutes = Math.round(ttlSeconds / 60);
+  return {
+    subject: 'Your AmiExpress achievements code',
+    body: [
+      'Someone asked to link this address to an AmiExpress achievements',
+      'account. The code is:',
+      '',
+      code,
+      '',
+      'Type it into the achievements door on the BBS you are calling. It is',
+      `good for ${minutes} minutes and can be used once.`,
+      '',
+      'If this was not you, ignore this mail. Nothing is linked to this',
+      'address, and nothing can be, until that code is typed in.',
+      '',
+      '--',
+      'AmiExpress achievements',
+      ach.publicBaseUrl,
+      '',
+    ].join('\n'),
+  };
+}

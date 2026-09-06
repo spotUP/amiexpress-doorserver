@@ -21,7 +21,8 @@
  * script never sends mail, and demanding a mail server before a sysop can
  * mint a key would be a startup rule leaking into an operator tool.
  */
-import { BoardError, createBoard, listBoards, rotateBoardKey, setBoardSuspended } from '../src/achievements/boards';
+import { createBoard, listBoards, rotateBoardKey, setBoardSuspended } from '../src/achievements/boards';
+import { SurfaceError } from '../src/achievements/errors';
 import { initAchievementsDb, openAchievementsDb } from '../src/achievements/db';
 import type { AchievementsConfig } from '../src/achievements/config';
 
@@ -108,7 +109,7 @@ try {
       usage();
   }
 } catch (err) {
-  if (err instanceof BoardError) {
+  if (err instanceof SurfaceError) {
     console.error(`[ERROR] ${err.message}`);
     process.exit(1);
   }

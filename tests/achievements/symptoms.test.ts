@@ -10,7 +10,8 @@
  * AC-15 takes SYM-11 - and AC-20's ledger records which task closed which.
  *
  * MOVED OUT SO FAR: SYM-2 and SYM-3 now live in
- * tests/achievements/boards.test.ts, where they are GREEN (AC-4).
+ * tests/achievements/boards.test.ts, where they are GREEN (AC-4); SYM-4 now
+ * lives in tests/achievements/players.test.ts, GREEN (AC-7).
  *
  * SYM-1 STAYS HERE THROUGH AC-5, and its reason is written on the test
  * itself: the surface is mounted now, but the endpoint SYM-1 drives is
@@ -55,33 +56,6 @@ describe('the achievements surface, as a board author meets it', () => {
     // must ANSWER, whatever it answers.
     expect(res.status).not.toBe(404);
     expect(res.headers['x-achievements-contract']).toBe('1');
-  });
-
-  it('SYM-4: registering twice creates two players for one email', async () => {
-    const first = await request(fx.app)
-      .post('/achievements/v1/players')
-      .set('Authorization', fx.auth)
-      .send({ email: 'caller@example.com', handle: 'Caller' });
-    const second = await request(fx.app)
-      .post('/achievements/v1/players')
-      .set('Authorization', fx.auth)
-      .send({ email: 'CALLER@example.com', handle: 'SomeoneElse' });
-
-    expect(first.status).toBe(202);
-    expect(second.status).toBe(202);
-
-    // email_key = lower(trim(email)) is the identity: one row, and the
-    // second registration never renamed the player.
-    const db = fx.openAchievements();
-    try {
-      const rows = db
-        .prepare('SELECT handle FROM players WHERE email_key = ?')
-        .all('caller@example.com') as { handle: string }[];
-      expect(rows).toHaveLength(1);
-      expect(rows[0].handle).toBe('Caller');
-    } finally {
-      db.close();
-    }
   });
 
   it('SYM-5: a board reports for an email that never linked it and the events land', async () => {

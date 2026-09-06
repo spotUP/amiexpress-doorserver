@@ -16,6 +16,7 @@
  *   catch-all in src/app.ts and is answered with index.html and a 200 - the
  *   exact behaviour AC-1's SYM-2 measured before this surface existed.
  */
+import type Database from 'better-sqlite3';
 import express, { NextFunction, Request, Response } from 'express';
 import { requireAdmin } from '../auth';
 import type { AuthedRequest } from '../auth';
@@ -23,9 +24,17 @@ import type { ServerConfig } from '../config';
 import type { AchievementsConfig } from './config';
 import { withAchievementsDb } from './db';
 import { catalogRevision } from './catalog';
+import { SurfaceError } from './errors';
 import { achievementsHealth } from './health';
+import { queueMail, verificationMail } from './mail';
 import {
-  BoardError,
+  VERIFY_CODE_TTL_SECONDS,
+  registerPlayer,
+  resendCode,
+  verifyPlayer,
+} from './players';
+import type { IssuedCode } from './players';
+import {
   auditBoard,
   createBoard,
   getBoard,
@@ -34,7 +43,7 @@ import {
   rotateBoardKey,
   setBoardSuspended,
 } from './boards';
-import type { BoardRow } from './boards';
+import type { BoardRequest, BoardRow } from './boards';
 import { ACHIEVEMENTS_CONTRACT_VERSION } from '../../contract/achievement-types';
 import type { BoardSummary } from '../../contract/achievement-types';
 
@@ -145,6 +154,75 @@ export function createAchievementsRouter(
   // Everything below this line is board-facing and needs a key.
   router.use(requireBoard(ach));
 
+  // ---------------------------------------------------------------------
+  // Players. A board registers on its caller's behalf, so every route here
+  // is behind the board key - but the PLAYER is identified by an email the
+  // board never sees again: no response from this surface carries an
+  // address, and a test asserts that over every body the suite produces.
+  //
+  // Mail is QUEUED inside the same open handle that wrote the code, never
+  // sent inline. That is why no route here holds a Mailer: the seam lives
+  // at the drain (mail.ts), which is the only thing that ever opens a
+  // socket, and an SMTP server that is refusing connections cannot turn a
+  // registration into a 500.
+  // ---------------------------------------------------------------------
+  const queueCode = (db: Database.Database, issued: IssuedCode, now: number): void => {
+    const mail = verificationMail(ach, issued.code, VERIFY_CODE_TTL_SECONDS);
+    queueMail(db, issued.to, mail.subject, mail.body, now);
+  };
+
+  router.post('/players', (req: BoardRequest, res: Response) => {
+    const body = (req.body ?? {}) as { email?: unknown; handle?: unknown };
+    if (typeof body.email !== 'string' || typeof body.handle !== 'string') {
+      throw new SurfaceError('bad_request', 400, 'email and handle are required');
+    }
+    const email = body.email;
+    const handle = body.handle;
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      queueCode(db, registerPlayer(db, email, handle, now), now);
+      auditBoard(db, req.board?.id ?? null, 'player:register', 1, now);
+      // 202 whether or not the address already existed. The response never
+      // reveals whether an email is registered.
+      res.status(202).json({ queued: true });
+    });
+  });
+
+  router.post('/players/resend', (req: BoardRequest, res: Response) => {
+    const body = (req.body ?? {}) as { email?: unknown };
+    if (typeof body.email !== 'string') {
+      throw new SurfaceError('bad_request', 400, 'email is required');
+    }
+    const email = body.email;
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const issued = resendCode(db, email, now);
+      // null means the address has no player. It is NOT an error and it is
+      // NOT visible: the same 202 either way, so this endpoint cannot be
+      // used as a register of who has signed up.
+      if (issued) {
+        queueCode(db, issued, now);
+        auditBoard(db, req.board?.id ?? null, 'player:resend', 1, now);
+      }
+      res.status(202).json({ queued: true });
+    });
+  });
+
+  router.post('/players/verify', (req: BoardRequest, res: Response) => {
+    const body = (req.body ?? {}) as { email?: unknown; code?: unknown };
+    if (typeof body.email !== 'string' || typeof body.code !== 'string') {
+      throw new SurfaceError('bad_request', 400, 'email and code are required');
+    }
+    const email = body.email;
+    const code = body.code;
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const profile = verifyPlayer(db, email, code, now);
+      auditBoard(db, req.board?.id ?? null, 'player:verify', 1, now);
+      res.json(profile);
+    });
+  });
+
   // An achievements path that matches no route above must NOT fall through
   // to the single-page app. It answers here, as this API, in JSON.
   router.use((_req: Request, res: Response) => {
@@ -156,7 +234,7 @@ export function createAchievementsRouter(
       next(err);
       return;
     }
-    if (err instanceof BoardError) {
+    if (err instanceof SurfaceError) {
       res.status(err.status).json({ error: err.code, detail: err.message });
       return;
     }

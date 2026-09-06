@@ -183,6 +183,9 @@ Rules:
 
 - Handles are 3-16 characters matching
   `^[A-Za-z0-9][A-Za-z0-9 ._-]{2,15}$` and are unique case-insensitively.
+  Leading and trailing whitespace is TRIMMED before that pattern is applied
+  and before the uniqueness check, so no listing ever shows a padded name
+  and padding is not a way around a handle somebody already holds.
 - The email is validated shallowly: one `@`, a dot in the domain, at most
   254 characters. The emailed code is the real proof; deep validation is the
   mail server's job.
