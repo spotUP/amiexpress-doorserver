@@ -17,6 +17,7 @@ import request from 'supertest';
 import Database from 'better-sqlite3';
 import { createApp } from '../src/app';
 import { jsonBodyDigest } from '../scripts/capture-parity-fixtures';
+import { weakEtag } from './weak-etag';
 import { buildManifest, renderListTxt } from '../src/manifest';
 import { loadConfig } from '../src/config';
 
@@ -82,6 +83,27 @@ describeOrSkip('parity with the BBS-hosted API', () => {
   // bodies with the raw column put back and asserts the result still hashes
   // to the byte the old API produced.
   const DESCRIPTION_DIVERGENT = new Set(['manifest', 'list', 'manifest-type-xim', 'list-type-xim', 'manifest-q']);
+
+  // /health gained ONE key, `achievements`, and nothing else moved.
+  //
+  // It is the URL the container healthcheck and the deploy workflow call,
+  // and the achievements surface has to be able to say whether it is on and
+  // how deep its mail queue is without a second liveness endpoint to
+  // configure. docs/ACHIEVEMENTS-API.md documents that key as part of this
+  // response, so it is contractual rather than incidental.
+  //
+  // The capture predates it, so the comparison below lifts the key out and
+  // compares what remains - the same mechanism this file already uses for
+  // the manifest's `generatedAt`, and for the same reason: a field that is
+  // legitimately OURS must not be mistaken for a parity regression. Every
+  // other byte, and the ORDER of the three original keys, is still pinned:
+  // the reconstruction is the response with one key deleted, so any change
+  // to `status`, `revision` or `doors` still fails.
+  //
+  // No 68K client reads this endpoint. The byte-exact contract that matters
+  // to the AmigaDOS clients is /manifest, /list.txt, /index.tsv and
+  // /archive, and not one of them is touched here.
+  const ADDITIVE_ONLY = new Set(['health']);
   const parityCaptures = captures.filter(
     (c) => !c.name.startsWith('divergence-') && !DESCRIPTION_DIVERGENT.has(c.name)
   );
@@ -100,7 +122,21 @@ describeOrSkip('parity with the BBS-hosted API', () => {
           r.on('end', () => cb(null, Buffer.concat(chunks)));
         });
       expect(res.status).toBe(c.status);
+      const additive = ADDITIVE_ONLY.has(c.name);
       for (const [key, value] of Object.entries(c.headers)) {
+        // Content-Length AND ETag are BOTH derived from the body, so both
+        // moved by exactly the added key. Express computes the ETag with the
+        // `etag` module over the bytes it is about to send (res.send ->
+        // wetag), which is measured, not assumed: the capture's
+        // W/"3b-W17/PxAGFWovWR66XakauJ7vmXE" is etag() over the 59-byte
+        // three-key body, and the four-key body hashes to
+        // W/"5c-BIq9kKTfgT8UWIeGbJrPtJYmfUU". Skipping only Content-Length
+        // and still comparing the ETag would fail a response that is
+        // correct. Both are re-pinned against the reconstruction below, and
+        // the ETag pin is STRICTER than this loop: an ETag over the
+        // reconstructed bytes matching the capture's proves byte equality -
+        // key order included - not merely an equal length.
+        if (additive && (key === 'content-length' || key === 'etag')) continue;
         if (key === 'content-type' || key === 'content-length' || key.startsWith('x-') || key === 'etag') {
           expect(`${key}=${res.headers[key]}`).toBe(`${key}=${value}`);
         }
@@ -134,7 +170,9 @@ describeOrSkip('parity with the BBS-hosted API', () => {
       }
 
       const body = res.body as Buffer;
-      expect(body.length).toBe(c.byteLength);
+      if (!additive) {
+        expect(body.length).toBe(c.byteLength);
+      }
 
       // A JSON body carries `generatedAt: new Date().toISOString()`
       // (door-repo-manifest.ts:309), so its bytes are never twice the same -
@@ -142,6 +180,24 @@ describeOrSkip('parity with the BBS-hosted API', () => {
       // digest of the body with that field lifted out, and assert separately
       // that the field is still a real ISO instant. Its length is fixed at 24
       // characters, so the Content-Length check above still bites.
+      if (additive) {
+        // The response with `achievements` deleted must be the capture, byte
+        // for byte: same keys, same order, same values, same length.
+        const parsed: Record<string, unknown> = JSON.parse(body.toString('utf-8'));
+        expect(parsed.achievements).toBeDefined();
+        const { achievements: ours, ...asTheBbsAnsweredIt } = parsed;
+        expect(ours).toEqual({ enabled: false });
+        const reconstructed = Buffer.from(JSON.stringify(asTheBbsAnsweredIt), 'utf-8');
+        // The live headers describe the LIVE body...
+        expect(Number(res.headers['content-length'])).toBe(body.length);
+        expect(res.headers.etag).toBe(weakEtag(body));
+        // ...and the reconstruction is the capture, to the byte.
+        expect(reconstructed.length).toBe(c.byteLength);
+        expect(jsonBodyDigest(reconstructed).digest).toBe(c.jsonDigest);
+        expect(weakEtag(reconstructed)).toBe(c.headers.etag);
+        return;
+      }
+
       if (c.jsonDigest !== undefined) {
         const parsed: Record<string, unknown> = JSON.parse(body.toString('utf-8'));
         // Only /manifest carries a wall-clock `generatedAt`

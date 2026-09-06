@@ -985,9 +985,42 @@ Content-Type: application/json; charset=utf-8
 | `status`   | string  | Always the literal `"ok"` when the endpoint responds at all.    |
 | `revision` | string  | Same value as `X-Door-Repo-Revision` and `/manifest`'s `revision` field. See section 7. |
 | `doors`    | integer | Total row count in the catalog, ignoring any filters (this endpoint takes no `?type=`/`?q=` parameters). |
+| `achievements` | object | Present on the standalone door server only; see below. |
 
 `revision` reads `"unknown"` here for the same local-development reason
 given throughout this document -- see section 7.
+
+### The `achievements` key
+
+The standalone door server (`amiexpress-doorserver`) hosts a second,
+sibling API at `/achievements/v1` -- documented in
+`docs/ACHIEVEMENTS-API.md`, not here -- and APPENDS exactly one key to this
+object so the container healthcheck and the deploy workflow keep one URL to
+poll instead of two. Nothing else moves: `status`, `revision` and `doors`
+keep their names, their order and their values.
+
+On a server whose sysop never configured achievements (`ACHIEVEMENTS_DB`
+unset), the key reads:
+
+```json
+"achievements": { "enabled": false }
+```
+
+and with the surface on:
+
+```json
+"achievements": { "enabled": true, "contractVersion": "1",
+                  "players": 118, "pendingMail": 0 }
+```
+
+`pendingMail` is the mail queue depth: a number that stops going down means
+verification codes are going nowhere.
+
+A client that reads `status`, `revision` or `doors` needs no change. A
+client that compares this body byte-for-byte -- there is one, the parity
+harness in `tests/parity.test.ts` -- must lift the key back out first, and
+must re-derive `Content-Length` AND `ETag` from what remains: both are
+computed from the response body, so both moved with it.
 
 ## 7. Update detection
 

@@ -12,6 +12,15 @@
  * MOVED OUT SO FAR: SYM-2 and SYM-3 now live in
  * tests/achievements/boards.test.ts, where they are GREEN (AC-4).
  *
+ * SYM-1 STAYS HERE THROUGH AC-5, and its reason is written on the test
+ * itself: the surface is mounted now, but the endpoint SYM-1 drives is
+ * POST /events, which AC-9 writes. AC-5 delivered the half it can honestly
+ * deliver - the surface answers as itself, with its own headers, on every
+ * response including a 404 - and that half is asserted in
+ * tests/achievements/mount.test.ts. Wiring a stub /events to turn a status
+ * code green would be scaffolding written for a test, which is the one
+ * thing the RED file exists to prevent.
+ *
  * Every test drives the REAL app: `createApp(cfg)` over HTTP through
  * supertest, exactly as tests/routes.test.ts does. Never a router, never a
  * handler, never a function in isolation. A test that passes here is
@@ -30,6 +39,10 @@ beforeEach(() => {
 afterEach(() => fx.cleanup());
 
 describe('the achievements surface, as a board author meets it', () => {
+  // STILL RED AFTER AC-5, deliberately: the surface IS mounted (the header
+  // assertion below now passes), but POST /events does not exist until AC-9,
+  // so the router answers its own JSON 404. The remaining gap is an
+  // endpoint, not a mount.
   it('SYM-1: a board with a valid key is told 404 by a server that never mounted the surface', async () => {
     const res = await request(fx.app)
       .post('/achievements/v1/events')

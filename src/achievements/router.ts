@@ -22,6 +22,8 @@ import type { AuthedRequest } from '../auth';
 import type { ServerConfig } from '../config';
 import type { AchievementsConfig } from './config';
 import { withAchievementsDb } from './db';
+import { catalogRevision } from './catalog';
+import { achievementsHealth } from './health';
 import {
   BoardError,
   auditBoard,
@@ -33,6 +35,7 @@ import {
   setBoardSuspended,
 } from './boards';
 import type { BoardRow } from './boards';
+import { ACHIEVEMENTS_CONTRACT_VERSION } from '../../contract/achievement-types';
 import type { BoardSummary } from '../../contract/achievement-types';
 
 /** A 100-event batch is ~20 KB; the limit matches src/admin-routes.ts. */
@@ -58,7 +61,26 @@ export function createAchievementsRouter(
 ): express.Router {
   const router = express.Router();
 
+  // Every response, errors included, carries both headers: a client can then
+  // notice a catalog change without asking for the catalog, and can tell
+  // this API's own 401 apart from a reverse proxy's. Mounted before the body
+  // parser so a body that is not JSON is refused with them too.
+  router.use((_req: Request, res: Response, next: NextFunction) => {
+    res.set('X-Achievements-Contract', ACHIEVEMENTS_CONTRACT_VERSION);
+    res.set(
+      'X-Achievements-Revision',
+      withAchievementsDb(ach, (db) => catalogRevision(db), { readonly: true })
+    );
+    next();
+  });
+
   router.use(express.json({ limit: BODY_LIMIT }));
+
+  // No board key: a monitor and a sysop must be able to ask whether the
+  // surface is alive, and every number here is a count, never a name.
+  router.get('/health', (_req: Request, res: Response) => {
+    res.json(achievementsHealth(ach));
+  });
 
   // ---------------------------------------------------------------------
   // Curation: issuing board keys. Gated by the ADMIN token, never by a board

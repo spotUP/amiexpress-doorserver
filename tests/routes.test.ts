@@ -114,7 +114,15 @@ describe('read API', () => {
   it('serves health without hashing the corpus', async () => {
     const res = await request(app).get('/api/door-repo/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', revision: 'c1-t1700000000', doors: 1 });
+    // The achievements key is APPENDED (AC-5); status, revision and doors
+    // keep their names, their order and their values, which is what
+    // tests/parity.test.ts pins by lifting the new key back out.
+    expect(res.body).toEqual({
+      status: 'ok',
+      revision: 'c1-t1700000000',
+      doors: 1,
+      achievements: { enabled: false },
+    });
   });
 
   // The catch-all bails on any method that is not GET, so HEAD 404s on a

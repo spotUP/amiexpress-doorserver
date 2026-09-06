@@ -7,10 +7,12 @@
  *                              freshness check, see the handler below).
  *   GET /list.txt              byte-exact ISO-8859-1/CRLF plain-text index.
  *   GET /archive/:archiveName  streams the archive file + its checksums.
- *   GET /health                { status, revision, doors } — lightweight;
- *                              uses getDoorCount(), never buildManifest(),
- *                              so a liveness poll never re-hashes the
- *                              whole archive corpus.
+ *   GET /health                { status, revision, doors, achievements } —
+ *                              lightweight; uses getDoorCount(), never
+ *                              buildManifest(), so a liveness poll never
+ *                              re-hashes the whole archive corpus. The
+ *                              achievements key is { enabled: false } on a
+ *                              server that never configured that surface.
  *
  * All four thin-wrap Task 1/2 building blocks (./manifest.ts,
  * ./checksums.ts) and ./catalog.ts — no new DB access or business logic
@@ -29,6 +31,7 @@ import * as fs from 'fs';
 import { pipeline } from 'stream';
 import { buildManifest, renderListTxt, renderListTxtCached } from './manifest';
 import { clampRecent, renderIndexTsvCached } from './index-tsv';
+import { achievementsHealthSummary } from './achievements/health';
 import { getArchiveChecksums } from './checksums';
 import {
   findArchiveNameForDizBasename,
@@ -504,7 +507,11 @@ export function createRouter(cfg: ServerConfig): express.Router {
     const revision = getCatalogRevision(cfg);
     const doors = getDoorCount(cfg);
     res.set('X-Door-Repo-Revision', revision);
-    res.json({ status: 'ok', revision, doors });
+    // The achievements key is APPENDED; every existing field keeps its name
+    // and its value. This is the URL the container healthcheck and the deploy
+    // workflow already call, so a server that never configured the surface
+    // reports { enabled: false } here and nothing else changes for it.
+    res.json({ status: 'ok', revision, doors, achievements: achievementsHealthSummary(cfg) });
   });
 
   return doorRepoRouter;
