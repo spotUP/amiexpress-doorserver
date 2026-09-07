@@ -35,6 +35,7 @@ import {
 } from './players';
 import type { IssuedCode } from './players';
 import { linkBoard, rotateLinkCode, unlinkBoard } from './links';
+import { storeEvents } from './events';
 import {
   auditBoard,
   createBoard,
@@ -277,6 +278,22 @@ export function createAchievementsRouter(
       const boardId = keyBoard(req);
       const out = rotateLinkCode(db, email, code, now);
       auditBoard(db, boardId, 'link:rotate', 1, now);
+      res.json(out);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Events. One request, one transaction: a batch-level refusal thrown
+  // inside it rolls back whatever the loop had stored before it fired, so
+  // "nothing is stored" is a property of the transaction, not of the order
+  // the checks happen to run in.
+  // ---------------------------------------------------------------------
+  router.post('/events', (req: BoardRequest, res: Response) => {
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const boardId = keyBoard(req);
+      const body: unknown = req.body;
+      const out = db.transaction(() => storeEvents(db, boardId, body, now))();
       res.json(out);
     });
   });

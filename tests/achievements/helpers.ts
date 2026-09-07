@@ -220,3 +220,48 @@ export function recordingMailer(): RecordingMailer {
     },
   };
 }
+
+export interface AchievementDef {
+  id: string;
+  /** The event type the rule reads. */
+  type: string;
+  op?: string;
+  n?: number;
+  key?: string;
+  /** The types the candidate index lists; defaults to [type]. */
+  types?: string[];
+  points?: number;
+  tier?: 'bronze' | 'silver' | 'gold' | 'platinum';
+  family?: string;
+  hidden?: boolean;
+  name?: string;
+  extra?: Record<string, unknown>;
+}
+
+/**
+ * Put an achievement in the catalog the way the seed loader (AC-11) will:
+ * the definition row and its candidate-index rows. Until the loader
+ * exists, this is how a suite gives an event type something to move.
+ */
+export function defineAchievement(db: Database.Database, def: AchievementDef): void {
+  const rule = { op: def.op ?? 'count', type: def.type, n: def.n ?? 1, ...(def.key ? { key: def.key } : {}), ...(def.extra ?? {}) };
+  const now = 1700000000;
+  db.prepare(
+    `INSERT INTO achievements (id, name, description, family, tier, points, hidden, rule, digest, source, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'seed', ?, ?)`
+  ).run(
+    def.id,
+    def.name ?? def.id,
+    `Test definition of ${def.id}`,
+    def.family ?? def.id.split('.')[0],
+    def.tier ?? 'bronze',
+    def.points ?? 5,
+    def.hidden ? 1 : 0,
+    JSON.stringify(rule),
+    `digest-${def.id}`,
+    now,
+    now
+  );
+  const types = db.prepare('INSERT OR IGNORE INTO achievement_types (achievement_id, type) VALUES (?, ?)');
+  for (const t of def.types ?? [def.type]) types.run(def.id, t);
+}

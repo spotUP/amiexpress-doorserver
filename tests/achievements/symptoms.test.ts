@@ -13,20 +13,15 @@
  * tests/achievements/boards.test.ts, where they are GREEN (AC-4); SYM-4 now
  * lives in tests/achievements/players.test.ts, GREEN (AC-7).
  *
- * SYM-5 STAYS HERE THROUGH AC-8, for the same reason as SYM-1: it drives
- * POST /events, which AC-9 writes. AC-8 delivered the link itself - the row
- * exists for the key's board only, and no key can make one for another
- * board (tests/achievements/links.test.ts); the refusal this test asks for
- * is the first thing AC-9's endpoint does with that row's absence.
+ * SYM-5, SYM-6, SYM-7 and SYM-8 now live in tests/achievements/events.test.ts,
+ * GREEN (AC-9), adapted to a world with players and links: the RED versions
+ * posted for an address nobody had registered, which AC-9 rejects before it
+ * ever reaches the behaviour they were written to catch.
  *
- * SYM-1 STAYS HERE THROUGH AC-5, and its reason is written on the test
- * itself: the surface is mounted now, but the endpoint SYM-1 drives is
- * POST /events, which AC-9 writes. AC-5 delivered the half it can honestly
- * deliver - the surface answers as itself, with its own headers, on every
- * response including a 404 - and that half is asserted in
- * tests/achievements/mount.test.ts. Wiring a stub /events to turn a status
- * code green would be scaffolding written for a test, which is the one
- * thing the RED file exists to prevent.
+ * SYM-1 CLOSED BY AC-9: it asked for POST /events to exist behind the
+ * mounted surface. AC-5 delivered the mount and its headers
+ * (tests/achievements/mount.test.ts); AC-9 delivered the endpoint, and every
+ * test in tests/achievements/events.test.ts drives it.
  *
  * Every test drives the REAL app: `createApp(cfg)` over HTTP through
  * supertest, exactly as tests/routes.test.ts does. Never a router, never a
@@ -46,126 +41,6 @@ beforeEach(() => {
 afterEach(() => fx.cleanup());
 
 describe('the achievements surface, as a board author meets it', () => {
-  // STILL RED AFTER AC-5, deliberately: the surface IS mounted (the header
-  // assertion below now passes), but POST /events does not exist until AC-9,
-  // so the router answers its own JSON 404. The remaining gap is an
-  // endpoint, not a mount.
-  it('SYM-1: a board with a valid key is told 404 by a server that never mounted the surface', async () => {
-    const res = await request(fx.app)
-      .post('/achievements/v1/events')
-      .set('Authorization', fx.auth)
-      .send({ events: [] });
-
-    // A 404 here is indistinguishable from "this host does not run
-    // achievements at all" - the same two-meanings-one-status complaint
-    // docs/DOOR-REPO-API.md already makes about the door repo. The surface
-    // must ANSWER, whatever it answers.
-    expect(res.status).not.toBe(404);
-    expect(res.headers['x-achievements-contract']).toBe('1');
-  });
-
-  it('SYM-5: a board reports for an email that never linked it and the events land', async () => {
-    const res = await request(fx.app)
-      .post('/achievements/v1/events')
-      .set('Authorization', fx.auth)
-      .send({
-        events: [
-          {
-            ref: `${TEST_BOARD_ID}:01J8Z0000000000000000001`,
-            email: 'stranger@example.com',
-            type: 'msg.post',
-            at: '2026-09-03T21:14:02Z',
-          },
-        ],
-      });
-
-    // The single-player case the 68K door always sends: every event in the
-    // batch is for an unlinked player, so the whole request is 403 and the
-    // door explains linking.
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('not_linked');
-  });
-
-  it('SYM-6: the same ref sent twice counts twice', async () => {
-    const event = {
-      ref: `${TEST_BOARD_ID}:01J8Z0000000000000000002`,
-      email: 'caller@example.com',
-      type: 'msg.post',
-      at: '2026-09-03T21:14:02Z',
-    };
-    const post = () =>
-      request(fx.app)
-        .post('/achievements/v1/events')
-        .set('Authorization', fx.auth)
-        .send({ events: [event] });
-
-    const first = await post();
-    const second = await post();
-
-    expect(first.body).toMatchObject({ accepted: 1, duplicates: 0 });
-    // The primary key (board_id, ref) is the whole idempotency story: a
-    // resend is a duplicate by construction, and folds nothing.
-    expect(second.body).toMatchObject({ accepted: 0, duplicates: 1 });
-  });
-
-  it('SYM-7: an event stamped next year sets a streak nobody earned', async () => {
-    const nextYear = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
-    const res = await request(fx.app)
-      .post('/achievements/v1/events')
-      .set('Authorization', fx.auth)
-      .send({
-        events: [
-          {
-            ref: `${TEST_BOARD_ID}:01J8Z0000000000000000003`,
-            email: 'caller@example.com',
-            type: 'presence.call',
-            at: nextYear,
-          },
-        ],
-      });
-
-    expect(res.status).toBe(200);
-
-    const db = fx.openAchievements();
-    try {
-      const row = db
-        .prepare('SELECT at, received_at, clamped FROM events WHERE ref = ?')
-        .get(`${TEST_BOARD_ID}:01J8Z0000000000000000003`) as
-        | { at: number; received_at: number; clamped: number }
-        | undefined;
-      expect(row).toBeDefined();
-      // Clamped to the server's own clock, and the clamp is recorded on the
-      // row - streaks and windows read the clamped value, nothing reads the
-      // raw one.
-      expect(row?.clamped).toBe(1);
-      expect(row?.at).toBe(row?.received_at);
-    } finally {
-      db.close();
-    }
-  });
-
-  it('SYM-8: a board posts meta.unlock and mints itself an achievement', async () => {
-    const res = await request(fx.app)
-      .post('/achievements/v1/events')
-      .set('Authorization', fx.auth)
-      .send({
-        events: [
-          {
-            ref: `${TEST_BOARD_ID}:01J8Z0000000000000000004`,
-            email: 'caller@example.com',
-            type: 'meta.unlock',
-            key: 'msg.post.100',
-            at: '2026-09-03T21:14:02Z',
-          },
-        ],
-      });
-
-    // A meta.* type from a board is an attack signal, not a typo: the whole
-    // batch is refused, and nothing about it is per-event.
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe('meta_type_rejected');
-  });
-
   it('SYM-9: catalog.txt comes back as UTF-8 with LF line endings', async () => {
     const res = await request(fx.app)
       .get('/achievements/v1/catalog.txt')

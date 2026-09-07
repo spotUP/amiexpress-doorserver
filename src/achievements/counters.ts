@@ -109,3 +109,23 @@ export function recordEvent(db: Database.Database, e: StoredEvent): boolean {
   foldEvent(db, e);
   return true;
 }
+
+/**
+ * stat.snapshot: an absolute counter out of a board's user record, stored
+ * as max(existing, value). A LOWER snapshot after a higher one changes
+ * nothing at all; `count` rules read max(counters.n, snapshot) (D10).
+ */
+export function recordSnapshot(
+  db: Database.Database,
+  playerId: number,
+  name: string,
+  value: number,
+  now: number
+): void {
+  db.prepare(
+    `INSERT INTO snapshots (player_id, name, value, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(player_id, name) DO UPDATE SET
+       value = MAX(value, excluded.value),
+       updated_at = CASE WHEN excluded.value > value THEN excluded.updated_at ELSE updated_at END`
+  ).run(playerId, name, value, now);
+}
