@@ -109,13 +109,11 @@ export function chargesFor(route: 'events' | 'register' | 'verify' | 'links' | '
         ...[...perPlayer].map(([k, n]) => ({ key: `event-rows:player:${k}`, limit: LIMITS.eventRowsPerPlayer, cost: n })),
       ];
     }
-    case 'register': {
-      const k = emailKey(b.email);
-      return [
-        { key: `register:board:${boardId}`, limit: LIMITS.registerPerBoard },
-        ...(k ? [{ key: `register:email:${k}`, limit: LIMITS.registerPerEmail }] : []),
-      ];
-    }
+    case 'register':
+      // The per-address budget is MAIL, not requests: it is charged by the
+      // handler right before a mail is queued (chargeMail), so a request
+      // refused for a bad handle does not eat the address's three.
+      return [{ key: `register:board:${boardId}`, limit: LIMITS.registerPerBoard }];
     case 'verify': {
       const k = emailKey(b.email);
       return [
@@ -158,4 +156,10 @@ export function rateLimitAdmin() {
       next(err);
     }
   };
+}
+
+/** The mail budget for one address: three in an hour, charged at the queue. */
+export function chargeMail(email: string): void {
+  const k = emailKey(email);
+  if (k) charge([{ key: `register:email:${k}`, limit: LIMITS.registerPerEmail }]);
 }

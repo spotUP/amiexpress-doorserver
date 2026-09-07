@@ -17,6 +17,10 @@ import type { Response } from 'supertest';
 import { defineAchievement, makeAchievementsFixture, TEST_BOARD_ID } from './helpers';
 import type { AchievementsFixture } from './helpers';
 
+// Scrypt and a thousand requests under eight parallel workers: five
+// seconds is a load-dependent limit, not a correctness one.
+jest.setTimeout(60000);
+
 let fx: AchievementsFixture;
 let db: Database.Database;
 

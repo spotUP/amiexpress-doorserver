@@ -12,6 +12,10 @@ import { LIMITS, _resetRateLimitsForTests } from '../../src/achievements/ratelim
 import { defineAchievement, makeAchievementsFixture, TEST_BOARD_ID } from './helpers';
 import type { AchievementsFixture } from './helpers';
 
+// Scrypt and a thousand requests under eight parallel workers: five
+// seconds is a load-dependent limit, not a correctness one.
+jest.setTimeout(60000);
+
 let fx: AchievementsFixture;
 let db: Database.Database;
 let now = 1800000000;
@@ -86,8 +90,10 @@ describe('rate limits', () => {
     expect(db.prepare('SELECT COUNT(*) AS n FROM mail_queue').get()).toEqual({ n: 3 });
 
     expect((await post('/players', { email: 'other@example.com', handle: 'Other' })).status).toBe(202);
-    // A refusal on the address counter did not charge the board counter.
-    for (let i = 0; i < LIMITS.registerPerBoard.max - 4; i += 1) {
+    // The board's own budget counts REQUESTS, refused ones included: six so
+    // far (three hammers, the refused fourth, the refused resend, other),
+    // so four more fit and the eleventh is refused.
+    for (let i = 0; i < LIMITS.registerPerBoard.max - 6; i += 1) {
       expect((await post('/players', { email: `p${i}@example.com`, handle: `Player${i}` })).status).toBe(202);
     }
     expect((await post('/players', { email: 'last@example.com', handle: 'Last' })).status).toBe(429);

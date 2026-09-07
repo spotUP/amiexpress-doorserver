@@ -21,6 +21,10 @@ import { createBoard } from '../../src/achievements/boards';
 import { makeAchievementsFixture, TEST_BOARD_ID } from './helpers';
 import type { AchievementsFixture } from './helpers';
 
+// Scrypt and a thousand requests under eight parallel workers: five
+// seconds is a load-dependent limit, not a correctness one.
+jest.setTimeout(60000);
+
 const FIXTURE = path.join(__dirname, 'fixtures', 'recorded-week.jsonl');
 const EXPECTED = path.join(__dirname, 'fixtures', 'recorded-week.expected.json');
 const DAY = 86400;

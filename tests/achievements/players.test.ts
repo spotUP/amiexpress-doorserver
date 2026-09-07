@@ -22,6 +22,10 @@ import { MAX_CODE_ATTEMPTS, VERIFY_CODE_TTL_SECONDS } from '../../src/achievemen
 import { makeAchievementsFixture, TEST_BOARD_ID } from './helpers';
 import type { AchievementsFixture } from './helpers';
 
+// Scrypt and a thousand requests under eight parallel workers: five
+// seconds is a load-dependent limit, not a correctness one.
+jest.setTimeout(60000);
+
 let fx: AchievementsFixture;
 let db: Database.Database;
 

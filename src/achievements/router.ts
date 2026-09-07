@@ -42,7 +42,7 @@ import { patchProfile, readProfile } from './profile';
 import { leaderboard, parseLeaderboardQuery, renderLeaderboardTxt } from './leaderboard';
 import { ensureCurrentSeason } from './seasons';
 import { refreshRarityIfStale } from './rarity';
-import { rateLimit, rateLimitAdmin } from './ratelimit';
+import { chargeMail, rateLimit, rateLimitAdmin } from './ratelimit';
 import {
   auditBoard,
   createBoard,
@@ -194,6 +194,9 @@ export function createAchievementsRouter(
   // registration into a 500.
   // ---------------------------------------------------------------------
   const queueCode = (db: Database.Database, issued: IssuedCode, now: number): void => {
+    // Three mails an hour per address (AC-17), charged here where the mail
+    // is, so a refused registration costs the address nothing.
+    chargeMail(issued.to);
     const mail = verificationMail(ach, issued.code, VERIFY_CODE_TTL_SECONDS);
     queueMail(db, issued.to, mail.subject, mail.body, now);
   };
