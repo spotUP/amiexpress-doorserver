@@ -255,12 +255,23 @@ interface CodeRow {
  * The attempt counter is written before the throw. A refusal that forgot to
  * record itself would leave the cap at five for ever.
  */
+export interface SpendOptions {
+  /**
+   * Accept a code past its expiry. Only POST /links/rotate wants this: the
+   * expired code is the player's proof of identity there, and refusing it
+   * would leave a player who was slow reaching the next board with no way
+   * to get a code at all. Burned and spent codes are still refused.
+   */
+  allowExpired?: boolean;
+}
+
 export function spendCode(
   db: Database.Database,
   player: PlayerRow | null,
   kind: CodeKind,
   code: string,
-  now: number = nowSeconds()
+  now: number = nowSeconds(),
+  opts: SpendOptions = {}
 ): PlayerRow {
   const badCode = (): SurfaceError =>
     new SurfaceError('bad_code', 400, 'that code is not the one this address is waiting for');
@@ -281,7 +292,7 @@ export function spendCode(
   // caller who has burned a code needs a NEW one whether or not the old one
   // would still have been in date.
   if (row.attempts >= MAX_CODE_ATTEMPTS) throw burned();
-  if (row.expires_at <= now) {
+  if (row.expires_at <= now && !opts.allowExpired) {
     throw new SurfaceError('code_expired', 400, 'that code has expired; ask for a new one');
   }
 

@@ -13,6 +13,12 @@
  * tests/achievements/boards.test.ts, where they are GREEN (AC-4); SYM-4 now
  * lives in tests/achievements/players.test.ts, GREEN (AC-7).
  *
+ * SYM-5 STAYS HERE THROUGH AC-8, for the same reason as SYM-1: it drives
+ * POST /events, which AC-9 writes. AC-8 delivered the link itself - the row
+ * exists for the key's board only, and no key can make one for another
+ * board (tests/achievements/links.test.ts); the refusal this test asks for
+ * is the first thing AC-9's endpoint does with that row's absence.
+ *
  * SYM-1 STAYS HERE THROUGH AC-5, and its reason is written on the test
  * itself: the surface is mounted now, but the endpoint SYM-1 drives is
  * POST /events, which AC-9 writes. AC-5 delivered the half it can honestly

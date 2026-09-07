@@ -34,6 +34,7 @@ import {
   verifyPlayer,
 } from './players';
 import type { IssuedCode } from './players';
+import { linkBoard, rotateLinkCode, unlinkBoard } from './links';
 import {
   auditBoard,
   createBoard,
@@ -220,6 +221,63 @@ export function createAchievementsRouter(
       const profile = verifyPlayer(db, email, code, now);
       auditBoard(db, req.board?.id ?? null, 'player:verify', 1, now);
       res.json(profile);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Links. Every route here acts on THE KEY'S BOARD; there is no board field
+  // in any body, and a key that could name another board could unlink it.
+  // ---------------------------------------------------------------------
+  const keyBoard = (req: BoardRequest): string => {
+    const id = req.board?.id;
+    if (!id) throw new SurfaceError('unauthenticated', 401, 'a board key is required');
+    return id;
+  };
+
+  router.post('/links', (req: BoardRequest, res: Response) => {
+    const body = (req.body ?? {}) as { email?: unknown; code?: unknown };
+    if (typeof body.email !== 'string' || typeof body.code !== 'string') {
+      throw new SurfaceError('bad_request', 400, 'email and code are required');
+    }
+    const email = body.email;
+    const code = body.code;
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const boardId = keyBoard(req);
+      const out = db.transaction(() => linkBoard(db, boardId, email, code, now))();
+      auditBoard(db, boardId, 'link', 1, now);
+      res.json(out);
+    });
+  });
+
+  router.delete('/links', (req: BoardRequest, res: Response) => {
+    const body = (req.body ?? {}) as { email?: unknown };
+    if (typeof body.email !== 'string') {
+      throw new SurfaceError('bad_request', 400, 'email is required');
+    }
+    const email = body.email;
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const boardId = keyBoard(req);
+      const out = unlinkBoard(db, boardId, email);
+      auditBoard(db, boardId, 'unlink', 1, now);
+      res.json(out);
+    });
+  });
+
+  router.post('/links/rotate', (req: BoardRequest, res: Response) => {
+    const body = (req.body ?? {}) as { email?: unknown; code?: unknown };
+    if (typeof body.email !== 'string' || typeof body.code !== 'string') {
+      throw new SurfaceError('bad_request', 400, 'email and code are required');
+    }
+    const email = body.email;
+    const code = body.code;
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const boardId = keyBoard(req);
+      const out = rotateLinkCode(db, email, code, now);
+      auditBoard(db, boardId, 'link:rotate', 1, now);
+      res.json(out);
     });
   });
 
