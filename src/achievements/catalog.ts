@@ -27,6 +27,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type Database from 'better-sqlite3';
 import { ruleTypes } from './engine';
+import { rarityOf } from './rarity';
 import { esc, oneLine, toLatin1Safe } from '../text-format';
 import type { AchievementDef, CatalogAchievement, RarityBucket, Rule, Tier } from '../../contract/achievement-types';
 
@@ -158,8 +159,8 @@ export function parseSince(since: string | undefined): number | null {
   return m ? Number(m[1]) : null;
 }
 
-/** With no rarity row - fewer than twenty verified players, or day one. */
-export const RARITY_FLOOR = { pctTenths: 1000, bucket: 'common' as RarityBucket };
+/** Re-exported: the floor is defined next to the arithmetic it mirrors. */
+export { RARITY_FLOOR } from './rarity';
 
 interface CatalogRow {
   id: string;
@@ -215,8 +216,8 @@ export function catalogRows(db: Database.Database, boardId: string, sinceEpoch: 
       points: r.points,
       hidden: r.hidden !== 0,
       rule: JSON.parse(r.rule) as Rule,
-      rarityPctTenths: r.pct_tenths ?? RARITY_FLOOR.pctTenths,
-      rarityBucket: r.bucket ?? RARITY_FLOOR.bucket,
+      rarityPctTenths: rarityOf(r.pct_tenths, r.bucket).pctTenths,
+      rarityBucket: rarityOf(r.pct_tenths, r.bucket).bucket,
       updatedAt: new Date(r.updated_at * 1000).toISOString(),
     };
   });

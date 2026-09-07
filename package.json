@@ -13,7 +13,8 @@
     "test:parity": "PARITY_DB=${PARITY_DB:-/tmp/parity-source.db} PARITY_ARCHIVES=${PARITY_ARCHIVES:-/Users/spot/Code/amiexpress_doors/Archives} jest --config jest.config.ts tests/parity.test.ts",
     "build:web": "npm --prefix web ci && npm --prefix web run build",
     "build:all": "npm run build:web && npm run build",
-    "dev:web": "npm --prefix web run dev"
+    "dev:web": "npm --prefix web run dev",
+    "capture:achievements-doc": "tsx scripts/capture-achievements-examples.ts"
   },
   "dependencies": {
     "@types/busboy": "^1.5.4",

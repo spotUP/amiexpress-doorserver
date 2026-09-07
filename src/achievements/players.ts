@@ -27,6 +27,7 @@ import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import { hashPassword, verifyPassword } from '../auth';
 import { SurfaceError } from './errors';
+import { rarityOf } from './rarity';
 import type { PlayerProfile, Tier, UnlockOut } from '../../contract/achievement-types';
 
 /**
@@ -367,7 +368,7 @@ export function playerProfile(db: Database.Database, player: PlayerRow): PlayerP
     tier: r.tier,
     points: r.points,
     hidden: r.hidden !== 0,
-    rarityPctTenths: r.rarity_tenths ?? 0,
+    rarityPctTenths: rarityOf(r.rarity_tenths).pctTenths,
     at: new Date(r.at * 1000).toISOString(),
   }));
 

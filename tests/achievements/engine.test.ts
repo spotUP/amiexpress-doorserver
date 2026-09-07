@@ -12,6 +12,7 @@ import Database from 'better-sqlite3';
 import request from 'supertest';
 import type { Response } from 'supertest';
 import { createBoard } from '../../src/achievements/boards';
+import { RARITY_FLOOR } from '../../src/achievements/rarity';
 import { _lastEvaluatedForTests, MAX_PROGRESS } from '../../src/achievements/engine';
 import { defineAchievement, makeAchievementsFixture, TEST_BOARD_ID } from './helpers';
 import type { AchievementsFixture } from './helpers';
@@ -85,7 +86,17 @@ describe('the rule engine', () => {
     const hundredth = event('caller@example.com', 'msg.post');
     const res = await post('/events', { events: [hundredth] });
     expect(res.body.unlocks).toEqual([
-      expect.objectContaining({ id: 'msg.post.100', name: 'Century', tier: 'silver', points: 10, hidden: false, rarityPctTenths: 0 }),
+      // The floor, not 0: an unlock nothing has recomputed a rarity for is
+      // `common` at 1000, the same answer the catalog gives for it. This
+      // line pinned 0 until rarity-floor.test.ts showed what a door printed.
+      expect.objectContaining({
+        id: 'msg.post.100',
+        name: 'Century',
+        tier: 'silver',
+        points: 10,
+        hidden: false,
+        rarityPctTenths: RARITY_FLOOR.pctTenths,
+      }),
     ]);
     expect(typeof res.body.unlocks[0].at).toBe('string');
     // The resend is a duplicate and moves nothing, so nothing is evaluated.

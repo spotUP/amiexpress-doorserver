@@ -32,6 +32,7 @@
 import type Database from 'better-sqlite3';
 import { recordEvent } from './counters';
 import { ensureCurrentSeason } from './seasons';
+import { rarityOf } from './rarity';
 import type { ProgressOut, Rule, Tier, UnlockOut } from '../../contract/achievement-types';
 
 export const MAX_CASCADE_DEPTH = 5;
@@ -56,6 +57,8 @@ interface CandidateRow {
   points: number;
   hidden: number;
   rule: string;
+  /** The stored rarity, or null when nothing has recomputed it yet. */
+  pct_tenths: number | null;
   /** 1 when this player already holds it. */
   unlocked: number;
 }
@@ -166,9 +169,10 @@ function candidates(db: Database.Database, playerId: number, types: string[]): C
   const marks = types.map(() => '?').join(',');
   return db
     .prepare(
-      `SELECT DISTINCT a.id, a.name, a.tier, a.points, a.hidden, a.rule,
+      `SELECT DISTINCT a.id, a.name, a.tier, a.points, a.hidden, a.rule, r.pct_tenths,
               EXISTS (SELECT 1 FROM unlocks u WHERE u.player_id = ? AND u.achievement_id = a.id) AS unlocked
          FROM achievement_types t JOIN achievements a ON a.id = t.achievement_id
+         LEFT JOIN rarity r ON r.achievement_id = a.id
         WHERE t.type IN (${marks})
         ORDER BY a.id`
     )
@@ -258,7 +262,7 @@ export function evaluate(
           tier: c.tier,
           points: c.points,
           hidden: c.hidden !== 0,
-          rarityPctTenths: 0,
+          rarityPctTenths: rarityOf(c.pct_tenths).pctTenths,
           at: new Date(now * 1000).toISOString(),
         });
 

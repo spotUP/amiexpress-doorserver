@@ -17,13 +17,29 @@ what a TypeScript client compiles against.
 `tests/achievements/contract.test.ts` fails the build if this document and
 that module drift apart.
 
-**Status: the contract is frozen; the implementation is landing behind it.**
-The examples below are written from the contract, not captured from a
-running server - which is the opposite of `docs/DOOR-REPO-API.md`'s rule and
-is called out here rather than left to be assumed. AC-21 of the
-implementation plan replaces every example with a real captured one before
-deploy. Nothing about the SHAPES will move when it does; that is the whole
-point of freezing the contract first.
+**Every example below is captured from the real server**, the way
+`docs/DOOR-REPO-API.md`'s are. One ordered walk - register, verify, link,
+publish a door's definitions, report events, read the catalog, the
+leaderboard and a profile, unlink - is driven through the real application,
+as `tests/achievements/doc-story.ts` builds it, and
+`scripts/capture-achievements-examples.ts` writes what came back into the
+fenced blocks marked `<!-- capture: ... -->`. Re-capture with
+`npm run capture:achievements-doc`.
+
+The walk is re-run on every CI run by
+`tests/achievements/doc-examples-are-real.test.ts`, which fails if this
+document and the server disagree about any field, count or status - so an
+example here cannot go stale in the direction of the reader. Codes,
+timestamps and revisions differ every run and are compared by shape;
+everything else is compared exactly. A listing too long to print whole is
+cut, and the cut is stated under the fence.
+
+Capturing found what reading could not: `POST /events` and
+`GET /players/<email>` were reporting a freshly unlocked achievement as
+`rarityPctTenths: 0` - held by nobody, the most legendary number the bucket
+table has - while the catalog reported the documented floor of `1000` for
+the same achievement in the same breath. The prose here had been right about
+that floor for weeks.
 
 ## Contents
 
@@ -158,14 +174,21 @@ Fifteen board-facing endpoints. All paths below are relative to
 Register a player. The handle is the only identifier any other board or any
 listing ever shows.
 
+<!-- capture: players.register.request -->
 ```json
-{ "email": "caller@example.com", "handle": "Spot" }
+{
+  "email": "caller@example.com",
+  "handle": "Spot"
+}
 ```
 
 Answers `202` with:
 
+<!-- capture: players.register.response -->
 ```json
-{ "queued": true }
+{
+  "queued": true
+}
 ```
 
 **`202` is the answer whether or not the address already exists.** The
@@ -208,16 +231,29 @@ must survive the mail server being down.
 
 ### POST /players/verify
 
+<!-- capture: players.verify.request -->
 ```json
-{ "email": "caller@example.com", "code": "K7QMX4" }
+{
+  "email": "caller@example.com",
+  "code": "A23TKT"
+}
 ```
 
 Answers `200` with a `PlayerProfile` carrying the player's first link code:
 
+<!-- capture: players.verify.response -->
 ```json
-{ "handle": "Spot", "verified": true, "private": false, "points": 0,
-  "linkedBoards": [], "unlocks": [], "progress": [],
-  "linkCode": "B9TWJ2", "linkCodeExpiresAt": "2026-09-03T21:29:02Z" }
+{
+  "handle": "Spot",
+  "verified": true,
+  "private": false,
+  "points": 0,
+  "linkedBoards": [],
+  "unlocks": [],
+  "progress": [],
+  "linkCode": "FQ9MRE",
+  "linkCodeExpiresAt": "2026-09-07T19:04:00.000Z"
+}
 ```
 
 **No response from this API ever contains an email address.** The profile
@@ -235,8 +271,11 @@ of who has signed up.
 
 ### POST /players/resend
 
+<!-- capture: players.resend.request -->
 ```json
-{ "email": "caller@example.com" }
+{
+  "email": "caller@example.com"
+}
 ```
 
 Answers `202` `{"queued": true}`, always. A new code REPLACES the old one,
@@ -247,13 +286,24 @@ mail limits apply (`429`, section on rate limits below).
 
 Links **the key's board**. There is no board field in the body, ever.
 
+<!-- capture: links.link.request -->
 ```json
-{ "email": "caller@example.com", "code": "B9TWJ2" }
+{
+  "email": "caller@example.com",
+  "code": "FQ9MRE"
+}
 ```
 
+<!-- capture: links.link.response -->
 ```json
-{ "linked": true, "boards": ["uprough"],
-  "linkCode": "P4XMK8", "linkCodeExpiresAt": "2026-09-03T21:44:02Z" }
+{
+  "linked": true,
+  "boards": [
+    "uprough"
+  ],
+  "linkCode": "A6SB2Q",
+  "linkCodeExpiresAt": "2026-09-07T19:04:00.000Z"
+}
 ```
 
 The link code is **single-use**, and a successful link issues the NEXT one
@@ -273,12 +323,19 @@ nothing.
 
 ### DELETE /links
 
+<!-- capture: links.unlink.request -->
 ```json
-{ "email": "caller@example.com" }
+{
+  "email": "phantasm@example.com"
+}
 ```
 
+<!-- capture: links.unlink.response -->
 ```json
-{ "linked": false, "boards": [] }
+{
+  "linked": false,
+  "boards": []
+}
 ```
 
 Unlinks **the key's board only**. A board key can never unlink another
@@ -292,12 +349,20 @@ achievements count.
 
 ### POST /links/rotate
 
+<!-- capture: links.rotate.request -->
 ```json
-{ "email": "caller@example.com", "code": "P4XMK8" }
+{
+  "email": "caller@example.com",
+  "code": "A6SB2Q"
+}
 ```
 
+<!-- capture: links.rotate.response -->
 ```json
-{ "linkCode": "R6ZBN3", "linkCodeExpiresAt": "2026-09-03T21:59:02Z" }
+{
+  "linkCode": "QK9QTQ",
+  "linkCodeExpiresAt": "2026-09-07T19:04:01.000Z"
+}
 ```
 
 For a player whose code expired before they reached the next board.
@@ -306,24 +371,68 @@ For a player whose code expired before they reached the next board.
 
 The write path. A batch of at most 100 events, idempotent by `ref`.
 
+<!-- capture: events.clean.request -->
 ```json
-{ "events": [
-  { "ref": "uprough:01J8Z4M0000000000000000001", "email": "caller@example.com",
-    "type": "msg.post", "at": "2026-09-03T21:14:02Z", "value": 1,
-    "key": "conf:2", "door": null, "client": "amiga" }
-] }
+{
+  "events": [
+    {
+      "ref": "uprough:01J8Z4M0000000000000000001",
+      "email": "caller@example.com",
+      "type": "msg.post",
+      "at": "2026-09-07T18:49:01Z",
+      "value": 1,
+      "key": "conf:2",
+      "door": null,
+      "client": "amiga"
+    }
+  ]
+}
 ```
 
 Response:
 
+<!-- capture: events.clean.response -->
 ```json
-{ "accepted": 1, "duplicates": 0,
-  "rejected": [], "notLinked": [],
-  "unlocks": [ { "id": "msg.post.100", "name": "Century", "tier": "silver",
-                 "points": 10, "hidden": false, "rarityPctTenths": 81,
-                 "at": "2026-09-03T21:14:02Z" } ],
-  "progress": [ { "id": "msg.post.1000", "have": 100, "need": 1000 } ] }
+{
+  "accepted": 1,
+  "duplicates": 0,
+  "rejected": [],
+  "notLinked": [],
+  "unlocks": [
+    {
+      "id": "msg.post.1",
+      "name": "First Words",
+      "tier": "bronze",
+      "points": 5,
+      "hidden": false,
+      "rarityPctTenths": 1000,
+      "at": "2026-09-07T18:49:01.000Z"
+    },
+    {
+      "id": "rare.newboard.first",
+      "name": "Ground Floor",
+      "tier": "gold",
+      "points": 25,
+      "hidden": true,
+      "rarityPctTenths": 1000,
+      "at": "2026-09-07T18:49:01.000Z"
+    }
+  ],
+  "progress": [
+    {
+      "id": "boards.same.3",
+      "have": 1,
+      "need": 3
+    },
+    {
+      "id": "msg.burst.3",
+      "have": 1,
+      "need": 3
+    }
+  ]
+}
 ```
+*(the first 2 of 14 `progress` entries.)*
 
 #### Per-event verdicts
 
@@ -342,12 +451,40 @@ with it - and the sender would have no way to tell which row to drop.
 Reasons: `unknown_event_type`, `not_linked`, `unknown_player`,
 `unverified_player`.
 
+<!-- capture: events.mixed.response -->
 ```json
-{ "accepted": 98, "duplicates": 1,
-  "rejected": [ { "ref": "uprough:01J8Z...002", "reason": "not_linked" } ],
-  "notLinked": ["stranger@example.com"],
-  "unlocks": [], "progress": [] }
+{
+  "accepted": 1,
+  "duplicates": 1,
+  "rejected": [
+    {
+      "ref": "uprough:01J8Z4M0000000000000000402",
+      "reason": "not_linked"
+    },
+    {
+      "ref": "uprough:01J8Z4M0000000000000000403",
+      "reason": "unknown_event_type"
+    }
+  ],
+  "notLinked": [
+    "stranger@example.com"
+  ],
+  "unlocks": [],
+  "progress": [
+    {
+      "id": "msg.post.10",
+      "have": 8,
+      "need": 10
+    },
+    {
+      "id": "msg.conf.distinct.10",
+      "have": 1,
+      "need": 10
+    }
+  ]
+}
 ```
+*(the first 2 of 6 `progress` entries.)*
 
 #### Batch-level faults
 
@@ -381,20 +518,37 @@ safe to run any number of times.
 
 ### GET /catalog
 
+<!-- capture: catalog.since.request -->
 ```
-GET /catalog?since=a58-t1756900000
+GET /achievements/v1/catalog?since=a66-t1788806940
 ```
 
+<!-- capture: catalog.since.response -->
 ```json
-{ "contractVersion": "1", "revision": "a62-t1757000000",
-  "since": "a58-t1756900000",
+{
+  "contractVersion": "1",
+  "revision": "a67-t1788806941",
+  "since": "a66-t1788806940",
   "achievements": [
-    { "id": "msg.post.100", "name": "Century",
-      "description": "Post a hundred messages", "family": "msg",
-      "tier": "silver", "points": 10, "hidden": false,
-      "rule": { "op": "count", "type": "msg.post", "n": 100 },
-      "rarityPctTenths": 81, "rarityBucket": "rare",
-      "updatedAt": "2026-09-01T09:00:00Z" } ] }
+    {
+      "id": "door.grandmaster.first_win",
+      "name": "First Blood",
+      "description": "Win a game of chess",
+      "family": "door",
+      "tier": "bronze",
+      "points": 5,
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "door.grandmaster.win",
+        "n": 1
+      },
+      "rarityPctTenths": 1000,
+      "rarityBucket": "common",
+      "updatedAt": "2026-09-07T18:49:01.000Z"
+    }
+  ]
+}
 ```
 
 - `ETag: "<revision>"`, and a matching `If-None-Match` answers `304` with no
@@ -426,19 +580,21 @@ otherwise make everything legendary.
 The same data in the house plain-text format (section 7). Same `since`, same
 `ETag`, same `304`.
 
+<!-- capture: catalog.txt.response -->
 ```
 GET /achievements/v1/catalog.txt
-Authorization: Board uprough.qeAtPnDs4Wv2Lm7xKcRb9TfHgJyZuNe3
+Authorization: Board uprough.<key>
 
 HTTP/1.1 200 OK
 Content-Type: text/plain; charset=ISO-8859-1
 X-Achievements-Contract: 1
-X-Achievements-Revision: a62-t1757000000
+X-Achievements-Revision: a67-t1788806941
 
-ACHIEVE|1|a62-t1757000000|2<CR><LF>
-msg.post.100|msg|silver|10|0|Century|Post a hundred messages|count|81|rare<CR><LF>
-rare.midnight|rare|gold|25|1|???||count|4|legendary<CR><LF>
+ACHIEVE|1|a67-t1788806941|67<CR><LF>
+boards.linked.10|boards|gold|25|0|Scene Veteran|Link ten boards|distinct|1000|common<CR><LF>
+boards.linked.2|boards|bronze|5|0|Two Timer|Link two boards|distinct|1000|common<CR><LF>
 ```
+*(the first 2 of 67 `rows` entries.)*
 
 (`<CR><LF>` marks the two real bytes 0x0D 0x0A, written out here so this
 document itself stays one line per row.)
@@ -448,17 +604,36 @@ document itself stays one line per row.)
 Register a door's own achievement definitions. The `<door>` segment is the
 door's command name and must match `^[a-z0-9][a-z0-9-]{1,31}$`.
 
+<!-- capture: catalog.door.request -->
 ```json
-{ "digest": "sha256:2f1c...",
+{
+  "digest": "sha256:2f1c8a3e5d7b9042c6e1f8a4b2d0c9e7f5a3b1d8c6e4f2a0b9d7c5e3f1a8b6d4",
   "achievements": [
-    { "id": "door.grandmaster.first_win", "name": "First Blood",
-      "description": "Win a game of chess", "family": "door",
-      "tier": "bronze", "points": 5, "hidden": false,
-      "rule": { "op": "count", "type": "door.grandmaster.win", "n": 1 } } ] }
+    {
+      "id": "door.grandmaster.first_win",
+      "name": "First Blood",
+      "description": "Win a game of chess",
+      "family": "door",
+      "tier": "bronze",
+      "points": 5,
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "door.grandmaster.win",
+        "n": 1
+      }
+    }
+  ]
+}
 ```
 
+<!-- capture: catalog.door.response -->
 ```json
-{ "added": 1, "unchanged": 0, "total": 1 }
+{
+  "added": 1,
+  "unchanged": 0,
+  "total": 1
+}
 ```
 
 `digest` is the door manifest's own digest, so an unchanged manifest is a
@@ -488,15 +663,35 @@ door's catalog half-old and half-new with no way for the author to tell.
 
 ### GET /leaderboard
 
+<!-- capture: leaderboard.global.request -->
 ```
-GET /leaderboard?scope=global&period=all&limit=50
-GET /leaderboard?scope=board:uprough&period=season
+GET /achievements/v1/leaderboard?scope=global&period=all&limit=50
 ```
 
+A board's own ranks come from `GET /leaderboard?scope=board:uprough&period=season`.
+
+<!-- capture: leaderboard.global.response -->
 ```json
-{ "scope": "global", "period": "all", "season": null,
-  "revision": "l50-t1757000000",
-  "rows": [ { "rank": 1, "handle": "Spot", "points": 480, "unlocks": 37 } ] }
+{
+  "scope": "global",
+  "period": "all",
+  "season": null,
+  "revision": "l2-t1788806941",
+  "rows": [
+    {
+      "rank": 1,
+      "handle": "Spot",
+      "points": 40,
+      "unlocks": 4
+    },
+    {
+      "rank": 2,
+      "handle": "Phantasm",
+      "points": 5,
+      "unlocks": 1
+    }
+  ]
+}
 ```
 
 - `scope=global` ranks VERIFIED, NON-PRIVATE players by points summed over
@@ -534,32 +729,70 @@ closes silently and grants nothing.
 The same query parameters, the same ordering, in the house plain-text format
 (section 7).
 
+<!-- capture: leaderboard.txt.response -->
 ```
 GET /achievements/v1/leaderboard.txt?scope=board:uprough&period=all
-Authorization: Board uprough.qeAtPnDs4Wv2Lm7xKcRb9TfHgJyZuNe3
+Authorization: Board uprough.<key>
 
 HTTP/1.1 200 OK
 Content-Type: text/plain; charset=ISO-8859-1
 X-Achievements-Contract: 1
-X-Achievements-Revision: a62-t1757000000
+X-Achievements-Revision: a67-t1788806941
 
-ACHIEVE|1|l2-t1757000000|2<CR><LF>
-1|Spot|480|37<CR><LF>
-2|Phantasm|455|34<CR><LF>
+ACHIEVE|1|l2-t1788806941|2<CR><LF>
+1|Spot|40|4<CR><LF>
+2|Phantasm|5|1<CR><LF>
 ```
 
 ### GET /players/&lt;email&gt;
 
 The email is URL-encoded in the path and matched case-insensitively.
 
+<!-- capture: players.profile.response -->
 ```json
-{ "handle": "Spot", "verified": true, "private": false, "points": 480,
-  "linkedBoards": ["uprough", "cyberspace"],
-  "unlocks": [ { "id": "msg.post.100", "name": "Century", "tier": "silver",
-                 "points": 10, "hidden": false, "rarityPctTenths": 81,
-                 "at": "2026-08-14T18:02:11Z" } ],
-  "progress": [ { "id": "msg.post.1000", "have": 412, "need": 1000 } ] }
+{
+  "handle": "Spot",
+  "verified": true,
+  "private": false,
+  "points": 40,
+  "linkedBoards": [
+    "uprough"
+  ],
+  "unlocks": [
+    {
+      "id": "door.grandmaster.first_win",
+      "name": "First Blood",
+      "tier": "bronze",
+      "points": 5,
+      "hidden": false,
+      "rarityPctTenths": 1000,
+      "at": "2026-09-07T18:49:01.000Z"
+    },
+    {
+      "id": "msg.burst.3",
+      "name": "On A Roll",
+      "tier": "bronze",
+      "points": 5,
+      "hidden": false,
+      "rarityPctTenths": 1000,
+      "at": "2026-09-07T18:49:01.000Z"
+    }
+  ],
+  "progress": [
+    {
+      "id": "msg.post.10",
+      "have": 8,
+      "need": 10
+    },
+    {
+      "id": "boards.linked.2",
+      "have": 1,
+      "need": 2
+    }
+  ]
+}
 ```
+*(the first 2 of 4 `unlocks` entries, the first 2 of 9 `progress` entries.)*
 
 **Gated by the LINK, not by the privacy flag.** A board that is not linked
 to that email gets `403 not_linked` whether the player is private or not,
@@ -578,11 +811,62 @@ address oracle.
 
 ### PATCH /players/&lt;email&gt;
 
+<!-- capture: players.patch.request -->
 ```json
-{ "private": true }
+{
+  "private": true
+}
 ```
 
-Answers the updated `PlayerProfile`. Changes only that player's own flags,
+Answers the updated `PlayerProfile`:
+
+<!-- capture: players.patch.response -->
+```json
+{
+  "handle": "Spot",
+  "verified": true,
+  "private": true,
+  "points": 40,
+  "linkedBoards": [
+    "uprough"
+  ],
+  "unlocks": [
+    {
+      "id": "door.grandmaster.first_win",
+      "name": "First Blood",
+      "tier": "bronze",
+      "points": 5,
+      "hidden": false,
+      "rarityPctTenths": 1000,
+      "at": "2026-09-07T18:49:01.000Z"
+    },
+    {
+      "id": "msg.burst.3",
+      "name": "On A Roll",
+      "tier": "bronze",
+      "points": 5,
+      "hidden": false,
+      "rarityPctTenths": 1000,
+      "at": "2026-09-07T18:49:01.000Z"
+    }
+  ],
+  "progress": [
+    {
+      "id": "msg.post.10",
+      "have": 8,
+      "need": 10
+    },
+    {
+      "id": "boards.linked.2",
+      "have": 1,
+      "need": 2
+    }
+  ]
+}
+```
+*(the first 2 of 4 `unlocks` entries, the first 2 of 9 `progress` entries.)*
+
+Changes only that player's own flags,
 and only from a linked board - the player is standing at the door on that
 board. A `handle` change is subject to the same uniqueness rule as
 registration and answers `409 handle_taken` when it is refused; the old
@@ -599,9 +883,17 @@ handle stands.
 
 No board key required.
 
+<!-- capture: health.response -->
 ```json
-{ "status": "ok", "contractVersion": "1", "revision": "a62-t1757000000",
-  "players": 118, "boards": 4, "pendingMail": 0, "season": "2026Q3" }
+{
+  "status": "ok",
+  "contractVersion": "1",
+  "revision": "a67-t1788806941",
+  "players": 3,
+  "boards": 1,
+  "pendingMail": 4,
+  "season": "2026Q3"
+}
 ```
 
 `pendingMail` is the queue depth. A number that stops going down is how a
@@ -612,9 +904,19 @@ The DOOR-REPO health object (`/api/door-repo/health`) also gains an
 `achievements` key, so the existing container healthcheck keeps working
 either way:
 
+<!-- capture: health.doorrepo.response -->
 ```json
-{ "status": "ok", "revision": "c3301-t1755000000", "doors": 3301,
-  "achievements": { "enabled": false } }
+{
+  "status": "ok",
+  "revision": "c1-t1700000000",
+  "doors": 1,
+  "achievements": {
+    "enabled": true,
+    "contractVersion": "1",
+    "players": 3,
+    "pendingMail": 4
+  }
+}
 ```
 
 ## 5. The event contract
@@ -795,11 +1097,13 @@ established for `list.txt`, and carry the same stability promise.
 <id>|<family>|<tier>|<points>|<hidden>|<name>|<description>|<op>|<rarity_tenths>|<bucket>
 ```
 
+<!-- capture: format.catalog.rows -->
 ```
-ACHIEVE|1|a62-t1757000000|2
-msg.post.100|msg|silver|10|0|Century|Post a hundred messages|count|81|rare
-rare.midnight|rare|gold|25|1|???||count|4|legendary
+ACHIEVE|1|a67-t1788806941|67<CR><LF>
+boards.linked.10|boards|gold|25|0|Scene Veteran|Link ten boards|distinct|1000|common<CR><LF>
+rare.caller.1000|rare|gold|25|1|???||count|1000|common<CR><LF>
 ```
+*(two real rows of the 67 this response carried: one plain, one hidden.)*
 
 - `hidden` is exactly one byte, `1` or `0`, so a C89 client tests it without
   parsing.
@@ -815,10 +1119,11 @@ rare.midnight|rare|gold|25|1|???||count|4|legendary
 <rank>|<handle>|<points>|<unlocks>
 ```
 
+<!-- capture: format.leaderboard.rows -->
 ```
-ACHIEVE|1|l50-t1757000000|2
-1|Spot|480|37
-2|Phantasm|455|34
+ACHIEVE|1|l2-t1788806941|2<CR><LF>
+1|Spot|40|4<CR><LF>
+2|Phantasm|5|1<CR><LF>
 ```
 
 The leaderboard's revision is `l<rows>-t<newest unlock timestamp>` scoped to

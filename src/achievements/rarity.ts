@@ -28,6 +28,29 @@ export function bucketFor(pctTenths: number): RarityBucket {
   return 'legendary';
 }
 
+/**
+ * The rarity a reader sees when no rarity row exists yet - an achievement
+ * published since the last recompute, or a database on its first day.
+ *
+ * This is the SAME floor `computeRarity` writes under twenty verified
+ * players, and it lives here rather than at a read site because three
+ * surfaces answer this question (the catalog, a profile's unlocks and the
+ * unlocks an events batch returns). Two of them used to answer `0` -
+ * "unlocked by nobody", the most legendary number there is - which is the
+ * exact day-one arithmetic the floor exists to prevent, and which the
+ * captured examples in docs/ACHIEVEMENTS-API.md caught.
+ */
+export const RARITY_FLOOR = { pctTenths: 1000, bucket: 'common' as RarityBucket };
+
+/** The floor applied: a stored rarity, or the floor when there is none. */
+export function rarityOf(
+  pctTenths: number | null | undefined,
+  bucket?: RarityBucket | null
+): { pctTenths: number; bucket: RarityBucket } {
+  if (pctTenths === null || pctTenths === undefined) return { ...RARITY_FLOOR };
+  return { pctTenths, bucket: bucket ?? bucketFor(pctTenths) };
+}
+
 export interface RarityRun {
   verifiedPlayers: number;
   achievements: number;
