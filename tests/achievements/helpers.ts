@@ -26,6 +26,7 @@ import { bootstrapAdmins } from '../../src/auth';
 import { createApp } from '../../src/app';
 import { createBoard, _clearBoardKeyCacheForTests } from '../../src/achievements/boards';
 import { initAchievementsDb, openAchievementsDb } from '../../src/achievements/db';
+import { loadSeed } from '../../src/achievements/catalog';
 import type { ServerConfig } from '../../src/config';
 import type { AchievementsConfig } from '../../src/achievements/config';
 import type { Mailer } from '../../src/achievements/mail';
@@ -46,6 +47,13 @@ export interface FixtureOptions {
    * by default - it costs two scrypt hashes, and most suites are board-facing.
    */
   admin?: boolean;
+  /**
+   * Load seeds/achievements.seed.json into the fixture, as startup does.
+   * Off by default: most suites define the one or two achievements their
+   * events are meant to move, and a seeded catalog would make every id a
+   * collision and every batch an evaluation of sixty rules.
+   */
+  seed?: boolean;
 }
 
 export interface AchievementsFixture {
@@ -125,7 +133,7 @@ export function makeAchievementsFixture(opts: FixtureOptions = {}): Achievements
 
   // Exactly what startup does: schema, then migrations, against a file that
   // does not exist yet.
-  initAchievementsDb(ach);
+  initAchievementsDb(ach, { seed: opts.seed ? loadSeed() : null });
 
   const achDb = openAchievementsDb(ach);
   let boardKey: string;

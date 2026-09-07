@@ -15,6 +15,8 @@ import * as path from 'path';
 import { runMigrations } from '../migrations';
 import { ACHIEVEMENTS_MIGRATIONS } from './migrations';
 import type { AchievementsConfig } from './config';
+import { loadSeed, seedCatalog } from './catalog';
+import type { Seed } from './catalog';
 
 export function openAchievementsDb(
   ach: AchievementsConfig,
@@ -57,14 +59,27 @@ export function applyAchievementsSchema(db: Database.Database): void {
 
 /**
  * Create the file if it does not exist, apply the schema, run the
- * migrations. Returns the names of the migrations that actually ran, so
- * startup can report them - the same contract runMigrations() has.
+ * migrations, seed the catalog. Returns the names of the migrations that
+ * actually ran, so startup can report them - the same contract
+ * runMigrations() has.
+ *
+ * `seed` is the shipped file by default; a suite that defines its own
+ * catalog passes null and starts empty, and the seed suite passes the file.
  */
-export function initAchievementsDb(ach: AchievementsConfig): string[] {
+export function initAchievementsDb(
+  ach: AchievementsConfig,
+  opts: { seed?: Seed | null } = {}
+): string[] {
   const db = openAchievementsDb(ach);
   try {
     applyAchievementsSchema(db);
-    return runMigrations(db, ACHIEVEMENTS_MIGRATIONS);
+    const ran = runMigrations(db, ACHIEVEMENTS_MIGRATIONS);
+    const seed = opts.seed === undefined ? loadSeed() : opts.seed;
+    if (seed) {
+      const r = seedCatalog(db, seed);
+      if (r.inserted.length > 0) console.log(`[INFO] achievements: seeded ${r.inserted.length} achievements`);
+    }
+    return ran;
   } finally {
     db.close();
   }

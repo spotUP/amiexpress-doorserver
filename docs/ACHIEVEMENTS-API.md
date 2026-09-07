@@ -722,6 +722,19 @@ This is the table SP2 implements, key by key:
 | `wall.tag` | `conf:<id>` | which conference the wall tag was left in |
 | `bull.read.all` | - | the caller finished that board's own bulletin set |
 | `stat.snapshot` | `<type>` | an absolute counter out of the board's user record |
+| `msg.post` | `midnight` | the message was posted between 00:00 and 00:05 board time |
+| `msg.thread` | - | a thread the caller started drew its first reply |
+| `msg.comment` | - | the caller left a comment for the sysop |
+| `wall.everyconf` | - | the caller has now tagged the wall in every conference this board has |
+| `presence.client` | `c64` / `amiga` | the transport said the caller is on real hardware (PETSCII autodetect / dedicated port; `AE_CLIENT` / `AE_CONNECTION`) |
+| `presence.petscii` | - | a session completed in PETSCII mode |
+| `presence.minutes` | - | minutes online, as `stat.snapshot` |
+| `social.chat` / `social.nodechat` / `social.page` / `social.olm` / `social.vote` / `social.greet` | - | one event per act |
+| `door.play` | `<command>` | the caller ran that door |
+| `door.minutes` | - | minutes inside a door, as `value` |
+
+The seed catalog (`seeds/achievements.seed.json`) reads exactly these types
+and keys; a fact the board does not report is an achievement nobody can earn.
 
 ### Progress
 
