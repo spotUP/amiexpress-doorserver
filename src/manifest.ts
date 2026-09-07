@@ -34,6 +34,9 @@ import { resolveArchivePath, getCatalogRevision, loadCorpusGroupTags } from './c
 import { openDb } from './db';
 import type { ServerConfig } from './config';
 import type { ManifestDoor, DoorRepoManifest } from '../contract/manifest-types';
+import { esc, oneLine, toLatin1Safe } from './text-format';
+// Re-exported for the importers that knew it here before it moved (AC-12).
+export { toLatin1Safe };
 
 export type { ManifestDoor, DoorRepoManifest };
 
@@ -345,36 +348,6 @@ export function buildManifest(cfg: ServerConfig, opts?: CatalogQuery): DoorRepoM
 // verify against the strong digest without every client paying 64 bytes per
 // row (~211 KB of extra catalog on the current 3301-row corpus) on every
 // catalog fetch.
-
-function esc(s: string): string {
-  return s.replace(/\|/g, '!');
-}
-
-function oneLine(s: string): string {
-  return s.replace(/[\r\n\t]+/g, ' ');
-}
-
-// `Buffer.from(str, 'latin1')` never throws on a character outside the
-// ISO-8859-1 range: it silently truncates each UTF-16 code unit to its
-// low byte (e.g. Cyrillic U+0416 becomes byte 0x16, an unrelated control
-// character), producing a valid-looking but WRONG byte, not an error and
-// not a visible marker. Against the real catalog this affects a handful of
-// rows with non-ASCII metadata (accented names not in precomposed form,
-// stray Unicode punctuation, etc.). Since these bytes are parsed by a real
-// Amiga client with no Unicode awareness, an explicit '?' substitution is
-// preferable to that silent corruption.
-//
-// Iterates by Unicode code point (not UTF-16 code unit), so an astral
-// character encoded as a surrogate pair collapses to exactly one '?'
-// ("a single '?' per character"), not two.
-export function toLatin1Safe(s: string): string {
-  let out = '';
-  for (const ch of s) {
-    const cp = ch.codePointAt(0) ?? 0;
-    out += cp <= 0xff ? ch : '?';
-  }
-  return out;
-}
 
 /**
  * Rendered-catalog cache, keyed by the catalog revision and the filters.

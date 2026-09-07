@@ -27,7 +27,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type Database from 'better-sqlite3';
 import { ruleTypes } from './engine';
-import type { AchievementDef, Rule, Tier } from '../../contract/achievement-types';
+import { esc, oneLine, toLatin1Safe } from '../text-format';
+import type { AchievementDef, CatalogAchievement, RarityBucket, Rule, Tier } from '../../contract/achievement-types';
 
 export function catalogRevision(db: Database.Database): string {
   const row = db
@@ -140,4 +141,115 @@ export function seedCatalog(
   });
   run();
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Serving the catalog: JSON rows, the text rows, and `since`.
+// ---------------------------------------------------------------------------
+
+/**
+ * The `-t<epoch>` suffix of a revision this server once returned, or null
+ * when it does not parse. null means THE WHOLE CATALOG and a 200 - never a
+ * 400: an old client with a mangled cursor must be able to recover.
+ */
+export function parseSince(since: string | undefined): number | null {
+  if (typeof since !== 'string') return null;
+  const m = /^a\d+-t(\d{1,12})$/.exec(since.trim());
+  return m ? Number(m[1]) : null;
+}
+
+/** With no rarity row - fewer than twenty verified players, or day one. */
+export const RARITY_FLOOR = { pctTenths: 1000, bucket: 'common' as RarityBucket };
+
+interface CatalogRow {
+  id: string;
+  name: string;
+  description: string;
+  family: string;
+  tier: Tier;
+  points: number;
+  hidden: number;
+  rule: string;
+  updated_at: number;
+  pct_tenths: number | null;
+  bucket: RarityBucket | null;
+  /** 1 when a player linked to the asking board has unlocked it. */
+  revealed: number;
+}
+
+/** How many times catalogRows() ran; the 304 test proves it did not. */
+let rowReads = 0;
+export function _catalogRowReadsForTests(): number {
+  return rowReads;
+}
+
+/**
+ * The catalog as the asking board may see it. A hidden achievement is
+ * LISTED with hidden: true, but its name is `???` and its description empty
+ * until a player linked to THIS board has unlocked it: the catalog is
+ * per-board, not per-player, and the flag alone would let any client print
+ * the surprise.
+ */
+export function catalogRows(db: Database.Database, boardId: string, sinceEpoch: number | null): CatalogAchievement[] {
+  rowReads += 1;
+  const rows = db
+    .prepare(
+      `SELECT a.id, a.name, a.description, a.family, a.tier, a.points, a.hidden, a.rule, a.updated_at,
+              r.pct_tenths, r.bucket,
+              EXISTS (SELECT 1 FROM unlocks u JOIN links l ON l.player_id = u.player_id
+                       WHERE u.achievement_id = a.id AND l.board_id = ?) AS revealed
+         FROM achievements a
+         LEFT JOIN rarity r ON r.achievement_id = a.id
+        WHERE a.updated_at > ?
+        ORDER BY a.id`
+    )
+    .all(boardId, sinceEpoch ?? -1) as CatalogRow[];
+  return rows.map((r) => {
+    const withheld = r.hidden !== 0 && r.revealed === 0;
+    return {
+      id: r.id,
+      name: withheld ? '???' : r.name,
+      description: withheld ? '' : r.description,
+      family: r.family,
+      tier: r.tier,
+      points: r.points,
+      hidden: r.hidden !== 0,
+      rule: JSON.parse(r.rule) as Rule,
+      rarityPctTenths: r.pct_tenths ?? RARITY_FLOOR.pctTenths,
+      rarityBucket: r.bucket ?? RARITY_FLOOR.bucket,
+      updatedAt: new Date(r.updated_at * 1000).toISOString(),
+    };
+  });
+}
+
+/** One text field: pipes to `!`, line breaks to spaces, Latin-1 only. */
+function textField(s: string): string {
+  return toLatin1Safe(esc(oneLine(s)));
+}
+
+/**
+ * catalog.txt, byte for byte (ACHIEVEMENTS-API.md, section 7):
+ *   ACHIEVE|1|<revision>|<count>CRLF
+ *   <id>|<family>|<tier>|<points>|<hidden>|<name>|<description>|<op>|<rarity_tenths>|<bucket>CRLF
+ * Append-only: a new field goes on the END of a row.
+ */
+export function renderCatalogTxt(rows: CatalogAchievement[], revision: string): Buffer {
+  const lines = [`ACHIEVE|1|${revision}|${rows.length}`];
+  for (const a of rows) {
+    lines.push(
+      [
+        textField(a.id),
+        textField(a.family),
+        a.tier,
+        String(a.points),
+        a.hidden ? '1' : '0',
+        textField(a.name),
+        textField(a.description).slice(0, 120),
+        a.rule.op,
+        String(a.rarityPctTenths),
+        a.rarityBucket,
+      ].join('|')
+    );
+  }
+  return Buffer.from(lines.join('\r\n') + '\r\n', 'latin1');
 }

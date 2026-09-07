@@ -23,7 +23,7 @@ import type { AuthedRequest } from '../auth';
 import type { ServerConfig } from '../config';
 import type { AchievementsConfig } from './config';
 import { withAchievementsDb } from './db';
-import { catalogRevision } from './catalog';
+import { catalogRevision, catalogRows, parseSince, renderCatalogTxt } from './catalog';
 import { SurfaceError } from './errors';
 import { achievementsHealth } from './health';
 import { queueMail, verificationMail } from './mail';
@@ -304,6 +304,44 @@ export function createAchievementsRouter(
       })();
       res.json(out);
     });
+  });
+
+  // ---------------------------------------------------------------------
+  // The catalog, JSON and text. The ETag is the revision, set and checked
+  // through req.fresh BEFORE a row is read, exactly as /manifest does: a
+  // 304 never pays for the rows it throws away.
+  // ---------------------------------------------------------------------
+  const catalogHeaders = (req: Request, res: Response): string | null => {
+    const revision = withAchievementsDb(ach, (db) => catalogRevision(db), { readonly: true });
+    res.set('ETag', `"${revision}"`);
+    if (req.fresh) {
+      res.status(304).end();
+      return null;
+    }
+    return revision;
+  };
+  const sinceOf = (req: Request): { since: string | null; epoch: number | null } => {
+    const raw = typeof req.query.since === 'string' ? req.query.since : undefined;
+    return { since: raw ?? null, epoch: parseSince(raw) };
+  };
+
+  router.get('/catalog', (req: BoardRequest, res: Response) => {
+    const revision = catalogHeaders(req, res);
+    if (revision === null) return;
+    const boardId = keyBoard(req);
+    const { since, epoch } = sinceOf(req);
+    const achievements = withAchievementsDb(ach, (db) => catalogRows(db, boardId, epoch), { readonly: true });
+    res.json({ contractVersion: ACHIEVEMENTS_CONTRACT_VERSION, revision, since: epoch === null ? null : since, achievements });
+  });
+
+  router.get('/catalog.txt', (req: BoardRequest, res: Response) => {
+    const revision = catalogHeaders(req, res);
+    if (revision === null) return;
+    const boardId = keyBoard(req);
+    const { epoch } = sinceOf(req);
+    const rows = withAchievementsDb(ach, (db) => catalogRows(db, boardId, epoch), { readonly: true });
+    res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
+    res.send(renderCatalogTxt(rows, revision));
   });
 
   // An achievements path that matches no route above must NOT fall through

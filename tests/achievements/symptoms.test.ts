@@ -14,7 +14,8 @@
  * lives in tests/achievements/players.test.ts, GREEN (AC-7).
  *
  * SYM-5, SYM-6, SYM-7 and SYM-8 now live in tests/achievements/events.test.ts,
- * GREEN (AC-9), adapted to a world with players and links: the RED versions
+ * GREEN (AC-9), adapted to a world with players and links; SYM-9 lives in
+ * tests/achievements/catalog.test.ts, GREEN (AC-12). The RED versions
  * posted for an address nobody had registered, which AC-9 rejects before it
  * ever reaches the behaviour they were written to catch.
  *
@@ -41,22 +42,6 @@ beforeEach(() => {
 afterEach(() => fx.cleanup());
 
 describe('the achievements surface, as a board author meets it', () => {
-  it('SYM-9: catalog.txt comes back as UTF-8 with LF line endings', async () => {
-    const res = await request(fx.app)
-      .get('/achievements/v1/catalog.txt')
-      .set('Authorization', fx.auth)
-      .buffer(true);
-
-    expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toBe('text/plain; charset=ISO-8859-1');
-    const text = Buffer.from(res.body).toString('latin1');
-    expect(text.startsWith('ACHIEVE|1|')).toBe(true);
-    // CRLF throughout, including after the last row - a 68K line reader
-    // depends on it.
-    expect(text).toContain('\r\n');
-    expect(text.replace(/\r\n/g, '')).not.toContain('\n');
-  });
-
   it('SYM-10: a door redefines a published achievement id and the old definition is lost', async () => {
     const push = (name: string) =>
       request(fx.app)
