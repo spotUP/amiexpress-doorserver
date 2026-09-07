@@ -14,7 +14,7 @@ import type { AchievementsFixture } from './helpers';
 
 // Scrypt and a thousand requests under eight parallel workers: five
 // seconds is a load-dependent limit, not a correctness one.
-jest.setTimeout(60000);
+jest.setTimeout(180000);
 
 let fx: AchievementsFixture;
 let db: Database.Database;
