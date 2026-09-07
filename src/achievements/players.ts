@@ -135,7 +135,7 @@ export function findPlayerByEmail(db: Database.Database, email: string): PlayerR
 }
 
 /** COLLATE NOCASE, matching the unique index the schema puts on handle. */
-function handleOwner(db: Database.Database, handle: string): number | null {
+export function handleOwner(db: Database.Database, handle: string): number | null {
   const row = db
     .prepare('SELECT id FROM players WHERE handle = ? COLLATE NOCASE')
     .get(handle) as { id: number } | undefined;

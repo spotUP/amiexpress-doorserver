@@ -38,6 +38,7 @@ import { linkBoard, rotateLinkCode, unlinkBoard } from './links';
 import { storeEvents } from './events';
 import { evaluate } from './engine';
 import { registerDoorCatalog } from './doors';
+import { patchProfile, readProfile } from './profile';
 import {
   auditBoard,
   createBoard,
@@ -354,6 +355,36 @@ export function createAchievementsRouter(
       const now = Math.floor(Date.now() / 1000);
       const boardId = keyBoard(req);
       res.json(db.transaction(() => registerDoorCatalog(db, boardId, door, body, now))());
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // The profile, from a linked board. The address is in the path, URL
+  // encoded; the answer never contains it.
+  // ---------------------------------------------------------------------
+  router.get('/players/:email', (req: BoardRequest, res: Response) => {
+    const email = decodeURIComponent(String(req.params.email));
+    withAchievementsDb(ach, (db) => {
+      res.json(readProfile(db, keyBoard(req), email));
+    });
+  });
+
+  router.patch('/players/:email', (req: BoardRequest, res: Response) => {
+    const email = decodeURIComponent(String(req.params.email));
+    const body = (req.body ?? {}) as { private?: unknown; handle?: unknown };
+    if (body.private !== undefined && typeof body.private !== 'boolean') {
+      throw new SurfaceError('bad_request', 400, 'private is a boolean');
+    }
+    if (body.handle !== undefined && typeof body.handle !== 'string') {
+      throw new SurfaceError('bad_request', 400, 'handle is a string');
+    }
+    const patch = { private: body.private as boolean | undefined, handle: body.handle as string | undefined };
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const boardId = keyBoard(req);
+      const out = db.transaction(() => patchProfile(db, boardId, email, patch))();
+      auditBoard(db, boardId, 'player:patch', 1, now);
+      res.json(out);
     });
   });
 
