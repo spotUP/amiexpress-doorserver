@@ -18,6 +18,16 @@
  * takes, and re-enters evaluate() for those types. `all` rules index under
  * the pseudo-type meta.unlock, which is the only way a meta award can fire.
  * Five levels, then a [WARN] and a stop.
+ *
+ * EARNED AGAIN, ELSEWHERE. An achievement unlocks once, globally - so what
+ * does "earn the same achievement on three boards" (boards.same.3) count?
+ * The boards from which the player satisfied it. When a board's events
+ * move a rule the player has ALREADY unlocked and the rule still holds,
+ * the server appends meta.unlock for that board too (its ref names the
+ * board, so once per board), inserts no unlock and reports no progress.
+ * counter_dims then holds one board row per (player, achievement), which
+ * is exactly the distinct the rule reads. Found by AC-18's replay, where
+ * the cascade the plan promised could not fire.
  */
 import type Database from 'better-sqlite3';
 import { recordEvent } from './counters';
@@ -46,6 +56,8 @@ interface CandidateRow {
   points: number;
   hidden: number;
   rule: string;
+  /** 1 when this player already holds it. */
+  unlocked: number;
 }
 
 export interface Progress {
@@ -154,13 +166,13 @@ function candidates(db: Database.Database, playerId: number, types: string[]): C
   const marks = types.map(() => '?').join(',');
   return db
     .prepare(
-      `SELECT DISTINCT a.id, a.name, a.tier, a.points, a.hidden, a.rule
+      `SELECT DISTINCT a.id, a.name, a.tier, a.points, a.hidden, a.rule,
+              EXISTS (SELECT 1 FROM unlocks u WHERE u.player_id = ? AND u.achievement_id = a.id) AS unlocked
          FROM achievement_types t JOIN achievements a ON a.id = t.achievement_id
         WHERE t.type IN (${marks})
-          AND NOT EXISTS (SELECT 1 FROM unlocks u WHERE u.player_id = ? AND u.achievement_id = a.id)
         ORDER BY a.id`
     )
-    .all(...types, playerId) as CandidateRow[];
+    .all(playerId, ...types) as CandidateRow[];
 }
 
 /** Every achievement id the last evaluate() considered, for the index test. */
@@ -211,10 +223,30 @@ export function evaluate(
       for (const c of candidates(db, playerId, pending)) {
         lastEvaluated.push(c.id);
         const rule = JSON.parse(c.rule) as Rule;
+        // A meta rule re-asked from its own meta event would loop on itself.
+        if (c.unlocked !== 0 && rule.op !== 'count' && rule.op !== 'first' && rule.op !== 'sum' && rule.op !== 'distinct' && rule.op !== 'streak' && rule.op !== 'within') continue;
         const p = progressOf(db, playerId, rule);
         if (p === null) continue;
         if (p.have < p.need) {
-          progress.set(c.id, { id: c.id, have: p.have, need: p.need });
+          if (c.unlocked === 0) progress.set(c.id, { id: c.id, have: p.have, need: p.need });
+          continue;
+        }
+        if (c.unlocked !== 0) {
+          // Earned again, from this board: one meta.unlock per board, no
+          // second unlock, no progress. The ref makes the "once per board".
+          if (recordEvent(db, {
+            boardId,
+            ref: `${boardId}:meta.unlock:${playerId}:${c.id}`,
+            playerId,
+            type: 'meta.unlock',
+            key: c.id,
+            value: 1,
+            at: now,
+            receivedAt: now,
+            clamped: false,
+          })) {
+            next.add('meta.unlock');
+          }
           continue;
         }
         const wasFirst = (boardUnlockCount.get(boardId) as { n: number }).n === 0;

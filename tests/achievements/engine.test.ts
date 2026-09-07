@@ -121,7 +121,6 @@ describe('the rule engine', () => {
   it('earning the same achievement on three boards unlocks; three achievements on one board does not', async () => {
     // The meta rule: meta.unlock, dim board, grouped by key (the achievement id).
     defineAchievement(db, { id: 'boards.same.3', rule: { op: 'distinct', type: 'meta.unlock', dim: 'board', n: 3, group: 'key' } });
-    // Three plain achievements for the "three on one board" half.
     for (const t of ['a', 'b', 'c']) defineAchievement(db, { id: `x.${t}`, rule: { op: 'first', type: `x.${t}` } });
     let code = await linkedPlayer('caller@example.com', 'Caller');
     const boards = ['two', 'three'].map((id) => `Board ${createBoard(db, id, id, null).key}`);
@@ -136,28 +135,16 @@ describe('the rule engine', () => {
     expect(await unlocksOf([event('caller@example.com', 'x.a'), event('caller@example.com', 'x.b'), event('caller@example.com', 'x.c')])).toEqual(['x.a', 'x.b', 'x.c']);
     expect(db.prepare(`SELECT COUNT(*) AS n FROM unlocks WHERE achievement_id = 'boards.same.3'`).get()).toEqual({ n: 0 });
 
-    // The same achievement cannot unlock again on another board - it is
-    // global - so "on three boards" is what the meta.unlock rows for ONE id
-    // across boards would say. Feed them the way three boards' unlocks
-    // would: the server's own event, keyed by the id, from each board.
-    // That path is the cascade, driven here through the boards' own
-    // unlocks of a per-board first-event achievement.
-    defineAchievement(db, { id: 'y.first', rule: { op: 'first', type: 'y' } });
-    expect(await unlocksOf([event('caller@example.com', 'y')])).toEqual(['y.first']);
-    // Boards two and three report the same type; y.first is already
-    // unlocked, so no new unlock and no new meta.unlock there...
-    expect(await unlocksOf([event('caller@example.com', 'y', { board: 'two' })], boards[0])).toEqual([]);
-    // ...which is exactly why "the same achievement on three boards" is a
-    // rule about the meta.unlock rows the SERVER writes, one per (board,
-    // achievement). Write them the way three unlocks on three boards leave
-    // them, and the next unlock anywhere re-asks the meta question.
-    for (const b of ['two', 'three']) {
-      db.prepare(
-        `INSERT INTO counter_dims (player_id, type, dim, grp, dim_value, first_at) VALUES (1, 'meta.unlock', 'board', 'y.first', ?, 1)`
-      ).run(b);
-    }
-    defineAchievement(db, { id: 'z.first', rule: { op: 'first', type: 'z' } });
-    expect(await unlocksOf([event('caller@example.com', 'z')])).toEqual(['z.first', 'boards.same.3']);
+    // The same achievement, earned again from two more boards: x.a is held
+    // once, globally, but each board's own events satisfy its rule and the
+    // server records that board under meta.unlock - the third one fires
+    // the meta award, on the board that completed it.
+    expect(await unlocksOf([event('caller@example.com', 'x.a', { board: 'two' })], boards[0])).toEqual([]);
+    expect(await unlocksOf([event('caller@example.com', 'x.a', { board: 'three' })], boards[1])).toEqual(['boards.same.3']);
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM unlocks WHERE achievement_id = 'x.a'`).get()).toEqual({ n: 1 });
+    expect(db.prepare(`SELECT board_id FROM unlocks WHERE achievement_id = 'boards.same.3'`).get()).toEqual({ board_id: 'three' });
+    // And a fourth board adds nothing new to a rule already satisfied.
+    expect(await unlocksOf([event('caller@example.com', 'x.a', { board: 'three' })], boards[1])).toEqual([]);
   });
 
   it('calling on seven consecutive days unlocks; a gap on day four does not', async () => {
