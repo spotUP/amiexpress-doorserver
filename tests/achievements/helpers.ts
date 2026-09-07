@@ -29,6 +29,8 @@ import { initAchievementsDb, openAchievementsDb } from '../../src/achievements/d
 import type { ServerConfig } from '../../src/config';
 import type { AchievementsConfig } from '../../src/achievements/config';
 import type { Mailer } from '../../src/achievements/mail';
+import { ruleTypes } from '../../src/achievements/engine';
+import type { Rule } from '../../contract/achievement-types';
 
 /** The board every suite reports as. The id is the ref prefix (D1). */
 export const TEST_BOARD_ID = 'uprough';
@@ -223,28 +225,21 @@ export function recordingMailer(): RecordingMailer {
 
 export interface AchievementDef {
   id: string;
-  /** The event type the rule reads. */
-  type: string;
-  op?: string;
-  n?: number;
-  key?: string;
-  /** The types the candidate index lists; defaults to [type]. */
-  types?: string[];
+  rule: Rule;
   points?: number;
   tier?: 'bronze' | 'silver' | 'gold' | 'platinum';
   family?: string;
   hidden?: boolean;
   name?: string;
-  extra?: Record<string, unknown>;
 }
 
 /**
  * Put an achievement in the catalog the way the seed loader (AC-11) will:
- * the definition row and its candidate-index rows. Until the loader
- * exists, this is how a suite gives an event type something to move.
+ * the definition row and its candidate-index rows, under the types the
+ * engine's own ruleTypes() says the rule reads. Until the loader exists,
+ * this is how a suite gives an event type something to move.
  */
 export function defineAchievement(db: Database.Database, def: AchievementDef): void {
-  const rule = { op: def.op ?? 'count', type: def.type, n: def.n ?? 1, ...(def.key ? { key: def.key } : {}), ...(def.extra ?? {}) };
   const now = 1700000000;
   db.prepare(
     `INSERT INTO achievements (id, name, description, family, tier, points, hidden, rule, digest, source, created_at, updated_at)
@@ -257,11 +252,11 @@ export function defineAchievement(db: Database.Database, def: AchievementDef): v
     def.tier ?? 'bronze',
     def.points ?? 5,
     def.hidden ? 1 : 0,
-    JSON.stringify(rule),
+    JSON.stringify(def.rule),
     `digest-${def.id}`,
     now,
     now
   );
   const types = db.prepare('INSERT OR IGNORE INTO achievement_types (achievement_id, type) VALUES (?, ?)');
-  for (const t of def.types ?? [def.type]) types.run(def.id, t);
+  for (const t of ruleTypes(def.rule)) types.run(def.id, t);
 }

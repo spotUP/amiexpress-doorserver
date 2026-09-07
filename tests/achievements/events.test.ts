@@ -23,9 +23,9 @@ let db: Database.Database;
 beforeEach(() => {
   fx = makeAchievementsFixture();
   db = fx.openAchievements();
-  defineAchievement(db, { id: 'msg.post.100', type: 'msg.post', op: 'count', n: 100 });
-  defineAchievement(db, { id: 'presence.streak.7', type: 'presence.call', op: 'streak', n: 7 });
-  defineAchievement(db, { id: 'file.upload.100', type: 'file.upload', op: 'count', n: 100 });
+  defineAchievement(db, { id: 'msg.post.100', rule: { op: 'count', type: 'msg.post', n: 100 } });
+  defineAchievement(db, { id: 'presence.streak.7', rule: { op: 'streak', type: 'presence.call', unit: 'day', n: 7 } });
+  defineAchievement(db, { id: 'file.upload.100', rule: { op: 'count', type: 'file.upload', n: 100 } });
 });
 
 afterEach(() => {
@@ -81,7 +81,9 @@ describe('POST /events', () => {
     const second = await post('/events', { events: [e] });
 
     expect(first.status).toBe(200);
-    expect(first.body).toMatchObject({ accepted: 1, duplicates: 0, rejected: [], notLinked: [], unlocks: [], progress: [] });
+    expect(first.body).toMatchObject({ accepted: 1, duplicates: 0, rejected: [], notLinked: [], unlocks: [] });
+    // One message toward Century: the engine (AC-10) reports the distance.
+    expect(first.body.progress).toEqual([{ id: 'msg.post.100', have: 1, need: 100 }]);
     // The primary key (board_id, ref) is the whole idempotency story: a
     // resend is a duplicate by construction and folds nothing.
     expect(second.body).toMatchObject({ accepted: 0, duplicates: 1 });

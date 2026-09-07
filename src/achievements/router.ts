@@ -36,6 +36,7 @@ import {
 import type { IssuedCode } from './players';
 import { linkBoard, rotateLinkCode, unlinkBoard } from './links';
 import { storeEvents } from './events';
+import { evaluate } from './engine';
 import {
   auditBoard,
   createBoard,
@@ -293,7 +294,14 @@ export function createAchievementsRouter(
       const now = Math.floor(Date.now() / 1000);
       const boardId = keyBoard(req);
       const body: unknown = req.body;
-      const out = db.transaction(() => storeEvents(db, boardId, body, now))();
+      const out = db.transaction(() => {
+        const folded = { playerIds: [] as number[], types: [] as string[] };
+        const stored = storeEvents(db, boardId, body, now, folded);
+        // The fold decided which players and types moved; the engine asks
+        // its one indexed question about exactly those.
+        const verdict = evaluate(db, folded.playerIds, folded.types, boardId, now);
+        return { ...stored, unlocks: verdict.unlocks, progress: verdict.progress };
+      })();
       res.json(out);
     });
   });
