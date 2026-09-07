@@ -17,6 +17,15 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           DOORSERVER_JWT_SECRET: ${{ secrets.DOORSERVER_JWT_SECRET }}
+          # The three names below were listed in `envs:` and never given a
+          # value here, so ssh-action forwarded them EMPTY on every run, the
+          # script's "all three or none" gate saw no SMTP URL, and every deploy
+          # switched the achievements surface off. It only ever ran because
+          # someone wrote /app/doorserver/.env by hand - which the next deploy
+          # then overwrote (2026-09-07: mail died the moment a deploy ran).
+          ACHIEVEMENTS_DB: ${{ secrets.ACHIEVEMENTS_DB }}
+          ACHIEVEMENTS_SMTP_URL: ${{ secrets.ACHIEVEMENTS_SMTP_URL }}
+          ACHIEVEMENTS_MAIL_FROM: ${{ secrets.ACHIEVEMENTS_MAIL_FROM }}
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
