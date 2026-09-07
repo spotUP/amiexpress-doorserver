@@ -22,6 +22,7 @@
 import type Database from 'better-sqlite3';
 import { SurfaceError } from './errors';
 import { recordEvent } from './counters';
+import { evaluate } from './engine';
 import { findPlayerByEmail, issueCode, spendCode } from './players';
 import type { PlayerRow } from './players';
 import type { LinkResponse, RotateLinkResponse } from '../../contract/achievement-types';
@@ -94,7 +95,7 @@ export function linkBoard(
     player.id,
     now
   );
-  recordEvent(db, {
+  const appended = recordEvent(db, {
     boardId,
     ref: `${boardId}:meta.link:${player.id}`,
     playerId: player.id,
@@ -105,6 +106,11 @@ export function linkBoard(
     receivedAt: now,
     clamped: false,
   });
+  // The link is an event like any other, so the rules that read it run
+  // here: boards.linked.2/5/10 unlock at the link, not at the next message.
+  // The link response has no unlocks field (the contract is frozen); the
+  // unlock is in the profile, where the door shows it.
+  if (appended) evaluate(db, [player.id], ['meta.link'], boardId, now);
 
   return { linked: true, boards: linkedBoards(db, player.id), ...freshLinkCode(db, player.id, now) };
 }

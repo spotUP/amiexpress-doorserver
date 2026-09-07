@@ -246,6 +246,22 @@ describe('linking', () => {
     expect(profile).toEqual([{ board_id: 'other' }, { board_id: 'third' }, { board_id: TEST_BOARD_ID }]);
   });
 
+  it('linking a second board unlocks the two-boards award, at the link', async () => {
+    db.prepare(
+      `INSERT INTO achievements (id, name, description, family, tier, points, hidden, rule, digest, source, created_at, updated_at)
+       VALUES ('boards.linked.2', 'Two Timer', 'Link two boards', 'boards', 'bronze', 5, 0, '{"op":"distinct","type":"meta.link","dim":"board","n":2}', 'x', 'seed', 1, 1)`
+    ).run();
+    db.prepare(`INSERT INTO achievement_types (achievement_id, type) VALUES ('boards.linked.2', 'meta.link')`).run();
+    const first = await verifiedPlayer('caller@example.com', 'Caller');
+    const other = secondBoard();
+    const one = await send('post', '/links', { email: 'caller@example.com', code: first });
+    expect(db.prepare('SELECT COUNT(*) AS n FROM unlocks').get()).toEqual({ n: 0 });
+
+    await send('post', '/links', { email: 'caller@example.com', code: one.body.linkCode }, other);
+
+    expect(db.prepare('SELECT achievement_id, board_id FROM unlocks').all()).toEqual([{ achievement_id: 'boards.linked.2', board_id: 'other' }]);
+  });
+
   it('no response body this suite produced contains an email address', () => {
     for (const body of bodies) expect(body).not.toContain('@');
   });
