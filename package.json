@@ -14,7 +14,7 @@
     "build:web": "npm --prefix web ci && npm --prefix web run build",
     "build:all": "npm run build:web && npm run build",
     "dev:web": "npm --prefix web run dev",
-    "capture:achievements-doc": "tsx scripts/capture-achievements-examples.ts"
+    "capture:achievements-doc": "tsx tests/achievements/capture-doc-examples.ts"
   },
   "dependencies": {
     "@types/busboy": "^1.5.4",

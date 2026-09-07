@@ -1,6 +1,12 @@
-// scripts/capture-achievements-examples.ts
+// tests/achievements/capture-doc-examples.ts
 /**
  * Captures every example in docs/ACHIEVEMENTS-API.md from the real server.
+ *
+ * It lives beside the harness it drives rather than in scripts/, because
+ * scripts/ is COPIED INTO THE PRODUCTION IMAGE and compiled there
+ * (Dockerfile:19) while tests/ is not - a script importing a test helper
+ * fails `npm run build` inside Docker with TS2307 and takes the deploy
+ * with it, which is exactly what it did on 2026-09-07.
  *
  * Runs `runDocStory` (tests/achievements/doc-story.ts) against a throwaway
  * fixture - real `createApp`, real board key, real scrypt-hashed
@@ -15,11 +21,11 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { makeAchievementsFixture } from '../tests/achievements/helpers';
-import { runDocStory, applyCaptures } from '../tests/achievements/doc-story';
+import { makeAchievementsFixture } from './helpers';
+import { runDocStory, applyCaptures } from './doc-story';
 
 async function main(): Promise<void> {
-  const docPath = path.join(__dirname, '..', 'docs', 'ACHIEVEMENTS-API.md');
+  const docPath = path.join(__dirname, '..', '..', 'docs', 'ACHIEVEMENTS-API.md');
   const fx = makeAchievementsFixture({ seed: true });
   try {
     const captured = await runDocStory(fx);
