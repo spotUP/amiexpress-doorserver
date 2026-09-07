@@ -1,0 +1,750 @@
+{
+  "contractVersion": "1",
+  "note": "GENERATED from tests/describe.test.ts. Both repos run these cases.",
+  "cases": [
+    {
+      "input": {
+        "dizText": "+[ MYSTiC /X-POWER ]-----[ JoinCnf 4.0 ]---+\n¦_/\\___/\\___/\\___                          ¦\n|\\   /\\ __/_  __/ Added Features:          |\n|/ Y \\/_.¬\\/  \\   o Totally NEW Lay-Out    |\n/  | \\\\¬¦ \\\\  \\\\  o Manages up to 256 Cnfs |\n\\__l_//___//__//                           ¦\n|dL!\\/   \\/  \\/    Try it and be AMAZED!!  |\n+-[ EMPiRE/MYSTiC ]----[ XIM - /X 3.38+ ]--+",
+        "name": "JoinCnf",
+        "archiveName": "MST-JC40.LHA",
+        "binaryName": "JoinCnf",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "version": "4.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "+[ MYSTiC /X-POWER ]-----[ JoinCnf 4.0 ]---+\n¦_/\\___/\\___/\\___                          ¦\n|\\   /\\ __/_  __/ Added Features:          |\n|/ Y \\/_.¬\\/  \\   o Totally NEW Lay-Out    |\n/  | \\\\¬¦ \\\\  \\\\  o Manages up to 256 Cnfs |\n\\__l_//___//__//                           ¦\n|dL!\\/   \\/  \\/    Try it and be AMAZED!!  |\n+-[ EMPiRE/MYSTiC ]----[ XIM - /X 3.38+ ]--+",
+        "name": "JoinCnf",
+        "archiveName": "MST-JC40.LHA",
+        "binaryName": "JoinCnf",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "version": "4.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "+[ MYSTiC /X-POWER ]-----[ JoinCnf 4.0 ]---+\n¦_/\\___/\\___/\\___                          ¦\n|\\   /\\ __/_  __/ Added Features:          |\n|/ Y \\/_.¬\\/  \\   o Totally NEW Lay-Out    |\n/  | \\\\¬¦ \\\\  \\\\  o Manages up to 256 Cnfs |\n\\__l_//___//__//                           ¦\n|dL!\\/   \\/  \\/    Try it and be AMAZED!!  |\n+-[ EMPiRE/MYSTiC ]----[ XIM - /X 3.38+ ]--+",
+        "name": "JoinCnf",
+        "archiveName": "MST-JC40.LHA",
+        "binaryName": "JoinCnf",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "version": "4.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": " _/\\___/¦___/\\___/\\___/¦_/\\__.-------------.\n \\   /\\ | /\\ __/\\ . /\\ |\\ . /| bObO/mYStiC |\n / V \\/_. \\/_.¬\\/_| \\/ |/ |_\\| ~~~~~~~~~~~ |\n/  |  \\¬|  \\¬¦  \\¬|  \\ |  ¦ ¬\\  PRESENTS:  |\n\\__¦  /__  /__  / ¦__/_¦___  /  ~~~~~~~~~  |\n.---\\/---\\/---\\/-/X-pOwEr!-\\/^-------------|\n|   MultiTop (Version 2.0)  [RELEASE 2]    |\n| The BEST Top Utility ever written for /X |\n|  Make your OWN DESIGN (16 designs incl)  |\n|        ! WORTH TAKING A LOOK AT !        |\n`------------------------------------------'",
+        "name": "MultiTop",
+        "archiveName": "MST-MT20.LHA",
+        "binaryName": "MultiTop",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "MultiTop The Best Top Utility ever",
+        "version": "2.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": " _/\\___/¦___/\\___/\\___/¦_/\\__.-------------.\n \\   /\\ | /\\ __/\\ . /\\ |\\ . /| bObO/mYStiC |\n / V \\/_. \\/_.¬\\/_| \\/ |/ |_\\| ~~~~~~~~~~~ |\n/  |  \\¬|  \\¬¦  \\¬|  \\ |  ¦ ¬\\  PRESENTS:  |\n\\__¦  /__  /__  / ¦__/_¦___  /  ~~~~~~~~~  |\n.---\\/---\\/---\\/-/X-pOwEr!-\\/^-------------|\n|   MultiTop (Version 2.0)  [RELEASE 2]    |\n| The BEST Top Utility ever written for /X |\n|  Make your OWN DESIGN (16 designs incl)  |\n|        ! WORTH TAKING A LOOK AT !        |\n`------------------------------------------'",
+        "name": "MultiTop",
+        "archiveName": "MST-MT20.LHA",
+        "binaryName": "MultiTop",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "MultiTop The Best Top Utility ever",
+        "version": "2.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": " _/\\___/¦___/\\___/\\___/¦_/\\__.-------------.\n \\   /\\ | /\\ __/\\ . /\\ |\\ . /| bObO/mYStiC |\n / V \\/_. \\/_.¬\\/_| \\/ |/ |_\\| ~~~~~~~~~~~ |\n/  |  \\¬|  \\¬¦  \\¬|  \\ |  ¦ ¬\\  PRESENTS:  |\n\\__¦  /__  /__  / ¦__/_¦___  /  ~~~~~~~~~  |\n.---\\/---\\/---\\/-/X-pOwEr!-\\/^-------------|\n|   MultiTop (Version 2.0)  [RELEASE 2]    |\n| The BEST Top Utility ever written for /X |\n|  Make your OWN DESIGN (16 designs incl)  |\n|        ! WORTH TAKING A LOOK AT !        |\n`------------------------------------------'",
+        "name": "MultiTop",
+        "archiveName": "MST-MT20.LHA",
+        "binaryName": "MultiTop",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "MultiTop The Best Top Utility ever",
+        "version": "2.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": " _/\\___/¦___/\\___/\\___/¦_/\\__.-------------.\n \\   /\\ | /\\ __/\\ . /\\ |\\ . /| bObO/mYStiC |\n / V \\/_. \\/_.¬\\/_| \\/ |/ |_\\| ~~~~~~~~~~~ |\n/  |  \\¬|  \\¬¦  \\¬|  \\ |  ¦ ¬\\  PRESENTS:  |\n\\__¦  /__  /__  / ¦__/_¦___  /  ~~~~~~~~~  |\n.---\\/---\\/---\\/-/X-pOwEr!-\\/^-------------|\n|   MultiTop (Version 2.0)  [RELEASE 2]    |\n| The BEST Top Utility ever written for /X |\n|  Make your OWN DESIGN (16 designs incl)  |\n|        ! WORTH TAKING A LOOK AT !        |\n`------------------------------------------'",
+        "name": "MultiTop",
+        "archiveName": "MST-MT20.LHA",
+        "binaryName": "MultiTop",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "MultiTop The Best Top Utility ever",
+        "version": "2.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "  __/\\  __________ _ ___  /\\__\n.-\\_  \\/  _/   __/______\\/___/-------------.\n| /   \\/   \\______  \\_  \\/  \\_   mYSTIC!   |\n:/     \\____/   _____/___    / /X dIVISION .\n/_______\\-\\_____/--sTZ--l___/--------------:\n| KiLLraVeN/MYSTiC BRiNGS: KiLLER-BAUD 1.3 |\n| *Creates bulls about users' baud-rates!* :\n: o Exclude baud-rates  o Nice lay-out     |\n| o Two pages of info!  o Future proof!    |\n`------------------------------------------'",
+        "name": "KiLLER_Baud",
+        "archiveName": "MST-KB13.LHA",
+        "binaryName": "KiLLER_Baud",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Killer-Baud",
+        "version": "1.3",
+        "author": "Killraven/Mystic",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "      _______   _______           _______\n______\\     /__|      /___________\\___  /___\n\\_____ \\  _/   /     /__\\   ____/  _ /_/   /\n     5D-User V1.10 [-5th Dynasty-]\nCommand to list all users of the bbs with\nmany extra features like SEARCH NAME PART or",
+        "name": "5D-User",
+        "archiveName": "5D-USR11.LHA",
+        "binaryName": "5D-User",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "User Command to list all users of the BBS",
+        "version": "1.10",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "  ________._____________________________.__\n|    5D-AdiMenu V1.0 by [tHE aDDiCT/5D!]   |\n| Handles Textfiles like Commands, so use  |\n:  it as Doormenu, Filemenu or whatever!   |",
+        "name": "5D-AdiMenu",
+        "archiveName": "5D_AMN10.LHA",
+        "binaryName": "5D-AdiMenu",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Adi Menu Handles Textfiles like Commands, so use",
+        "version": "1.0",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "|\\______/___/_|\\  /___\\  /_____/___|____/Rpd\n`---------------\\/-----\\/----·presents·----'\n                5D-Who v2.40\n   Coded by SvEN tHE CREAToR/5tH DyNASTY\n           Now working on /X 3.30",
+        "name": "5D-Who",
+        "archiveName": "5D-WHO24.LZH",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Who",
+        "version": "2.40",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "  ÚÂÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÂ¿\n  ³Y³   ÓÄÄÙ Ð  Á ÐÄÄÙ ÓÄÄÙ   ³Y³\n  ³Y³ Tricks&PWs for 200 games³Y³\n  ÀÁÁÄÄÄÄÄ#10ÄÄSpooNManÄÄÄÄÄÄÄÁÁÙ",
+        "name": "SnesDX",
+        "archiveName": "SNESDX10.LZH",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Y Tricks&PWs for 200 games",
+        "version": "1.0",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": ".------------[ CALL 13th HOUR ]------------.\n|                                          |\n| CALLERS LOTTERY v1.o (c) cYBER/iNDY 1995 |\n|                                          |\n| /X 3.x+ Give your users a Byte Bonus and |\n| File bonus when they call your cool BBS! |\n|   Totally configurable to your needs!    |\n|        Download/Leech/Suck NOW!          |\n`--------------------------------------[c]-'",
+        "name": "Callers Lottery",
+        "archiveName": "AECL0T0.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Give your users a Byte Bonus",
+        "version": "",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "+[ MYSTiC /X-POWER ]-----[ JoinCnf 4.0 ]---+\n¦_/\\___/\\___/\\___                          ¦\n|\\   /\\ __/_  __/ Added Features:          |\n|/ Y \\/_.¬\\/  \\   o Totally NEW Lay-Out    |\n/  | \\\\¬¦ \\\\  \\\\  o Manages up to 256 Cnfs |\n\\__l_//___//__//                           ¦\n|dL!\\/   \\/  \\/    Try it and be AMAZED!!  |\n+-[ EMPiRE/MYSTiC ]----[ XIM - /X 3.38+ ]--+",
+        "name": "JoinCnf",
+        "archiveName": "MST-JC40.LHA",
+        "binaryName": "JoinCnf",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "version": "4.0",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "This tool starts only for Newusers /X",
+        "name": null,
+        "archiveName": "ALSTER.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "This tool starts only for Newusers",
+        "version": "",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "For AmiExpress or compatibilties, replaces internal B",
+        "name": "AmiBulls",
+        "archiveName": "AMIBULLS.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "For or compatibilties, replaces internal",
+        "version": "",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "Best Request Door for FAME, S-EXPRES",
+        "name": null,
+        "archiveName": "ARS-PREQ.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Best Request Door for , S-Expres",
+        "version": "",
+        "author": "",
+        "requiresBbs": "FAME"
+      }
+    },
+    {
+      "input": {
+        "dizText": "AE is my favourite editor",
+        "name": null,
+        "archiveName": "AE-EDIT.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Ae is my favourite editor",
+        "version": "",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "Generation X was a great game",
+        "name": null,
+        "archiveName": "GENX.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Generation X was a great game",
+        "version": "",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "                     __    ____  _     _\n  CR/\\ZE aND!       /\\_\\ __\\\n__________________  \\/_/  ____________/\\____\n ____ _ / __  /  /_____  / ____/  /  /·  _ /\n /  / //  ___/  /  /   \\/  /  /     //   \\/\n/____ /_____/_____/_____\\___ /__/__/______\\.\nSk¡n\\/---------- PRESENTS -\\/--------------+\n(« uSER lIST v1.1 - uPDATE © nIKE/cRZ^dLT »)\n+------------------------------------------+",
+        "name": "userlist",
+        "archiveName": "DLT-UL11.LHA",
+        "binaryName": "userlist",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "User List - Update Nike/Dlt",
+        "version": "1.1",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "  ___. __________   __. _________\n /   |/  _/   __ \\_/  |/  _/  __/__   kEKS\n/    \\    \\_  \\___/   \\    \\_____  \\_ cNET\n\\____|\\    /____  \\___|\\    /_______/ dESiGN\n       \\__/kDZ!\\___/    \\__/cD!\n LAST-UDLOAD v1.0b - Release Date: 12-07-95\n    dONE bY sERAPH   -  !BUGFIXED VERSION!",
+        "name": "LE-win5-96.exe",
+        "archiveName": "KDZ!LUDB.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "",
+        "version": "",
+        "author": "Seraph - !Bugfixed Version",
+        "requiresBbs": "CNet"
+      }
+    },
+    {
+      "input": {
+        "dizText": "______    ________.  /\\    ______.__________\n____ _____________",
+        "name": "Account Editor",
+        "archiveName": "ACC-V103.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Account Editor",
+        "version": "1.03",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "______    ________.  /\\    ______.__________",
+        "name": "____ _________________________________ _  :····/ __",
+        "archiveName": "ACC-V103.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Acc-V103",
+        "version": "1.03",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": null,
+        "name": null,
+        "archiveName": "ACC-V103.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Acc-V103",
+        "version": "1.03",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "XXXX....",
+        "name": "XXXX....",
+        "archiveName": "AE_DOORS.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Ae_Doors",
+        "version": "",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "Split Chat Door For AmiExpress",
+        "name": null,
+        "archiveName": "FULLCHAT.LHA",
+        "binaryName": "FullChat",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Full Chat - Split Chat Door",
+        "version": "",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "Snes-Tool v1.10",
+        "name": null,
+        "archiveName": "SNES.LHA",
+        "binaryName": "Snes-Tool",
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Snes-Tool",
+        "version": "1.10",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "hAUSfRAU!.exe - © FLi7e/SAD 1996\nHousewife simulator for AmiExpress",
+        "name": null,
+        "archiveName": "HAUSFRAU.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Housewife simulator",
+        "version": "",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "Größe der Datei anzeigen",
+        "name": null,
+        "archiveName": "X.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Größe der Datei anzeigen",
+        "version": "",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "Account   Editor\tv1.0\u0001\u0002 for real",
+        "name": null,
+        "archiveName": "ACC-V103.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Account Editor for real",
+        "version": "1.0",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "Account Editor supports every field of the AmiExpress config file format",
+        "name": null,
+        "archiveName": "ACC-V103.LHA",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "Account Editor supports every field of the config file",
+        "version": "1.03",
+        "author": "",
+        "requiresBbs": "AmiExpress"
+      }
+    }
+  ]
+}

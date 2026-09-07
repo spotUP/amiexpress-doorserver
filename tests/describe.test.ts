@@ -20,6 +20,7 @@ import {
   normaliseRequirement,
   tidyCase,
   toPlain,
+  DESCRIBE_CONTRACT_VERSION,
 } from '../src/describe';
 
 // The corpus derives its group tags from the archive names; these are the
@@ -33,6 +34,19 @@ const TAGS = buildGroupTags([
   'D-A.LHA', 'D-B.LHA', 'D-C.LHA',
 ]);
 
+/**
+ * Every case this suite exercises, recorded so the BBS can run the SAME cases
+ * against its vendored copy of the extractor.
+ *
+ * A sibling checkout cannot be a CI dependency, so byte-identity between the
+ * two repos is proved by a COMMITTED corpus that both of them run rather than
+ * by one repo reading the other's files. Regenerate with:
+ *
+ *   DESCRIBE_FIXTURES_OUT=contract/describe-fixtures.json \
+ *     npx jest --config jest.config.ts tests/describe.test.ts
+ */
+const recordedFixtures: Array<Record<string, unknown>> = [];
+
 function read(
   diz: string | null,
   binaryName: string | null,
@@ -40,19 +54,40 @@ function read(
   archiveName: string,
   extra?: { version?: string | null; author?: string | null }
 ) {
-  const facts = analyseDoor(
-    {
-      dizText: diz,
-      name,
-      archiveName,
-      binaryName,
-      catalogVersion: extra?.version ?? null,
-      catalogAuthor: extra?.author ?? null,
-    },
-    TAGS
-  );
-  return { ...facts, description: facts.description ?? '' };
+  const input = {
+    dizText: diz,
+    name,
+    archiveName,
+    binaryName,
+    catalogVersion: extra?.version ?? null,
+    catalogAuthor: extra?.author ?? null,
+  };
+  const facts = analyseDoor(input, TAGS);
+  const result = { ...facts, description: facts.description ?? '' };
+  if (process.env.DESCRIBE_FIXTURES_OUT) {
+    recordedFixtures.push({ input, groupTags: Array.from(TAGS).sort(), expected: result });
+  }
+  return result;
 }
+
+afterAll(() => {
+  const out = process.env.DESCRIBE_FIXTURES_OUT;
+  if (!out) return;
+  const fs = require('fs') as typeof import('fs');
+  fs.writeFileSync(
+    out,
+    JSON.stringify(
+      {
+        contractVersion: DESCRIBE_CONTRACT_VERSION,
+        note: 'GENERATED from tests/describe.test.ts. Both repos run these cases.',
+        cases: recordedFixtures,
+      },
+      null,
+      2,
+    ) + '\n',
+    'utf-8',
+  );
+});
 
 const JC40 = [
   '+[ MYSTiC /X-POWER ]-----[ JoinCnf 4.0 ]---+',
