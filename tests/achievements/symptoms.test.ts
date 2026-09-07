@@ -15,7 +15,8 @@
  *
  * SYM-5, SYM-6, SYM-7 and SYM-8 now live in tests/achievements/events.test.ts,
  * GREEN (AC-9), adapted to a world with players and links; SYM-9 lives in
- * tests/achievements/catalog.test.ts, GREEN (AC-12). The RED versions
+ * tests/achievements/catalog.test.ts, GREEN (AC-12); SYM-10 in
+ * tests/achievements/door-catalog.test.ts, GREEN (AC-13). The RED versions
  * posted for an address nobody had registered, which AC-9 rejects before it
  * ever reaches the behaviour they were written to catch.
  *
@@ -42,45 +43,6 @@ beforeEach(() => {
 afterEach(() => fx.cleanup());
 
 describe('the achievements surface, as a board author meets it', () => {
-  it('SYM-10: a door redefines a published achievement id and the old definition is lost', async () => {
-    const push = (name: string) =>
-      request(fx.app)
-        .put('/achievements/v1/catalog/doors/grandmaster')
-        .set('Authorization', fx.auth)
-        .send({
-          digest: name,
-          achievements: [
-            {
-              id: 'door.grandmaster.first_win',
-              name,
-              description: 'Win a game of chess',
-              family: 'door',
-              tier: 'bronze',
-              points: 5,
-              hidden: false,
-              rule: { op: 'count', type: 'door.grandmaster.win', n: 1 },
-            },
-          ],
-        });
-
-    const first = await push('First Blood');
-    const second = await push('First Kill');
-
-    expect(first.status).toBe(200);
-    // A published id is immutable, and the digest covers the name and the
-    // description as well as the rule (D8).
-    expect(second.status).toBe(409);
-    expect(second.body.error).toBe('definition_changed');
-
-    const catalog = await request(fx.app)
-      .get('/achievements/v1/catalog')
-      .set('Authorization', fx.auth);
-    const published = (catalog.body.achievements as { id: string; name: string }[]).find(
-      (a) => a.id === 'door.grandmaster.first_win'
-    );
-    expect(published?.name).toBe('First Blood');
-  });
-
   it('SYM-11: a private player appears in the global leaderboard', async () => {
     const db = fx.openAchievements();
     try {

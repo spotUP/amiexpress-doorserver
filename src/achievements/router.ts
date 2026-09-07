@@ -37,6 +37,7 @@ import type { IssuedCode } from './players';
 import { linkBoard, rotateLinkCode, unlinkBoard } from './links';
 import { storeEvents } from './events';
 import { evaluate } from './engine';
+import { registerDoorCatalog } from './doors';
 import {
   auditBoard,
   createBoard,
@@ -342,6 +343,18 @@ export function createAchievementsRouter(
     const rows = withAchievementsDb(ach, (db) => catalogRows(db, boardId, epoch), { readonly: true });
     res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
     res.send(renderCatalogTxt(rows, revision));
+  });
+
+  // A door's own definitions. Whole-request: the transaction is what makes
+  // "nothing is written when any id fails" true.
+  router.put('/catalog/doors/:door', (req: BoardRequest, res: Response) => {
+    const door = String(req.params.door);
+    const body: unknown = req.body;
+    withAchievementsDb(ach, (db) => {
+      const now = Math.floor(Date.now() / 1000);
+      const boardId = keyBoard(req);
+      res.json(db.transaction(() => registerDoorCatalog(db, boardId, door, body, now))());
+    });
   });
 
   // An achievements path that matches no route above must NOT fall through
