@@ -16,6 +16,10 @@ deploy schedule or database.
 | `DOOR_ARCHIVES_ROOT` | yes | directory holding the archive corpus |
 | `PORT` | no | listen port, default 3010 |
 | `DOORSERVER_ADMIN_KEYS` | no | `label:key,label:key` - curation keys (phase 3) |
+| `ACHIEVEMENTS_DB` | no | path to `achievements.db` (the SECOND database; see `docs/ACHIEVEMENTS-API.md`). Unset = the achievements surface is off. Its directory must exist; the file is created |
+| `ACHIEVEMENTS_SMTP_URL` | with `ACHIEVEMENTS_DB` | `smtp://user:pass@host:port` for the verification mail. Set `ACHIEVEMENTS_DB` without it and the server refuses to start - on purpose |
+| `ACHIEVEMENTS_MAIL_FROM` | with `ACHIEVEMENTS_DB` | the From address of that mail |
+| `ACHIEVEMENTS_BASE_URL` | no | the public base URL named in mail, default `https://doors.uprough.net` |
 
 Missing or non-existent paths are a startup failure, never a default.
 
@@ -38,6 +42,8 @@ commit), not via a routine `npm update`.
 | test | `npm test` |
 | test (CI) | `npm run test:ci` |
 | parity vs the BBS | `npm run test:parity` |
+| achievements: mint / rotate / suspend a board key | `npx tsx scripts/achievements-board.ts --db <path> list\|create\|rotate\|suspend\|resume` |
+| achievements: seasons and rarity by hand | `npx tsx scripts/achievements-season.ts --db <path> status\|close [--at <iso>]\|rarity [--now <iso>]` |
 
 `npm run test:parity` compares this server byte-for-byte against fixtures
 captured from the BBS-hosted door-repo API (`tests/fixtures/parity/`, see

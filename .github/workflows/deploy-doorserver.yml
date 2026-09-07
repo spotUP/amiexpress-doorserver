@@ -22,7 +22,7 @@ jobs:
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           command_timeout: 30m
-          envs: DOORSERVER_JWT_SECRET
+          envs: DOORSERVER_JWT_SECRET,ACHIEVEMENTS_DB,ACHIEVEMENTS_SMTP_URL,ACHIEVEMENTS_MAIL_FROM
           script: |
             set -euo pipefail
             cd /app/doorserver
@@ -47,6 +47,20 @@ jobs:
               printf 'DOORSERVER_JWT_SECRET=\n' > .env
               echo "[WARN] DOORSERVER_JWT_SECRET not set in workflow; admin API will be disabled"
             fi
+            # The achievements surface, from three more repository secrets.
+            # All three or none: ACHIEVEMENTS_DB set without SMTP is a
+            # startup failure by design (docs/ACHIEVEMENTS-API.md), so the
+            # workflow only writes ACHIEVEMENTS_DB when the SMTP URL is
+            # present too. Unset, the surface stays off and the door repo
+            # serves exactly as before.
+            if [ -n "${ACHIEVEMENTS_SMTP_URL:-}" ] && [ -n "${ACHIEVEMENTS_MAIL_FROM:-}" ]; then
+              printf 'ACHIEVEMENTS_DB=%s\n' "${ACHIEVEMENTS_DB:-/data/achievements.db}" >> .env
+              printf 'ACHIEVEMENTS_SMTP_URL=%s\n' "${ACHIEVEMENTS_SMTP_URL}" >> .env
+              printf 'ACHIEVEMENTS_MAIL_FROM=%s\n' "${ACHIEVEMENTS_MAIL_FROM}" >> .env
+              echo "[OK] achievements surface configured (db ${ACHIEVEMENTS_DB:-/data/achievements.db})"
+            else
+              echo "[INFO] achievements surface off: ACHIEVEMENTS_SMTP_URL / ACHIEVEMENTS_MAIL_FROM not set"
+            fi
             echo "== prune builder cache + dangling/unused images (host runs at 91% disk, 3.6 GB free) =="
             docker builder prune -f
             # Dangling layers only: -a would remove all unused images, dangerous on unattended live host
@@ -56,5 +70,15 @@ jobs:
             echo "== health =="
             sleep 10
             curl -fsS http://localhost:3010/api/door-repo/health
+            echo "== achievements: plain HTTP must reach the surface, and nothing else may go plain =="
+            # 200 here proves the Caddy exemption for /achievements/v1/* took
+            # (a 301 means a 68K client gets a redirect it cannot follow);
+            # 301 on /health proves the exemption is not wider than that.
+            # Both are the host's Caddyfile, not this repo, so they are
+            # REPORTED, never assumed - see docs/superpowers/plans/
+            # 2026-09-03-achievements-server.md, AC-21.
+            echo "catalog.txt over http: $(curl -s -o /dev/null -w '%{http_code}' http://doors.uprough.net/achievements/v1/catalog.txt)  (want 200)"
+            echo "health over http:      $(curl -s -o /dev/null -w '%{http_code}' http://doors.uprough.net/health)  (want 301)"
+            echo "achievements health:   $(curl -s http://localhost:3010/achievements/v1/health | head -c 300)"
             echo "== disk after =="
             df -h / | tail -1
