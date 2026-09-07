@@ -30,42 +30,39 @@
  * handler, never a function in isolation. A test that passes here is
  * mis-specified and is rewritten before AC-2 starts.
  */
-import request from 'supertest';
-import { makeAchievementsFixture, TEST_BOARD_ID } from './helpers';
-import type { AchievementsFixture } from './helpers';
+/**
+ * Where every symptom went. This file is the RED ledger AC-1 wrote; by
+ * AC-15 every test in it had moved into the suite of the task that turned
+ * it green, and what remains is the map - checked, so a renamed suite does
+ * not silently orphan a symptom's provenance.
+ */
+import * as fs from 'fs';
+import * as path from 'path';
 
-let fx: AchievementsFixture;
+const HOMES: Record<string, string> = {
+  'SYM-1': 'mount.test.ts',        // AC-5 mounted the surface; AC-9 gave it POST /events
+  'SYM-2': 'boards.test.ts',       // AC-4
+  'SYM-3': 'boards.test.ts',       // AC-4
+  'SYM-4': 'players.test.ts',      // AC-7
+  'SYM-5': 'events.test.ts',       // AC-9 (the link itself: links.test.ts, AC-8)
+  'SYM-6': 'events.test.ts',       // AC-9
+  'SYM-7': 'events.test.ts',       // AC-9
+  'SYM-8': 'events.test.ts',       // AC-9
+  'SYM-9': 'catalog.test.ts',      // AC-12
+  'SYM-10': 'door-catalog.test.ts', // AC-13
+  'SYM-11': 'leaderboard.test.ts', // AC-15
+};
 
-beforeEach(() => {
-  fx = makeAchievementsFixture();
-});
-
-afterEach(() => fx.cleanup());
-
-describe('the achievements surface, as a board author meets it', () => {
-  it('SYM-11: a private player appears in the global leaderboard', async () => {
-    const db = fx.openAchievements();
-    try {
-      db.prepare(
-        `INSERT INTO players (email_key, email, handle, verified_at, private, created_at)
-         VALUES ('hermit@example.com', 'hermit@example.com', 'Hermit', 1700000000, 1, 1700000000)`
-      ).run();
-      db.prepare(
-        `INSERT INTO players (email_key, email, handle, verified_at, private, created_at)
-         VALUES ('loud@example.com', 'loud@example.com', 'Loud', 1700000000, 0, 1700000000)`
-      ).run();
-    } finally {
-      db.close();
+describe('the RED file, emptied', () => {
+  it('every symptom has a home suite, and it exists', () => {
+    for (const [sym, file] of Object.entries(HOMES)) {
+      const full = path.join(__dirname, file);
+      expect(fs.existsSync(full)).toBe(true);
+      // SYM-1's assertion was split between the mount and the endpoint; the
+      // rest carry their name into the suite that owns them.
+      if (sym !== 'SYM-1' && !['SYM-2', 'SYM-3'].includes(sym)) {
+        expect(fs.readFileSync(full, 'utf8')).toContain(sym);
+      }
     }
-
-    const res = await request(fx.app)
-      .get('/achievements/v1/leaderboard?scope=global')
-      .set('Authorization', fx.auth);
-
-    expect(res.status).toBe(200);
-    const handles = (res.body.rows as { handle: string }[]).map((r) => r.handle);
-    // Private is a GLOBAL opt-out only: the board they are linked to still
-    // lists them, because that board's caller list is its sysop's own data.
-    expect(handles).not.toContain('Hermit');
   });
 });

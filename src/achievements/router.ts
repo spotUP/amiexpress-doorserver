@@ -39,6 +39,9 @@ import { storeEvents } from './events';
 import { evaluate } from './engine';
 import { registerDoorCatalog } from './doors';
 import { patchProfile, readProfile } from './profile';
+import { leaderboard, parseLeaderboardQuery, renderLeaderboardTxt } from './leaderboard';
+import { ensureCurrentSeason } from './seasons';
+import { refreshRarityIfStale } from './rarity';
 import {
   auditBoard,
   createBoard,
@@ -158,6 +161,23 @@ export function createAchievementsRouter(
 
   // Everything below this line is board-facing and needs a key.
   router.use(requireBoard(ach));
+
+  // THE CLOCK (D12). No scheduler: the top of every write request is when a
+  // season that has ended gets closed and a day-old rarity gets recomputed.
+  // Both do nothing unless the calendar says otherwise, so the cost on the
+  // hot path is two indexed reads.
+  router.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const now = Math.floor(Date.now() / 1000);
+      withAchievementsDb(ach, (db) =>
+        db.transaction(() => {
+          ensureCurrentSeason(db, now);
+          refreshRarityIfStale(db, now);
+        })()
+      );
+    }
+    next();
+  });
 
   // ---------------------------------------------------------------------
   // Players. A board registers on its caller's behalf, so every route here
@@ -386,6 +406,40 @@ export function createAchievementsRouter(
       auditBoard(db, boardId, 'player:patch', 1, now);
       res.json(out);
     });
+  });
+
+  // ---------------------------------------------------------------------
+  // Leaderboards. The ETag is the leaderboard's OWN fingerprint,
+  // l<rows>-t<newest unlock>, scoped to the query, so a 68K client holds
+  // one against a board scoreboard the way it holds one against the
+  // catalog. Computing it means running the query, which is the listing
+  // itself - so unlike the catalog there is nothing to save by checking
+  // freshness first, and the rows are simply not sent.
+  // ---------------------------------------------------------------------
+  const listing = (req: Request, res: Response): ReturnType<typeof leaderboard> | null => {
+    const q = parseLeaderboardQuery(req.query as Record<string, unknown>);
+    const now = Math.floor(Date.now() / 1000);
+    const lb = withAchievementsDb(ach, (db) => leaderboard(db, q, now), { readonly: true });
+    res.set('ETag', `"${lb.revision}"`);
+    if (req.fresh) {
+      res.status(304).end();
+      return null;
+    }
+    return lb;
+  };
+
+  router.get('/leaderboard', (req: BoardRequest, res: Response) => {
+    const lb = listing(req, res);
+    if (lb === null) return;
+    const { newestAt: _newestAt, ...body } = lb;
+    res.json(body);
+  });
+
+  router.get('/leaderboard.txt', (req: BoardRequest, res: Response) => {
+    const lb = listing(req, res);
+    if (lb === null) return;
+    res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
+    res.send(renderLeaderboardTxt(lb));
   });
 
   // An achievements path that matches no route above must NOT fall through

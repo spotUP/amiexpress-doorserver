@@ -44,16 +44,20 @@ describe('the achievements surface, where it is mounted', () => {
   it('does not fall through to the single-page app', async () => {
     const withKey = await request(fx.app).get('/achievements/v1/catalog').set('Authorization', fx.auth);
     const withoutKey = await request(fx.app).get('/achievements/v1/catalog');
+    const unknown = await request(fx.app).get('/achievements/v1/no-such-thing').set('Authorization', fx.auth);
 
-    for (const res of [withKey, withoutKey]) {
+    for (const res of [withKey, withoutKey, unknown]) {
       expect(res.headers['content-type']).toContain('application/json');
       expect(res.text).not.toContain('<div id="root">');
       expect(res.headers['cache-control']).toBeUndefined();
     }
-    // GET /catalog itself arrives in AC-12; what is proven here is that this
-    // API answers the path, and the site does not.
+    // This API answers the path, and the site does not: a key gets the
+    // catalog (AC-12), no key gets this API's own 401, and a path nothing
+    // here serves gets this API's own JSON 404 - never index.html.
     expect(withoutKey.status).toBe(401);
-    expect(withKey.status).toBe(404);
+    expect(withKey.status).toBe(200);
+    expect(unknown.status).toBe(404);
+    expect(unknown.body.error).toBe('bad_request');
   });
 
   it('carries the contract version header on every response, errors included', async () => {
