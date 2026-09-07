@@ -28,7 +28,9 @@ export class SurfaceError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly status: RefusalStatus,
-    message: string
+    message: string,
+    /** Seconds, for a 429; the router sends it as Retry-After and in the body. */
+    readonly retryAfter?: number
   ) {
     super(message);
     this.name = 'SurfaceError';

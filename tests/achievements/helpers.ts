@@ -25,6 +25,7 @@ import { runMigrations } from '../../src/migrations';
 import { bootstrapAdmins } from '../../src/auth';
 import { createApp } from '../../src/app';
 import { createBoard, _clearBoardKeyCacheForTests } from '../../src/achievements/boards';
+import { _resetRateLimitsForTests } from '../../src/achievements/ratelimit';
 import { initAchievementsDb, openAchievementsDb } from '../../src/achievements/db';
 import { loadSeed } from '../../src/achievements/catalog';
 import type { ServerConfig } from '../../src/config';
@@ -88,6 +89,9 @@ export function makeAchievementsFixture(opts: FixtureOptions = {}): Achievements
   // worker; a fixture that did not clear it could inherit another test's
   // board and hide a missing verification.
   _clearBoardKeyCacheForTests();
+  // So are the rate-limit windows: a suite that sent a hundred requests
+  // must not leave the next one starting at a hundred.
+  _resetRateLimitsForTests();
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-ach-'));
   fs.mkdirSync(path.join(dir, 'Archives'));

@@ -42,6 +42,7 @@ import { patchProfile, readProfile } from './profile';
 import { leaderboard, parseLeaderboardQuery, renderLeaderboardTxt } from './leaderboard';
 import { ensureCurrentSeason } from './seasons';
 import { refreshRarityIfStale } from './rarity';
+import { rateLimit, rateLimitAdmin } from './ratelimit';
 import {
   auditBoard,
   createBoard,
@@ -105,6 +106,7 @@ export function createAchievementsRouter(
   // ---------------------------------------------------------------------
   const admin = express.Router();
   admin.use(requireAdmin(cfg));
+  admin.use(rateLimitAdmin());
 
   admin.get('/boards', (_req: Request, res: Response) => {
     res.json(withAchievementsDb(ach, (db) => listBoards(db).map(summarise), { readonly: true }));
@@ -196,7 +198,7 @@ export function createAchievementsRouter(
     queueMail(db, issued.to, mail.subject, mail.body, now);
   };
 
-  router.post('/players', (req: BoardRequest, res: Response) => {
+  router.post('/players', rateLimit('register'), (req: BoardRequest, res: Response) => {
     const body = (req.body ?? {}) as { email?: unknown; handle?: unknown };
     if (typeof body.email !== 'string' || typeof body.handle !== 'string') {
       throw new SurfaceError('bad_request', 400, 'email and handle are required');
@@ -213,7 +215,7 @@ export function createAchievementsRouter(
     });
   });
 
-  router.post('/players/resend', (req: BoardRequest, res: Response) => {
+  router.post('/players/resend', rateLimit('register'), (req: BoardRequest, res: Response) => {
     const body = (req.body ?? {}) as { email?: unknown };
     if (typeof body.email !== 'string') {
       throw new SurfaceError('bad_request', 400, 'email is required');
@@ -233,7 +235,7 @@ export function createAchievementsRouter(
     });
   });
 
-  router.post('/players/verify', (req: BoardRequest, res: Response) => {
+  router.post('/players/verify', rateLimit('verify'), (req: BoardRequest, res: Response) => {
     const body = (req.body ?? {}) as { email?: unknown; code?: unknown };
     if (typeof body.email !== 'string' || typeof body.code !== 'string') {
       throw new SurfaceError('bad_request', 400, 'email and code are required');
@@ -258,7 +260,7 @@ export function createAchievementsRouter(
     return id;
   };
 
-  router.post('/links', (req: BoardRequest, res: Response) => {
+  router.post('/links', rateLimit('links'), (req: BoardRequest, res: Response) => {
     const body = (req.body ?? {}) as { email?: unknown; code?: unknown };
     if (typeof body.email !== 'string' || typeof body.code !== 'string') {
       throw new SurfaceError('bad_request', 400, 'email and code are required');
@@ -274,7 +276,7 @@ export function createAchievementsRouter(
     });
   });
 
-  router.delete('/links', (req: BoardRequest, res: Response) => {
+  router.delete('/links', rateLimit('links'), (req: BoardRequest, res: Response) => {
     const body = (req.body ?? {}) as { email?: unknown };
     if (typeof body.email !== 'string') {
       throw new SurfaceError('bad_request', 400, 'email is required');
@@ -289,7 +291,7 @@ export function createAchievementsRouter(
     });
   });
 
-  router.post('/links/rotate', (req: BoardRequest, res: Response) => {
+  router.post('/links/rotate', rateLimit('links'), (req: BoardRequest, res: Response) => {
     const body = (req.body ?? {}) as { email?: unknown; code?: unknown };
     if (typeof body.email !== 'string' || typeof body.code !== 'string') {
       throw new SurfaceError('bad_request', 400, 'email and code are required');
@@ -311,7 +313,7 @@ export function createAchievementsRouter(
   // "nothing is stored" is a property of the transaction, not of the order
   // the checks happen to run in.
   // ---------------------------------------------------------------------
-  router.post('/events', (req: BoardRequest, res: Response) => {
+  router.post('/events', rateLimit('events'), (req: BoardRequest, res: Response) => {
     withAchievementsDb(ach, (db) => {
       const now = Math.floor(Date.now() / 1000);
       const boardId = keyBoard(req);
@@ -368,7 +370,7 @@ export function createAchievementsRouter(
 
   // A door's own definitions. Whole-request: the transaction is what makes
   // "nothing is written when any id fails" true.
-  router.put('/catalog/doors/:door', (req: BoardRequest, res: Response) => {
+  router.put('/catalog/doors/:door', rateLimit('doorCatalog'), (req: BoardRequest, res: Response) => {
     const door = String(req.params.door);
     const body: unknown = req.body;
     withAchievementsDb(ach, (db) => {
@@ -454,7 +456,12 @@ export function createAchievementsRouter(
       return;
     }
     if (err instanceof SurfaceError) {
-      res.status(err.status).json({ error: err.code, detail: err.message });
+      if (err.retryAfter !== undefined) res.set('Retry-After', String(err.retryAfter));
+      res.status(err.status).json({
+        error: err.code,
+        detail: err.message,
+        ...(err.retryAfter !== undefined ? { retryAfter: err.retryAfter } : {}),
+      });
       return;
     }
     // A body that is not JSON, or one over the limit: body-parser's own
