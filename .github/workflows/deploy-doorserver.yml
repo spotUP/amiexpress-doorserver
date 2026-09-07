@@ -70,15 +70,17 @@ jobs:
             echo "== health =="
             sleep 10
             curl -fsS http://localhost:3010/api/door-repo/health
-            echo "== achievements: plain HTTP must reach the surface, and nothing else may go plain =="
-            # 200 here proves the Caddy exemption for /achievements/v1/* took
-            # (a 301 means a 68K client gets a redirect it cannot follow);
-            # 301 on /health proves the exemption is not wider than that.
-            # Both are the host's Caddyfile, not this repo, so they are
-            # REPORTED, never assumed - see docs/superpowers/plans/
-            # 2026-09-03-achievements-server.md, AC-21.
-            echo "catalog.txt over http: $(curl -s -o /dev/null -w '%{http_code}' http://doors.uprough.net/achievements/v1/catalog.txt)  (want 200)"
-            echo "health over http:      $(curl -s -o /dev/null -w '%{http_code}' http://doors.uprough.net/health)  (want 301)"
+            echo "== achievements: plain HTTP must reach the surface =="
+            # The host's Caddyfile serves EVERY path of doors.uprough.net over
+            # plain HTTP by design (Amiga stacks cannot do TLS; the block is
+            # commented so on the host), so no per-path exemption exists to
+            # take or to over-widen. What is checked: the surface answers as
+            # itself over http - 200 with its own header when configured, and
+            # its own JSON 404 (never index.html) when the surface is off.
+            # The Caddyfile is not in this repo, so this is REPORTED, never
+            # assumed - see docs/superpowers/plans/2026-09-03-achievements-server.md, AC-21.
+            curl -s -o /dev/null -w 'catalog.txt over http: %{http_code}  contract header: %{header_json}\n' http://doors.uprough.net/achievements/v1/catalog.txt | cut -c1-200 || true
             echo "achievements health:   $(curl -s http://localhost:3010/achievements/v1/health | head -c 300)"
+            echo "door-repo health:      $(curl -s http://localhost:3010/api/door-repo/health | head -c 300)"
             echo "== disk after =="
             df -h / | tail -1
