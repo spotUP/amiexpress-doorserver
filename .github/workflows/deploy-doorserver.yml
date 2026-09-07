@@ -63,7 +63,16 @@ jobs:
             # present too. Unset, the surface stays off and the door repo
             # serves exactly as before.
             if [ -n "${ACHIEVEMENTS_SMTP_URL:-}" ] && [ -n "${ACHIEVEMENTS_MAIL_FROM:-}" ]; then
-              printf 'ACHIEVEMENTS_DB=%s\n' "${ACHIEVEMENTS_DB:-/data/achievements.db}" >> .env
+              # Exported, not only written: ssh-action forwards every name in
+              # `envs` whether or not the secret exists, so an absent
+              # ACHIEVEMENTS_DB secret arrives here SET BUT EMPTY. docker
+              # compose gives a shell variable priority over .env, so that
+              # empty string overrode the path this file had just written and
+              # the server started with "ACHIEVEMENTS_DB is not set" - with a
+              # correct .env on disk (2026-09-07). The shell and the file must
+              # agree, so the default is applied to both.
+              export ACHIEVEMENTS_DB="${ACHIEVEMENTS_DB:-/data/achievements.db}"
+              printf 'ACHIEVEMENTS_DB=%s\n' "${ACHIEVEMENTS_DB}" >> .env
               printf 'ACHIEVEMENTS_SMTP_URL=%s\n' "${ACHIEVEMENTS_SMTP_URL}" >> .env
               printf 'ACHIEVEMENTS_MAIL_FROM=%s\n' "${ACHIEVEMENTS_MAIL_FROM}" >> .env
               echo "[OK] achievements surface configured (db ${ACHIEVEMENTS_DB:-/data/achievements.db})"
