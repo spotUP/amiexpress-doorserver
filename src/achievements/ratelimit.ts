@@ -37,7 +37,19 @@ export const LIMITS = {
   linksPerEmail: { max: 10, windowSeconds: HOUR } as Limit,
   doorCatalogPerBoard: { max: 10, windowSeconds: MINUTE } as Limit,
   adminPerAdmin: { max: 20, windowSeconds: MINUTE } as Limit,
+  // The global-requests surface (src/requests/), writes only. A GET is never
+  // limited here either - the same read exemption the header states.
+  requestsPostPerBoard: { max: 20, windowSeconds: MINUTE } as Limit,
+  requestsPostPerHandle: { max: 10, windowSeconds: HOUR } as Limit,
+  requestsActionPerBoard: { max: 60, windowSeconds: MINUTE } as Limit,
 };
+
+/** lower(trim(handle)) - the requests identity, shared with the store. */
+export function requestHandleKey(handle: unknown): string | null {
+  return typeof handle === 'string' && handle.trim().length > 0
+    ? handle.trim().toLowerCase()
+    : null;
+}
 
 interface Window {
   startedAt: number;
@@ -93,9 +105,22 @@ const emailKey = (email: unknown): string | null =>
   typeof email === 'string' && email.trim().length > 0 ? email.trim().toLowerCase() : null;
 
 /** The counters a request charges, by route. */
-export function chargesFor(route: 'events' | 'register' | 'verify' | 'links' | 'doorCatalog', boardId: string, body: unknown): Charge[] {
+export function chargesFor(route: 'events' | 'register' | 'verify' | 'links' | 'doorCatalog' | 'requestPost' | 'requestAction', boardId: string, body: unknown): Charge[] {
   const b = (body ?? {}) as Record<string, unknown>;
   switch (route) {
+    case 'requestPost': {
+      // Per board AND per handle: a board cannot post a thousand under a
+      // hundred handles, and one handle cannot flood a hundred boards.
+      const k = requestHandleKey(b.handle);
+      return [
+        { key: `req-post:board:${boardId}`, limit: LIMITS.requestsPostPerBoard },
+        ...(k ? [{ key: `req-post:handle:${boardId}:${k}`, limit: LIMITS.requestsPostPerHandle }] : []),
+      ];
+    }
+    case 'requestAction':
+      // vote / claim / release / done / withdraw: one board budget covers them
+      // all, so a spammer cannot vote a thousand times a minute.
+      return [{ key: `req-action:board:${boardId}`, limit: LIMITS.requestsActionPerBoard }];
     case 'events': {
       const events = Array.isArray(b.events) ? (b.events as Record<string, unknown>[]) : [];
       const perPlayer = new Map<string, number>();

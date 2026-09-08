@@ -158,19 +158,21 @@ describe('the achievements database, as an operator meets it', () => {
     const first = initAchievementsDb(ach);
     const second = initAchievementsDb(ach);
 
+    // The first start applies the one migration ACHIEVEMENTS_MIGRATIONS now
+    // carries (the global-requests tables, step 1); the second applies none.
+    expect(first).toEqual(['1:requests: the global-requests surface']);
     expect(second).toEqual([]);
-    expect(second).toEqual(first);
 
-    // With the array empty at birth both runs are trivially empty, so prove
-    // the RUNNER is genuinely wired to this database and to its own version
-    // counter (D5): a probe migration runs exactly once and is then
-    // remembered in achievements.db's own schema_migrations.
+    // Prove the RUNNER is genuinely wired to this database and to its own
+    // version counter (D5): a probe migration (a version the real array does
+    // not use) runs exactly once and is then remembered in achievements.db's
+    // own schema_migrations.
     const probe: Migration[] = [
-      { version: 1, name: 'probe', up: (db) => db.exec('CREATE TABLE IF NOT EXISTS probe (x INTEGER)') },
+      { version: 9999, name: 'probe', up: (db) => db.exec('CREATE TABLE IF NOT EXISTS probe (x INTEGER)') },
     ];
     const db = openAchievementsDb(ach);
     try {
-      expect(runMigrations(db, probe)).toEqual(['1:probe']);
+      expect(runMigrations(db, probe)).toEqual(['9999:probe']);
       expect(runMigrations(db, probe)).toEqual([]);
     } finally {
       db.close();

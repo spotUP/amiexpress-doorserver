@@ -6,6 +6,7 @@ import { createAdminRouter } from './admin-routes';
 import { createPublicRouter } from './public-routes';
 import { doorRepoCors } from './cors';
 import { createAchievementsRouter } from './achievements/router';
+import { createRequestsRouter } from './requests/router';
 import type { ServerConfig } from './config';
 
 export function createApp(cfg: ServerConfig): express.Express {
@@ -37,6 +38,13 @@ export function createApp(cfg: ServerConfig): express.Express {
   // serving half of one.
   if (cfg.achievements) {
     app.use('/achievements/v1', createAchievementsRouter(cfg, cfg.achievements));
+    // The global-requests surface: a second sibling API. Same board registry,
+    // same achievements.db, its own tables (migration step 1). Mounted here,
+    // BEFORE mountWebUi, for the exact reason the achievements mount is: the
+    // single-page catch-all only exempts /api/, so a requests path below it
+    // would answer index.html and a 200. Gated on the same config: a sysop who
+    // never configured achievements gets neither surface.
+    app.use('/requests/v1', createRequestsRouter(cfg, cfg.achievements));
   }
   mountWebUi(app);
   return app;

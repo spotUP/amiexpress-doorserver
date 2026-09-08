@@ -15,6 +15,16 @@
  * drift test then checks against each other.
  */
 import type { ErrorCode } from '../../contract/achievement-types';
+import type { RequestErrorCode } from '../../contract/request-types';
+
+/**
+ * The requests surface (src/requests/) throws the same SurfaceError with its
+ * own code list. The class was always "an error carrying one of a contract's
+ * error codes and the status that goes with it"; only the union of which
+ * contract widens. A parallel RequestError would have been a second class and
+ * a second branch in every router's error handler for no gain.
+ */
+export type SurfaceErrorCode = ErrorCode | RequestErrorCode;
 
 /**
  * The statuses a REFUSAL carries. A 5xx is deliberately not among them: it
@@ -26,7 +36,7 @@ export type RefusalStatus = 400 | 401 | 403 | 404 | 409 | 429;
 
 export class SurfaceError extends Error {
   constructor(
-    readonly code: ErrorCode,
+    readonly code: SurfaceErrorCode,
     readonly status: RefusalStatus,
     message: string,
     /** Seconds, for a 429; the router sends it as Retry-After and in the body. */

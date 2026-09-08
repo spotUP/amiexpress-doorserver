@@ -19,4 +19,49 @@
  */
 import type { Migration } from '../migrations';
 
-export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [];
+export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    name: 'requests: the global-requests surface',
+    // The global-requests door (a sibling surface, not an achievement) stores
+    // its rows HERE: the boards table is achievements.db's, and a second
+    // database would be a second place a board key has to be right. Every
+    // statement is CREATE TABLE / CREATE INDEX IF NOT EXISTS, so a re-run on a
+    // database that already has these tables is a no-op - which is what makes
+    // this step idempotent against the live achievements.db.
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS requests (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          kind           TEXT NOT NULL CHECK (kind IN ('release','art')),
+          title          TEXT NOT NULL,
+          notes          TEXT NOT NULL DEFAULT '',
+          board_id       TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+          handle         TEXT NOT NULL,          -- the BBS handle, as the door read it
+          handle_key     TEXT NOT NULL,          -- lower(trim(handle)); the identity
+          state          TEXT NOT NULL DEFAULT 'open'
+                         CHECK (state IN ('open','claimed','done','withdrawn')),
+          claim_board_id TEXT,
+          claim_handle   TEXT,
+          claim_handle_key TEXT,
+          claimed_at     INTEGER,
+          done_note      TEXT,
+          done_at        INTEGER,
+          votes          INTEGER NOT NULL DEFAULT 0,   -- denormalised: the list never aggregates
+          created_at     INTEGER NOT NULL,
+          updated_at     INTEGER NOT NULL
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_requests_open ON requests(state, kind, votes DESC, updated_at DESC)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_requests_author ON requests(board_id, handle_key)');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS request_votes (
+          request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+          board_id   TEXT NOT NULL,
+          handle_key TEXT NOT NULL,
+          at         INTEGER NOT NULL,
+          PRIMARY KEY (request_id, board_id, handle_key)   -- idempotent votes, by construction
+        )`);
+    },
+  },
+];
