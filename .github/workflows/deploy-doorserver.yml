@@ -16,6 +16,10 @@ jobs:
       - name: Deploy to Hetzner VPS
         uses: appleboy/ssh-action@v1.0.3
         env:
+          # This repo is PRIVATE, so the host cannot fetch anonymously.
+          # The workflow's own short-lived, read-only token lets it fetch as
+          # somebody. Same pattern as the BBS deploy (deploy-hetzner.yml).
+          GH_TOKEN: ${{ github.token }}
           DOORSERVER_JWT_SECRET: ${{ secrets.DOORSERVER_JWT_SECRET }}
           # The three names below were listed in `envs:` and never given a
           # value here, so ssh-action forwarded them EMPTY on every run, the
@@ -31,14 +35,46 @@ jobs:
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           command_timeout: 30m
-          envs: DOORSERVER_JWT_SECRET,ACHIEVEMENTS_DB,ACHIEVEMENTS_SMTP_URL,ACHIEVEMENTS_MAIL_FROM
+          envs: DOORSERVER_JWT_SECRET,ACHIEVEMENTS_DB,ACHIEVEMENTS_SMTP_URL,ACHIEVEMENTS_MAIL_FROM,GH_TOKEN
           script: |
             set -euo pipefail
             cd /app/doorserver
             echo "== disk before =="
             df -h / | tail -1
             echo "== git fetch + hard reset =="
-            git fetch --prune origin main
+            # Fetch as SOMEBODY. This repo is PRIVATE, so an anonymous HTTPS
+            # fetch dies with "could not read Username for 'https://github.com'"
+            # and the deploy stops before it starts (observed 2026-09-08, run
+            # 34228408047). The token is the workflow's own - short-lived and
+            # scoped to this repo - written to a 600 file rather than a command
+            # line so it never appears in `ps` on the host. Anonymous stays as
+            # the fallback, so a run with no token behaves exactly as before.
+            CRED_FILE=""
+            if [ -n "${GH_TOKEN:-}" ]; then
+              CRED_FILE=$(mktemp)
+              chmod 600 "$CRED_FILE"
+              printf 'https://x-access-token:%s@github.com\n' "$GH_TOKEN" > "$CRED_FILE"
+            fi
+            FETCH_OK=0
+            for attempt in 1 2 3 4 5; do
+              if [ -n "$CRED_FILE" ] \
+                && GIT_TERMINAL_PROMPT=0 git -c "credential.helper=store --file=$CRED_FILE" \
+                     fetch --prune origin main; then
+                FETCH_OK=1
+                break
+              fi
+              if GIT_TERMINAL_PROMPT=0 git fetch --prune origin main; then
+                FETCH_OK=1
+                break
+              fi
+              echo "fetch attempt $attempt failed; retrying in $((attempt * 5))s" >&2
+              sleep $((attempt * 5))
+            done
+            if [ -n "$CRED_FILE" ]; then rm -f "$CRED_FILE"; fi
+            if [ "$FETCH_OK" != "1" ]; then
+              echo "git fetch failed after 5 attempts" >&2
+              exit 1
+            fi
             git reset --hard origin/main
             echo "== ensure .env is in place =="
             # The .env file is gitignored (correctly - it holds a signing
