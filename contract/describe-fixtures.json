@@ -1,5 +1,5 @@
 {
-  "contractVersion": "2",
+  "contractVersion": "3",
   "note": "GENERATED from tests/describe.test.ts. Both repos run these cases.",
   "cases": [
     {

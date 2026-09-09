@@ -49,7 +49,7 @@
  * stale mirror is caught as a mismatch rather than as a silent divergence in
  * what a caller reads about a door.
  */
-export const DESCRIBE_CONTRACT_VERSION = '2';
+export const DESCRIBE_CONTRACT_VERSION = '3';
 
 /** Frame punctuation: decoration at either end of a cell. */
 const FRAME = " :-*()[]|_=+~<>.,'\"`^¦¬·°#!?/\\";
@@ -1284,11 +1284,9 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
     prettyProg.length >= 3 && (prettyProg.match(/[A-Za-zÀ-ÿ]/g) ?? []).length >= 3 && alnumShare(prettyProg) > 0.5;
   let prog = progOk ? prettyProg : '';
 
-  // Use a 120-char cap for the body reconstruction so wrapped paragraphs are not truncated.
-  // The manifest's list.txt slice (src/manifest.ts:438) still caps at 120, and index.tsv
-  // will get the same longer text — the 60-char house rule for index.tsv is not enforced here
-  // but the longer text is still readable; callers that need 60 can slice themselves.
-  let body = describeBlock(input.dizText, 120, prog || null);
+  // Use a 250-char cap for the body reconstruction so wrapped paragraphs are not truncated.
+  // The manifest's list.txt slice (src/manifest.ts:438) still caps at 120 for Amiga clients.
+  let body = describeBlock(input.dizText, 250, prog || null);
   if (!body && input.name) {
     const named = clean(input.name);
     body = score(named).score > 0 ? named : '';
@@ -1322,8 +1320,10 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
   prog = capitaliseName(stripVersionTail(prog, ver.version));
   if (prog && progCoveredByBody(prog, body)) prog = '';
 
-  // 120-char cap: a wrapped DIZ paragraph is typically 80-100 chars; 60 truncated mid-sentence.
-  let description: string | null = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))), 120);
+  // 250-char cap: a wrapped DIZ paragraph is often 120-200 chars; 60/120 truncated mid-sentence
+  // (e.g. "Additional", "so", "Walls" at 119, KCL's "and I really" at 119). 250 keeps the full
+  // paragraph for the JSON manifest and web UI; list.txt still does its own 120-char slice.
+  let description: string | null = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))), 250);
   if (!description) {
     // Everything the DIZ offered was a credit (KDZ!LUDB.LHA's only
     // prose line is "dONE bY sERAPH - !BUGFIXED VERSION", which moves
