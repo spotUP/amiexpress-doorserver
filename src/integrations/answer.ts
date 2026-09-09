@@ -8,9 +8,15 @@
  */
 import type Database from 'better-sqlite3';
 import type { Adapter, AdapterContext, AnswerItem, FetchJson } from './types';
+import { createFetchText, createHeadStatus } from './fetch';
 import { pouetAdapter } from './pouet';
 import { demozooAdapter } from './demozoo';
 import { asciiarenaAdapter } from './asciiarena';
+import { archiveorgAdapter } from './archiveorg';
+import { sceneorgAdapter } from './sceneorg';
+import { modarchiveAdapter } from './modarchive';
+import { tmdbAdapter } from './tmdb';
+import { omdbAdapter } from './omdb';
 import { getConfig, getSecretForAdapter, getCache, getStaleCache, setCache } from './store';
 
 export const ANSWER_CACHE_TTL_SECONDS = 120;
@@ -35,7 +41,14 @@ export interface Answer {
 
 /** Adapter registry. Keyed adapters join here in Phase 3; they stay
  *  dark until configured (isEnabled). */
-export const ADAPTERS: Adapter[] = [pouetAdapter, demozooAdapter, asciiarenaAdapter];
+export const ADAPTERS: Adapter[] = [
+  pouetAdapter, demozooAdapter, asciiarenaAdapter, archiveorgAdapter,
+  modarchiveAdapter, tmdbAdapter, omdbAdapter,
+];
+
+/** Everything /status reports: the fan-out plus sources with no search
+ *  side (scene.org link checks). */
+export const STATUS_ADAPTERS: Adapter[] = [...ADAPTERS, sceneorgAdapter as Adapter];
 
 function isEnabled(db: Database.Database, a: Adapter): boolean {
   const row = getConfig(db, a.id);
@@ -53,6 +66,25 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([p.finally(() => clearTimeout(timer!)), timeout]) as Promise<T>;
 }
 
+/** Round-robin across sources, capped: every contributing source stays
+ *  visible instead of the tail being sliced off (2026-09-10 - a global
+ *  slice(0,12) silently dropped Internet Archive behind Pouet+Demozoo). */
+export const ANSWER_MAX_RESULTS = 12;
+export function interleave(lists: AnswerItem[][], max = ANSWER_MAX_RESULTS): AnswerItem[] {
+  const out: AnswerItem[] = [];
+  for (let i = 0; out.length < max; i++) {
+    let took = false;
+    for (const list of lists) {
+      if (i < list.length && out.length < max) {
+        out.push(list[i]);
+        took = true;
+      }
+    }
+    if (!took) break;
+  }
+  return out;
+}
+
 export async function answer(
   db: Database.Database,
   fetchJson: FetchJson,
@@ -66,13 +98,15 @@ export async function answer(
 
   const enabled = ADAPTERS.filter((a) => isEnabled(db, a));
   const sources: SourceResult[] = [];
-  const results: AnswerItem[] = [];
+  const perSource: AnswerItem[][] = [];
 
   await Promise.all(
     enabled.map(async (a) => {
       const t0 = Date.now();
       const ctx: AdapterContext = {
         fetchJson,
+        fetchText: createFetchText(),
+        head: createHeadStatus(),
         getSecret: (keyName) => getSecretForAdapter(db, a.id, keyName),
         settings: getConfig(db, a.id)?.settings ?? {},
       };
@@ -88,7 +122,7 @@ export async function answer(
           ADAPTER_TIMEOUT_MS,
           a.id
         );
-        results.push(...items);
+        perSource.push(items.slice(0, 5));
         sources.push({ id: a.id, name: a.name, ok: true, ms: Date.now() - t0 });
       } catch (e) {
         sources.push({
@@ -98,7 +132,7 @@ export async function answer(
     })
   );
 
-  const merged: Answer = { query: q, mode, results: results.slice(0, 12), sources, stale: false };
+  const merged: Answer = { query: q, mode, results: interleave(perSource), sources, stale: false };
   const allFailed = sources.length > 0 && sources.every((s) => !s.ok);
   if (allFailed) {
     const stale = getStaleCache(db, cacheKey);

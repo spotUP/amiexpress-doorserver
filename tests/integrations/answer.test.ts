@@ -8,7 +8,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { openDb, applySchema } from '../../src/db';
 import { runMigrations } from '../../src/migrations';
-import { answer, ADAPTERS } from '../../src/integrations/answer';
+import { answer, ADAPTERS, interleave } from '../../src/integrations/answer';
 import { setConfig } from '../../src/integrations/store';
 import type { FetchJson } from '../../src/integrations/types';
 
@@ -44,6 +44,9 @@ const OK_FETCH: FetchJson = canned((url) => {
     }
     return { data: { service: 'asciiarena' } };
   }
+  if (url.includes('archive.org')) {
+    return { response: { numFound: 1, docs: [{ identifier: 'ia-hit', title: 'IA Hit', creator: 'someone' }] } };
+  }
   throw new Error(`unexpected ${url}`);
 });
 
@@ -51,9 +54,15 @@ describe('/answer fan-out', () => {
   it('merges attributed hits from every enabled source', async () => {
     const { dir, db } = tmpDb();
     const out = await answer(db, OK_FETCH, 'logic');
-    expect(out.results.length).toBeGreaterThanOrEqual(3);
-    expect(new Set(out.results.map((r) => r.source))).toEqual(new Set(['Pouët', 'Demozoo', 'AsciiArena']));
-    expect(out.sources.filter((s) => s.ok)).toHaveLength(ADAPTERS.length);
+    expect(out.results.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(out.results.map((r) => r.source))).toEqual(
+      new Set(['Pouët', 'Demozoo', 'AsciiArena', 'Internet Archive']));
+    // Keyed adapters stay dark without secrets: present in neither
+    // results nor sources.
+    expect(out.sources.find((s) => s.id === 'modarchive')).toBeUndefined();
+    expect(out.sources.find((s) => s.id === 'tmdb')).toBeUndefined();
+    expect(out.sources.find((s) => s.id === 'omdb')).toBeUndefined();
+    expect(out.sources.filter((s) => s.ok)).toHaveLength(4);
     expect(out.stale).toBe(false);
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -124,5 +133,30 @@ describe('/answer fan-out', () => {
     expect(out.sources.find((s) => s.id === 'demozoo')?.detail).toBe('no random');
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('interleave', () => {
+  const item = (source: string, n: number) => ({ source, title: `${source}${n}`, detail: '', url: '' });
+
+  it('round-robins so no contributing source is sliced off', () => {
+    const out = interleave([
+      [item('A', 1), item('A', 2), item('A', 3), item('A', 4), item('A', 5)],
+      [item('B', 1), item('B', 2), item('B', 3), item('B', 4), item('B', 5)],
+      [item('C', 1)],
+    ], 12);
+    // Regression (2026-09-10): a global slice(0,12) dropped Internet
+    // Archive entirely behind Pouet+Demozoo+AsciiArena.
+    expect(new Set(out.map((r) => r.source))).toEqual(new Set(['A', 'B', 'C']));
+    expect(out).toHaveLength(11);
+    expect(out[0]).toEqual(item('A', 1));
+    expect(out[1]).toEqual(item('B', 1));
+    expect(out[2]).toEqual(item('C', 1));
+    expect(out[3]).toEqual(item('A', 2));
+  });
+
+  it('caps at the max', () => {
+    const out = interleave([[item('A', 1), item('A', 2)], [item('B', 1), item('B', 2)]], 3);
+    expect(out).toHaveLength(3);
   });
 });

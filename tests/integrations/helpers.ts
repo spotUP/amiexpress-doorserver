@@ -33,4 +33,5 @@ export const ANSWER_FIXTURES: Record<string, string> = {
   'productions/1/': 'demozoo-prod-1.json',
   '/api/v1/search': 'asciiarena-search.json',
   '/api/v1/status': 'asciiarena-status.json',
+  'advancedsearch': 'ia-search.json',
 };

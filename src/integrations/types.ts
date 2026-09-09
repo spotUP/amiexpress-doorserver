@@ -7,6 +7,9 @@
  * run on recorded fixtures and `test:ci` makes no live HTTP calls.
  */
 export type FetchJson = (url: string) => Promise<unknown>;
+export type FetchText = (url: string) => Promise<string>;
+/** HEAD status code for link checks. */
+export type HeadStatus = (url: string) => Promise<number>;
 
 /** One chat-ready hit. Plain text, Latin-1-safe, attributed — the BBS
  *  operator chat renders these verbatim, so no HTML, no ANSI, no bulk. */
@@ -19,6 +22,10 @@ export interface AnswerItem {
 
 export interface AdapterContext {
   fetchJson: FetchJson;
+  /** Raw text for non-JSON sources (ModArchive XML, feeds). */
+  fetchText?: FetchText;
+  /** HEAD status for link checks. Defaults to a live HEAD in answer(). */
+  head?: HeadStatus;
   /** Server-side secret lookup (keyed sources only). Never serialized. */
   getSecret: (keyName: string) => string | null;
   settings: Record<string, unknown>;

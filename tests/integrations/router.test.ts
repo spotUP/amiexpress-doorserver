@@ -24,7 +24,8 @@ function tmpApp() {
   setup.close();
   const app = express();
   app.use('/api/integrations/v1', createIntegrationsRouter(
-    { dbPath } as never, { fetchJson: fixtureFetcher(ANSWER_FIXTURES) }));
+    { dbPath } as never,
+    { fetchJson: fixtureFetcher(ANSWER_FIXTURES), head: async () => 200 }));
   return { dir, app };
 }
 
@@ -34,10 +35,10 @@ describe('integrations router', () => {
     const res = await request(app).get('/api/integrations/v1/answer?q=logic');
     expect(res.status).toBe(200);
     expect(res.body.query).toBe('logic');
-    expect(res.body.results.length).toBeGreaterThanOrEqual(3);
+    expect(res.body.results.length).toBeGreaterThanOrEqual(4);
     expect(new Set(res.body.results.map((r: { source: string }) => r.source)))
-      .toEqual(new Set(['Pouët', 'Demozoo', 'AsciiArena']));
-    expect(res.body.sources.filter((s: { ok: boolean }) => s.ok)).toHaveLength(3);
+      .toEqual(new Set(['Pouët', 'Demozoo', 'AsciiArena', 'Internet Archive']));
+    expect(res.body.sources.filter((s: { ok: boolean }) => s.ok).length).toBeGreaterThanOrEqual(4);
     expect(res.body.stale).toBe(false);
     fs.rmSync(dir, { recursive: true, force: true });
   });
@@ -62,8 +63,18 @@ describe('integrations router', () => {
     const { dir, app } = tmpApp();
     const res = await request(app).get('/api/integrations/v1/status');
     expect(res.status).toBe(200);
-    expect(res.body.sources).toHaveLength(3);
-    expect(res.body.sources.every((s: { ok: boolean }) => s.ok)).toBe(true);
+    // 7 adapters + scene.org link checks.
+    expect(res.body.sources).toHaveLength(8);
+    // Keyless sources are healthy on fixtures; keyed ones report exactly
+    // why they are dark (no secret stored) instead of pretending.
+    for (const s of res.body.sources as Array<{ id: string; ok: boolean; needsKey: boolean; detail?: string }>) {
+      if (s.needsKey) {
+        expect(s.ok).toBe(false);
+        expect(s.detail).toMatch(/no api_key stored/);
+      } else {
+        expect(s.ok).toBe(true);
+      }
+    }
     expect(res.body.sources[0]).toEqual(expect.objectContaining({
       id: expect.any(String), name: expect.any(String),
       needsKey: expect.any(Boolean), latencyMs: expect.any(Number),
