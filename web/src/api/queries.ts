@@ -667,3 +667,139 @@ export function useVote(archiveName: string) {
     },
   });
 }
+
+export interface IntegrationSource {
+  id: string;
+  name: string;
+  needsKey: boolean;
+  builtin: boolean;
+  enabled: boolean;
+  settings: Record<string, unknown>;
+  secretNames: string[];
+  errors?: string[];
+}
+
+export interface IntegrationHealth {
+  id: string;
+  name: string;
+  needsKey: boolean;
+  ok: boolean;
+  latencyMs: number;
+  detail?: string;
+}
+
+const integrationKeys = {
+  all: ['integrations'] as const,
+  health: ['integrations', 'health'] as const,
+  demozooImport: ['integrations', 'demozoo-import'] as const,
+  releases: ['integrations', 'releases'] as const,
+};
+
+export function useIntegrations(enabled: boolean) {
+  return useQuery({
+    queryKey: integrationKeys.all,
+    queryFn: () => api.get<{ sources: IntegrationSource[] }>('/admin/integrations'),
+    enabled,
+  });
+}
+
+export function useIntegrationHealth(enabled: boolean) {
+  return useQuery({
+    queryKey: integrationKeys.health,
+    queryFn: async () => {
+      const res = await fetch('/api/integrations/v1/status');
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      return (await res.json()) as { sources: IntegrationHealth[] };
+    },
+    enabled,
+  });
+}
+
+function invalidateIntegrations(client: ReturnType<typeof useQueryClient>) {
+  void client.invalidateQueries({ queryKey: integrationKeys.all });
+  void client.invalidateQueries({ queryKey: integrationKeys.health });
+}
+
+export function useIntegrationToggle() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      api.patch(`/admin/integrations/${encodeURIComponent(id)}`, { enabled }),
+    onSuccess: () => invalidateIntegrations(client),
+  });
+}
+
+export function useIntegrationSettings() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, settings }: { id: string; settings: Record<string, unknown> }) =>
+      api.patch(`/admin/integrations/${encodeURIComponent(id)}`, { settings }),
+    onSuccess: () => invalidateIntegrations(client),
+  });
+}
+
+export function useIntegrationCreate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.post('/admin/integrations', body),
+    onSuccess: () => invalidateIntegrations(client),
+  });
+}
+
+export function useIntegrationDelete() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/admin/integrations/${encodeURIComponent(id)}`),
+    onSuccess: () => invalidateIntegrations(client),
+  });
+}
+
+export function useSecretStore() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, secret, keyName }: { id: string; secret: string; keyName?: string }) =>
+      api.post(`/admin/integrations/${encodeURIComponent(id)}/secrets`, { secret, keyName }),
+    onSuccess: () => invalidateIntegrations(client),
+  });
+}
+
+export function useSecretDelete() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, keyName }: { id: string; keyName: string }) =>
+      api.del(`/admin/integrations/${encodeURIComponent(id)}/secrets/${encodeURIComponent(keyName)}`),
+    onSuccess: () => invalidateIntegrations(client),
+  });
+}
+
+export interface IntegrationTestResult {
+  source: string;
+  query: string;
+  mapped?: Array<{ source: string; title: string; detail: string; url: string }>;
+  raw?: unknown;
+  error?: string;
+}
+
+export function useIntegrationTest() {
+  return useMutation({
+    mutationFn: ({ id, q }: { id: string; q: string }) =>
+      api.post<IntegrationTestResult>(`/admin/integrations/${encodeURIComponent(id)}/test`, { q }),
+  });
+}
+
+export function useDemozooImportCard(enabled: boolean) {
+  return useQuery({
+    queryKey: integrationKeys.demozooImport,
+    queryFn: () => api.get<{ processed: number; lastImportAt: number | null; rowsEnriched: number; rerun: string }>('/admin/integrations/demozoo-import'),
+    enabled,
+  });
+}
+
+export function useReleasesCard(enabled: boolean) {
+  return useQuery({
+    queryKey: integrationKeys.releases,
+    queryFn: () => api.get<{ revision: string; rows: number; stats: unknown }>('/admin/integrations/releases'),
+    enabled,
+    retry: false,
+  });
+}

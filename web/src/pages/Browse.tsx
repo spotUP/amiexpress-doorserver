@@ -3,7 +3,7 @@
  * asked for on this path - the corpus is public, and reading it is the point.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eraser, Inbox, LogIn, LogOut, RefreshCw, Search, Shield, Sparkles, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
+import { Eraser, Inbox, LogIn, LogOut, RefreshCw, Search, Shield, Sparkles, Trash2, Upload, Wand2, BarChart3, PlugZap } from 'lucide-react';
 import {
   useBatchDelete,
   useBatchHide,
@@ -29,6 +29,7 @@ import { ReleasesTable } from '../components/ReleasesTable';
 import { DoorDetailDialog } from '../components/DoorDetail';
 import { LoginDialog } from '../components/LoginDialog';
 import { AuditPanel } from './Audit';
+import { IntegrationsPanel } from './Integrations';
 import { HiddenPanel } from './Hidden';
 import { SubmissionsPanel } from './Submissions';
 import { ReleaseGroupsPanel } from './ReleaseGroups';
@@ -76,6 +77,7 @@ export function Browse() {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
@@ -467,6 +469,9 @@ export function Browse() {
                 </Button>
                 <Button variant="ghost" onClick={() => setAuditOpen(true)} className="hidden sm:inline-flex">
                   <Shield size={14} /> Audit
+                </Button>
+                <Button variant="ghost" onClick={() => setIntegrationsOpen(true)} className="hidden sm:inline-flex">
+                  <PlugZap size={14} /> Integrations
                 </Button>
                 <Button variant="ghost" onClick={signOut} className="hidden sm:inline-flex">
                   <LogOut size={14} /> Sign out
@@ -926,6 +931,7 @@ export function Browse() {
       />
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} onSignedIn={setAdmin} />
       <AuditPanel open={auditOpen} onOpenChange={setAuditOpen} enabled={Boolean(admin)} />
+      <IntegrationsPanel open={integrationsOpen} onOpenChange={setIntegrationsOpen} enabled={Boolean(admin)} />
       <HiddenPanel open={hiddenOpen} onOpenChange={setHiddenOpen} enabled={Boolean(admin)} />
       <SubmissionsPanel open={queueOpen} onOpenChange={setQueueOpen} enabled={Boolean(admin)} />
       <ReleaseGroupsPanel open={groupsOpen} onOpenChange={setGroupsOpen} enabled={Boolean(admin)} />

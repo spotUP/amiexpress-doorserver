@@ -28,6 +28,7 @@ import { stripArchiveOnServer, resolveArchivePath } from './catalog';
 import { extractFile, readLhaContents, readZipContents, readLzxContents, looksLikeText } from './archive-reader';
 import { deleteMembers, findArchiverBinary } from './lha-member-delete';
 import { createJob, runJobSequentially, getJob, setJobResult, markJobFailed } from './batch-jobs';
+import { createIntegrationsAdminRouter } from './integrations/admin';
 import * as fs from 'fs';
 
 /**
@@ -1930,6 +1931,10 @@ export function createAdminRouter(cfg: ServerConfig): Router {
       db.close();
     }
   });
+
+  // External scene-API integrations (operator-chat sources): keys,
+  // toggles, health, cache. Own module; same auth, same audit log.
+  router.use('/integrations', createIntegrationsAdminRouter(cfg));
 
   return router;
 }
