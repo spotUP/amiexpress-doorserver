@@ -287,48 +287,26 @@ export async function parseLines(
         }
       }
     }
-    // Strip BBS column padding: the listing indents most content lines by a
-    // deep shared column (often 33 spaces), which shoves pictures right.
-    // Two shapes qualify, both preserving relative alignment:
-    // - uniform: every line within 4 columns of a deep min (min>=15);
-    // - bulk: one indent holds >=60% of lines and sits at 30+ (a few deeper
-    //   outliers like titles/signatures stay relative; shallower overhangs
-    //   floor to 0 rather than slicing into content).
+    // Strip BBS column padding: when the shallowest content line still sits
+    // at 30+, the whole block rode in on the listing's indent column, which
+    // shoves pictures right for no reason. Cut the minimum off every line;
+    // deeper outliers (titles, signatures) keep their relative offset and
+    // shallower overhangs floor to 0 rather than slicing into content.
     // Ragged shallow blocks keep their source shape, first-line pad included.
     {
-      const indents: number[] = [];
+      let min = Infinity;
       for (const l of kept) {
         if (!l.trim()) continue;
-        indents.push(l.length - l.trimStart().length);
+        min = Math.min(min, l.length - l.trimStart().length);
       }
-      let cut = 0;
-      if (indents.length) {
-        const min = Math.min(...indents);
-        const max = Math.max(...indents);
-        if (min >= 15 && max - min <= 4) {
-          cut = min;
-        } else {
-          const counts = new Map<number, number>();
-          for (const i of indents) counts.set(i, (counts.get(i) ?? 0) + 1);
-          let mode = min;
-          let modeN = 0;
-          for (const [i, n] of counts) {
-            if (n > modeN) {
-              mode = i;
-              modeN = n;
-            }
-          }
-          if (mode >= 30 && modeN / indents.length >= 0.6) cut = mode;
-        }
-      }
-      if (cut > 0) {
+      if (min !== Infinity && min >= 30) {
         for (let i = 0; i < kept.length; i++) {
           if (!kept[i].trim()) {
             kept[i] = '';
             continue;
           }
           const ind = kept[i].length - kept[i].trimStart().length;
-          kept[i] = ind >= cut ? kept[i].slice(cut) : kept[i].trimStart();
+          kept[i] = ind >= min ? kept[i].slice(min) : kept[i].trimStart();
         }
       }
     }

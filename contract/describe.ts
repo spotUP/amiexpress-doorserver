@@ -606,8 +606,10 @@ export function bbsRequirementFromDiz(diz: string | null): string {
 // ─── author ────────────────────────────────────────────────────────────
 
 const AUTHOR_RE = /\s*[-,]?\s*\b(?:coded|written|programmed|created|made|done)?\s*by\s+(.+)$/i;
-/** Trailing clauses that are not part of a handle: "for /X", "v1.0", "1996". */
-const AUTHOR_TAIL_RE = /\s+(?:for|fuer|fur)\b.*$|\s+v?\d+[.,]\d+.*$|\s+(?:19|20)\d{2}.*$/i;
+/** Trailing clauses that are not part of a handle: "for /X", "v1.0", "1996",
+ *  and "On 30/11/95" (a DD/MM/YY date after On gloms onto the author). */
+const AUTHOR_TAIL_RE =
+  /\s+(?:for|fuer|fur)\b.*$|\s+v?\d+[.,]\d+.*$|\s+(?:19|20)\d{2}.*$|\s+[Oo]n\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b.*$/i;
 const AUTHOR_JUNK_RE = /^[^A-Za-zÀ-ÿ0-9]*(?:\/?X[\\/])?\s*/i;
 
 export function splitAuthor(desc: string, catalogAuthor?: string | null): { text: string; author: string } {

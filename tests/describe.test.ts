@@ -250,6 +250,11 @@ describe('banners and credits', () => {
     expect(description).toContain('list all users');
   });
 
+  it('strips a DD/MM/YY date after On from the author', () => {
+    const { author } = read('TYPED UP BY iGGY ON 30/11/95', null, null, 'HF-HSL.DOC');
+    expect(author).toBe('Iggy');
+  });
+
   it('leaves no dangling "by" once a credit tag is gone', () => {
     const { description } = read(AMN10, '5D-AdiMenu', '5D-AdiMenu', '5D_AMN10.LHA');
     expect(description).not.toMatch(/\bby$/i);
