@@ -467,6 +467,28 @@ describe('falling back', () => {
     const long = 'Account Editor supports every field of the AmiExpress config file format';
     expect(read(long, null, null, 'ACC-V103.LHA').description.length).toBeLessThanOrEqual(250);
   });
+
+  it('de-leets elite spelling: Thiz FiNe d00R Sh0W (the real ns!-c101.zip)', () => {
+    const diz = 'THiZ FiNe d00R WiLL SH0W THe USeRS SeCURiTY LeVeL';
+    expect(read(diz, null, null, 'NS-C101.ZIP').description).toBe(
+      'This Fine Door Will Show The Users Security Level.'
+    );
+  });
+
+  it('strips isolated art pillars and splits dot-joined words (the real ns!-e063.zip)', () => {
+    const diz = 'Ü ß User-Setting Door v0.63\nfull.lightbar.driven ctl configuration-file';
+    const { description, version } = read(diz, null, null, 'NS-E063.ZIP');
+    expect(description).not.toMatch(/[ÜßÛ]/);
+    expect(description).toContain('User-Setting Door');
+    expect(description).toContain('full lightbar driven');
+    expect(version).toBe('0.63');
+  });
+
+  it('keeps version-like trailing digits and 5TH as is', () => {
+    expect(tidyCase('beta3')).toBe('beta3');
+    expect(tidyCase('5TH')).toBe('5TH');
+    expect(tidyCase('Bu1')).toBe('Bu1');
+  });
 });
 
 describe('elite-cased acronyms are canonicalised, not preserved', () => {

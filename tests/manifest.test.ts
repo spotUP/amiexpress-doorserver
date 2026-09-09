@@ -141,7 +141,7 @@ describe('renderListTxt', () => {
     // cell (src/describe.ts, CELL_SPLIT). Either way no field can invent a
     // column - asserted for every row by the field count below.
     const pipe2 = body.split('\r\n').find((l) => l.startsWith('PIPE2.LHA'));
-    expect(pipe2).toContain('with a pipe in its own DIZ');
+    expect(pipe2).toContain('With a pipe in its own DIZ.');
     const dataLines = body.split('\r\n').filter((l) => l.length > 0 && !l.startsWith('DOORREPO|'));
     for (const line of dataLines) {
       expect(line.split('|')).toHaveLength(10);

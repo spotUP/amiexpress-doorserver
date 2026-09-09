@@ -49,12 +49,12 @@
  * stale mirror is caught as a mismatch rather than as a silent divergence in
  * what a caller reads about a door.
  */
-export const DESCRIBE_CONTRACT_VERSION = '5';
+export const DESCRIBE_CONTRACT_VERSION = '6';
 
-/** Frame punctuation: decoration at either end of a cell. */
-const FRAME = " :-*()[]|_=+~<>.,'\"`^¦¬·°#!?/\\";
+/** Frame punctuation: decoration at either end of a cell. Isolated high-bit art like Ü/Û/ß/±²³ also counts as frame. */
+const FRAME = " :-*()[]|_=+~<>.,'\"`^¦¬·°#!?/\\ÜÛßÝÞ±²³";
 
-const ART_RE = /^[\s_\-=*#~/\\|:.,+()[\]<>'"`^¦°·;!?%$&@]*$/;
+const ART_RE = /^[\s_\-=*#~/\\|:.,+()[\]<>'"`^¦°·;!?%$&@ÜÛßÝÞ±²³]*$/;
 const BANNER_RE = /\b(presents?|brings?|proudly|releases?|bringing|presenting)\b/i;
 
 /** Credits, distribution notes and dates: never a description. */
@@ -734,7 +734,18 @@ const ALLOWED_PUNCT = new Set(" .,:;!?'\"()[]/\\-_+&%#@*".split(''));
  * triggers a case transition (upper↔lower) is treated as a separator.
  */
 function splitArtJoinedWords(s: string): string {
-  return s.replace(/(?<=[A-Za-zÀ-ÿ])[\u0080-\u00ff](?=[A-Za-zÀ-ÿ])/g, (m, _off, full) => {
+  // Isolated high-bit art pillars like "Ü", "ß", "Û", "±²" that are not part of a word:
+  // "Ü ß User-Setting Door" -> "  User-Setting Door", "full.lightbar.driven Û Û ctl" -> "full lightbar driven   ctl"
+  // Keep legitimate German "Grüße" where ü/ß are inside a word, not isolated.
+  let out = s.replace(/\b[ÜÛßÝÞ±²³]{1,3}\b/g, ' ');
+  // Dots and ",." used as word separators in DIZ art: "full.lightbar.driven" -> "full lightbar driven",
+  // "driven,.x/y" -> "driven, x/y", "color.configuration-file" already handled, but ",." -> ", "
+  out = out.replace(/,\s*\.\s*/g, ', ');
+  out = out.replace(/\.\s*,\s*/g, ', ');
+  // Dots used as word separators in DIZ art: "full.lightbar.driven" -> "full lightbar driven"
+  // Keep version dots like "v0.63" (digit dot digit) and "v1.01".
+  out = out.replace(/(?<=[A-Za-zÀ-ÿ])\.(?=[A-Za-zÀ-ÿ])/g, ' ');
+  return out.replace(/(?<=[A-Za-zÀ-ÿ])[\u0080-\u00ff](?=[A-Za-zÀ-ÿ])/g, (m, _off, full) => {
     const before = full[_off - 1] ?? '';
     const after = full[_off + m.length] ?? '';
     const beforeIsUpper = before === before.toUpperCase() && before !== before.toLowerCase();
@@ -782,6 +793,7 @@ export function toPlain(s: string): string {
 
 /** Acronyms that must survive case normalisation. */
 const ACRONYMS = new Set([
+  '5TH', 'PWS',
   // Amiga door/BBS
   'XIM', 'AIM', 'SIM', 'TIM', 'IIM', 'FIM', 'BBS', 'QWK', 'LZX', 'LHA', 'DMS', 'CRC', 'ZIP',
   'ANSI', 'ASCII', 'MSG', 'OLM', 'ID', 'FAME', 'DIZ', 'NFO', 'DOC', 'TXT', 'CFG',
@@ -812,13 +824,36 @@ const ACRONYMS = new Set([
   'ALSA', 'JCL', 'TCL', 'PERL', 'AWK', 'SED',
   'NMI', 'CLI', 'GUI', 'TUI', 'CUI', 'NUI',
 ]);
-const MESSY_RE = /[a-zà-ÿ].*[A-ZÀ-Þ]/;
+const MESSY_RE = /[a-zà-ÿ][A-ZÀ-Þ]|[A-ZÀ-Þ].*[a-zà-ÿ]|[a-z0-9].*[A-Z]|[A-Z].*[a-z0-9]/;
 /**
- * CamelCase / PascalCase: capital + lowercase, then one or more internal
- * capital+lowercase subwords. These are intentional product names like
- * SmokeySmallStats, SplitChat, FileThing - NOT messy caps, do not rewrite.
+ * CamelCase / PascalCase: capital + lowercase (at least 3 letters), then one or more
+ * internal capital+lowercase subwords of at least 3 letters. These are intentional
+ * product names like SmokeySmallStats, SplitChat, FileThing - NOT messy caps like
+ * "FiNe" (2+2) or "Thiz" which are elite, not CamelCase. Requiring 3+ letters per
+ * hump keeps "FiNe" from being preserved as-is.
  */
-const CAMEL_RE = /^[A-ZÀ-Þ](?:[a-zà-ÿ]+|[0-9]+)(?:[A-ZÀ-Þ][a-zà-ÿ]+)+$/;
+const CAMEL_RE = /^[A-ZÀ-Þ][a-zà-ÿ]{2,}(?:[A-ZÀ-Þ][a-zà-ÿ]{2,})+$/;
+
+const LEET_MAP: Record<string, string> = { '0': 'o', '1': 'l', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b' };
+function deLeet(word: string): string {
+  // Handle "Thiz" -> "This" (z for s) – common elite for "This", "is", "as", etc. where z replaces s at end
+  if (/^Thiz$/i.test(word)) return word[0] === 'T' ? 'This' : word.replace(/z$/i, 's');
+  // Don't translate trailing version-like digits: "beta3", "Bu1", "C120" is a version, not leet
+  const trailingDigits = word.match(/[0-9]+$/);
+  const hasTrailingVersionDigits = trailingDigits && word.replace(/[0-9]+$/, '').length >= 1;
+  if (hasTrailingVersionDigits && trailingDigits[0].length <= 4 && !/[A-Za-z].*[0-9].*[A-Za-z]/.test(word)) {
+    if (/^[A-Za-z]+[0-9]+$/i.test(word)) return word;
+  }
+  if (!/[A-Za-z]/.test(word) || !/[0-9]/.test(word)) {
+    if (/^[A-Za-z]+z$/i.test(word) && word.length <= 5) {
+      const lower = word.toLowerCase();
+      if (['thiz', 'l0z', 'coz', 'cuz', 'plz'].includes(lower)) return lower === 'thiz' ? 'This' : word.slice(0, -1) + (word.endsWith('z') ? 's' : 'S');
+    }
+    return word;
+  }
+  if (/^v?\d+(\.\d+)?$/i.test(word)) return word;
+  return word.replace(/[0134578]/g, (c) => LEET_MAP[c] ?? c);
+}
 
 function capitalise(w: string): string {
   if (!w) return w;
@@ -827,9 +862,21 @@ function capitalise(w: string): string {
 }
 
 function tidyWord(w: string, handles: boolean): string {
-  const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  // Keep "5TH" (5th) and "PWs" (passwords) canonical – don't de-leet or re-case them
+  if (/^5TH$/i.test(w)) return '5TH';
+  if (/^PWS$/i.test(w)) return 'PWs';
+  // De-leet common elite digits inside words like d00R -> door, Sh0W -> Show, but keep version-like tokens
+  const deLeeted = deLeet(w);
+  const effective = deLeeted !== w && /[A-Za-z]/.test(deLeeted) ? deLeeted : w;
+  const core = effective.replace(/[^A-Za-zÀ-ÿ]/g, '');
   if (!core) return w;
   if (ACRONYMS.has(core.toUpperCase())) {
+    // If we de-leeted, return the de-leeted and cased form, not the original digits
+    if (effective !== w) {
+      const cap = core === core.toUpperCase() || core.length < 2 ? effective : effective.replace(/[A-Za-zÀ-ÿ]/g, (c) => c.toUpperCase());
+      // For de-leeted words, just capitalise the de-leeted form
+      if (core !== core.toUpperCase() && effective !== w) return capitalise(effective);
+    }
     // An acronym survives normalisation in its canonical form: "BBS" stays
     // "BBS", and scene-cased "bBS" is rewritten "BBS" - never left half-shouted.
     // Single letters are exempt: lowercase "x" in "v4.x" is a placeholder, not
@@ -860,11 +907,21 @@ function tidyWord(w: string, handles: boolean): string {
   // caps, so shouted words used to hide in mixed-case strings. Single
   // letters are exempt ("4 U"); known acronyms never reach here.
   if (core.length >= 2 && core === core.toUpperCase() && core !== core.toLowerCase()) {
+    return capitalise(effective);
+  }
+  if (MESSY_RE.test(effective) || (effective[0] === effective[0].toLowerCase() && /[A-ZÀ-Þ]/.test(effective))) {
+    if (CAMEL_RE.test(effective)) return w; // SmokeySmallStats, SplitChat - keep as-is (on effective, not w, so de-leeted still checked)
+    // For de-leeted words like d00R->dooR, capitalise the de-leeted form to get Door, not D00r
+    if (effective !== w) return capitalise(effective);
     return capitalise(w);
   }
-  if (MESSY_RE.test(w) || (w[0] === w[0].toLowerCase() && /[A-ZÀ-Þ]/.test(w))) {
-    if (CAMEL_RE.test(w)) return w; // SmokeySmallStats, SplitChat - keep as-is
-    return capitalise(w);
+  // If we de-leeted (d00R -> door) but it wasn't considered messy, still return the de-leeted lowercased form
+  // e.g. "d00R" de-leeted to "door" should become "door" lower, then later sentence-cased to "Door"
+  if (effective !== w) {
+    // Preserve the de-leeted letters but keep original casing for now; the outer tidyCase will handle sentence case
+    // For "d00R" -> "dooR" -> we want "door" lower, which capitalise will later make "Door" via sentence case
+    // So return effective lowercased
+    return effective.toLowerCase();
   }
   return w;
 }
@@ -872,12 +929,13 @@ function tidyWord(w: string, handles: boolean): string {
 /** Normalise elite/messy casing and de-shout ALL-CAPS prose. */
 export function tidyCase(text: string, handles = false): string {
   if (!text) return text;
-  let out = text.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => tidyWord(w, handles));
+  // Include digits inside words so leet like "d00R" and "Sh0W" is treated as one token, not "d" + "R"
+  let out = text.replace(/[A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9']*/g, (w) => tidyWord(w, handles));
   const letters = out.match(/[A-Za-zÀ-ÿ]/g) ?? [];
   const upper = letters.filter((c) => c === c.toUpperCase() && c !== c.toLowerCase()).length;
   if (letters.length && upper / letters.length > 0.7) {
-    out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) =>
-      ACRONYMS.has(w.replace(/[^A-Za-zÀ-ÿ]/g, '').toUpperCase()) ? w : capitalise(w)
+    out = out.replace(/[A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9']*/g, (w) =>
+      ACRONYMS.has(w.replace(/[^A-Za-zÀ-ÿ0-9]/g, '').toUpperCase()) ? w : capitalise(w)
     );
   }
   return out;
@@ -938,15 +996,16 @@ export function fixCasing(text: string): string {
   }
 
   // Fix individual words: canonicalise acronyms, lowercase everything else
-  out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => {
-    const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  // Include digits so leet "d00R" is one token, not "d" + "R"
+  out = out.replace(/[A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9']*/g, (w) => {
+    const core = w.replace(/[^A-Za-zÀ-ÿ0-9]/g, '');
     if (!core) return w;
     if (core.length < 2) return w;
-    if (ACRONYMS.has(core.toUpperCase())) {
+    if (ACRONYMS.has(core.toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I'))) {
       return core === core.toUpperCase() ? w : core.toUpperCase();
     }
     for (const acr of ACRONYMS) {
-      if (acr.length >= 3 && core.toUpperCase().endsWith(acr) && core.length > acr.length) return w;
+      if (acr.length >= 3 && core.toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I').endsWith(acr) && core.length > acr.length) return w;
     }
     return w.toLowerCase();
   });
@@ -979,11 +1038,11 @@ export function fixTitleCasing(text: string): string {
   let out = fixCasing(text);
 
   // Apply title case: capitalise every word, then lowercase the small words
-  out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => {
-    const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  out = out.replace(/[A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9']*/g, (w) => {
+    const core = w.replace(/[^A-Za-zÀ-ÿ0-9]/g, '');
     if (!core) return w;
     // Always capitalise acronyms
-    if (ACRONYMS.has(core.toUpperCase())) {
+    if (ACRONYMS.has(core.toUpperCase().replace(/0/g, 'O'))) {
       return core.toUpperCase();
     }
     return capitalise(w);
@@ -991,8 +1050,8 @@ export function fixTitleCasing(text: string): string {
 
   // Now lowercase the small words, but not the first word
   let first = true;
-  out = out.replace(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ']*/g, (w) => {
-    const core = w.replace(/[^A-Za-zÀ-ÿ]/g, '').toLowerCase();
+  out = out.replace(/[A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9']*/g, (w) => {
+    const core = w.replace(/[^A-Za-zÀ-ÿ0-9]/g, '').toLowerCase();
     if (first) { first = false; return w; }
     if (TITLE_CASE_LOWERCASE.has(core)) {
       return core;
@@ -1106,10 +1165,16 @@ export function ensureEndsWithPunctuation(s: string): string {
   const t = s.trim();
   if (!t) return t;
   if (/[.!?]$/.test(t)) return t;
-  // Also handle trailing quote/paren: "Hello world" -> "Hello world."
-  // But don't add if it ends with ellipsis already
   if (/\.\.\.$/.test(t)) return t;
   return t + '.';
+}
+
+export function ensureCapitalized(s: string): string {
+  if (!s) return s;
+  const t = s.trim();
+  if (!t) return t;
+  // Capitalize first letter, keep rest as is (already tidyCased)
+  return t[0].toUpperCase() + t.slice(1);
 }
 
 /** Strip a leading prog name that duplicated the separate `name` column.
@@ -1480,7 +1545,8 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
   // Strip door-type tokens like PPe/PPE that are metadata, not description.
   // e.g. "Light Bar Enhancer PPe" -> "Light Bar Enhancer"
   if (description) description = stripDoorTypeTokens(description);
-  // Ensure description ends with sentence punctuation.
+  // Ensure description starts with capital and ends with punctuation.
+  if (description) description = ensureCapitalized(description);
   if (description) description = ensureEndsWithPunctuation(description);
   if (!description) {
     // Everything the DIZ offered was a credit (KDZ!LUDB.LHA's only

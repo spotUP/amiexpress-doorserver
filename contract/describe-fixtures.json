@@ -1,5 +1,5 @@
 {
-  "contractVersion": "5",
+  "contractVersion": "6",
   "note": "GENERATED from tests/describe.test.ts. Both repos run these cases.",
   "cases": [
     {
@@ -744,6 +744,54 @@
         "version": "1.03",
         "author": "",
         "requiresBbs": "AmiExpress"
+      }
+    },
+    {
+      "input": {
+        "dizText": "THiZ FiNe d00R WiLL SH0W THe USeRS SeCURiTY LeVeL",
+        "name": null,
+        "archiveName": "NS-C101.ZIP",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "This Fine Door Will Show The Users Security Level.",
+        "version": "1.01",
+        "author": "",
+        "requiresBbs": ""
+      }
+    },
+    {
+      "input": {
+        "dizText": "Ü ß User-Setting Door v0.63\nfull.lightbar.driven ctl configuration-file",
+        "name": null,
+        "archiveName": "NS-E063.ZIP",
+        "binaryName": null,
+        "catalogVersion": null,
+        "catalogAuthor": null
+      },
+      "groupTags": [
+        "5D",
+        "CRZ",
+        "D",
+        "DLT",
+        "KDZ",
+        "MST"
+      ],
+      "expected": {
+        "description": "User-Setting Door full lightbar driven ctl configuration-file.",
+        "version": "0.63",
+        "author": "",
+        "requiresBbs": ""
       }
     }
   ]
