@@ -207,10 +207,12 @@ export function dropMetaBrackets(s: string): string {
 export function finalise(s: string, cap = 60): string {
   let out = stripFrameKeepingPairs(dropMetaBrackets(collapse(s ?? '')));
   if (out.length > cap) {
-    // Prefer to cut at a sentence boundary inside the window, then at a word boundary.
+    // Prefer to cut at a sentence boundary only when it keeps most of the cap.
+    // Cutting at the first sentence (e.g. 65/120) would discard a whole wrapped
+    // paragraph that follows; word-boundary keeps more content for multiline DIZs.
     const cut = out.slice(0, cap);
     const sentenceEnd = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-    if (sentenceEnd > cap * 0.4) {
+    if (sentenceEnd > cap * 0.65) {
       out = cut.slice(0, sentenceEnd + 1);
     } else {
       out = cut.includes(' ') ? cut.slice(0, cut.lastIndexOf(' ')) : cut;
@@ -382,23 +384,34 @@ export function describeBlock(diz: string | null, cap = 70, prog?: string | null
   }
 
   let parts = chosen.map((x) => x.text);
+  // DEBUG
+  // console.log("chosen block", chosen.map(x=>x.text), "cap", cap);
   parts[0] = parts[0].replace(/^(presents?|brings?|proudly|releases?|presenting|bringing)\b[\s:.-]*/i, '');
   parts[0] = stripFrameBoth(parts[0].replace(/^\d{1,2}[.)]\s+/, '')).trim();
   // DIZ feature lists are bulleted ("o Totally NEW Lay-Out"); the bullet is
   // decoration, and joining two bulleted lines must not read "Lay-Out o
   // Manages up to 256 Cnfs".
   parts = parts.map((p) => finalise(p.replace(/^[o*·+]\s+/, ''), cap)).filter((p) => p.length > 0);
+  // console.log("parts after finalise", parts);
   if (!parts.length) return '';
 
   // A first line that already stands on its own IS the description - only
   // keep appending while it is too short to mean anything by itself.
-  // Improved: allow a second line when the first ends with a comma/hyphen
-  // (a wrapped sentence like "LHA tester and adder for /X,") even if it is
-  // already >=30 chars, so a 5-line paragraph is not truncated to one line.
+  // Improved: allow wrapping when the next line is clearly a continuation:
+  // next starts lowercase (wrapped mid-sentence, e.g. KCL's "all the other
+  // utils..."), or the *original* DIZ line ended with comma/hyphen (so the
+  // cleaned text lost it, e.g. "for /X," -> "for /X"), even if already >=30.
+  const chosenIdx = blocks.indexOf(chosen);
+  const chosenStart = starts[chosenIdx] ?? 0;
   let text = parts[0];
-  for (const next of parts.slice(1)) {
-    if (text.length >= 30 && !/[,\-]$/.test(text.trim())) break;
-    // Hyphen continuation: "Lay-" + "Out" -> "Lay-Out"
+  for (let idx = 1; idx < parts.length; idx++) {
+    const next = parts[idx];
+    const rawPrevLine = (lines[chosenStart + idx - 1] ?? '').trim();
+    const rawPrevEndsCommaHyphen = /[,\-]\s*$/.test(rawPrevLine);
+    const nextStartsLower = /^[a-zà-ÿ]/.test(next.trim());
+    const textEndsCommaHyphen = /[,\-]$/.test(text.trim());
+    const shouldJoin = text.length < 30 || textEndsCommaHyphen || rawPrevEndsCommaHyphen || nextStartsLower;
+    if (!shouldJoin) break;
     if (text.endsWith('-') && /^[A-Za-zÀ-ÿ]/.test(next)) {
       text = text + next;
     } else {

@@ -212,7 +212,7 @@
         "MST"
       ],
       "expected": {
-        "description": "User Command to list all users of the BBS",
+        "description": "User Command to list all users of the BBS many extra features like Search Name Part or",
         "version": "1.10",
         "author": "",
         "requiresBbs": ""
@@ -236,7 +236,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Adi Menu Handles Textfiles like Commands, so use",
+        "description": "Adi Menu Handles Textfiles like Commands, so use it as Doormenu, Filemenu or whatever",
         "version": "1.0",
         "author": "THE Addict/5D",
         "requiresBbs": ""
