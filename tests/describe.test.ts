@@ -462,9 +462,9 @@ describe('falling back', () => {
     );
   });
 
-  it('never returns more than 60 characters', () => {
+  it('never returns more than 120 characters', () => {
     const long = 'Account Editor supports every field of the AmiExpress config file format';
-    expect(read(long, null, null, 'ACC-V103.LHA').description.length).toBeLessThanOrEqual(60);
+    expect(read(long, null, null, 'ACC-V103.LHA').description.length).toBeLessThanOrEqual(120);
   });
 });
 

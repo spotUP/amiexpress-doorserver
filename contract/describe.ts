@@ -49,7 +49,7 @@
  * stale mirror is caught as a mismatch rather than as a silent divergence in
  * what a caller reads about a door.
  */
-export const DESCRIBE_CONTRACT_VERSION = '1';
+export const DESCRIBE_CONTRACT_VERSION = '2';
 
 /** Frame punctuation: decoration at either end of a cell. */
 const FRAME = " :-*()[]|_=+~<>.,'\"`^¦¬·°#!?/\\";
@@ -207,8 +207,14 @@ export function dropMetaBrackets(s: string): string {
 export function finalise(s: string, cap = 60): string {
   let out = stripFrameKeepingPairs(dropMetaBrackets(collapse(s ?? '')));
   if (out.length > cap) {
+    // Prefer to cut at a sentence boundary inside the window, then at a word boundary.
     const cut = out.slice(0, cap);
-    out = cut.includes(' ') ? cut.slice(0, cut.lastIndexOf(' ')) : cut;
+    const sentenceEnd = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+    if (sentenceEnd > cap * 0.4) {
+      out = cut.slice(0, sentenceEnd + 1);
+    } else {
+      out = cut.includes(' ') ? cut.slice(0, cut.lastIndexOf(' ')) : cut;
+    }
   }
   // A bracket opened and never closed is either a truncation scar or a
   // credit tag whose closer the frame-strip already ate ("[-5th Dynasty-]"
@@ -236,25 +242,43 @@ interface Scored {
   text: string;
 }
 
+function plainForScoring(s: string): string {
+  return toPlain(s);
+}
+
 function score(line: string): Scored {
   const c = clean(line);
   if (!c || ART_RE.test(c)) return { score: -99, text: c };
-  if (!WORD_RE.test(c)) return { score: -99, text: c };
+  const p = plainForScoring(c);
+  if (!p || ART_RE.test(p)) return { score: -99, text: c };
+  if (!WORD_RE.test(p)) return { score: -99, text: c };
   if (highBitShare(c) > 0.3) return { score: -99, text: c };
   if (alnumShare(c) < 0.5) return { score: -99, text: c };
+  // Frame-density early reject: a line that is >40% frame punctuation + high-bit art
+  // with very few real words is a border, even if one word slipped through.
+  const frameChars = (p.match(/[_\-=*#~\/\\|:.,+()[\]<>'"`^¦°·;!?%$&@]/g) ?? []).length;
+  if (p.length > 10 && frameChars / p.length > 0.4) {
+    const w = p.match(/[A-Za-zÀ-ÿ]{3,}/g) ?? [];
+    if (w.length <= 1) return { score: -99, text: c };
+  }
   if (c.length < 6) return { score: -50, text: c };
   let s = 0;
-  if (JUNK_RE.test(c)) s -= 40;
+  // JUNK/COPYRIGHT/COMPAT are tested on the cleaned form `c` so "©" and "courier"
+  // are not missed after plain conversion. Courier as a BBS name is not junk in
+  // the sense of a distribution note — penalise it less so a wrapped sentence
+  // like "S!X and Courier clones. Since I was..." does not split the paragraph.
+  const isCourierOnly = /\bcourier\b/i.test(c) && !/passed\s+thr|released?\s+(on|at|by)|\bthanx|greets?\b|\bdate\b|\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b|^\s*(by|coded\s+by|written\s+by)\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*,?\s*\d/i.test(c);
+  if (isCourierOnly) s -= 8;
+  else if (JUNK_RE.test(c)) s -= 40;
   if (COPYRIGHT_RE.test(c)) s -= 40;
-  if (COMPAT_RE.test(c)) s -= 20;
+  if (COMPAT_RE.test(c)) s -= 8;
   if (HANDLE_RE.test(c)) s -= 40;
-  if (VERSIONISH_RE.test(c)) s += 12;
-  if (DOORISH_RE.test(c)) s += 8;
-  const words = c.match(/[A-Za-zÀ-ÿ]{3,}/g) ?? [];
+  if (VERSIONISH_RE.test(p)) s += 12;
+  if (DOORISH_RE.test(p)) s += 8;
+  const words = p.match(/[A-Za-zÀ-ÿ]{3,}/g) ?? [];
   s += Math.min(words.length, 6) * 3;
-  if (c.length > 55) s -= 4;
-  // "Added Features:" heads a list, it does not describe the door. The colon
-  // is tested on the RAW line because clean() strips it off.
+  if (p.length > 55) s -= 4;
+  if (p.split(/\s+/).length <= 2 && p.length < 20) s -= 2;
   if (/:[\s|¦:.]*$/.test(line)) s -= 6;
   return { score: s, text: c };
 }
@@ -327,11 +351,10 @@ export function describeBlock(diz: string | null, cap = 70, prog?: string | null
   const starts: number[] = [];
   lines.forEach((line, i) => {
     const s = bestCell(line);
-    const prose = s.score > 0 && !JUNK_RE.test(s.text) && !HANDLE_RE.test(s.text);
+    const p = plainForScoring(s.text);
+    const isHandle = HANDLE_RE.test(p.trim());
+    const prose = s.score > 0 && !isHandle;
     if (prose) {
-      // The block's own line number, not lines.indexOf(line): two identical
-      // lines in one DIZ would otherwise score every later block as if it
-      // started at the first copy.
       if (!cur.length) starts.push(i);
       cur.push(s);
     } else if (cur.length) {
@@ -340,7 +363,6 @@ export function describeBlock(diz: string | null, cap = 70, prog?: string | null
     }
   });
   if (cur.length) blocks.push(cur);
-  // No paragraph qualified - fall back to the best single line.
   if (!blocks.length) return describeLine(diz);
 
   const blockScore = (b: Scored[], firstLine: number): number =>
@@ -370,10 +392,19 @@ export function describeBlock(diz: string | null, cap = 70, prog?: string | null
 
   // A first line that already stands on its own IS the description - only
   // keep appending while it is too short to mean anything by itself.
+  // Improved: allow a second line when the first ends with a comma/hyphen
+  // (a wrapped sentence like "LHA tester and adder for /X,") even if it is
+  // already >=30 chars, so a 5-line paragraph is not truncated to one line.
   let text = parts[0];
   for (const next of parts.slice(1)) {
-    if (text.length >= 30) break;
-    text = `${text} ${next}`;
+    if (text.length >= 30 && !/[,\-]$/.test(text.trim())) break;
+    // Hyphen continuation: "Lay-" + "Out" -> "Lay-Out"
+    if (text.endsWith('-') && /^[A-Za-zÀ-ÿ]/.test(next)) {
+      text = text + next;
+    } else {
+      text = `${text} ${next}`;
+    }
+    if (text.length >= cap) break;
   }
   return finalise(text.replace(/\s+[o*·]\s+/g, ' '), cap);
 }
@@ -642,10 +673,35 @@ const ALLOWED_PUNCT = new Set(" .,:;!?'\"()[]/\\-_+&%#@*".split(''));
  * word); Latin-1 SYMBOLS go, and that includes everything below 0xC0 ('³',
  * 'µ', '·') - the range scene art draws its pillars and shades from.
  */
+/**
+ * Split art-joined words where a high-bit pillar sits between two letter runs.
+ * e.g. "LightúBar" -> "Light Bar" but "Grüße" stays. Heuristic: the join is art
+ * when the high-bit char is between an upper+lower boundary or between two
+ * distinct capitalised words; legitimate German ü/ä/ö sits inside a single
+ * lowercase-run word. We normalise the narrow case that leaks into descriptions:
+ * a high-bit char flanked by a word-char on both sides where either side
+ * triggers a case transition (upper↔lower) is treated as a separator.
+ */
+function splitArtJoinedWords(s: string): string {
+  return s.replace(/(?<=[A-Za-zÀ-ÿ])[\u0080-\u00ff](?=[A-Za-zÀ-ÿ])/g, (m, _off, full) => {
+    const before = full[_off - 1] ?? '';
+    const after = full[_off + m.length] ?? '';
+    const beforeIsUpper = before === before.toUpperCase() && before !== before.toLowerCase();
+    const afterIsUpper = after === after.toUpperCase() && after !== after.toLowerCase();
+    // "LightúBar" : T (upper/lower mix) -> B upper => split
+    // "Grüße" : r lower -> ß (non-ASCII) lower => keep
+    if (beforeIsUpper !== afterIsUpper) return ' ';
+    // Between two capitals is always a separator in this corpus
+    if (beforeIsUpper && afterIsUpper) return ' ';
+    return m;
+  });
+}
+
 export function toPlain(s: string): string {
   if (!s) return s;
+  let src = splitArtJoinedWords(s);
   const out: string[] = [];
-  for (const ch of s.replace(ANSI_RE, '')) {
+  for (const ch of src.replace(ANSI_RE, '')) {
     const code = ch.charCodeAt(0);
     if ((code < 0x80 && /[A-Za-z0-9]/.test(ch)) || ALLOWED_PUNCT.has(ch)) {
       out.push(ch);
@@ -1159,18 +1215,67 @@ export interface DoorInput {
 }
 
 /**
+ * Scan the whole DIZ for a version, preferring one near the program name/title.
+ * Falls back to splitVersion on the description body when the DIZ scan finds nothing.
+ */
+export function versionFromDizWhole(diz: string | null, prog?: string | null): string {
+  if (!diz) return '';
+  const lines = diz.replace(/\r/g, '').split('\n').map((l) => l.replace(ANSI_RE, '').replace(/[\x00-\x1f\x7f]/g, ' '));
+  let best: { ver: string; score: number } | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Try version regexes on this line
+    for (const re of [VER_RE, BARE_VER_RE]) {
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(line)) !== null) {
+        if (BBS_CONTEXT_RE.test(line.slice(0, m.index))) continue;
+        const ver = normaliseVersion(m[1] ?? m[2]);
+        let sc = 10;
+        // Bonus if near program name or title on same line or adjacent
+        if (prog && line.toLowerCase().includes(prog.toLowerCase().slice(0, 4))) sc += 8;
+        if (i < 3) sc += 3; // title area
+        if (best === null || sc > best.score) best = { ver, score: sc };
+        break; // one per line is enough
+      }
+      if (best && best.score >= 18) break;
+    }
+  }
+  return best?.ver ?? '';
+}
+
+export function authorFromDizWhole(diz: string | null): string {
+  if (!diz) return '';
+  const lines = diz.replace(/\r/g, '').split('\n').map((l) => l.replace(ANSI_RE, '').replace(/[\x00-\x1f\x7f]/g, ' '));
+  for (const line of lines) {
+    const p = toPlain(clean(line));
+    const m = AUTHOR_RE.exec(p);
+    if (m) {
+      const raw = stripFrameBoth(m[1] ?? '').trim();
+      const cand = collapse(stripFrameBoth(raw.replace(AUTHOR_TAIL_RE, '')).trim());
+      if (cand && cand.length <= 40 && (cand.match(/[A-Za-z0-9]/g) ?? []).length >= 2) {
+        return cand;
+      }
+    }
+  }
+  return '';
+}
+
+/**
  * Read a door's four facts out of its DIZ, its catalog row and its archive
  * name, in that order of trust.
  */
 export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): DoorFacts {
   const prettyProg = prettifyProgram(toPlain(input.binaryName ?? ''), groupTags);
-  // binary_name is sometimes a stray token like "8" or "."; a program name
-  // must look like a name.
   const progOk =
     prettyProg.length >= 3 && (prettyProg.match(/[A-Za-zÀ-ÿ]/g) ?? []).length >= 3 && alnumShare(prettyProg) > 0.5;
   let prog = progOk ? prettyProg : '';
 
-  let body = describeBlock(input.dizText, 70, prog || null);
+  // Use a 120-char cap for the body reconstruction so wrapped paragraphs are not truncated.
+  // The manifest's list.txt slice (src/manifest.ts:438) still caps at 120, and index.tsv
+  // will get the same longer text — the 60-char house rule for index.tsv is not enforced here
+  // but the longer text is still readable; callers that need 60 can slice themselves.
+  let body = describeBlock(input.dizText, 120, prog || null);
   if (!body && input.name) {
     const named = clean(input.name);
     body = score(named).score > 0 ? named : '';
@@ -1191,16 +1296,21 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
   body = req.text;
   const requiresBbs = req.requires || bbsRequirementFromDiz(input.dizText);
 
-  const ver = splitVersion(body, input.catalogVersion);
+  // Whole-DIZ scans for version/author — these see lines outside the chosen paragraph.
+  const dizVer = versionFromDizWhole(input.dizText, prog || input.name);
+  const dizAuthor = authorFromDizWhole(input.dizText);
+
+  const ver = splitVersion(body, dizVer || input.catalogVersion);
   body = ver.text;
 
-  const auth = splitAuthor(body, input.catalogAuthor ?? banner.credit);
+  const auth = splitAuthor(body, dizAuthor || (input.catalogAuthor ?? banner.credit));
   body = auth.text;
 
   prog = capitaliseName(stripVersionTail(prog, ver.version));
   if (prog && progCoveredByBody(prog, body)) prog = '';
 
-  let description: string | null = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))));
+  // 120-char cap: a wrapped DIZ paragraph is typically 80-100 chars; 60 truncated mid-sentence.
+  let description: string | null = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))), 120);
   if (!description) {
     // Everything the DIZ offered was a credit (KDZ!LUDB.LHA's only
     // prose line is "dONE bY sERAPH - !BUGFIXED VERSION", which moves

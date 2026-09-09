@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1",
+  "contractVersion": "2",
   "note": "GENERATED from tests/describe.test.ts. Both repos run these cases.",
   "cases": [
     {
@@ -238,7 +238,7 @@
       "expected": {
         "description": "Adi Menu Handles Textfiles like Commands, so use",
         "version": "1.0",
-        "author": "",
+        "author": "THE Addict/5D",
         "requiresBbs": ""
       }
     },
@@ -262,7 +262,7 @@
       "expected": {
         "description": "Who",
         "version": "2.40",
-        "author": "",
+        "author": "Sven THE Creator/5TH Dynasty",
         "requiresBbs": "AmiExpress"
       }
     },
@@ -309,7 +309,7 @@
       ],
       "expected": {
         "description": "Give your users a Byte Bonus",
-        "version": "",
+        "version": "1.0",
         "author": "",
         "requiresBbs": "AmiExpress"
       }
@@ -501,7 +501,7 @@
       ],
       "expected": {
         "description": "",
-        "version": "",
+        "version": "1.0b",
         "author": "Seraph - !Bugfixed Version",
         "requiresBbs": "CNet"
       }
@@ -740,7 +740,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Account Editor supports every field of the config file",
+        "description": "Account Editor supports every field of the config file format",
         "version": "1.03",
         "author": "",
         "requiresBbs": "AmiExpress"
