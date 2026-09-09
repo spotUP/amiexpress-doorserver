@@ -838,6 +838,8 @@ const LEET_MAP: Record<string, string> = { '0': 'o', '1': 'l', '3': 'e', '4': 'a
 function deLeet(word: string): string {
   // Handle "Thiz" -> "This" (z for s) – common elite for "This", "is", "as", etc. where z replaces s at end
   if (/^Thiz$/i.test(word)) return word[0] === 'T' ? 'This' : word.replace(/z$/i, 's');
+  // Never translate a leading digit: "1oo", "5TH", "3D" are names/ordinals, not leet
+  if (/^[0-9]/.test(word)) return word;
   // Don't translate trailing version-like digits: "beta3", "Bu1", "C120" is a version, not leet
   const trailingDigits = word.match(/[0-9]+$/);
   const hasTrailingVersionDigits = trailingDigits && word.replace(/[0-9]+$/, '').length >= 1;
@@ -865,6 +867,8 @@ function tidyWord(w: string, handles: boolean): string {
   // Keep "5TH" (5th) and "PWs" (passwords) canonical – don't de-leet or re-case them
   if (/^5TH$/i.test(w)) return '5TH';
   if (/^PWS$/i.test(w)) return 'PWs';
+  // Ordinals/group tags like "5D", "4DOS", "3D" are names, not leet – leave exactly as is
+  if (/^[0-9]+[A-Za-z]+$/.test(w)) return w;
   // De-leet common elite digits inside words like d00R -> door, Sh0W -> Show, but keep version-like tokens
   const deLeeted = deLeet(w);
   const effective = deLeeted !== w && /[A-Za-z]/.test(deLeeted) ? deLeeted : w;
@@ -1173,7 +1177,10 @@ export function ensureCapitalized(s: string): string {
   if (!s) return s;
   const t = s.trim();
   if (!t) return t;
-  // Capitalize first letter, keep rest as is (already tidyCased)
+  // Preserve elite/mixed-case openers like "fUCKLHA" or "eBay": only capitalize
+  // a plain lowercase start, never re-case a word that already carries capitals
+  const firstWord = t.split(/\s+/)[0] ?? '';
+  if (/[A-ZÀ-Þ]/.test(firstWord.slice(1))) return t;
   return t[0].toUpperCase() + t.slice(1);
 }
 
