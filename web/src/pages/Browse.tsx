@@ -299,7 +299,11 @@ export function Browse() {
   }, [q, system, type, requires, latestOnly, guessedOnly, unstrippedOnly, matchingNames]);
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[86rem] flex-col gap-4 px-4 py-6">
+    <div
+      className={`mx-auto flex min-h-screen w-full flex-col gap-4 px-4 py-6 ${
+        isReleases ? 'max-w-none' : 'max-w-[86rem]'
+      }`}
+    >
       <header className="flex flex-col gap-4">
         <h1 className="m-0">
           <img
