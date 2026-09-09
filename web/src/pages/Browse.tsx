@@ -22,8 +22,10 @@ import {
 } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
+import { useReleases } from '../api/releases';
 import type { AdminUser, Door } from '../api/types';
 import { DoorTable, type SortState } from '../components/DoorTable';
+import { ReleasesTable } from '../components/ReleasesTable';
 import { DoorDetailDialog } from '../components/DoorDetail';
 import { LoginDialog } from '../components/LoginDialog';
 import { AuditPanel } from './Audit';
@@ -43,6 +45,11 @@ const PER_PAGE = 50;
 let toastIdCounter = 0;
 
 export function Browse() {
+  const [src, setSrc] = useState<'doors' | 'releases'>(() =>
+    new URLSearchParams(window.location.search).get('src') === 'releases' ? 'releases' : 'doors'
+  );
+  const isReleases = src === 'releases';
+  const [relFlag, setRelFlag] = useState('');
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [system, setSystem] = useState('');
@@ -76,6 +83,13 @@ export function Browse() {
   const [selectAllMatching, setSelectAllMatching] = useState(false);
 
   useLiveRevision();
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (isReleases) url.searchParams.set('src', 'releases');
+    else url.searchParams.delete('src');
+    window.history.replaceState(null, '', url);
+  }, [isReleases]);
 
   // Typing must not fire a request per keystroke.
   useEffect(() => {
@@ -114,6 +128,11 @@ export function Browse() {
   );
   const { data, isLoading } = useDoors(query);
   const { data: facets } = useFacets();
+  const relQuery = useMemo(
+    () => ({ q, flag: relFlag || undefined, page, perPage: PER_PAGE }),
+    [q, relFlag, page]
+  );
+  const { data: relData, isLoading: relLoading } = useReleases(relQuery, isReleases);
 
   // Transient feedback for the batch actions that have no other visible
   // result (no progress bar, no job) - they used to succeed or fail in
@@ -181,7 +200,19 @@ export function Browse() {
     }
   }, [stripPreviewProgress, stripPreviewJobId]);
 
-  const pages = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1;
+  const activeTotal = isReleases ? relData?.total : data?.total;
+  const pages = activeTotal ? Math.max(1, Math.ceil(activeTotal / PER_PAGE)) : 1;
+  const pageLabel = isReleases
+    ? relLoading
+      ? 'Loading...'
+      : relData
+        ? `Page ${page} of ${pages}`
+        : ''
+    : isLoading
+      ? 'Loading...'
+      : data
+        ? `Page ${data.page} of ${pages}`
+        : '';
 
   function sortBy(key: string) {
     setSortState((prev) => ({ sort: key, dir: prev.sort === key && prev.dir === 'asc' ? 'desc' : 'asc' }));
@@ -280,7 +311,13 @@ export function Browse() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm text-muted">
-              {data ? `${data.total.toLocaleString()} AmiExpress doors` : 'Reading the catalog...'}
+              {isReleases
+                ? relData
+                  ? `${relData.total.toLocaleString()} BBS file-list entries`
+                  : 'Reading the file listing...'
+                : data
+                  ? `${data.total.toLocaleString()} AmiExpress doors`
+                  : 'Reading the catalog...'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -331,6 +368,37 @@ export function Browse() {
 
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex overflow-hidden rounded border border-line text-xs" role="group" aria-label="Catalog source">
+            <button
+              onClick={() => { setSrc('doors'); setPage(1); }}
+              aria-pressed={!isReleases}
+              className={`px-3 py-1.5 ${!isReleases ? 'bg-raised text-ink' : 'text-muted hover:bg-raised'}`}
+            >
+              Doors
+            </button>
+            <button
+              onClick={() => { setSrc('releases'); setPage(1); }}
+              aria-pressed={isReleases}
+              className={`px-3 py-1.5 ${isReleases ? 'bg-raised text-ink' : 'text-muted hover:bg-raised'}`}
+            >
+              BBS Files
+            </button>
+          </div>
+          {isReleases && (
+            <Select
+              ariaLabel="Filter by listing flag"
+              placeholder="Any flag"
+              value={relFlag}
+              onChange={(v) => { setRelFlag(v); setPage(1); }}
+              options={[
+                { value: 'N', label: 'N — as listed' },
+                { value: 'P', label: 'P — as listed' },
+                { value: 'D', label: 'D — nuked' },
+                { value: 'F', label: 'F — flagged' },
+                { value: 'O', label: 'O — as listed' },
+              ]}
+            />
+          )}
           <div className="relative min-w-[16rem] flex-1">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <Input
@@ -341,6 +409,7 @@ export function Browse() {
               className="pl-9"
             />
           </div>
+          {!isReleases && (
           <details className="relative md:hidden">
             <summary className="cursor-pointer list-none rounded border border-line px-3 py-1.5 text-xs text-muted hover:bg-raised">
               Filters{(system || type || requires) ? ' *' : ''}
@@ -369,6 +438,8 @@ export function Browse() {
               />
             </div>
           </details>
+          )}
+          {!isReleases && (
           <div className="hidden items-center gap-2 md:flex">
             <Select
               ariaLabel="Filter by collection"
@@ -392,7 +463,8 @@ export function Browse() {
               options={(facets?.requires ?? []).map((f) => ({ value: f.value ?? '', label: `${f.value} (${f.n})` }))}
             />
           </div>
-        {admin && (
+          )}
+        {admin && !isReleases && (
           <Button
             variant={guessedOnly ? 'primary' : 'ghost'}
             onClick={() => {
@@ -404,7 +476,7 @@ export function Browse() {
             <Wand2 size={14} /> Needs a name
           </Button>
         )}
-        {admin && (
+        {admin && !isReleases && (
           <Button
             variant={unstrippedOnly ? 'primary' : 'ghost'}
             onClick={() => {
@@ -416,6 +488,7 @@ export function Browse() {
             <Eraser size={14} /> Needs ad review
           </Button>
         )}
+        {!isReleases && (
         <Button
           variant={latestOnly ? 'primary' : 'ghost'}
           onClick={() => {
@@ -426,6 +499,8 @@ export function Browse() {
         >
           Latest only
         </Button>
+        )}
+        {!isReleases && (
         <SavedSearches
           query={q}
           system={system}
@@ -440,10 +515,11 @@ export function Browse() {
             setPage(1);
           }}
         />
+        )}
       </div>
       </div>
 
-      {admin && stripApplyJobId && stripApplyProgress && stripApplyProgress.status === 'running' ? (
+      {admin && !isReleases && stripApplyJobId && stripApplyProgress && stripApplyProgress.status === 'running' ? (
         <div className="flex items-center gap-3 rounded-lg border border-accent bg-accent/5 px-4 py-2 text-sm">
           <RefreshCw size={14} className="animate-spin text-accent" />
           <span>Stripping {stripApplyProgress.completed} / {stripApplyProgress.total}</span>
@@ -558,6 +634,9 @@ export function Browse() {
         />
       ) : null}
 
+      {isReleases ? (
+        <ReleasesTable rows={relData?.rows ?? []} />
+      ) : (
       <DoorTable
         rows={data?.rows ?? []}
         sortState={sortState}
@@ -579,10 +658,11 @@ export function Browse() {
         onSelectAllMatching={selectAllFiltered}
         selectAllMatchingActive={selectAllMatching}
       />
+      )}
 
       <footer className="sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t border-line bg-bg py-3 text-sm text-muted">
         <span>
-          {isLoading ? 'Loading...' : data ? `Page ${data.page} of ${pages}` : ''}
+          {pageLabel}
         </span>
         <div className="flex items-center gap-2">
           <Button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
@@ -618,7 +698,7 @@ export function Browse() {
         </div>
       </footer>
 
-      <DoorDetailDialog archiveName={open} admin={admin} onClose={() => setOpen(null)} />
+      {!isReleases && <DoorDetailDialog archiveName={open} admin={admin} onClose={() => setOpen(null)} />}
       <JobResultsDialog
         jobId={stripApplyJobId}
         open={stripApplyResultsOpen}
