@@ -76,10 +76,32 @@ collapse whitespace. Leave `!` and case alone (stylized nicks).
   Sunday busiest (52,786 vs Friday 38,506); biggest `UNS-8Bit.lha`
   78 MB (2011); longest desc `HF-SCD0.LHA` 6,781 chars/88 lines;
   most downloaded `FDRD015R.ZIP` 34 d/L; median size 130,542 bytes.
+- CORRECTION 2026-09-10: the first crowned winner (`SLT!RX10.LZX` at
+  1989-12-18) was wrong — the file is listed 3x (1989/1998/1999, same
+  size twice) while its own art says ©1998. firstDiz now excludes twin
+  rows (same filename+size, conflicting dates) and requires 8+ dashes
+  (prose like `----Animator---` fooled the 4-run). Real winner, agreed
+  by SQL + line-shape analysis: `SBDOC1.DMS`, 1991-03-09, Dual Crew
+  "SNUSKBUSKEs DOCDISK #1" box, singly listed, neighbours agree.
 - Gotcha fixed en route: SQL `LIKE '%____%'` matches EVERYTHING (`_`
   is a wildcard) — must be `LIKE '%\_\_\_\_%' ESCAPE '\'` with doubled
   backslashes through the TS template literal (same for the ESCAPE
   literal itself; a backtick inside a `--` comment also broke parsing).
 - Full `test:ci`: 689 passed + 1 pre-existing skip; one unrelated flake
   (`tests/achievements/rarity-floor.test.ts` fails in full runs, passes
-  alone, untouched by this work).
+  alone, untouched by this work). Rerun 2026-09-09: 690 passed, flake gone.
+
+## Deploy + live reimport 2026-09-09 (manual over SSH)
+
+- Push-triggered GitHub deploys are NOT landing: host git sat at 1a8e92c
+  through both pushes, `git fetch` fails with "Repository not found"
+  (private repo, anonymous fetch), images predated the pushes. Check the
+  Actions UI — no API access from here (404 as johanBMS).
+- Manual treesync instead: copied the 14-file union 1a8e92c..bdbf120 to
+  /app/doorserver (checksums match), rebuilt (`docker compose up -d
+  --build`, one transient Docker Hub 502, retry clean), health OK.
+  Host git still reads 1a8e92c with a working tree equal to bdbf120 — a
+  future fetch+reset converges to identical content, nothing to reconcile.
+- Reimport live with backup releases.db.bak-2026-09-09 kept alongside:
+  299,437 rows, withUploader 6,044 -> 8,267, firstDiz SLT!RX10.LZX,
+  no SQLITE_BUSY errors in server logs, health stayed green throughout.

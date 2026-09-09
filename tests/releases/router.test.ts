@@ -202,14 +202,19 @@ describe('releases surface', () => {
   it('answers facts with headline records', async () => {
     const cfg = makeCfg();
     seedReleases(cfg);
-    // One art-bearing description so firstDiz has a winner (base seed is prose).
+    // One art-bearing description so firstDiz has a winner (base seed is prose),
+    // plus an EARLIER art row with a conflicting twin date (same file, two
+    // dates = BBS typo): it must not win "first".
     const db = new Database(cfg.releases!.dbPath);
     try {
-      db.prepare(
+      const ins = db.prepare(
         `INSERT INTO release_files
            (dir_no, file_no, filename, flag, size_bytes, size_note, date_iso, dl_count, uploader, description, version, author, release_group, release_group_full, raw_desc)
-         VALUES (7, 1, 'ARTDIZ.LHA', 'P', 100, null, '1990-06-01', null, null, 'An art diz.', null, null, null, null, '____\n| art |\n| art |\n____')`
-      ).run();
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      ins.run(7, 1, 'ARTDIZ.LHA', 'P', 100, null, '1990-06-01', null, null, 'An art diz.', null, null, null, null, '____\n| art |\n| art |\n____');
+      ins.run(7, 2, 'TYPO.LHA', 'P', 50, null, '1989-01-01', null, null, 'Typo date.', null, null, null, null, '____\n| art |\n| art |\n____');
+      ins.run(8, 1, 'TYPO.LHA', 'P', 50, null, '1999-01-01', null, null, 'Typo date.', null, null, null, null, '____\n| art |\n| art |\n____');
     } finally {
       db.close();
     }
@@ -222,13 +227,13 @@ describe('releases surface', () => {
     expect(res.body.firstDiz.lines).toBe(4);
     expect(res.body.peakYear).toEqual({ year: '2020', n: 2 });
     expect(res.body.peakMonth).toEqual({ month: '2020-01', n: 2 });
-    expect(res.body.topExt[0]).toEqual({ ext: '.LHA', n: 3 });
+    expect(res.body.topExt[0]).toEqual({ ext: '.LHA', n: 5 });
     expect(res.body.extCrossover).toBeNull();
     expect(res.body.weekday.day).toBe('Friday');
     expect(res.body.biggest.sizeBytes).toBe(420431);
     expect(res.body.longestDesc.filename).toBe('BETTER.WRP');
     expect(res.body.mostDownloaded.dlCount).toBe(5);
-    expect(res.body.medianSize).toBe(324864);
+    expect(res.body.medianSize).toBe(100);
     expect(res.body.futureCount).toBe(0);
   });
 

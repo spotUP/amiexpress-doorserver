@@ -325,12 +325,13 @@ export interface ReleaseFacts {
     lastFile: FactsFile;
   };
   /**
-   * Earliest file description that reads as a real DIZ: 4+ lines with
-   * art runs (`____`, `****`, `----`, `++++`, `||||`, `¼`, …). Validated
-   * 2026-09-10 against a line-shape analysis over all 299,437 entries:
-   * both agree on the winner; the only SQL-only extras are magazine
-   * headers with underscore art. rawDesc is included so the page can
-   * render it verbatim.
+   * Earliest RELIABLY-DATED file description that reads as a real DIZ: 4+
+   * lines with art runs (`____`, `****`, `----`, `++++`, `||||`, `¼`, …),
+   * excluding rows whose date contradicts a twin row (same filename AND
+   * size, different date — e.g. SLT!RX10.LZX is listed as both 12-18-89
+   * and 12-18-98 while its own art says ©1998, so neither row's date can
+   * crown it "first"). rawDesc is included so the page can render the
+   * winner verbatim.
    */
   firstDiz: (FactsFile & { lines: number; rawDesc: string }) | null;
   peakYear: { year: string; n: number };
@@ -378,9 +379,21 @@ export function getReleasesFacts(rel: ReleasesConfig): ReleaseFacts {
               -- LIKE underscore is a wildcard, so the underscore run is
               -- ESCAPEd (the rest are literal). Unescaped, it would match
               -- any 4+ characters, i.e. every row.
-              AND (raw_desc LIKE '%\\_\\_\\_\\_%' ESCAPE '\\' OR raw_desc LIKE '%****%' OR raw_desc LIKE '%----%'
+              AND (raw_desc LIKE '%\\_\\_\\_\\_%' ESCAPE '\\' OR raw_desc LIKE '%****%'
+                -- Dashes need 8+: prose uses short runs for emphasis
+                -- ("Animation By ----Animator---"), boxes use dozens.
+                OR raw_desc LIKE '%--------%'
                 OR raw_desc LIKE '%++++%' OR raw_desc LIKE '%||||%' OR raw_desc LIKE '%¼%'
                 OR raw_desc LIKE '%────%' OR raw_desc LIKE '%====%')
+              -- Same file twice with two dates means at least one date is a
+              -- BBS typo: neither row may claim a "first". (Different sizes
+              -- are different builds and keep their dates.)
+              AND NOT EXISTS (
+                SELECT 1 FROM release_files twin
+                 WHERE twin.filename = release_files.filename
+                   AND COALESCE(twin.size_bytes, -1) = COALESCE(release_files.size_bytes, -1)
+                   AND twin.date_iso <> release_files.date_iso
+              )
             ORDER BY date_iso ASC, id ASC LIMIT 1`
         )
         .get() as ((FactsFile & { lines: number; rawDesc: string }) | undefined);

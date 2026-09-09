@@ -54,8 +54,8 @@ export function FactsPanel({
                       <DizView text={data.firstDiz.rawDesc} label="first art-bearing file description" />
                     </div>
                     <p className="mt-1 text-xs text-muted">
-                      Heuristic: 4+ description lines with ASCII-art runs. Earlier entries are
-                      one-line prose — the art DIZ arrives here.
+                      Earliest reliably-dated one: 4+ description lines with ASCII-art runs,
+                      skipping files listed twice with conflicting dates (BBS date typos).
                     </p>
                   </section>
                 )}
