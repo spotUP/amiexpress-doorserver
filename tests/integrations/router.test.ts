@@ -13,6 +13,9 @@ import { runMigrations } from '../../src/migrations';
 import { createIntegrationsRouter } from '../../src/integrations/router';
 import { fixtureFetcher, ANSWER_FIXTURES } from './helpers';
 
+const fixtureFile = (name: string): string =>
+  fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf-8');
+
 function tmpApp() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-rtr-'));
   fs.mkdirSync(path.join(dir, 'Archives'));
@@ -25,7 +28,15 @@ function tmpApp() {
   const app = express();
   app.use('/api/integrations/v1', createIntegrationsRouter(
     { dbPath } as never,
-    { fetchJson: fixtureFetcher(ANSWER_FIXTURES), head: async () => 200 }));
+    {
+      fetchJson: fixtureFetcher(ANSWER_FIXTURES),
+      fetchText: async (url: string) => {
+        if (url.includes('demoparty.net')) return fixtureFile('demoparty-feed.xml');
+        if (url.includes('sixteencolors')) return fixtureFile('artpacks-tree.json');
+        throw new Error(`no fixture for ${url}`);
+      },
+      head: async () => 200,
+    }));
   return { dir, app };
 }
 
@@ -63,14 +74,18 @@ describe('integrations router', () => {
     const { dir, app } = tmpApp();
     const res = await request(app).get('/api/integrations/v1/status');
     expect(res.status).toBe(200);
-    // 7 adapters + scene.org link checks.
-    expect(res.body.sources).toHaveLength(8);
+    // 10 adapters + scene.org link checks.
+    expect(res.body.sources).toHaveLength(11);
     // Keyless sources are healthy on fixtures; keyed ones report exactly
-    // why they are dark (no secret stored) instead of pretending.
+    // why they are dark (no secret stored) instead of pretending; radio
+    // reports its missing station the same honest way.
     for (const s of res.body.sources as Array<{ id: string; ok: boolean; needsKey: boolean; detail?: string }>) {
       if (s.needsKey) {
         expect(s.ok).toBe(false);
         expect(s.detail).toMatch(/no api_key stored/);
+      } else if (s.id === 'radio') {
+        expect(s.ok).toBe(false);
+        expect(s.detail).toBe('no stationUrl configured');
       } else {
         expect(s.ok).toBe(true);
       }

@@ -14,7 +14,20 @@ export const FETCH_TIMEOUT_MS = 10000;
 export const FETCH_MAX_BYTES = 1024 * 1024;
 export const USER_AGENT = 'AmiExpress-DoorServer/1.0 (operator-chat integrations; https://doors.uprough.net)';
 
-function getBody(url: string, accept: string, timeoutMs: number, method = 'GET'): Promise<Buffer> {
+export class ResponseTooLarge extends Error {
+  constructor(maxBytes: number) {
+    super(`response over ${Math.round(maxBytes / 1024)} KB cap`);
+    this.name = 'ResponseTooLarge';
+  }
+}
+
+function getBody(
+  url: string,
+  accept: string,
+  timeoutMs: number,
+  method = 'GET',
+  maxBytes = FETCH_MAX_BYTES
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     let parsed: URL;
     try {
@@ -43,14 +56,14 @@ function getBody(url: string, accept: string, timeoutMs: number, method = 'GET')
         }
         const chunks: Buffer[] = [];
         let bytes = 0;
-        res.on('data', (c: Buffer) => {
-          bytes += c.length;
-          if (bytes > FETCH_MAX_BYTES) {
-            req.destroy(new Error('response over 1 MB cap'));
-            return;
-          }
-          chunks.push(c);
-        });
+          res.on('data', (c: Buffer) => {
+            bytes += c.length;
+            if (bytes > maxBytes) {
+              req.destroy(new ResponseTooLarge(maxBytes));
+              return;
+            }
+            chunks.push(c);
+          });
         res.on('end', () => resolve(Buffer.concat(chunks)));
         res.on('error', reject);
       }
@@ -61,9 +74,10 @@ function getBody(url: string, accept: string, timeoutMs: number, method = 'GET')
   });
 }
 
-export function createFetchText(opts?: { timeoutMs?: number }): FetchText {
+export function createFetchText(opts?: { timeoutMs?: number; maxBytes?: number }): FetchText {
   const timeoutMs = opts?.timeoutMs ?? FETCH_TIMEOUT_MS;
-  return async (url: string) => (await getBody(url, '*/*', timeoutMs)).toString('utf-8');
+  const maxBytes = opts?.maxBytes ?? FETCH_MAX_BYTES;
+  return async (url: string) => (await getBody(url, '*/*', timeoutMs, 'GET', maxBytes)).toString('utf-8');
 }
 
 export function createHeadStatus(opts?: { timeoutMs?: number }): HeadStatus {

@@ -7,7 +7,7 @@
  * is served with stale:true rather than an empty shrug.
  */
 import type Database from 'better-sqlite3';
-import type { Adapter, AdapterContext, AnswerItem, FetchJson } from './types';
+import type { Adapter, AdapterContext, AnswerItem, FetchJson, FetchText, HeadStatus } from './types';
 import { createFetchText, createHeadStatus } from './fetch';
 import { pouetAdapter } from './pouet';
 import { demozooAdapter } from './demozoo';
@@ -17,6 +17,9 @@ import { sceneorgAdapter } from './sceneorg';
 import { modarchiveAdapter } from './modarchive';
 import { tmdbAdapter } from './tmdb';
 import { omdbAdapter } from './omdb';
+import { demopartyAdapter } from './demoparty';
+import { artpacksAdapter } from './artpacks';
+import { radioAdapter } from './radio';
 import { getConfig, getSecretForAdapter, getCache, getStaleCache, setCache } from './store';
 
 export const ANSWER_CACHE_TTL_SECONDS = 120;
@@ -44,6 +47,7 @@ export interface Answer {
 export const ADAPTERS: Adapter[] = [
   pouetAdapter, demozooAdapter, asciiarenaAdapter, archiveorgAdapter,
   modarchiveAdapter, tmdbAdapter, omdbAdapter,
+  demopartyAdapter, artpacksAdapter, radioAdapter,
 ];
 
 /** Everything /status reports: the fan-out plus sources with no search
@@ -89,7 +93,8 @@ export async function answer(
   db: Database.Database,
   fetchJson: FetchJson,
   query: string,
-  mode: AnswerMode = 'search'
+  mode: AnswerMode = 'search',
+  opts?: { fetchText?: FetchText; head?: HeadStatus }
 ): Promise<Answer> {
   const q = query.trim().slice(0, 120);
   const cacheKey = `answer:${mode}:${q.toLowerCase()}`;
@@ -105,8 +110,8 @@ export async function answer(
       const t0 = Date.now();
       const ctx: AdapterContext = {
         fetchJson,
-        fetchText: createFetchText(),
-        head: createHeadStatus(),
+        fetchText: opts?.fetchText ?? createFetchText(),
+        head: opts?.head ?? createHeadStatus(),
         getSecret: (keyName) => getSecretForAdapter(db, a.id, keyName),
         settings: getConfig(db, a.id)?.settings ?? {},
       };
@@ -133,10 +138,16 @@ export async function answer(
   );
 
   const merged: Answer = { query: q, mode, results: interleave(perSource), sources, stale: false };
-  const allFailed = sources.length > 0 && sources.every((s) => !s.ok);
-  if (allFailed) {
+  // Empty now but non-empty before: serve the stale merged answer marked
+  // stale rather than an empty shrug (2026-09-10 - an all-failed check
+  // alone misfires when a benign source like unconfigured radio reports
+  // ok with zero items).
+  if (merged.results.length === 0) {
     const stale = getStaleCache(db, cacheKey);
-    if (stale) return { ...(JSON.parse(stale.body) as Answer), stale: true };
+    if (stale) {
+      const staleAnswer = JSON.parse(stale.body) as Answer;
+      if (staleAnswer.results.length > 0) return { ...staleAnswer, stale: true };
+    }
   } else {
     setCache(db, cacheKey, JSON.stringify(merged), ANSWER_CACHE_TTL_SECONDS);
   }

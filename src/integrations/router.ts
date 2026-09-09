@@ -12,7 +12,7 @@ import type { ServerConfig } from '../config';
 import { openDb } from '../db';
 import { createFetchJson, createFetchText, createHeadStatus, assertPublicUrl } from './fetch';
 import { checkLink } from './sceneorg';
-import type { FetchJson, HeadStatus } from './types';
+import type { FetchJson, FetchText, HeadStatus } from './types';
 import { ADAPTERS, STATUS_ADAPTERS, answer, type AnswerMode } from './answer';
 import { getSecretForAdapter } from './store';
 
@@ -20,11 +20,11 @@ const MODES: AnswerMode[] = ['search', 'random', 'latest'];
 
 export function createIntegrationsRouter(
   cfg: ServerConfig,
-  deps?: { fetchJson?: FetchJson; head?: HeadStatus }
+  deps?: { fetchJson?: FetchJson; fetchText?: FetchText; head?: HeadStatus }
 ): Router {
   const router = Router();
   const fetchJson = deps?.fetchJson ?? createFetchJson();
-  const fetchText = createFetchText();
+  const fetchText = deps?.fetchText ?? createFetchText();
   const head = deps?.head ?? createHeadStatus();
 
   /** One question, attributed hits from every enabled source. */
@@ -38,7 +38,7 @@ export function createIntegrationsRouter(
     }
     const db = openDb(cfg);
     try {
-      const out = await answer(db, fetchJson, q, mode);
+      const out = await answer(db, fetchJson, q, mode, { fetchText, head });
       res.json(out);
     } catch (e) {
       res.status(500).json({ error: `answer failed: ${(e as Error).message}` });

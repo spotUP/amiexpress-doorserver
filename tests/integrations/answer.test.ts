@@ -50,19 +50,32 @@ const OK_FETCH: FetchJson = canned((url) => {
   throw new Error(`unexpected ${url}`);
 });
 
+// Text sources (feeds, trees) go through fetchText, never fetchJson.
+function textFetch(url: string): Promise<string> {
+  if (url.includes('demoparty.net')) {
+    return Promise.resolve(`<?xml version="1.0"?><rss><channel><item><title>Logic Party</title><link>https://example.org/?mtm_x=1</link><demopartynet:date>1 Jan 2027</demopartynet:date><demopartynet:country>se</demopartynet:country><demopartynet:url>https://example.org/</demopartynet:url></item></channel></rss>`);
+  }
+  if (url.includes('sixteencolors')) {
+    return Promise.resolve(JSON.stringify({ tree: [{ path: '1990/logic-pack.zip', type: 'blob' }] }));
+  }
+  return Promise.reject(new Error(`unexpected ${url}`));
+}
+const TEXT_OPTS = { fetchText: textFetch };
+
 describe('/answer fan-out', () => {
   it('merges attributed hits from every enabled source', async () => {
     const { dir, db } = tmpDb();
-    const out = await answer(db, OK_FETCH, 'logic');
-    expect(out.results.length).toBeGreaterThanOrEqual(4);
+    const out = await answer(db, OK_FETCH, 'logic', 'search', TEXT_OPTS);
+    expect(out.results.length).toBeGreaterThanOrEqual(6);
     expect(new Set(out.results.map((r) => r.source))).toEqual(
-      new Set(['Pouët', 'Demozoo', 'AsciiArena', 'Internet Archive']));
+      new Set(['Pouët', 'Demozoo', 'AsciiArena', 'Internet Archive', 'demoparty.net', 'artpacks']));
     // Keyed adapters stay dark without secrets: present in neither
-    // results nor sources.
+    // results nor sources. Radio has no station configured: ok, empty.
     expect(out.sources.find((s) => s.id === 'modarchive')).toBeUndefined();
     expect(out.sources.find((s) => s.id === 'tmdb')).toBeUndefined();
     expect(out.sources.find((s) => s.id === 'omdb')).toBeUndefined();
-    expect(out.sources.filter((s) => s.ok)).toHaveLength(4);
+    expect(out.sources.find((s) => s.id === 'radio')?.ok).toBe(true);
+    expect(out.sources.filter((s) => s.ok).length).toBeGreaterThanOrEqual(6);
     expect(out.stale).toBe(false);
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -70,10 +83,10 @@ describe('/answer fan-out', () => {
 
   it('serves the second identical query from cache without fetching', async () => {
     const { dir, db } = tmpDb();
-    await answer(db, OK_FETCH, 'cached-q');
+    await answer(db, OK_FETCH, 'cached-q', 'search', TEXT_OPTS);
     let calls = 0;
     const counting: FetchJson = async (url) => { calls++; return OK_FETCH(url); };
-    const out = await answer(db, counting, 'cached-q');
+    const out = await answer(db, counting, 'cached-q', 'search', TEXT_OPTS);
     expect(calls).toBe(0);
     expect(out.results.length).toBeGreaterThan(0);
     db.close();
@@ -83,7 +96,7 @@ describe('/answer fan-out', () => {
   it('skips a disabled source and says which sources answered', async () => {
     const { dir, db } = tmpDb();
     setConfig(db, 'pouet', { enabled: false });
-    const out = await answer(db, OK_FETCH, 'logic');
+    const out = await answer(db, OK_FETCH, 'logic', 'search', TEXT_OPTS);
     expect(out.results.every((r) => r.source !== 'Pouët')).toBe(true);
     expect(out.sources.find((s) => s.id === 'pouet')).toBeUndefined();
     db.close();
@@ -96,7 +109,7 @@ describe('/answer fan-out', () => {
       if (url.includes('pouet.net')) throw new Error('pouet down');
       return OK_FETCH(url);
     };
-    const out = await answer(db, flaky, 'logic');
+    const out = await answer(db, flaky, 'logic', 'search', TEXT_OPTS);
     expect(out.results.length).toBeGreaterThan(0);
     const pouet = out.sources.find((s) => s.id === 'pouet');
     expect(pouet?.ok).toBe(false);
@@ -107,7 +120,7 @@ describe('/answer fan-out', () => {
 
   it('serves stale cache marked stale when everything fails', async () => {
     const { dir, db } = tmpDb();
-    await answer(db, OK_FETCH, 'doomed');
+    await answer(db, OK_FETCH, 'doomed', 'search', TEXT_OPTS);
     const dead: FetchJson = async () => { throw new Error('net gone'); };
     // Bust the fresh cache by disabling... no: expire it by writing the
     // merged row old. Simplest honest expiry: answer again after the TTL.
@@ -116,10 +129,11 @@ describe('/answer fan-out', () => {
     // Fresh cache still holds, so force the all-failed path by clearing it:
     db.prepare("DELETE FROM integration_cache WHERE cache_key = 'answer:search:doomed'").run();
     // Re-seed as stale: cache the merged answer, then age it past TTL.
-    const first = await answer(db, OK_FETCH, 'doomed');
+    const first = await answer(db, OK_FETCH, 'doomed', 'search', TEXT_OPTS);
     expect(first.stale).toBe(false);
     db.prepare("UPDATE integration_cache SET fetched_at = fetched_at - 10000 WHERE cache_key = 'answer:search:doomed'").run();
-    const out = await answer(db, dead, 'doomed');
+    const deadText = async () => { throw new Error('net gone'); };
+    const out = await answer(db, dead, 'doomed', 'search', { fetchText: deadText });
     expect(out.stale).toBe(true);
     expect(out.results.length).toBeGreaterThan(0);
     db.close();
@@ -128,7 +142,7 @@ describe('/answer fan-out', () => {
 
   it('random mode uses only sources that offer it', async () => {
     const { dir, db } = tmpDb();
-    const out = await answer(db, OK_FETCH, 'anything', 'random');
+    const out = await answer(db, OK_FETCH, 'anything', 'random', TEXT_OPTS);
     expect(out.results.every((r) => r.source === 'Pouët')).toBe(true);
     expect(out.sources.find((s) => s.id === 'demozoo')?.detail).toBe('no random');
     db.close();
