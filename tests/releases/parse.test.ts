@@ -247,6 +247,26 @@ describe('parseLines blocks', () => {
     expect(parseEntryLine('FOO.LHA P 1  01-01-90  Grüße Âge Ã©')?.firstDesc).toBe('Grüße Âge é');
   });
 
+  it('dedents a bulk indent with deeper outliers, keeping them relative', async () => {
+    const pad = ' '.repeat(33);
+    const text = [
+      '[ File #9799 ]                  ·===============·',
+      'FIX-HILL.LHA P 688128  12-02-95  ________.___',
+      `${pad}\\_   ___|_`,
+      ' '.repeat(39) + '¬\\____',
+      ' '.repeat(45) + '(C) Vulka',
+      `${pad}06:01:33  -=-  nODE:  1  -=-  cPS:  970  -=-`,
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries[0].descLines).toEqual([
+      '________.___',
+      '\\_   ___|_',
+      '      ¬\\____',
+      '            (C) Vulka',
+      '06:01:33  -=-  nODE:  1  -=-  cPS:  970  -=-',
+    ]);
+  });
+
   it('drops trailing ornament and date lines of the next entry', async () => {
     const text = [
       '[ File #6449 ]                  ·===============·',
