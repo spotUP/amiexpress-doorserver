@@ -241,6 +241,237 @@ export function streamReleases(
   return { rows };
 }
 
+export interface ReleaseStats {
+  total: number;
+  /** Entries naming an uploader (chevron + explicit credits, ~3% of corpus). */
+  withUploader: number;
+  withDlCount: number;
+  byFlag: { value: string | null; n: number }[];
+  byGroup: { value: string | null; n: number }[];
+  byUploader: { value: string | null; n: number }[];
+  byAuthor: { value: string | null; n: number }[];
+  sizeDistribution: { value: string | null; n: number }[];
+  /** Entry months (`YYYY-MM`), chronological. */
+  overTime: { value: string | null; n: number }[];
+}
+
+/** Aggregated statistics for the dashboard. Mirrors GET /stats on doors. */
+export function getReleasesStats(rel: ReleasesConfig): ReleaseStats {
+  return withReleasesDb(
+    rel,
+    (db: Database.Database) => {
+      const one = (sql: string): number => (db.prepare(sql).get() as { n: number }).n;
+      const all = (sql: string): { value: string | null; n: number }[] =>
+        db.prepare(sql).all() as { value: string | null; n: number }[];
+      const total = one('SELECT COUNT(*) AS n FROM release_files');
+      const withUploader = one(
+        `SELECT COUNT(*) AS n FROM release_files WHERE uploader IS NOT NULL AND uploader != ''`
+      );
+      const withDlCount = one('SELECT COUNT(*) AS n FROM release_files WHERE dl_count IS NOT NULL');
+      const byFlag = all(
+        `SELECT NULLIF(flag, '') AS value, COUNT(*) AS n
+           FROM release_files GROUP BY value ORDER BY n DESC`
+      );
+      const byGroup = all(
+        `SELECT release_group AS value, COUNT(*) AS n
+           FROM release_files WHERE release_group IS NOT NULL AND release_group != ''
+           GROUP BY value ORDER BY n DESC LIMIT 20`
+      );
+      const byUploader = all(
+        `SELECT uploader AS value, COUNT(*) AS n
+           FROM release_files WHERE uploader IS NOT NULL AND uploader != ''
+           GROUP BY value ORDER BY n DESC LIMIT 20`
+      );
+      const byAuthor = all(
+        `SELECT author AS value, COUNT(*) AS n
+           FROM release_files WHERE author IS NOT NULL AND author != ''
+           GROUP BY value ORDER BY n DESC LIMIT 20`
+      );
+      const sizeDistribution = all(
+        `SELECT
+           CASE
+             WHEN size_bytes IS NULL THEN 'No size (nuked)'
+             WHEN size_bytes < 10240 THEN '< 10 KB'
+             WHEN size_bytes < 102400 THEN '10-100 KB'
+             WHEN size_bytes < 1048576 THEN '100 KB - 1 MB'
+             WHEN size_bytes < 10485760 THEN '1-10 MB'
+             ELSE '10+ MB'
+           END AS value,
+           COUNT(*) AS n
+         FROM release_files GROUP BY value ORDER BY MIN(size_bytes) IS NULL, MIN(size_bytes)`
+      );
+      const overTime = all(
+        `SELECT substr(date_iso, 1, 7) AS value, COUNT(*) AS n
+           FROM release_files GROUP BY value ORDER BY value`
+      );
+      return { total, withUploader, withDlCount, byFlag, byGroup, byUploader, byAuthor, sizeDistribution, overTime };
+    },
+    { readonly: true }
+  );
+}
+
+export interface FactsFile {
+  filename: string;
+  dirNo: number;
+  fileNo: number;
+  dateIso: string;
+}
+
+export interface ReleaseFacts {
+  span: {
+    firstDate: string;
+    lastDate: string;
+    firstFile: FactsFile;
+    lastFile: FactsFile;
+  };
+  /**
+   * Earliest file description that reads as a real DIZ: 4+ lines with
+   * art runs (`____`, `****`, `----`, `++++`, `||||`, `¼`, …). Validated
+   * 2026-09-10 against a line-shape analysis over all 299,437 entries:
+   * both agree on the winner; the only SQL-only extras are magazine
+   * headers with underscore art. rawDesc is included so the page can
+   * render it verbatim.
+   */
+  firstDiz: (FactsFile & { lines: number; rawDesc: string }) | null;
+  peakYear: { year: string; n: number };
+  peakMonth: { month: string; n: number };
+  topExt: { ext: string; n: number }[];
+  /** First year LHA uploads outnumber DMS ones (the format migration). */
+  extCrossover: { year: string } | null;
+  weekday: { day: string; counts: number[] };
+  biggest: (FactsFile & { sizeBytes: number }) | null;
+  longestDesc: (FactsFile & { chars: number; lines: number }) | null;
+  mostDownloaded: (FactsFile & { dlCount: number }) | null;
+  medianSize: number | null;
+  /** Entries dated after today (capture typos like 2038-08-10). */
+  futureCount: number;
+}
+
+/** Extension leaderboard over a fixed list (LIKE keeps it index-free but
+ *  exact: one full scan per call, ~300k rows, fine for a dialog fetch). */
+const FACT_EXTS = ['LHA', 'DMS', 'TXT', 'LZX', 'ZIP', 'NFO', 'WRP', 'LZH', 'EXE', 'DOC'];
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Curated headline records for the facts page. One dialog fetch. */
+export function getReleasesFacts(rel: ReleasesConfig): ReleaseFacts {
+  return withReleasesDb(
+    rel,
+    (db: Database.Database) => {
+      const span = db
+        .prepare('SELECT MIN(date_iso) AS firstDate, MAX(date_iso) AS lastDate FROM release_files')
+        .get() as { firstDate: string; lastDate: string };
+      const fileBy = (order: string): FactsFile =>
+        db
+          .prepare(
+            `SELECT filename, dir_no AS dirNo, file_no AS fileNo, date_iso AS dateIso
+               FROM release_files ORDER BY date_iso ${order}, id ${order} LIMIT 1`
+          )
+          .get() as FactsFile;
+      const firstDizRow = db
+        .prepare(
+          `SELECT filename, dir_no AS dirNo, file_no AS fileNo, date_iso AS dateIso,
+                  LENGTH(raw_desc) - LENGTH(REPLACE(raw_desc, CHAR(10), '')) + 1 AS lines,
+                  raw_desc AS rawDesc
+             FROM release_files
+            WHERE LENGTH(raw_desc) - LENGTH(REPLACE(raw_desc, CHAR(10), '')) + 1 >= 4
+              -- LIKE underscore is a wildcard, so the underscore run is
+              -- ESCAPEd (the rest are literal). Unescaped, it would match
+              -- any 4+ characters, i.e. every row.
+              AND (raw_desc LIKE '%\\_\\_\\_\\_%' ESCAPE '\\' OR raw_desc LIKE '%****%' OR raw_desc LIKE '%----%'
+                OR raw_desc LIKE '%++++%' OR raw_desc LIKE '%||||%' OR raw_desc LIKE '%¼%'
+                OR raw_desc LIKE '%────%' OR raw_desc LIKE '%====%')
+            ORDER BY date_iso ASC, id ASC LIMIT 1`
+        )
+        .get() as ((FactsFile & { lines: number; rawDesc: string }) | undefined);
+      const peakYear = db
+        .prepare(
+          `SELECT substr(date_iso, 1, 4) AS year, COUNT(*) AS n
+             FROM release_files GROUP BY year ORDER BY n DESC LIMIT 1`
+        )
+        .get() as { year: string; n: number };
+      const peakMonth = db
+        .prepare(
+          `SELECT substr(date_iso, 1, 7) AS month, COUNT(*) AS n
+             FROM release_files GROUP BY month ORDER BY n DESC LIMIT 1`
+        )
+        .get() as { month: string; n: number };
+      const extSums = FACT_EXTS.map((e) => `SUM(CASE WHEN filename LIKE '%.${e}' THEN 1 ELSE 0 END) AS "${e}"`).join(
+        ', '
+      );
+      const extRow = db.prepare(`SELECT ${extSums} FROM release_files`).get() as Record<string, number>;
+      const topExt = FACT_EXTS.map((ext) => ({ ext: `.${ext}`, n: extRow[ext] ?? 0 }))
+        .filter((r) => r.n > 0)
+        .sort((a, b) => b.n - a.n);
+      const crossoverRows = db
+        .prepare(
+          `SELECT substr(date_iso, 1, 4) AS y,
+                  SUM(CASE WHEN filename LIKE '%.DMS' THEN 1 ELSE 0 END) AS dms,
+                  SUM(CASE WHEN filename LIKE '%.LHA' THEN 1 ELSE 0 END) AS lha
+             FROM release_files GROUP BY y ORDER BY y`
+        )
+        .all() as { y: string; dms: number; lha: number }[];
+      const crossover = crossoverRows.find((r) => r.dms > 0 && r.lha > r.dms) ?? null;
+      const wdRows = db
+        .prepare(
+          `SELECT CAST(strftime('%w', date_iso) AS INTEGER) AS wd, COUNT(*) AS n
+             FROM release_files GROUP BY wd`
+        )
+        .all() as { wd: number; n: number }[];
+      const counts = [0, 0, 0, 0, 0, 0, 0];
+      for (const r of wdRows) counts[r.wd] = r.n;
+      const topWd = counts.indexOf(Math.max(...counts));
+      const biggest = db
+        .prepare(
+          `SELECT filename, dir_no AS dirNo, file_no AS fileNo, date_iso AS dateIso, size_bytes AS sizeBytes
+             FROM release_files WHERE size_bytes IS NOT NULL ORDER BY size_bytes DESC LIMIT 1`
+        )
+        .get() as ((FactsFile & { sizeBytes: number }) | undefined);
+      const longest = db
+        .prepare(
+          `SELECT filename, dir_no AS dirNo, file_no AS fileNo, date_iso AS dateIso,
+                  LENGTH(raw_desc) AS chars,
+                  LENGTH(raw_desc) - LENGTH(REPLACE(raw_desc, CHAR(10), '')) + 1 AS lines
+             FROM release_files ORDER BY chars DESC LIMIT 1`
+        )
+        .get() as ((FactsFile & { chars: number; lines: number }) | undefined);
+      const mostDl = db
+        .prepare(
+          `SELECT filename, dir_no AS dirNo, file_no AS fileNo, date_iso AS dateIso, dl_count AS dlCount
+             FROM release_files WHERE dl_count IS NOT NULL ORDER BY dl_count DESC LIMIT 1`
+        )
+        .get() as ((FactsFile & { dlCount: number }) | undefined);
+      const sized = (db.prepare('SELECT COUNT(*) AS n FROM release_files WHERE size_bytes IS NOT NULL').get() as {
+        n: number;
+      }).n;
+      const medianSize =
+        sized === 0
+          ? null
+          : (db
+              .prepare('SELECT size_bytes AS v FROM release_files WHERE size_bytes IS NOT NULL ORDER BY v LIMIT 1 OFFSET ?')
+              .get(Math.floor((sized - 1) / 2)) as { v: number }).v;
+      const futureCount = (
+        db.prepare(`SELECT COUNT(*) AS n FROM release_files WHERE date_iso > date('now')`).get() as { n: number }
+      ).n;
+      return {
+        span: { firstDate: span.firstDate, lastDate: span.lastDate, firstFile: fileBy('ASC'), lastFile: fileBy('DESC') },
+        firstDiz: firstDizRow ?? null,
+        peakYear,
+        peakMonth,
+        topExt,
+        extCrossover: crossover ? { year: crossover.y } : null,
+        weekday: { day: WEEKDAYS[topWd], counts },
+        biggest: biggest ?? null,
+        longestDesc: longest ?? null,
+        mostDownloaded: mostDl ?? null,
+        medianSize,
+        futureCount,
+      };
+    },
+    { readonly: true }
+  );
+}
+
 export function listReleaseGroups(rel: ReleasesConfig): { abbreviation: string; fullName: string; files: number }[] {
   return withReleasesDb(
     rel,

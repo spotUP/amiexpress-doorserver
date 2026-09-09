@@ -26,6 +26,8 @@ Every response carries `X-Releases-Contract` (currently `1`) and
 | GET | `/dump` | every matching row as NDJSON, slim columns, resumable (below) |
 | GET | `/files/:id` | one full row incl. `rawDesc`, or 404 `{error:"not_found"}` |
 | GET | `/groups` | `{groups: [{abbreviation, fullName, files}]}` by file count |
+| GET | `/stats` | `{total, withUploader, withDlCount, byFlag, byGroup[20], byUploader[20], byAuthor[20], sizeDistribution, overTime[]}` |
+| GET | `/facts` | headline records: date span + first/last files, first art-DIZ (with `rawDesc`), peak year/month, extension leaderboard + DMS→LHA crossover year, weekday counts, biggest / longest-desc / most-downloaded files, median size, future-dated count |
 
 ### Bot recipe (full pull + stay current)
 
@@ -67,10 +69,21 @@ field promise identical to `list.txt`.
   null and `sizeNote` holds the reason (`>NUKED<`, `DELETED`, `RENAMED`,
   `>>OLD<<`, …). `N`/`P` meanings are unconfirmed and stored raw.
 - `dateIso` is the entry-line date (`MM-DD-YY`, pivot YY≥80 → 19YY).
-- `dlCount` (`d/L tIMES:`) exists on newer entries only; `uploader`
-  (`Name >>note<<` trailer) is best-effort. A `DL's: NN` stamp burned into
+- `dlCount` (`d/L tIMES:`) exists on newer entries only; `uploader` is
+  best-effort (~3% of entries name one): the `Name >>note<<` trailer plus
+  explicit credits (`Sent by:`, `Uploaded by:`, `Smashed by:`,
+  `Supplied by:`, `Brought [to you] by:`, `Uploader:`, trailing
+  `…upload by X`), first match wins, lightly normalized (trimmed,
+  unwrapped, placeholders like `unknown` dropped). Deliberately NOT read:
+  `[-nick-]` bracket runs and `( nick )` fills are courier/greet credits
+  in the art, not the uploader. A `DL's: NN` stamp burned into
   art lines at a fixed column is stripped (columns restored) and counted
   when no `d/L` line exists.
+- `/stats` mirrors the doors `/stats` dashboard shape where it applies:
+  no hidden/withDoc counts (no curation here), plus `withUploader` /
+  `withDlCount` coverage counts, a `No size (nuked)` size bucket, and
+  `overTime` as entry months (`YYYY-MM`). The uploader chart covers only
+  entries that name one — the `withUploader` count says how many that is.
 - `description`/`version`/`author` come from `contract/describe.ts` over the
   entry's description lines — the same extractor as doors, so fixes land here too.
 - `releaseGroup`/`releaseGroupFull` come from the filename prefix via the

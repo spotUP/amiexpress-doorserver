@@ -31,6 +31,16 @@
  *   - `d/L tIMES: N` → download count (newer entries only)
  *   - `Uploader >>note<<` trailer (e.g. `Bigophone >>last Belgian Trader <<`)
  *     → uploader hint. Best-effort: a line whose only `>>…<<` content matches.
+ *   - Explicit credit lines → uploader, first match wins. Full-line anchored
+ *     (`Sent by: X`, `Uploaded by X`, `Smashed by X`, `Supplied by X`,
+ *     `Brought [to you] by X`, `Uploader: X`, all case-insensitive) plus a
+ *     trailing `…upload by X` (e.g. `Another Graff-tastic upload by Graffito`).
+ *     Measured 2026-09-10 over 299,437 entries: chevron 6,044 + explicit
+ *     3,350 (overlap 29) ≈ 3.1% name an uploader. Deliberately NOT read:
+ *     `[-nick-]` bracket runs (39,721 last-lines) and `( nick )` fills are
+ *     courier/greet credits in the art, not the uploader — minting uploaders
+ *     from them would be false data. `Courier:`/`Sysop:` are role labels,
+ *     not uploaders, and are left in the description.
  *
  * The remaining block lines are the entry's mini file_id: single-line prose,
  * wrapped prose, or a full inline ASCII-art DIZ — the same three shapes
@@ -76,7 +86,66 @@ const DATE_RE = /(\d{2})-(\d{2})-(\d{2})/;
 const DELETED_RE = /^(\S+(?: \S+)*?)\s*\[DELETED\]\s+(\d{2})-(\d{2})-(\d{2})\s?(.*)$/;
 const FLAGLESS_RE = /^(.+?)\s+(\d[\d,]*)\s+(\d{2})-(\d{2})-(\d{2})\s?(.*)$/;
 const DL_RE = /d\/L tIMES:\s*(\d+)/;
-const UPLOADER_RE = /^\s*(\S[^<>]*?)\s*>>(.+)<<\s*$/;
+/**
+ * Chevron trailer. The name may not START with `>`/`<`: art title lines like
+ * `>>>>> -+- The Beast of Scoopex -+- <<<<<` (1,419 in the corpus) otherwise
+ * match with the "name" being a lone `>` — measured 2026-09-10, 1,119
+ * entries carried uploader `>`.
+ */
+const UPLOADER_RE = /^\s*([^\s<>][^<>]*?)\s*>>(.+)<<\s*$/;
+/**
+ * Explicit uploader credits, full-line anchored (case-insensitive). `Uploader:`
+ * is the 90s email-posting header (top of block, rarely last); the rest are
+ * usually the last line. `Courier:`/`Sysop:` are excluded on purpose: roles,
+ * not uploaders.
+ */
+const EXPLICIT_UPLOADER_RES = [
+  /^\s*sent\s+by\s*:?\s*(.+?)\s*$/i,
+  /^\s*upload(?:ed)?\s+by\s*:?\s*(.+?)\s*$/i,
+  /^\s*smashed\s+by\s*:?\s*(.+?)\s*$/i,
+  /^\s*suppl(?:ied|y)\s+by\s*:?\s*(.+?)\s*$/i,
+  /^\s*brought\s+(?:to\s+you\s+)?by\s*:?\s*(.+?)\s*$/i,
+  /^\s*uploader\s*:\s*(.+?)\s*$/i,
+];
+/** Trailing `…upload by X` inside a longer line (never the anchored form). */
+const TRAILING_UPLOAD_BY_RE = /upload\s+by\s+([A-Za-z0-9!_?'\/\-\\]+)\s*$/i;
+
+/**
+/** Placeholder credits that name nobody (`Uploader: unknown`, `Sent by: -`). */
+const UPLOADER_JUNK_RE = /^(unknown|none|n\/a|na|\?+|-+|\.+)$/i;
+
+/**
+ * Light cleanup for uploader credits: trim, collapse whitespace, strip one
+ * layer of symmetric wrapping (`*** X ***`, `---[ X ]---` → `X`). Case and
+ * `!`/`.` are left alone — scene nicks are stylized (`sHANE/CRUX!`,
+ * `Sonic!`) and stripping them would corrupt the name. Returns null when
+ * nothing usable remains.
+ */
+export function normalizeUploader(raw: string): string | null {
+  let s = raw.trim().replace(/\s+/g, ' ');
+  if (!s || UPLOADER_JUNK_RE.test(s)) return null;
+  for (;;) {
+    const before = s;
+    // Balanced outer pairs: [X], (X), "X", 'X'.
+    const pair = s.match(/^([\[("'])(.*)([\])"'])$/);
+    if (pair && pair[2].trim()) s = pair[2].trim();
+    // Edge ornament runs: ***, ---, ___, ~~~, ### (+ spaces).
+    s = s.replace(/^[*\-_=~#]+\s*(.*?)\s*[*\-_=~#]+$/, '$1').trim();
+    if (s === before) break;
+  }
+  return s || null;
+}
+
+/** First explicit credit match in a line, normalized — or null. */
+export function matchExplicitUploader(line: string): string | null {
+  for (const re of EXPLICIT_UPLOADER_RES) {
+    const m = line.match(re);
+    if (m) return normalizeUploader(m[1]);
+  }
+  const t = line.match(TRAILING_UPLOAD_BY_RE);
+  if (t) return normalizeUploader(t[1]);
+  return null;
+}
 /**
  * Inline download-count stamp the BBS burns into art lines at a fixed column:
  * `                       DL's: 10  \  ___//…` — the same art one dir over
@@ -244,7 +313,13 @@ export async function parseLines(
     let dlCount: number | null = null;
     let uploader: string | null = null;
     const kept: string[] = [];
-    if (entryLine.firstDesc.trim()) kept.push(entryLine.firstDesc);
+    // A credit header can ride on the entry line itself (`TOOL.LHA …
+    // Uploader: Amon HF`); it is metadata, not description.
+    if (entryLine.firstDesc.trim()) {
+      const firstCredit = matchExplicitUploader(entryLine.firstDesc);
+      if (firstCredit) uploader = firstCredit;
+      else kept.push(entryLine.firstDesc);
+    }
     for (const rawDl of descLines) {
       // Strip an inline DL's stamp first; the restored spaces keep the art
       // columns identical to the unstamped twin (same file, another dir).
@@ -262,10 +337,26 @@ export async function parseLines(
         dlCount = Number(dm[1]);
         continue;
       }
+      // Explicit credits first (more specific), then the chevron trailer.
+      // First match wins across both: courier/greet art never matches the
+      // anchored forms, so this cannot steal a real credit line.
+      if (uploader === null) {
+        const explicit = matchExplicitUploader(dl);
+        if (explicit) {
+          uploader = explicit;
+          continue;
+        }
+      }
       const um = dl.match(UPLOADER_RE);
+      // Route through the same cleanup as explicit credits: wrapping and
+      // placeholder values (`unknown`, `-`) fall through to the description
+      // instead of minting junk uploaders.
       if (um && uploader === null && !/[|¦]/.test(dl)) {
-        uploader = um[1].trim();
-        continue;
+        const chevron = normalizeUploader(um[1]);
+        if (chevron) {
+          uploader = chevron;
+          continue;
+        }
       }
       kept.push(dl);
     }

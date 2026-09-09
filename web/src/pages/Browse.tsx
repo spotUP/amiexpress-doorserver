@@ -2,8 +2,8 @@
  * The site: search, filter, sort, open a door, download it. No login is ever
  * asked for on this path - the corpus is public, and reading it is the point.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eraser, Inbox, LogIn, LogOut, RefreshCw, Search, Shield, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Eraser, Inbox, LogIn, LogOut, RefreshCw, Search, Shield, Sparkles, Trash2, Upload, Wand2, BarChart3 } from 'lucide-react';
 import {
   useBatchDelete,
   useBatchHide,
@@ -22,7 +22,7 @@ import {
 } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
-import { useReleases, useReleaseGroups } from '../api/releases';
+import { useReleases, useReleaseGroups, type ReleaseFile } from '../api/releases';
 import type { AdminUser, Door } from '../api/types';
 import { DoorTable, type SortState } from '../components/DoorTable';
 import { ReleasesTable } from '../components/ReleasesTable';
@@ -32,6 +32,8 @@ import { AuditPanel } from './Audit';
 import { HiddenPanel } from './Hidden';
 import { SubmissionsPanel } from './Submissions';
 import { ReleaseGroupsPanel } from './ReleaseGroups';
+import { ReleaseStatsPanel } from './ReleaseStats';
+import { FactsPanel } from './Facts';
 import { StatsPanel } from './Stats';
 import { SubmitDialog } from '../components/SubmitDialog';
 import { BatchToolbar } from '../components/BatchToolbar';
@@ -40,7 +42,10 @@ import { JobResultsDialog } from '../components/JobResultsDialog';
 import { SavedSearches } from '../components/SavedSearches';
 import { Button, Input, Select, ToastStack, type ToastMessage } from '../components/ui';
 
-const PER_PAGE = 50;
+const PER_PAGE_OPTIONS = [25, 50, 100, 200];
+// Both backends cap the page size (doors: 200, releases: 500); the options
+// stay within the tighter cap so one selector serves both tables.
+const DEFAULT_PER_PAGE = 50;
 
 let toastIdCounter = 0;
 
@@ -60,6 +65,8 @@ export function Browse() {
   const [unstrippedOnly, setUnstrippedOnly] = useState(false);
   const [latestOnly, setLatestOnly] = useState(false);
   const [sortState, setSortState] = useState<SortState>({ sort: 'indexed', dir: 'desc' });
+  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
+  const [paging, setPaging] = useState<'pages' | 'infinite'>('pages');
   const [relSort, setRelSort] = useState<SortState>({ sort: 'date', dir: 'desc' });
   const [relFromMonth, setRelFromMonth] = useState('');
   const [relToMonth, setRelToMonth] = useState('');
@@ -74,6 +81,8 @@ export function Browse() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [relStatsOpen, setRelStatsOpen] = useState(false);
+  const [factsOpen, setFactsOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
   // Snapshot of `selected` taken at the moment the anchor was set by a plain
@@ -126,11 +135,11 @@ export function Browse() {
       sort: sortState.sort,
       dir: sortState.dir,
       page,
-      perPage: PER_PAGE,
+      perPage,
     }),
-    [q, system, type, requires, guessedOnly, unstrippedOnly, sortState, page]
+    [q, system, type, requires, guessedOnly, unstrippedOnly, sortState, page, perPage]
   );
-  const { data, isLoading } = useDoors(query);
+  const { data, isLoading, isFetching: doorsFetching } = useDoors(query);
   const { data: facets } = useFacets();
   const relQuery = useMemo(() => {
     // Month inputs are YYYY-MM; expand to full ISO dates for the API's
@@ -150,10 +159,10 @@ export function Browse() {
       sort: relSort.sort,
       order: relSort.dir,
       page,
-      perPage: PER_PAGE,
+      perPage,
     };
-  }, [q, relFlag, relGroup, relFromMonth, relToMonth, relSort, page]);
-  const { data: relData, isLoading: relLoading } = useReleases(relQuery, isReleases);
+  }, [q, relFlag, relGroup, relFromMonth, relToMonth, relSort, page, perPage]);
+  const { data: relData, isLoading: relLoading, isFetching: relFetching } = useReleases(relQuery, isReleases);
   const { data: relGroups } = useReleaseGroups(isReleases);
 
   // Transient feedback for the batch actions that have no other visible
@@ -223,17 +232,92 @@ export function Browse() {
   }, [stripPreviewProgress, stripPreviewJobId]);
 
   const activeTotal = isReleases ? relData?.total : data?.total;
-  const pages = activeTotal ? Math.max(1, Math.ceil(activeTotal / PER_PAGE)) : 1;
+  const pages = activeTotal ? Math.max(1, Math.ceil(activeTotal / perPage)) : 1;
+  const isInfinite = paging === 'infinite';
+
+  // Infinite scroll accumulates pages into one long list. The reset key
+  // covers everything EXCEPT the page: when filters, sort, source or page
+  // size change, the list restarts from the fetch instead of appending to
+  // stale rows. Merging dedupes by row key, so StrictMode's double effects
+  // and placeholderData's previous-page echo cannot duplicate rows.
+  const doorResetKey = JSON.stringify({ ...query, page: 0 });
+  const relResetKey = JSON.stringify({ ...relQuery, page: 0 });
+  const [doorInf, setDoorInf] = useState<Door[]>([]);
+  const [relInf, setRelInf] = useState<ReleaseFile[]>([]);
+  const doorKeyRef = useRef('');
+  const relKeyRef = useRef('');
+
+  function mergeRows<T>(prev: T[], next: T[], key: (r: T) => string): T[] {
+    if (prev.length === 0) return next;
+    const seen = new Set(prev.map(key));
+    const fresh = next.filter((r) => !seen.has(key(r)));
+    return fresh.length === 0 ? prev : [...prev, ...fresh];
+  }
+
+  useEffect(() => {
+    if (!isInfinite || !data) return;
+    if (doorKeyRef.current !== doorResetKey) {
+      doorKeyRef.current = doorResetKey;
+      setDoorInf(data.rows);
+    } else if (page === 1) {
+      setDoorInf(data.rows);
+    } else {
+      setDoorInf((prev) => mergeRows(prev, data.rows, (d) => d.archiveName));
+    }
+  }, [data, page, isInfinite, doorResetKey]);
+
+  useEffect(() => {
+    if (!isInfinite || !relData) return;
+    if (relKeyRef.current !== relResetKey) {
+      relKeyRef.current = relResetKey;
+      setRelInf(relData.rows);
+    } else if (page === 1) {
+      setRelInf(relData.rows);
+    } else {
+      setRelInf((prev) => mergeRows(prev, relData.rows, (r) => String(r.id)));
+    }
+  }, [relData, page, isInfinite, relResetKey]);
+
+  const doorRows = isInfinite ? doorInf : (data?.rows ?? []);
+  const relRows = isInfinite ? relInf : (relData?.rows ?? []);
+  const shownCount = isReleases ? relRows.length : doorRows.length;
+
+  // The sentinel at the end of the list pulls the next page when it scrolls
+  // into view. isFetching (not isLoading) gates it: the next page's fetch
+  // must finish before another one starts, otherwise fast scrolling fires a
+  // burst of skipped pages.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const fetching = isReleases ? relFetching : doorsFetching;
+  useEffect(() => {
+    if (!isInfinite) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !fetching && page < pages) {
+          setPage((p) => Math.min(pages, p + 1));
+        }
+      },
+      { rootMargin: '800px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isInfinite, fetching, page, pages]);
+
   const pageLabel = isReleases
-    ? relLoading
+    ? relLoading && !relData
       ? 'Loading...'
       : relData
-        ? `Page ${page} of ${pages}`
+        ? isInfinite
+          ? `Showing ${shownCount.toLocaleString()} of ${relData.total.toLocaleString()}`
+          : `Page ${page} of ${pages}`
         : ''
-    : isLoading
+    : isLoading && !data
       ? 'Loading...'
       : data
-        ? `Page ${data.page} of ${pages}`
+        ? isInfinite
+          ? `Showing ${shownCount.toLocaleString()} of ${data.total.toLocaleString()}`
+          : `Page ${data.page} of ${pages}`
         : '';
 
   function sortBy(key: string) {
@@ -263,7 +347,9 @@ export function Browse() {
 
   const toggleRange = useCallback((index: number, event: React.MouseEvent) => {
     setSelectAllMatching(false);
-    const rows = data?.rows ?? [];
+    // Index into the VISIBLE rows: in infinite mode the table shows the
+    // accumulated list, not just the current page.
+    const rows = doorRows;
     const name = rows[index]?.archiveName;
     if (!name) return;
     if (event.shiftKey && anchorIndex !== null) {
@@ -285,17 +371,19 @@ export function Browse() {
     setSelected(next);
     setRangeBase(next);
     setAnchorIndex(index);
-  }, [data, anchorIndex, rangeBase, selected]);
+  }, [doorRows, anchorIndex, rangeBase, selected]);
 
   const toggleAll = useCallback(() => {
     setSelectAllMatching(false);
     setRangeBase(null);
     setSelected((prev) => {
-      const rows = data?.rows ?? [];
+      // Visible rows (the accumulated list in infinite mode): "select all"
+      // covers what is loaded; "select all N matching" still covers the rest.
+      const rows = doorRows;
       if (rows.every((d) => prev.has(d.archiveName))) return new Set();
       return new Set(rows.map((d) => d.archiveName));
     });
-  }, [data]);
+  }, [doorRows]);
 
   const clearSelection = useCallback(() => {
     setSelectAllMatching(false);
@@ -355,9 +443,14 @@ export function Browse() {
             <Button variant="ghost" onClick={() => setSubmitOpen(true)}>
               <Upload size={14} /> <span className="hidden sm:inline">Send in a door</span><span className="sm:hidden">Send</span>
             </Button>
-            <Button variant="ghost" onClick={() => setStatsOpen(true)}>
+            <Button variant="ghost" onClick={() => (isReleases ? setRelStatsOpen(true) : setStatsOpen(true))}>
               <BarChart3 size={14} /> <span className="hidden sm:inline">Stats</span>
             </Button>
+            {isReleases && (
+              <Button variant="ghost" onClick={() => setFactsOpen(true)}>
+                <Sparkles size={14} /> <span className="hidden sm:inline">Facts</span>
+              </Button>
+            )}
             {admin ? (
               <>
                 <span className="hidden text-xs text-muted sm:inline">
@@ -715,10 +808,10 @@ export function Browse() {
       ) : null}
 
       {isReleases ? (
-        <ReleasesTable rows={relData?.rows ?? []} sortState={relSort} onSort={sortReleasesBy} />
+        <ReleasesTable rows={relRows} sortState={relSort} onSort={sortReleasesBy} />
       ) : (
       <DoorTable
-        rows={data?.rows ?? []}
+        rows={doorRows}
         sortState={sortState}
         onSort={sortBy}
         onOpen={(door: Door) => setOpen(door.archiveName)}
@@ -740,11 +833,55 @@ export function Browse() {
       />
       )}
 
+      {isInfinite && (
+        <div ref={sentinelRef} aria-hidden="true" className="flex items-center justify-center py-4 text-sm text-muted">
+          {fetching ? (
+            <span>Loading more…</span>
+          ) : page < pages ? (
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pages, p + 1))}
+              className="rounded border border-line px-3 py-1.5 text-xs text-muted hover:bg-raised hover:text-ink"
+            >
+              Load more ({(shownCount).toLocaleString()} of {(activeTotal ?? 0).toLocaleString()})
+            </button>
+          ) : (
+            shownCount > 0 && <span>That is everything — {shownCount.toLocaleString()} rows.</span>
+          )}
+        </div>
+      )}
+
       <footer className="sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t border-line bg-bg py-3 text-sm text-muted">
         <span>
           {pageLabel}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex overflow-hidden rounded border border-line text-xs" role="group" aria-label="Paging mode">
+            <button
+              onClick={() => { setPaging('pages'); setPage(1); }}
+              aria-pressed={!isInfinite}
+              className={`px-3 py-1.5 ${!isInfinite ? 'bg-raised text-ink' : 'text-muted hover:bg-raised'}`}
+            >
+              Pages
+            </button>
+            <button
+              onClick={() => { setPaging('infinite'); setPage(1); }}
+              aria-pressed={isInfinite}
+              className={`px-3 py-1.5 ${isInfinite ? 'bg-raised text-ink' : 'text-muted hover:bg-raised'}`}
+            >
+              Infinite
+            </button>
+          </div>
+          <Select
+            value={String(perPage)}
+            onChange={(v) => { setPerPage(Number(v)); setPage(1); }}
+            options={PER_PAGE_OPTIONS.map((n) => ({ value: String(n), label: `${n} / page` }))}
+            placeholder="Per page"
+            ariaLabel={isInfinite ? 'Rows loaded at a time' : 'Rows per page'}
+            required
+          />
+          {!isInfinite && (
+          <>
           <Button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
             Previous
           </Button>
@@ -775,6 +912,8 @@ export function Browse() {
           <Button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>
             Next
           </Button>
+          </>
+          )}
         </div>
       </footer>
 
@@ -791,6 +930,8 @@ export function Browse() {
       <SubmissionsPanel open={queueOpen} onOpenChange={setQueueOpen} enabled={Boolean(admin)} />
       <ReleaseGroupsPanel open={groupsOpen} onOpenChange={setGroupsOpen} enabled={Boolean(admin)} />
       <StatsPanel open={statsOpen} onOpenChange={setStatsOpen} />
+      <ReleaseStatsPanel open={relStatsOpen} onOpenChange={setRelStatsOpen} />
+      <FactsPanel open={factsOpen} onOpenChange={setFactsOpen} />
       <SubmitDialog open={submitOpen} onOpenChange={setSubmitOpen} />
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>

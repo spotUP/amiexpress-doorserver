@@ -2,6 +2,8 @@
  * The releases surface: read-only HTTP over releases.db, beside the door repo.
  *
  *   GET /health        { status, contractVersion, revision, files }
+ *   GET /stats         aggregated counts for the dashboard
+ *   GET /facts         headline records for the facts page
  *   GET /list          JSON ReleaseListResponse (?q=&flag=&dir=&from=&to=&sort=&order=&limit=&offset=)
  *   GET /list.txt      house plain-text index (same filters, ISO-8859-1/CRLF)
  *   GET /files/:id     one ReleaseRow, or 404 { error: "not_found" }
@@ -19,7 +21,9 @@ import {
   DUMP_DEFAULT_FIELDS,
   getReleaseById,
   getReleasesCount,
+  getReleasesFacts,
   getReleasesRevision,
+  getReleasesStats,
   listReleaseGroups,
   queryReleases,
   streamReleases,
@@ -158,6 +162,22 @@ export function createReleasesRouter(_cfg: ServerConfig, rel: ReleasesConfig): e
       contractVersion: RELEASES_CONTRACT_VERSION,
       revision: getReleasesRevision(rel),
       groups: listReleaseGroups(rel),
+    });
+  });
+
+  router.get('/stats', (_req: Request, res: Response) => {
+    res.json({
+      contractVersion: RELEASES_CONTRACT_VERSION,
+      revision: getReleasesRevision(rel),
+      ...getReleasesStats(rel),
+    });
+  });
+
+  router.get('/facts', (_req: Request, res: Response) => {
+    res.json({
+      contractVersion: RELEASES_CONTRACT_VERSION,
+      revision: getReleasesRevision(rel),
+      ...getReleasesFacts(rel),
     });
   });
 

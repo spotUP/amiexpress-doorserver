@@ -8,6 +8,8 @@
  */
 import * as fs from 'fs';
 import {
+  matchExplicitUploader,
+  normalizeUploader,
   parseEntryLine,
   parseLines,
   parseFilelist,
@@ -285,6 +287,91 @@ describe('parseLines blocks', () => {
     const { entries, anomalies } = await collect('[ File #9 ]\n[ End of File List ]\n');
     expect(entries).toHaveLength(0);
     expect(anomalies).toHaveLength(1);
+  });
+});
+
+describe('explicit uploader trailers', () => {
+  it('normalizes wrapping but keeps stylized nicks intact', () => {
+    expect(normalizeUploader('  *** BLUEBEARD *** ')).toBe('BLUEBEARD');
+    expect(normalizeUploader('-----[  EddiE  ]-----')).toBe('EddiE');
+    expect(normalizeUploader('sHANE/CRUX!')).toBe('sHANE/CRUX!');
+    expect(normalizeUploader('Sonic!')).toBe('Sonic!');
+    expect(normalizeUploader('  SiDeSaLaD  ')).toBe('SiDeSaLaD');
+  });
+
+  it('rejects placeholder credits that name nobody', () => {
+    expect(normalizeUploader('unknown')).toBeNull();
+    expect(normalizeUploader(' - ')).toBeNull();
+    expect(normalizeUploader('???')).toBeNull();
+    expect(normalizeUploader('')).toBeNull();
+  });
+
+  it('matches the explicit credit forms and nothing else', () => {
+    expect(matchExplicitUploader('Sent by: SiDeSaLaD')).toBe('SiDeSaLaD');
+    expect(matchExplicitUploader('sent by AMON')).toBe('AMON');
+    expect(matchExplicitUploader('Uploaded by THE TEA DRINKER')).toBe('THE TEA DRINKER');
+    expect(matchExplicitUploader('Smashed by:   Belø\\X/ 0')).toBe('Belø\\X/ 0');
+    expect(matchExplicitUploader('Supplied by DPJ/MYSTIC')).toBe('DPJ/MYSTIC');
+    expect(matchExplicitUploader('Brought to you by QuAtRo')).toBe('QuAtRo');
+    expect(matchExplicitUploader('Uploader: Amon HF')).toBe('Amon HF');
+    expect(matchExplicitUploader('Another Graff-tastic upload by Graffito')).toBe('Graffito');
+    // Courier/greet art and roles are NOT uploaders.
+    expect(matchExplicitUploader('[-fAShbACk!-]¼[-sCX-][-mYtH-]')).toBeNull();
+    expect(matchExplicitUploader('[-------------------------------( CASE )---]')).toBeNull();
+    expect(matchExplicitUploader('Courier: Xad/Nightfall')).toBeNull();
+    expect(matchExplicitUploader('Deep Core Fix (Classic Crack)')).toBeNull();
+  });
+
+  it('pulls a last-line Sent by credit out of the description', async () => {
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'FIX.LHA      P 1234  01-01-90  Deep Core Fix (Classic Crack)',
+      '                                 SideSalad',
+      '                                 Sent by: SiDeSaLaD',
+      '[ File #2 ]                     ·===============·',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].uploader).toBe('SiDeSaLaD');
+    expect(entries[0].descLines).toEqual(['Deep Core Fix (Classic Crack)', 'SideSalad']);
+  });
+
+  it('reads a top-of-block Uploader email header, keeps art credits as description', async () => {
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'TOOL.LHA     P 1234  01-01-90  Uploader: Amon HF',
+      '                                 A useful tool.',
+      '                                 [-fAShbACk!-]¼[-sCX-][-mYtH-]',
+      '[ File #2 ]                     ·===============·',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].uploader).toBe('Amon HF');
+    expect(entries[0].descLines).toContain('[-fAShbACk!-]¼[-sCX-][-mYtH-]');
+  });
+
+  it('does not read art title chevrons as uploaders', async () => {
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'BEAST.LHA    P 1234  01-01-90  >>>>> -+- The Beast of Scoopex -+- welcome! <<<<<',
+      '[ File #2 ]                     ·===============·',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].uploader).toBeNull();
+    expect(entries[0].descLines).toEqual(['>>>>> -+- The Beast of Scoopex -+- welcome! <<<<<']);
+  });
+
+  it('leaves entries with no credit line at null uploader', async () => {
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'NOCRED.LHA   P 1234  01-01-90  Just a file.',
+      '                                 [---( CASE )---]',
+      '[ File #2 ]                     ·===============·',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].uploader).toBeNull();
   });
 });
 

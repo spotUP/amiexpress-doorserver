@@ -49,10 +49,10 @@ function seedReleases(cfg: ServerConfig): void {
         (dir_no, file_no, filename, flag, size_bytes, size_note, date_iso, dl_count, uploader, description, version, author, release_group, release_group_full, raw_desc)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    ins.run(1, 1, 'BETTER.WRP', 'N', 324864, null, '1988-12-12', null, null, 'Dead than Alien! Kool game.', null, null, null, null, 'Better Dead than Alien! Kool game!');
+    ins.run(1, 1, 'BETTER.WRP', 'N', 324864, null, '1988-12-12', null, 'AMON', 'Dead than Alien! Kool game.', null, null, null, null, 'Better Dead than Alien! Kool game!');
     ins.run(2, 1, 'SCAPEMAK.DMS', 'D', null, '>NUKED<', '1992-03-28', null, null, 'Scape Maker.', '1.3', null, null, null, 'Scape Maker v1.3');
-    ins.run(61, 2, 'STORM-TR.LHA', 'P', 420431, null, '2020-01-03', 5, null, 'Storm tracker.', null, null, 'STORM', 'Storm', 'Storm tracker.');
-    ins.run(61, 3, 'PRISM2V2.LHA', 'P', 420431, null, '2020-01-03', 5, null, 'Prism2v2.Device for WiFi!', null, null, null, null, 'Prism2v2.Device for WiFi!');
+    ins.run(61, 2, 'STORM-TR.LHA', 'P', 420431, null, '2020-01-03', 5, 'AMON', 'Storm tracker.', null, null, 'STORM', 'Storm', 'Storm tracker.');
+    ins.run(61, 3, 'PRISM2V2.LHA', 'P', 420431, null, '2020-01-03', 5, 'SiDeSaLaD', 'Prism2v2.Device for WiFi!', null, null, null, null, 'Prism2v2.Device for WiFi!');
   } finally {
     db.close();
   }
@@ -181,6 +181,55 @@ describe('releases surface', () => {
     const f = await request(app).get('/releases/v1/list?group=storm');
     expect(f.body.total).toBe(1);
     expect(f.body.rows[0].releaseGroup).toBe('STORM');
+  });
+
+  it('answers stats with flag, group and uploader breakdowns', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const res = await request(createApp(cfg)).get('/releases/v1/stats');
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(4);
+    expect(res.body.withUploader).toBe(3);
+    expect(res.body.withDlCount).toBe(2);
+    expect(res.body.byUploader[0]).toEqual({ value: 'AMON', n: 2 });
+    expect(res.body.byFlag).toContainEqual({ value: 'P', n: 2 });
+    expect(res.body.byGroup).toEqual([{ value: 'STORM', n: 1 }]);
+    expect(res.body.sizeDistribution).toContainEqual({ value: 'No size (nuked)', n: 1 });
+    expect(res.body.overTime[0]).toEqual({ value: '1988-12', n: 1 });
+    expect(res.headers['x-releases-contract']).toBe('1');
+  });
+
+  it('answers facts with headline records', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    // One art-bearing description so firstDiz has a winner (base seed is prose).
+    const db = new Database(cfg.releases!.dbPath);
+    try {
+      db.prepare(
+        `INSERT INTO release_files
+           (dir_no, file_no, filename, flag, size_bytes, size_note, date_iso, dl_count, uploader, description, version, author, release_group, release_group_full, raw_desc)
+         VALUES (7, 1, 'ARTDIZ.LHA', 'P', 100, null, '1990-06-01', null, null, 'An art diz.', null, null, null, null, '____\n| art |\n| art |\n____')`
+      ).run();
+    } finally {
+      db.close();
+    }
+    const res = await request(createApp(cfg)).get('/releases/v1/facts');
+    expect(res.status).toBe(200);
+    expect(res.body.span.firstDate).toBe('1988-12-12');
+    expect(res.body.span.lastDate).toBe('2020-01-03');
+    expect(res.body.span.firstFile.filename).toBe('BETTER.WRP');
+    expect(res.body.firstDiz.filename).toBe('ARTDIZ.LHA');
+    expect(res.body.firstDiz.lines).toBe(4);
+    expect(res.body.peakYear).toEqual({ year: '2020', n: 2 });
+    expect(res.body.peakMonth).toEqual({ month: '2020-01', n: 2 });
+    expect(res.body.topExt[0]).toEqual({ ext: '.LHA', n: 3 });
+    expect(res.body.extCrossover).toBeNull();
+    expect(res.body.weekday.day).toBe('Friday');
+    expect(res.body.biggest.sizeBytes).toBe(420431);
+    expect(res.body.longestDesc.filename).toBe('BETTER.WRP');
+    expect(res.body.mostDownloaded.dlCount).toBe(5);
+    expect(res.body.medianSize).toBe(324864);
+    expect(res.body.futureCount).toBe(0);
   });
 
   it('serves list.txt in the house format', async () => {

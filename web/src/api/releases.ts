@@ -87,6 +87,60 @@ export interface ReleaseGroup {
   files: number;
 }
 
+export interface ReleaseStats {
+  contractVersion: string;
+  revision: string;
+  total: number;
+  withUploader: number;
+  withDlCount: number;
+  byFlag: { value: string | null; n: number }[];
+  byGroup: { value: string | null; n: number }[];
+  byUploader: { value: string | null; n: number }[];
+  byAuthor: { value: string | null; n: number }[];
+  sizeDistribution: { value: string | null; n: number }[];
+  overTime: { value: string | null; n: number }[];
+}
+
+export interface FactsFile {
+  filename: string;
+  dirNo: number;
+  fileNo: number;
+  dateIso: string;
+}
+
+export interface ReleaseFacts {
+  contractVersion: string;
+  revision: string;
+  span: { firstDate: string; lastDate: string; firstFile: FactsFile; lastFile: FactsFile };
+  firstDiz: (FactsFile & { lines: number; rawDesc: string }) | null;
+  peakYear: { year: string; n: number };
+  peakMonth: { month: string; n: number };
+  topExt: { ext: string; n: number }[];
+  extCrossover: { year: string } | null;
+  weekday: { day: string; counts: number[] };
+  biggest: (FactsFile & { sizeBytes: number }) | null;
+  longestDesc: (FactsFile & { chars: number; lines: number }) | null;
+  mostDownloaded: (FactsFile & { dlCount: number }) | null;
+  medianSize: number | null;
+  futureCount: number;
+}
+
+export function useReleaseFacts(enabled = true) {
+  return useQuery({
+    queryKey: [...releaseKeys.all, 'facts'] as const,
+    queryFn: () => get<ReleaseFacts>('/facts'),
+    enabled,
+  });
+}
+
+export function useReleaseStats(enabled = true) {
+  return useQuery({
+    queryKey: [...releaseKeys.all, 'stats'] as const,
+    queryFn: () => get<ReleaseStats>('/stats'),
+    enabled,
+  });
+}
+
 export function useReleaseGroups(enabled = true) {
   return useQuery({
     queryKey: [...releaseKeys.all, 'groups'] as const,
