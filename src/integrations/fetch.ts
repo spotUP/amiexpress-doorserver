@@ -85,6 +85,66 @@ export function createHeadStatus(opts?: { timeoutMs?: number }): HeadStatus {
   return async (url: string) => Number(await getBody(url, '*/*', timeoutMs, 'HEAD'));
 }
 
+export interface RawResponse {
+  status: number;
+  location?: string;
+  body: Buffer;
+}
+
+/** Status + headers + body without following redirects: the custom-source
+ *  adapter validates each hop itself (SSRF guard), the shared JSON fetcher
+ *  fails 3xx closed. Same timeout and cap. */
+export function fetchRaw(
+  url: string,
+  opts?: { timeoutMs?: number; maxBytes?: number; headers?: Record<string, string> }
+): Promise<RawResponse> {
+  const timeoutMs = opts?.timeoutMs ?? FETCH_TIMEOUT_MS;
+  const maxBytes = opts?.maxBytes ?? FETCH_MAX_BYTES;
+  return new Promise((resolve, reject) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      reject(new Error('bad url'));
+      return;
+    }
+    if (parsed.protocol !== 'https:') {
+      reject(new Error('https only'));
+      return;
+    }
+    const req = https.request(
+      url,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json', 'User-Agent': USER_AGENT, ...(opts?.headers ?? {}) },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        res.on('data', (c: Buffer) => {
+          bytes += c.length;
+          if (bytes > maxBytes) {
+            req.destroy(new ResponseTooLarge(maxBytes));
+            return;
+          }
+          chunks.push(c);
+        });
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            location: res.headers.location,
+            body: Buffer.concat(chunks),
+          })
+        );
+        res.on('error', reject);
+      }
+    );
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('fetch timeout')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 /** SSRF guard for caller-supplied URLs (/check, custom sources): https
  *  only, no credentials in the URL, and the host must not resolve to a
  *  loopback / RFC-1918 / link-local address. Throws on violation. */

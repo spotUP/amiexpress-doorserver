@@ -20,6 +20,7 @@ import { omdbAdapter } from './omdb';
 import { demopartyAdapter } from './demoparty';
 import { artpacksAdapter } from './artpacks';
 import { radioAdapter } from './radio';
+import { loadCustomAdapters } from './custom';
 import { getConfig, getSecretForAdapter, getCache, getStaleCache, setCache } from './store';
 
 export const ANSWER_CACHE_TTL_SECONDS = 120;
@@ -102,6 +103,10 @@ export async function answer(
   if (hit) return { ...(JSON.parse(hit.body) as Answer), stale: false };
 
   const enabled = ADAPTERS.filter((a) => isEnabled(db, a));
+  // Custom sources are data, not code: enabled + valid ones join the
+  // same fan-out with the same attribution. Invalid/disabled stay dark.
+  const customs = loadCustomAdapters(db);
+  enabled.push(...customs);
   const sources: SourceResult[] = [];
   const perSource: AnswerItem[][] = [];
 
@@ -149,7 +154,12 @@ export async function answer(
       if (staleAnswer.results.length > 0) return { ...staleAnswer, stale: true };
     }
   } else {
-    setCache(db, cacheKey, JSON.stringify(merged), ANSWER_CACHE_TTL_SECONDS);
+    // A custom source's own TTL tightens the merged row it rides in.
+    const customTtls = customs
+      .map((a) => a.ttlSeconds)
+      .filter((t): t is number => typeof t === 'number');
+    const ttl = customTtls.length ? Math.min(ANSWER_CACHE_TTL_SECONDS, ...customTtls) : ANSWER_CACHE_TTL_SECONDS;
+    setCache(db, cacheKey, JSON.stringify(merged), ttl);
   }
   return merged;
 }

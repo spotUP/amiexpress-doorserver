@@ -41,6 +41,8 @@ export interface Adapter {
   id: string;
   name: string;
   needsKey: boolean;
+  /** Custom sources only: tightens the merged-answer cache row. */
+  ttlSeconds?: number;
   search: (q: string, ctx: AdapterContext) => Promise<AnswerItem[]>;
   /** Absent when the source has no random endpoint. */
   random?: (ctx: AdapterContext) => Promise<AnswerItem[]>;
