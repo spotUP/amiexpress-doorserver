@@ -37,9 +37,10 @@ services:
       ACHIEVEMENTS_MAIL_FROM: ${ACHIEVEMENTS_MAIL_FROM:-}
       ACHIEVEMENTS_BASE_URL: ${ACHIEVEMENTS_BASE_URL:-https://doors.uprough.net}
       # The releases surface (docs/RELEASES-API.md). Same volume, own file,
-      # own surface: unset, the surface is off and everything else serves as
-      # before. Populated offline by scripts/import-bbs-filelist.ts.
-      RELEASES_DB: ${RELEASES_DB:-}
+      # own surface: empty when never imported (the server creates it, the
+      # importer fills it offline via scripts/import-bbs-filelist.ts), and
+      # everything else serves as before either way.
+      RELEASES_DB: ${RELEASES_DB:-/data/releases.db}
       # Uploads wait in /data/quarantine (beside the database, never inside
       # the archive root); the server creates it at startup.
     healthcheck:
