@@ -186,7 +186,7 @@ describe('a box row is read as cells, not as a sentence', () => {
 
   it('describes MST-JC40 by what the door does', () => {
     const { description } = read(JC40, 'JoinCnf', 'JoinCnf', 'MST-JC40.LHA');
-    expect(description).toBe('Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs');
+    expect(description).toBe('Totally New Lay-Out Manages up to 256 Cnfs');
   });
 
   it('keeps a single word trapped in border art out of the description', () => {
@@ -214,7 +214,7 @@ describe('metadata is not description', () => {
     // version is still a real requirement, and "written for" is the
     // dangling connector the removal leaves behind.
     const { description, requiresBbs } = read(MT20, 'MultiTop', 'MultiTop', 'MST-MT20.LHA');
-    expect(description).toBe('MultiTop The Best Top Utility ever');
+    expect(description).toBe('The Best Top Utility ever');
     expect(requiresBbs).toBe('AmiExpress');
   });
 
@@ -390,7 +390,7 @@ describe('falling back', () => {
       '+------------------------------------------+',
     ].join('\n');
     const { description, version } = read(diz, 'userlist', 'userlist', 'DLT-UL11.LHA');
-    expect(description).toBe('User List - Update Nike/Dlt');
+    expect(description).toBe('Update Nike/Dlt');
     expect(version).toBe('1.1');
   });
 
@@ -434,10 +434,11 @@ describe('falling back', () => {
 
   it('prefixes the program name when the line does not already carry it', () => {
     // The bare "For AmiExpress" mention (no version) moves into
-    // requiresBbs, same as a versioned one would.
+    // requiresBbs, same as a versioned one would. The program name is no
+    // longer prefixed – the name column already carries it.
     const diz = 'Split Chat Door For AmiExpress';
     const { description, requiresBbs } = read(diz, 'FullChat', null, 'FULLCHAT.LHA');
-    expect(description).toBe('Full Chat - Split Chat Door');
+    expect(description).toBe('Split Chat Door');
     expect(requiresBbs).toBe('AmiExpress');
   });
 

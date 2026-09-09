@@ -49,7 +49,7 @@
  * stale mirror is caught as a mismatch rather than as a silent divergence in
  * what a caller reads about a door.
  */
-export const DESCRIBE_CONTRACT_VERSION = '3';
+export const DESCRIBE_CONTRACT_VERSION = '4';
 
 /** Frame punctuation: decoration at either end of a cell. */
 const FRAME = " :-*()[]|_=+~<>.,'\"`^¦¬·°#!?/\\";
@@ -1037,6 +1037,65 @@ export function compose(prog: string, body: string): string {
   return prog || body;
 }
 
+/** Strip a leading prog name that duplicated the separate `name` column.
+ *  e.g. "Bbsguard . One of the best..." -> "One of the best...",
+ *  "Bbsguard - One of..." -> "One of...",  "Kclhaad LHA tester..." -> "LHA tester..."
+ *  Uses squash (alphanumeric only, lowercased) so "BBS Guard" matches "Bbsguard"
+ *  and "Adi Menu" matches "AdiMenu". Handles " - ", " . ", ".", ":", etc. */
+export function stripLeadingProg(desc: string, prog: string): string {
+  if (!desc || !prog) return desc;
+  const progTrim = prog.trim();
+  if (!progTrim) return desc;
+  const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const progSquash = squash(progTrim);
+  if (!progSquash) return desc;
+  const descSquash = squash(desc);
+  // Exact prog alone – don't strip (bodyAddsNothing case)
+  if (descSquash === progSquash) return desc;
+  if (!descSquash.startsWith(progSquash)) return desc;
+  // Also require word-boundary: the prog prefix must be followed by a word break in desc,
+  // otherwise "BBS" would strip from "BBSize" incorrectly. Check that the character after
+  // prog in desc is not a letter/digit (or desc is longer).
+  // Find where prog ends in desc by counting words that squash to prog.
+  const progWords = progTrim.split(/\s+/).filter(Boolean);
+  const descWords = desc.split(/\s+/);
+  // Try word-wise first (handles "Adi Menu" -> "Adi Menu Handles...")
+  let wordMatch = true;
+  for (let i = 0; i < progWords.length; i++) {
+    if (squash(descWords[i] || '') !== squash(progWords[i])) {
+      wordMatch = false;
+      break;
+    }
+  }
+  if (wordMatch) {
+    if (descWords.length === progWords.length) return desc;
+    return descWords.slice(progWords.length).join(' ').trim().replace(/^[.\-:\s]+/, '').trim();
+  }
+  // Fallback: squash prefix match (handles "BBS Guard" vs "Bbsguard")
+  // Find the split point in desc where squash reaches prog length
+  let acc = '';
+  let splitIdx = -1;
+  for (let i = 0; i < descWords.length; i++) {
+    acc += squash(descWords[i]);
+    if (acc === progSquash) {
+      splitIdx = i;
+      break;
+    }
+    if (acc.length > progSquash.length) break;
+  }
+  if (splitIdx !== -1) {
+    return descWords.slice(splitIdx + 1).join(' ').trim().replace(/^[.\-:\s]+/, '').trim();
+  }
+  // Last resort: regex with optional space/punctuation (handles "Bbsguard . One...")
+  const esc = progTrim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const prefixed = new RegExp(`^${esc}\\s*[\\-\\.:]*\\s*`, 'i');
+  if (prefixed.test(desc)) {
+    const stripped = desc.replace(prefixed, '').trim();
+    if (stripped) return stripped;
+  }
+  return desc;
+}
+
 /**
  * Remove a version glued onto the program name ("aereg 106" + 1.06), but
  * only when the digits actually match the version we extracted, so
@@ -1317,13 +1376,32 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
   const auth = splitAuthor(body, dizAuthor || (input.catalogAuthor ?? banner.credit));
   body = auth.text;
 
+  const originalProgForStrip = prog;
   prog = capitaliseName(stripVersionTail(prog, ver.version));
   if (prog && progCoveredByBody(prog, body)) prog = '';
 
   // 250-char cap: a wrapped DIZ paragraph is often 120-200 chars; 60/120 truncated mid-sentence
   // (e.g. "Additional", "so", "Walls" at 119, KCL's "and I really" at 119). 250 keeps the full
   // paragraph for the JSON manifest and web UI; list.txt still does its own 120-char slice.
-  let description: string | null = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))), 250);
+  let composed = finalise(toPlain(compose(tidyCase(prog), tidyCase(body))), 250);
+  // Strip leading prog name – the name is already a separate column, so
+  // "Bbsguard . One of the best..." should be just "One of the best...".
+  // Use original prog (before progCoveredByBody cleared it) so "Adi Menu
+  // Handles..." where body already starts with prog is also stripped.
+  const progForStrip = tidyCase(originalProgForStrip || prog);
+  let description: string | null = composed ? stripLeadingProg(composed, progForStrip) : null;
+  // Also try stripping the catalog name when prog was empty (e.g. KCL where
+  // binaryName is null but DIZ starts with "Kclhaad")
+  if (description && input.name) {
+    const nameForStrip = tidyCase(toPlain(input.name));
+    const alt = stripLeadingProg(description, nameForStrip);
+    if (alt !== description && alt) description = alt;
+  }
+  if (description && input.archiveName) {
+    const baseForStrip = tidyCase(toPlain(archiveBase(input.archiveName)));
+    const alt2 = stripLeadingProg(description, baseForStrip);
+    if (alt2 !== description && alt2 && alt2.length >= 20) description = alt2;
+  }
   if (!description) {
     // Everything the DIZ offered was a credit (KDZ!LUDB.LHA's only
     // prose line is "dONE bY sERAPH - !BUGFIXED VERSION", which moves

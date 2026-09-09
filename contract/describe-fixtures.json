@@ -1,5 +1,5 @@
 {
-  "contractVersion": "3",
+  "contractVersion": "4",
   "note": "GENERATED from tests/describe.test.ts. Both repos run these cases.",
   "cases": [
     {
@@ -20,7 +20,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "description": "Totally New Lay-Out Manages up to 256 Cnfs",
         "version": "4.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -44,7 +44,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "description": "Totally New Lay-Out Manages up to 256 Cnfs",
         "version": "4.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -68,7 +68,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "description": "Totally New Lay-Out Manages up to 256 Cnfs",
         "version": "4.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -92,7 +92,7 @@
         "MST"
       ],
       "expected": {
-        "description": "MultiTop The Best Top Utility ever",
+        "description": "The Best Top Utility ever",
         "version": "2.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -116,7 +116,7 @@
         "MST"
       ],
       "expected": {
-        "description": "MultiTop The Best Top Utility ever",
+        "description": "The Best Top Utility ever",
         "version": "2.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -140,7 +140,7 @@
         "MST"
       ],
       "expected": {
-        "description": "MultiTop The Best Top Utility ever",
+        "description": "The Best Top Utility ever",
         "version": "2.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -164,7 +164,7 @@
         "MST"
       ],
       "expected": {
-        "description": "MultiTop The Best Top Utility ever",
+        "description": "The Best Top Utility ever",
         "version": "2.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -212,7 +212,7 @@
         "MST"
       ],
       "expected": {
-        "description": "User Command to list all users of the BBS many extra features like Search Name Part or",
+        "description": "Command to list all users of the BBS many extra features like Search Name Part or",
         "version": "1.10",
         "author": "",
         "requiresBbs": ""
@@ -236,7 +236,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Adi Menu Handles Textfiles like Commands, so use it as Doormenu, Filemenu or whatever",
+        "description": "Handles Textfiles like Commands, so use it as Doormenu, Filemenu or whatever",
         "version": "1.0",
         "author": "THE Addict/5D",
         "requiresBbs": ""
@@ -332,7 +332,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Join Cnf - Totally New Lay-Out Manages up to 256 Cnfs",
+        "description": "Totally New Lay-Out Manages up to 256 Cnfs",
         "version": "4.0",
         "author": "",
         "requiresBbs": "AmiExpress"
@@ -476,7 +476,7 @@
         "MST"
       ],
       "expected": {
-        "description": "User List - Update Nike/Dlt",
+        "description": "Update Nike/Dlt",
         "version": "1.1",
         "author": "",
         "requiresBbs": ""
@@ -620,7 +620,7 @@
         "MST"
       ],
       "expected": {
-        "description": "Full Chat - Split Chat Door",
+        "description": "Split Chat Door",
         "version": "",
         "author": "",
         "requiresBbs": "AmiExpress"
