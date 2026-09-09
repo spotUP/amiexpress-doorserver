@@ -25,8 +25,7 @@ Result: **153 inserted** (min 20 files/tag), **97 held** (conflicts like
 `SH: Sieg Heil!/SpaceHawks`, `SOS: Software of Sweden/Save Our Souls`,
 `APX: Appendix/Apex`, `APT: Apathy/Advanced Pirating Technologies`,
 `SNT: Sanity/Stupid Name Team`, `TSB: The Special Brothers/The Spaceballs`
-+ thin ones like `HTS`, `SCB`, `E^D`). Includes `PTL→Reko`… wait, no:
-re-check log before claiming. Confirmed inserts include `IRS→Iris` (183),
++ thin ones like `HTS`, `SCB`, `E^D`). Confirmed inserts include `IRS→Iris` (183),
 `SPB→Spaceballs` (152), `TEK→The Electronic Knights` (323),
 `PDY→Prodigy`, `A8S→After Eights`, `MWI→Madwizards`, `DPH→Depth`,
 `IFT→Infect`, `NCE→Nuance`, `CRB→Cryptoburners`, `CSL→Crystal`,
@@ -43,15 +42,15 @@ Live `doors.db` updated via targeted SQL + pre-backup (839 rows total).
   single letters, `SE` (ambiguous ascii odds), `SH` (mixed: Sledge Hammer
   `SH_MPLS` vs `SH-OCKED` "shocked" — needs owner call).
 - **Strong leads for hand curation** (via admin release-groups UI):
-  `PTL→Reko?` (53% of descs credit Reko), `S8→Islona?` (32%),
-  `ATX→Anthrox?` (trainers credited Anthrox), `DLT→Delight?`,
-  `APX→Apex` (`Apex - Denistro`), `AND→Andromeda`, `A8S→After Eights`
-  (`After Eights 1st Production`), `AC!→Artcore` (`-Artcore`),
-  `IRS→Iris` (`-Iris`), `DKG→Dark Age`, `APT→Apathy`, `FTR→Factor`,
-  `MIR→Mirage` (`Mirage Chit-chat`), `TP5/TP6/TP7→The Party` (years match).
-- **Demozoo scrape: not feasible cleanly.** No search endpoint, list rows lack
-  abbreviations (145k details infeasible), site search is Cloudflare-walled.
-  The listing + existing Demozoo door data is the source; rest is hand curation.
+  `S8→Islona?` (32%), `ATX→Anthrox?`, `DLT→Delight?`, `MIR→Mirage`,
+  `TP5/TP6/TP7→The Party` (years match). Resolved by the cross-match instead:
+  `PTL→Purple Turtle` (not Reko — desc credit misled), `AND→Anadune`
+  (not Andromeda), `APX→Appendix` wins over Apex on prod count (held as
+  conflict — owner call), same for `APT`, `FTR`, `SNT`, `TSB`.
+- **Demozoo scrape: feasible after all.** No search endpoint, list rows lack
+  abbreviations, site search Cloudflared — but enumerating all 78,437 Amiga
+  productions (platforms 5/6/26, ~15 min, cached+resumable) and harvesting
+  `author_nicks` works and is now `scripts/fetch-demozoo-groups.ts`.
 
 ## Full credit table (tag, files, top co-occurring credits)
 
