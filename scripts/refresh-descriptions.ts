@@ -61,18 +61,18 @@ const updateStmt = db.prepare(`
 
 const tx = db.transaction(() => {
   for (const row of rows) {
-    const hasDescOverride = overrides.get(row.id)?.has('description');
-    const hasNameOverride = overrides.get(row.id)?.has('name');
-    const hasVersionOverride = overrides.get(row.id)?.has('version');
-    const hasAuthorOverride = overrides.get(row.id)?.has('author');
-    const hasRequiresOverride = overrides.get(row.id)?.has('requires_bbs');
-
-    // If all overridable fields we care about are already hand-edited, skip entirely
-    const allOverridden = hasDescOverride && hasNameOverride && hasVersionOverride && hasAuthorOverride && hasRequiresOverride;
-    if (allOverridden) {
+    const hasAnyOverride = overrides.has(row.id);
+    // The "edited" badge means the door has been hand-edited for any field;
+    // per the user's request, those doors remain untouched entirely.
+    if (hasAnyOverride) {
       skippedEdited++;
       continue;
     }
+    const hasDescOverride = false;
+    const hasNameOverride = false;
+    const hasVersionOverride = false;
+    const hasAuthorOverride = false;
+    const hasRequiresOverride = false;
 
     const derived = analyseDoor({
       dizText: row.file_id_diz,
