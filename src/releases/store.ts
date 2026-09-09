@@ -14,6 +14,7 @@ export interface ReleaseQuery {
   dir?: number;
   from?: string;
   to?: string;
+  sort?: string;
   order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
@@ -35,6 +36,32 @@ const ALL_COLUMNS = `id, dir_no AS dirNo, file_no AS fileNo, filename, flag,
   dl_count AS dlCount, uploader, description, version, author,
   release_group AS releaseGroup, release_group_full AS releaseGroupFull,
   raw_desc AS rawDesc`;
+
+/**
+ * Sort keys are an allowlist mapped to SQL, never interpolated from the
+ * query string: `sort` reaches this straight from a URL.
+ */
+export const RELEASE_SORT_COLUMNS: Record<string, string> = {
+  id: 'id',
+  filename: 'filename COLLATE NOCASE',
+  group: 'release_group COLLATE NOCASE',
+  flag: 'flag',
+  size: 'size_bytes',
+  date: 'date_iso',
+  dir: 'dir_no',
+  file: 'file_no',
+  version: 'version COLLATE NOCASE',
+  author: 'author COLLATE NOCASE',
+  downloads: 'dl_count',
+  uploader: 'uploader COLLATE NOCASE',
+};
+
+export function resolveReleaseSort(sort: string | undefined): string {
+  if (sort && Object.prototype.hasOwnProperty.call(RELEASE_SORT_COLUMNS, sort)) {
+    return RELEASE_SORT_COLUMNS[sort];
+  }
+  return RELEASE_SORT_COLUMNS.id;
+}
 
 /** Slim default for bulk pulls: everything except the art block. */
 export const DUMP_DEFAULT_FIELDS: ReleaseField[] = [
@@ -152,9 +179,12 @@ export function queryReleases(
 ): { total: number; rows: Partial<ReleaseRow>[]; limit: number; offset: number } {
   const limit = Math.min(LIST_MAX_LIMIT, Math.max(1, Math.floor(q.limit ?? LIST_DEFAULT_LIMIT)));
   // A cursor is the position: offset is ignored while one is active, and the
-  // order is forced ascending so "everything after X" means one thing.
+  // sort+order are forced to id ascending so "everything after X" means one
+  // thing. A cursor running in any other order is a contradiction.
   const offset = q.since !== undefined ? 0 : Math.max(0, Math.floor(q.offset ?? 0));
+  const sortSql = q.since !== undefined ? RELEASE_SORT_COLUMNS.id : resolveReleaseSort(q.sort);
   const order = q.since !== undefined ? 'ASC' : q.order === 'desc' ? 'DESC' : 'ASC';
+  const orderBy = sortSql === RELEASE_SORT_COLUMNS.id ? `ORDER BY id ${order}` : `ORDER BY ${sortSql} ${order}, id ASC`;
   const columns = columnsFor(q.fields, ALL_COLUMNS);
   return withReleasesDb(
     rel,
@@ -163,7 +193,7 @@ export function queryReleases(
       const total = (db.prepare(`SELECT COUNT(*) AS n FROM release_files ${clause}`).get(...params) as { n: number })
         .n;
       const rows = db
-        .prepare(`SELECT ${columns} FROM release_files ${clause} ORDER BY id ${order} LIMIT ? OFFSET ?`)
+        .prepare(`SELECT ${columns} FROM release_files ${clause} ${orderBy} LIMIT ? OFFSET ?`)
         .all(...params, limit, offset) as Partial<ReleaseRow>[];
       return { total, rows, limit, offset };
     },

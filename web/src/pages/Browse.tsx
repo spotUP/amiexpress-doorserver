@@ -60,6 +60,9 @@ export function Browse() {
   const [unstrippedOnly, setUnstrippedOnly] = useState(false);
   const [latestOnly, setLatestOnly] = useState(false);
   const [sortState, setSortState] = useState<SortState>({ sort: 'indexed', dir: 'desc' });
+  const [relSort, setRelSort] = useState<SortState>({ sort: 'date', dir: 'desc' });
+  const [relFromMonth, setRelFromMonth] = useState('');
+  const [relToMonth, setRelToMonth] = useState('');
   const [page, setPage] = useState(1);
   const [pageInput, setPageInput] = useState('');
   const [open, setOpen] = useState<string | null>(null);
@@ -129,10 +132,27 @@ export function Browse() {
   );
   const { data, isLoading } = useDoors(query);
   const { data: facets } = useFacets();
-  const relQuery = useMemo(
-    () => ({ q, flag: relFlag || undefined, group: relGroup || undefined, page, perPage: PER_PAGE }),
-    [q, relFlag, relGroup, page]
-  );
+  const relQuery = useMemo(() => {
+    // Month inputs are YYYY-MM; expand to full ISO dates for the API's
+    // from/to (string-compared YYYY-MM-DD). Year-only filtering is Jan–Dec.
+    const monthEnd = (m: string): string => {
+      const [y, mo] = m.split('-').map(Number);
+      if (!y || !mo) return m;
+      const last = new Date(y, mo, 0).getDate();
+      return `${m}-${String(last).padStart(2, '0')}`;
+    };
+    return {
+      q,
+      flag: relFlag || undefined,
+      group: relGroup || undefined,
+      from: relFromMonth ? `${relFromMonth}-01` : undefined,
+      to: relToMonth ? monthEnd(relToMonth) : undefined,
+      sort: relSort.sort,
+      order: relSort.dir,
+      page,
+      perPage: PER_PAGE,
+    };
+  }, [q, relFlag, relGroup, relFromMonth, relToMonth, relSort, page]);
   const { data: relData, isLoading: relLoading } = useReleases(relQuery, isReleases);
   const { data: relGroups } = useReleaseGroups(isReleases);
 
@@ -218,6 +238,11 @@ export function Browse() {
 
   function sortBy(key: string) {
     setSortState((prev) => ({ sort: key, dir: prev.sort === key && prev.dir === 'asc' ? 'desc' : 'asc' }));
+    setPage(1);
+  }
+
+  function sortReleasesBy(key: string) {
+    setRelSort((prev) => ({ sort: key, dir: prev.sort === key && prev.dir === 'asc' ? 'desc' : 'asc' }));
     setPage(1);
   }
 
@@ -416,6 +441,43 @@ export function Browse() {
                 { value: 'O', label: 'O — as listed' },
               ]}
             />
+          )}
+          {isReleases && (
+            <div className="flex items-center gap-1 text-xs text-muted">
+              <label className="flex items-center gap-1">
+                From
+                <input
+                  type="month"
+                  min="1988-01"
+                  max="2026-12"
+                  value={relFromMonth}
+                  onChange={(e) => { setRelFromMonth(e.target.value); setPage(1); }}
+                  aria-label="Filter from year and month"
+                  className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-ink"
+                />
+              </label>
+              <label className="flex items-center gap-1">
+                To
+                <input
+                  type="month"
+                  min="1988-01"
+                  max="2026-12"
+                  value={relToMonth}
+                  onChange={(e) => { setRelToMonth(e.target.value); setPage(1); }}
+                  aria-label="Filter to year and month"
+                  className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-ink"
+                />
+              </label>
+              {(relFromMonth || relToMonth) && (
+                <button
+                  type="button"
+                  onClick={() => { setRelFromMonth(''); setRelToMonth(''); setPage(1); }}
+                  className="rounded px-1.5 py-1 text-xs text-accent hover:bg-raised"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           )}
           <div className="relative min-w-[16rem] flex-1">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -653,7 +715,7 @@ export function Browse() {
       ) : null}
 
       {isReleases ? (
-        <ReleasesTable rows={relData?.rows ?? []} />
+        <ReleasesTable rows={relData?.rows ?? []} sortState={relSort} onSort={sortReleasesBy} />
       ) : (
       <DoorTable
         rows={data?.rows ?? []}

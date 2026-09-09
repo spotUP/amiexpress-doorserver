@@ -43,6 +43,9 @@ export interface ReleaseQuery {
   flag?: string;
   group?: string;
   dir?: number;
+  from?: string;
+  to?: string;
+  sort?: string;
   order?: 'asc' | 'desc';
   page?: number;
   perPage?: number;
@@ -63,7 +66,10 @@ export function toReleaseSearch(query: ReleaseQuery): string {
   if (query.flag) params.set('flag', query.flag);
   if (query.group) params.set('group', query.group);
   if (query.dir) params.set('dir', String(query.dir));
-  if (query.order === 'desc') params.set('order', 'desc');
+  if (query.from) params.set('from', query.from);
+  if (query.to) params.set('to', query.to);
+  if (query.sort) params.set('sort', query.sort);
+  if (query.order) params.set('order', query.order);
   if (query.page && query.page > 1) params.set('offset', String((query.page - 1) * (query.perPage ?? 50)));
   if (query.perPage) params.set('limit', String(query.perPage));
   const s = params.toString();

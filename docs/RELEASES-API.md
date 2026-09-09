@@ -41,9 +41,13 @@ No auth. Poll `GET /health` and compare `revision`; when it moves:
 
 `GET /list` query: `q` (filename + description substring), `flag` (`N`/`P`/`D`/…),
 `dir` (dir number), `group` (exact abbreviation, e.g. `FLT`),
-`from`/`to` (`YYYY-MM-DD` on the entry date), `order`
-(`asc`/`desc` by id), `limit` (default 100, max 500), `offset`,
-`since` (only `id` greater than this — forces ascending order, ignores offset),
+`from`/`to` (`YYYY-MM-DD` on the entry date), `sort` (one of
+`filename`, `group`, `flag`, `size`, `date`, `dir`, `file`, `version`,
+`author`, `downloads`, `uploader`, `id` — default `id`, unknown names fall
+back to `id`), `order` (`asc`/`desc` on the sort column, default `asc`),
+`limit` (default 100, max 500), `offset`,
+`since` (only `id` greater than this — forces `id` ascending, ignores
+`sort`/`order`/`offset`),
 `fields` (comma list of row keys; unknown names ignored, `id` always kept).
 Answers `{contractVersion, revision, total, offset, limit, rows[]}`.
 

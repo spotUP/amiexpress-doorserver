@@ -4,9 +4,35 @@
  * detail dialog with the full extracted row.
  */
 import { useState } from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { ReleaseFile } from '../api/releases';
-import { Badge, Button, formatSize } from './ui';
+import { Badge, Button, cx, formatSize } from './ui';
 import { DizView } from './DizView';
+import type { SortState } from './DoorTable';
+
+const COLUMNS: { key: string; label: string; sortable: boolean; className?: string }[] = [
+  { key: 'filename', label: 'File', sortable: true, className: 'whitespace-nowrap' },
+  { key: 'group', label: 'Group', sortable: true },
+  { key: 'flag', label: 'Flag', sortable: true },
+  { key: 'size', label: 'Size', sortable: true, className: 'whitespace-nowrap' },
+  { key: 'date', label: 'Date', sortable: true, className: 'whitespace-nowrap' },
+  { key: 'dir', label: 'Dir', sortable: true, className: 'whitespace-nowrap' },
+  { key: 'version', label: 'Ver', sortable: true, className: 'whitespace-nowrap' },
+  { key: 'author', label: 'Author', sortable: true },
+  { key: 'downloads', label: 'DLs', sortable: true, className: 'whitespace-nowrap' },
+  { key: 'description', label: 'Description', sortable: false },
+  { key: 'rawDesc', label: 'File ID', sortable: false },
+];
+
+function SortHeader({ column, sortState, onSort }: { column: typeof COLUMNS[number]; sortState: SortState; onSort: (k: string) => void }) {
+  if (!column.sortable) return column.label;
+  return (
+    <button type="button" onClick={() => onSort(column.key)} className="inline-flex items-center gap-1 hover:text-ink">
+      {column.label}
+      {sortState.sort === column.key && (sortState.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+    </button>
+  );
+}
 
 function flagBadge(flag: string): React.ReactNode {
   if (flag === 'D') return <Badge tone="warn">nuked</Badge>;
@@ -61,7 +87,7 @@ function ReleaseDetailDialog({ row, onClose }: { row: ReleaseFile | null; onClos
   );
 }
 
-export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
+export function ReleasesTable({ rows, sortState, onSort }: { rows: ReleaseFile[]; sortState: SortState; onSort: (key: string) => void }) {
   const [open, setOpen] = useState<ReleaseFile | null>(null);
   return (
     <>
@@ -69,17 +95,11 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
         <table className="w-full border-collapse text-sm">
               <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-              <th className="px-3 py-2 font-medium">File</th>
-              <th className="px-3 py-2 font-medium">Group</th>
-              <th className="px-3 py-2 font-medium">Flag</th>
-              <th className="px-3 py-2 font-medium">Size</th>
-              <th className="px-3 py-2 font-medium">Date</th>
-              <th className="px-3 py-2 font-medium">Dir</th>
-              <th className="px-3 py-2 font-medium">Ver</th>
-              <th className="px-3 py-2 font-medium">Author</th>
-              <th className="px-3 py-2 font-medium">DLs</th>
-              <th className="px-3 py-2 font-medium">Description</th>
-              <th className="px-3 py-2 font-medium">File ID</th>
+              {COLUMNS.map((column) => (
+                <th key={column.key} scope="col" className={cx('px-3 py-2 font-medium', column.className)}>
+                  <SortHeader column={column} sortState={sortState} onSort={onSort} />
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>

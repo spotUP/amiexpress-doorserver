@@ -2,7 +2,7 @@
  * The releases surface: read-only HTTP over releases.db, beside the door repo.
  *
  *   GET /health        { status, contractVersion, revision, files }
- *   GET /list          JSON ReleaseListResponse (?q=&flag=&dir=&from=&to=&order=&limit=&offset=)
+ *   GET /list          JSON ReleaseListResponse (?q=&flag=&dir=&from=&to=&sort=&order=&limit=&offset=)
  *   GET /list.txt      house plain-text index (same filters, ISO-8859-1/CRLF)
  *   GET /files/:id     one ReleaseRow, or 404 { error: "not_found" }
  *
@@ -46,6 +46,7 @@ function parseQuery(req: Request) {
     dir: num(req.query.dir),
     from: str(req.query.from),
     to: str(req.query.to),
+    sort: str(req.query.sort),
     order: order as 'asc' | 'desc',
     limit: num(req.query.limit),
     offset: num(req.query.offset),

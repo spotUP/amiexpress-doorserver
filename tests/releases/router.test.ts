@@ -90,6 +90,38 @@ describe('releases surface', () => {
     expect(page.body.offset).toBe(1);
   });
 
+  it('sorts by a named column in both directions', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const app = createApp(cfg);
+    const asc = await request(app).get('/releases/v1/list?sort=filename&order=asc');
+    expect(asc.body.rows.map((r: { filename: string }) => r.filename)).toEqual([
+      'BETTER.WRP',
+      'PRISM2V2.LHA',
+      'SCAPEMAK.DMS',
+      'STORM-TR.LHA',
+    ]);
+    const dateDesc = await request(app).get('/releases/v1/list?sort=date&order=desc');
+    expect(dateDesc.body.rows[0].dateIso).toBe('2020-01-03');
+    expect(dateDesc.body.rows[dateDesc.body.rows.length - 1].dateIso).toBe('1988-12-12');
+    // Unknown sort keys fall back to id order rather than 500ing.
+    const bogus = await request(app).get('/releases/v1/list?sort=nope');
+    expect(bogus.status).toBe(200);
+    expect(bogus.body.rows.map((r: { id: number }) => r.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('filters by entry-date range with from/to', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const app = createApp(cfg);
+    const res = await request(app).get('/releases/v1/list?from=1990-01-01&to=2021-12-31');
+    expect(res.body.total).toBe(3);
+    // A month UI sends whole-month bounds; March 1992 alone is the nuked row.
+    const month = await request(app).get('/releases/v1/list?from=1992-03-01&to=1992-03-31');
+    expect(month.body.total).toBe(1);
+    expect(month.body.rows[0].filename).toBe('SCAPEMAK.DMS');
+  });
+
   it('serves one file and 404s unknown ids', async () => {
     const cfg = makeCfg();
     seedReleases(cfg);
