@@ -189,6 +189,19 @@ describe('parseLines blocks', () => {
     expect(entries[1].descLines[0]).toBe('Double Dragon!');
   });
 
+  it('aligns a sparse art block whose second line carries wide gaps', async () => {
+    const pad = ' '.repeat(33);
+    const text = [
+      '[ File #9805 ]                  ·===============·',
+      'BK-HSLH.LHA  P  83264  12-02-95  ______          __   __',
+      `${pad}T ___ \\         | | / /`,
+      `${pad}| | / /_______  ! l/ /_______  _  ___`,
+    ].join('\n');
+    const { entries } = await collect(text);
+    // Second line scores 0.35 art-density (gap-diluted); the 0.3 gate catches it
+    expect(entries[0].descLines[0]).toBe(`${pad}______          __   __`);
+  });
+
   it('drops trailing ornament and date lines of the next entry', async () => {
     const text = [
       '[ File #6449 ]                  ·===============·',

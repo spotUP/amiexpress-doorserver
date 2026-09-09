@@ -95,7 +95,10 @@ const ORNAMENT_RE = /¸,ø\*¤|^\s*¸.*\d{2}-\d{2}-\d{2}\s*$/;
 
 /** True when a line reads as box art rather than prose: mostly punctuation /
  *  high-bit drawing chars. Used to align an art block's trimmed first line
- *  with its siblings; prose paragraphs must never be re-indented. */
+ *  with its siblings; prose paragraphs must never be re-indented. The gate
+ *  sits at 0.3 because sparse art lines carry wide gaps that dilute the
+ *  ratio (`T ___ \         | | / /` scores 0.35); prose with punctuation
+ *  stays near 0.05, so the margin holds. */
 function looksLikeArt(line: string): boolean {
   const t = line.trim();
   if (t.length < 4) return false;
@@ -104,7 +107,7 @@ function looksLikeArt(line: string): boolean {
     const code = ch.charCodeAt(0);
     if (code > 0x7f || !/[A-Za-z0-9 ]/.test(ch)) odd++;
   }
-  return odd / t.length > 0.4;
+  return odd / t.length > 0.3;
 }
 
 export interface ParsedEntryLine {
