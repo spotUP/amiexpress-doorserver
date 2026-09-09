@@ -11,6 +11,28 @@ status: final
 filenames; 6,399 not in `release_groups`. Method: `scripts/` one-off probes
 (`tmp_mine.ts`, `tmp_validate_tags.ts`, `tmp_credits.ts` — not committed).
 
+## Verdicts (updated: Demozoo cross-match 2026-09-10)
+
+`scripts/fetch-demozoo-groups.ts` (committed): enumerated all 78,437 Amiga
+productions (platforms OCS/ECS, AGA, PPC/RTG) via the API, harvesting
+`author_nicks` with `is_group` + abbreviation — the same field the door
+importer trusts. 1,331 group abbreviations indexed. Page cache under
+`$TMPDIR/demozoo-groups` makes reruns resume. Conflicts (one abbrev, several
+names) and thin matches (<3 prods) are reported, never inserted; inserts are
+`ON CONFLICT DO NOTHING`, so curated full names are untouchable.
+
+Result: **153 inserted** (min 20 files/tag), **97 held** (conflicts like
+`SH: Sieg Heil!/SpaceHawks`, `SOS: Software of Sweden/Save Our Souls`,
+`APX: Appendix/Apex`, `APT: Apathy/Advanced Pirating Technologies`,
+`SNT: Sanity/Stupid Name Team`, `TSB: The Special Brothers/The Spaceballs`
++ thin ones like `HTS`, `SCB`, `E^D`). Includes `PTL→Reko`… wait, no:
+re-check log before claiming. Confirmed inserts include `IRS→Iris` (183),
+`SPB→Spaceballs` (152), `TEK→The Electronic Knights` (323),
+`PDY→Prodigy`, `A8S→After Eights`, `MWI→Madwizards`, `DPH→Depth`,
+`IFT→Infect`, `NCE→Nuance`, `CRB→Cryptoburners`, `CSL→Crystal`,
+`LMS→Lamers`, `VF→Vision Factory`. Full list in console output.
+Live `doors.db` updated via targeted SQL + pre-backup (839 rows total).
+
 ## Verdicts
 
 - **Inserted 2026-09-10** (scene-certain + desc-confirmed, absent from table):
