@@ -88,6 +88,24 @@ const UPLOADER_RE = /^\s*(\S[^<>]*?)\s*>>(.+)<<\s*$/;
  * downloads out of harm's way — DIZ prose never indents that deep.
  */
 const DL_STAMP_RE = /^( {15,})DL's: (\d\d)(?=\s)/;
+/** AquaScan's own ornament (`_¸,ø*¤…_¸_`) and its date line — the next entry's
+ *  header, not this entry's description. Only ever stripped from the END of a
+ *  block, so identical glyphs inside real art are untouched. */
+const ORNAMENT_RE = /¸,ø\*¤|^\s*¸.*\d{2}-\d{2}-\d{2}\s*$/;
+
+/** True when a line reads as box art rather than prose: mostly punctuation /
+ *  high-bit drawing chars. Used to align an art block's trimmed first line
+ *  with its siblings; prose paragraphs must never be re-indented. */
+function looksLikeArt(line: string): boolean {
+  const t = line.trim();
+  if (t.length < 4) return false;
+  let odd = 0;
+  for (const ch of t) {
+    const code = ch.charCodeAt(0);
+    if (code > 0x7f || !/[A-Za-z0-9 ]/.test(ch)) odd++;
+  }
+  return odd / t.length > 0.4;
+}
 
 export interface ParsedEntryLine {
   filename: string;
@@ -243,6 +261,23 @@ export async function parseLines(
         continue;
       }
       kept.push(dl);
+    }
+    // Drop the next entry's ornament/date lines off the end of the block.
+    while (kept.length && (ORNAMENT_RE.test(kept[kept.length - 1]) || !kept[kept.length - 1].trim())) {
+      kept.pop();
+    }
+    // The entry line's own art row was trimmed to column 0 while its
+    // siblings kept their source indent (BK-HL1.DMS: first row at 0, rest
+    // at 33). Re-indent it to the first art sibling so the picture lines
+    // up; prose is never touched (looksLikeArt gate).
+    if (kept.length >= 2 && !kept[0].startsWith(' ')) {
+      const next = kept.slice(1).find((l) => l.trim());
+      if (next) {
+        const indent = next.length - next.trimStart().length;
+        if (indent >= 15 && looksLikeArt(next)) {
+          kept[0] = ' '.repeat(indent) + kept[0];
+        }
+      }
     }
     onEntry({
       dirNo,

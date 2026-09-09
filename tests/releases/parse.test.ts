@@ -174,6 +174,38 @@ describe('parseLines blocks', () => {
     expect(entries[0].descLines[1]).toBe('                                     / __  /\\');
   });
 
+  it('re-indents an art first line to its siblings, leaves prose alone', async () => {
+    const pad = ' '.repeat(33);
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'BK-HL1.DMS   P 856845  02-02-96  _|__  ___  __|_',
+      `${pad}\\___)(___\\(___/ |`,
+      '[ File #2 ]                     ·===============·',
+      'DRAGON.WRP   N 756736  12-31-88  Double Dragon!',
+      `${pad}Graphics could be a lot better though.`,
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries[0].descLines[0]).toBe(`${pad}_|__  ___  __|_`);
+    expect(entries[1].descLines[0]).toBe('Double Dragon!');
+  });
+
+  it('drops trailing ornament and date lines of the next entry', async () => {
+    const text = [
+      '[ File #6449 ]                  ·===============·',
+      'TURBO_T.NFO  P 1234  01-01-90  Turbo Trax info',
+      '                                 :::[ MDR ]:::',
+      '',
+      '                                            _¸,ø*¤°¬°¤*ø,¸_',
+      '      ¸,ø*¤°¬¯¬°¤*ø,¸ 08-21-95',
+      '[ File #6450 ]                  ·===============·',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries[0].descLines).toEqual([
+      '                                 Turbo Trax info',
+      '                                 :::[ MDR ]:::',
+    ]);
+  });
+
   it('records an anomaly when no entry line follows a marker', async () => {
     const { entries, anomalies } = await collect('[ File #9 ]\n[ End of File List ]\n');
     expect(entries).toHaveLength(0);
