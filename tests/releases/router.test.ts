@@ -237,6 +237,19 @@ describe('releases surface', () => {
     expect(res.body.futureCount).toBe(0);
   });
 
+  it('serves a random release with the full row', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const names = ['BETTER.WRP', 'SCAPEMAK.DMS', 'STORM-TR.LHA', 'PRISM2V2.LHA'];
+    for (let i = 0; i < 5; i++) {
+      const res = await request(createApp(cfg)).get('/releases/v1/random');
+      expect(res.status).toBe(200);
+      expect(names).toContain(res.body.filename);
+      expect(res.body).toHaveProperty('rawDesc');
+      expect(res.body).toHaveProperty('dateIso');
+    }
+  });
+
   it('serves list.txt in the house format', async () => {
     const cfg = makeCfg();
     seedReleases(cfg);

@@ -4,6 +4,7 @@
  *   GET /health        { status, contractVersion, revision, files }
  *   GET /stats         aggregated counts for the dashboard
  *   GET /facts         headline records for the facts page
+ *   GET /random        one random ReleaseRow (same shape as /files/:id)
  *   GET /list          JSON ReleaseListResponse (?q=&flag=&dir=&from=&to=&sort=&order=&limit=&offset=)
  *   GET /list.txt      house plain-text index (same filters, ISO-8859-1/CRLF)
  *   GET /files/:id     one ReleaseRow, or 404 { error: "not_found" }
@@ -19,6 +20,7 @@ import { RELEASES_CONTRACT_VERSION, type ReleaseField } from '../../contract/rel
 import { esc, oneLine, toLatin1Safe } from '../text-format';
 import {
   DUMP_DEFAULT_FIELDS,
+  getRandomRelease,
   getReleaseById,
   getReleasesCount,
   getReleasesFacts,
@@ -179,6 +181,15 @@ export function createReleasesRouter(_cfg: ServerConfig, rel: ReleasesConfig): e
       revision: getReleasesRevision(rel),
       ...getReleasesFacts(rel),
     });
+  });
+
+  router.get('/random', (_req: Request, res: Response) => {
+    const row = getRandomRelease(rel);
+    if (!row) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    res.json(row);
   });
 
   router.get('/files/:id', (req: Request, res: Response) => {

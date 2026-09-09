@@ -124,7 +124,14 @@ export function Select({
         </RadixSelect.Icon>
       </RadixSelect.Trigger>
       <RadixSelect.Portal>
-        <RadixSelect.Content className="z-50 overflow-hidden rounded-md border border-line bg-raised shadow-xl">
+        {/* item-aligned, not popper: popper's floating-ui positioner fights
+            the viewport's own scroll (long option lists - groups, page jump)
+            and the menu detaches from the trigger. item-aligned anchors the
+            selected item over the trigger with no positioner to fight. */}
+        <RadixSelect.Content
+          position="item-aligned"
+          className="z-50 overflow-hidden rounded-md border border-line bg-raised shadow-xl"
+        >
           <RadixSelect.Viewport className="max-h-72 p-1">
             {!required && <Item value="__all__">{placeholder}</Item>}
             {options.map((option) => (

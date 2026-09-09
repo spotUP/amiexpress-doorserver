@@ -25,6 +25,7 @@ Every response carries `X-Releases-Contract` (currently `1`) and
 | GET | `/list.txt` | first 500 rows in house text format (Latin-1, CRLF) |
 | GET | `/dump` | every matching row as NDJSON, slim columns, resumable (below) |
 | GET | `/files/:id` | one full row incl. `rawDesc`, or 404 `{error:"not_found"}` |
+| GET | `/random` | one random full row (same shape), or 404 on an empty table |
 | GET | `/groups` | `{groups: [{abbreviation, fullName, files}]}` by file count |
 | GET | `/stats` | `{total, withUploader, withDlCount, byFlag, byGroup[20], byUploader[20], byAuthor[20], sizeDistribution, overTime[]}` |
 | GET | `/facts` | headline records: date span + first/last files, first art-DIZ (with `rawDesc`), peak year/month, extension leaderboard + DMS→LHA crossover year, weekday counts, biggest / longest-desc / most-downloaded files, median size, future-dated count |

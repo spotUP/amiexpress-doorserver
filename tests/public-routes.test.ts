@@ -195,6 +195,29 @@ describe('GET /doors/:archiveName', () => {
     expect((await get('/doors/NOPE.LHA')).status).toBe(404);
   });
 
+  it('serves curator tags on list rows and detail, A-Z', async () => {
+    const db = openDb(cfg);
+    db.prepare("INSERT INTO door_tags (catalog_id, tag) VALUES ('id1', 'classic'), ('id1', 'bbs')").run();
+    db.close();
+    const list = await get('/doors?q=ACC');
+    expect(list.body.rows[0].tags).toEqual(['bbs', 'classic']);
+    const untagged = await get('/doors?q=CHATT');
+    expect(untagged.body.rows[0].tags).toEqual([]);
+    const detail = await get('/doors/ACC-V103.LHA');
+    expect(detail.body.tags).toEqual(['bbs', 'classic']);
+  });
+
+  it('serves a random door with the full detail body', async () => {
+    const names = ['ACC-V103.LHA', 'CHATT101.LHA', 'LOOSE.LHA'];
+    for (let i = 0; i < 5; i++) {
+      const res = await get('/doors/random');
+      expect(res.status).toBe(200);
+      expect(names).toContain(res.body.archiveName);
+      expect(res.body.fileIdDiz).toBeDefined();
+      expect(res.body.downloadUrl).toContain('/archive/');
+    }
+  });
+
   it('does not shadow the byte-exact legacy routes', async () => {
     // /archive, /list.txt and /index.tsv live in routes.ts and must still
     // answer even though this router is mounted first.

@@ -67,6 +67,8 @@ interface DoorRow {
   has_doc: number;
   votes_up: number;
   votes_down: number;
+  /** Curator tags, tab-joined (a tag never contains a tab). */
+  tags: string | null;
   release_date: string | null;
   platform: string | null;
   download_url: string | null;
@@ -124,6 +126,8 @@ interface DoorJson {
   downloadUrl: string;
   votesUp: number;
   votesDown: number;
+  /** Curator tags, A–Z. Empty when the door has none. */
+  tags: string[];
   indexedAt: number;
   releaseDate: string | null;
   platform: string | null;
@@ -185,6 +189,9 @@ function toJson(row: DoorRow, overrides: OverrideMap, groupTags: ReadonlySet<str
     downloadUrl: `/api/door-repo/archive/${encodeURIComponent(corrected.archive_name)}`,
     votesUp: corrected.votes_up ?? 0,
     votesDown: corrected.votes_down ?? 0,
+    // GROUP_CONCAT has no ORDER BY in SQLite: sort here so list rows read
+    // the same A–Z as the detail route (which orders in SQL).
+    tags: corrected.tags ? [...new Set(corrected.tags.split('\t'))].filter((t) => t).sort() : [],
     indexedAt: corrected.indexed_at ?? 0,
     releaseDate: corrected.release_date ?? null,
     platform: corrected.platform ?? null,
@@ -321,6 +328,7 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       }
       const SELECT_ROW = `SELECT d.id, archive_name, archive_path, binary_name, door_type, name, version, author,
                   d.release_group, ${releaseGroupsTable ? 'rg.full_name' : 'NULL'} AS release_group_full_name,
+                  (SELECT GROUP_CONCAT(t.tag, CHAR(9)) FROM door_tags t WHERE t.catalog_id = d.id) AS tags,
                   category, description, requires_bbs, file_id_diz, archive_size,
                   md5, sha256, junk_count, ads_stripped, indexed_at,
                   (CASE WHEN doc_raw IS NOT NULL AND doc_raw <> '' THEN 1 ELSE 0 END) AS has_doc,
@@ -380,22 +388,17 @@ export function createPublicRouter(cfg: ServerConfig): Router {
     }
   });
 
-  /** Everything about one door, including the full FILE_ID.DIZ and file list. */
-  router.get('/doors/:archiveName', (req: Request, res: Response) => {
-    // Express 5 types a wildcard-free param as string | string[]; a repeated
-    // path segment is not a door name.
-    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
-    const entry = archiveName ? getCatalogEntryByArchive(cfg, archiveName) : null;
-    if (!entry) {
-      res.status(404).json({ error: 'no such door' });
-      return;
-    }
+  type DoorEntry = NonNullable<ReturnType<typeof getCatalogEntryByArchive>>;
+
+  /** The full detail body for one entry: shared by the named and random routes. */
+  function buildDoorDetail(entry: DoorEntry): Record<string, unknown> {
     const db = openDb(cfg, { readonly: true });
     let groupTags: ReadonlySet<string>;
     let overrides: OverrideMap;
     let releaseGroupFullName: string | null = null;
     let votesUp = 0;
     let votesDown = 0;
+    let tags: string | null = null;
     try {
       groupTags = buildGroupTags(
         (db.prepare('SELECT archive_name FROM door_catalog').all() as { archive_name: string }[]).map(
@@ -417,6 +420,10 @@ export function createPublicRouter(cfg: ServerConfig): Router {
           .all(catId) as { vote: number; n: number }[];
         votesUp = counts.find((c) => c.vote === 1)?.n ?? 0;
         votesDown = counts.find((c) => c.vote === -1)?.n ?? 0;
+        const tagRows = db
+          .prepare('SELECT tag FROM door_tags WHERE catalog_id = ? ORDER BY tag')
+          .all(catId) as { tag: string }[];
+        tags = tagRows.length ? tagRows.map((t) => t.tag).join('\t') : null;
       }
     } finally {
       db.close();
@@ -431,10 +438,11 @@ export function createPublicRouter(cfg: ServerConfig): Router {
       has_doc: entry.doc_raw && entry.doc_raw.length > 0 ? 1 : 0,
       votes_up: votesUp,
       votes_down: votesDown,
+      tags,
       demozoo_url: (entry as unknown as { demozoo_url?: string | null }).demozoo_url ?? null,
     };
 
-    res.json({
+    return {
       ...toJson(row, overrides, groupTags),
       // The raw DIZ and doc are what a sysop actually wants to read before
       // installing a door, and the admin UI shows them side by side with the
@@ -456,7 +464,45 @@ export function createPublicRouter(cfg: ServerConfig): Router {
         isJunk: f.is_junk === 1,
         junkReason: f.junk_reason,
       })),
-    });
+    };
+  }
+
+  /**
+   * A random visible door, full detail body. For "surprise me" callers
+   * (chat bots included): no parameters, hidden doors excluded.
+   * Registered BEFORE /doors/:archiveName so "random" is not read as a name.
+   */
+  router.get('/doors/random', (_req: Request, res: Response) => {
+    const db = openDb(cfg, { readonly: true });
+    let archiveName: string | null = null;
+    try {
+      const hidden = hiddenExclusion(db);
+      const picked = db.prepare(
+        `SELECT archive_name FROM door_catalog ${hidden ? `WHERE ${hidden}` : ''} ORDER BY RANDOM() LIMIT 1`
+      ).get() as { archive_name: string } | undefined;
+      archiveName = picked?.archive_name ?? null;
+    } finally {
+      db.close();
+    }
+    const entry = archiveName ? getCatalogEntryByArchive(cfg, archiveName) : null;
+    if (!entry) {
+      res.status(404).json({ error: 'no doors' });
+      return;
+    }
+    res.json(buildDoorDetail(entry));
+  });
+
+  /** Everything about one door, including the full FILE_ID.DIZ and file list. */
+  router.get('/doors/:archiveName', (req: Request, res: Response) => {
+    // Express 5 types a wildcard-free param as string | string[]; a repeated
+    // path segment is not a door name.
+    const archiveName = Array.isArray(req.params.archiveName) ? '' : req.params.archiveName;
+    const entry = archiveName ? getCatalogEntryByArchive(cfg, archiveName) : null;
+    if (!entry) {
+      res.status(404).json({ error: 'no such door' });
+      return;
+    }
+    res.json(buildDoorDetail(entry));
   });
 
   /** One archive's files, classified against the CURRENT rules. */

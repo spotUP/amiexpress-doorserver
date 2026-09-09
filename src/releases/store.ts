@@ -500,6 +500,21 @@ export function listReleaseGroups(rel: ReleasesConfig): { abbreviation: string; 
   );
 }
 
+/**
+ * One random file entry, full columns. For "surprise me" callers (chat bots
+ * included): no parameters, no filters.
+ */
+export function getRandomRelease(rel: ReleasesConfig): ReleaseRow | null {
+  return withReleasesDb(
+    rel,
+    (db) =>
+      (db.prepare(`SELECT ${ALL_COLUMNS} FROM release_files ORDER BY RANDOM() LIMIT 1`).get() as
+        | ReleaseRow
+        | undefined) ?? null,
+    { readonly: true }
+  );
+}
+
 export function getReleaseById(rel: ReleasesConfig, id: number): ReleaseRow | null {
   return withReleasesDb(
     rel,

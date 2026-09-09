@@ -27,6 +27,8 @@ export interface Door {
   downloadUrl: string;
   votesUp: number;
   votesDown: number;
+  /** Curator tags, A–Z. Empty when the door has none. */
+  tags: string[];
   indexedAt: number;
   /** Demozoo enrichment. null when the importer has not seen this door. */
   releaseDate: string | null;
