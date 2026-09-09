@@ -186,7 +186,7 @@ describe('a box row is read as cells, not as a sentence', () => {
 
   it('describes MST-JC40 by what the door does', () => {
     const { description } = read(JC40, 'JoinCnf', 'JoinCnf', 'MST-JC40.LHA');
-    expect(description).toBe('Totally New Lay-Out Manages up to 256 Cnfs');
+    expect(description).toBe('Totally New Lay-Out Manages up to 256 Cnfs.');
   });
 
   it('keeps a single word trapped in border art out of the description', () => {
@@ -214,7 +214,7 @@ describe('metadata is not description', () => {
     // version is still a real requirement, and "written for" is the
     // dangling connector the removal leaves behind.
     const { description, requiresBbs } = read(MT20, 'MultiTop', 'MultiTop', 'MST-MT20.LHA');
-    expect(description).toBe('The Best Top Utility ever');
+    expect(description).toBe('The Best Top Utility ever.');
     expect(requiresBbs).toBe('AmiExpress');
   });
 
@@ -259,7 +259,7 @@ describe('banners and credits', () => {
   it('is not fooled by a compatibility note', () => {
     const { description } = read(WHO24, null, '5D-Who', '5D-WHO24.LZH');
     expect(description.toLowerCase()).not.toContain('working on');
-    expect(description).toBe('Who');
+    expect(description).toBe('Who.');
   });
 });
 
@@ -390,7 +390,7 @@ describe('falling back', () => {
       '+------------------------------------------+',
     ].join('\n');
     const { description, version } = read(diz, 'userlist', 'userlist', 'DLT-UL11.LHA');
-    expect(description).toBe('Update Nike/Dlt');
+    expect(description).toBe('Update Nike/Dlt.');
     expect(version).toBe('1.1');
   });
 
@@ -415,21 +415,21 @@ describe('falling back', () => {
 
   it('uses the catalog name when every DIZ line is art', () => {
     const diz = '______    ________.  /\\    ______.__________\n____ _____________';
-    expect(read(diz, null, 'Account Editor', 'ACC-V103.LHA').description).toBe('Account Editor');
+    expect(read(diz, null, 'Account Editor', 'ACC-V103.LHA').description).toBe('Account Editor.');
   });
 
   it('uses the archive base name when the DIZ and the name are both art', () => {
     const diz = '______    ________.  /\\    ______.__________';
     const name = '____ _________________________________ _  :····/ __';
-    expect(read(diz, null, name, 'ACC-V103.LHA').description).toBe('Acc-V103');
+    expect(read(diz, null, name, 'ACC-V103.LHA').description).toBe('Acc-V103.');
   });
 
   it('uses the archive base name when there is no DIZ at all', () => {
-    expect(read(null, null, null, 'ACC-V103.LHA').description).toBe('Acc-V103');
+    expect(read(null, null, null, 'ACC-V103.LHA').description).toBe('Acc-V103.');
   });
 
   it('rejects a repeated-character placeholder (the real AE_DOORS.LHA)', () => {
-    expect(read('XXXX....', null, 'XXXX....', 'AE_DOORS.LHA').description).toBe('Ae_Doors');
+    expect(read('XXXX....', null, 'XXXX....', 'AE_DOORS.LHA').description).toBe('Ae_Doors.');
   });
 
   it('prefixes the program name when the line does not already carry it', () => {
@@ -438,28 +438,28 @@ describe('falling back', () => {
     // longer prefixed – the name column already carries it.
     const diz = 'Split Chat Door For AmiExpress';
     const { description, requiresBbs } = read(diz, 'FullChat', null, 'FULLCHAT.LHA');
-    expect(description).toBe('Split Chat Door');
+    expect(description).toBe('Split Chat Door.');
     expect(requiresBbs).toBe('AmiExpress');
   });
 
   it('does not name the door twice', () => {
-    expect(read('Snes-Tool v1.10', 'Snes-Tool', null, 'SNES.LHA').description).toBe('Snes-Tool');
+    expect(read('Snes-Tool v1.10', 'Snes-Tool', null, 'SNES.LHA').description).toBe('Snes-Tool.');
   });
 
   it('skips a copyright line in favour of a later one', () => {
     const diz = 'hAUSfRAU!.exe - © FLi7e/SAD 1996\nHousewife simulator for AmiExpress';
     const { description, requiresBbs } = read(diz, null, null, 'HAUSFRAU.LHA');
-    expect(description).toBe('Housewife simulator');
+    expect(description).toBe('Housewife simulator.');
     expect(requiresBbs).toBe('AmiExpress');
   });
 
   it('keeps accented letters: they are letters, not decoration', () => {
-    expect(read('Größe der Datei anzeigen', null, null, 'X.LHA').description).toBe('Größe der Datei anzeigen');
+    expect(read('Größe der Datei anzeigen', null, null, 'X.LHA').description).toBe('Größe der Datei anzeigen.');
   });
 
   it('strips control characters and collapses whitespace', () => {
     expect(read('Account   Editor\tv1.0\x01\x02 for real', null, null, 'ACC-V103.LHA').description).toBe(
-      'Account Editor for real'
+      'Account Editor for real.'
     );
   });
 

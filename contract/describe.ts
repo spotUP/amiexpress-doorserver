@@ -49,7 +49,7 @@
  * stale mirror is caught as a mismatch rather than as a silent divergence in
  * what a caller reads about a door.
  */
-export const DESCRIBE_CONTRACT_VERSION = '4';
+export const DESCRIBE_CONTRACT_VERSION = '5';
 
 /** Frame punctuation: decoration at either end of a cell. */
 const FRAME = " :-*()[]|_=+~<>.,'\"`^¦¬·°#!?/\\";
@@ -1037,6 +1037,43 @@ export function compose(prog: string, body: string): string {
   return prog || body;
 }
 
+/** Door-type tokens that are metadata, not description. PPe/PPE is the
+ *  PCBoard door type and appears as "PPe v1.o" in many DIZs; it should not
+ *  stay in the description after the version is stripped. */
+const DOOR_TYPE_TOKENS = new Set(['ppe', 'xim', 'aim', 'fim', 'tim', 'iim', 'rexx', 'exe', 'lha', 'lzh', 'lzx', 'dms', 'zip']);
+export function stripDoorTypeTokens(desc: string): string {
+  if (!desc) return desc;
+  // Remove standalone PPe/PPE etc. when they appear as a separate word,
+  // especially trailing or before end. Keep it when it's part of a larger
+  // phrase like "LHA tester" – but "PPe" alone at end is junk.
+  // For now, strip any standalone token that is exactly a door type and
+  // is at the end or followed only by punctuation, and also strip "PPe"
+  // anywhere it appears as a separate word that looks like a type tag
+  // (e.g. "Enhancer PPe" -> "Enhancer").
+  let out = desc;
+  // First, handle "PPe" specifically: remove " PPe" (case-insensitive) as a whole word
+  out = out.replace(/\s+PPe\b/gi, (m) => {
+    // Keep it if it's clearly part of description like "PPe door" – but
+    // "PPe" is almost never descriptive, it's the door kind.
+    // The user's report: file_ids have PPe from release group, not description.
+    return '';
+  });
+  // General door types at end: " ... XIM" or " ... PPE"
+  out = out.replace(new RegExp(`\\s+(${Array.from(DOOR_TYPE_TOKENS).join('|')})\\s*$`, 'i'), '');
+  return collapse(out);
+}
+
+export function ensureEndsWithPunctuation(s: string): string {
+  if (!s) return s;
+  const t = s.trim();
+  if (!t) return t;
+  if (/[.!?]$/.test(t)) return t;
+  // Also handle trailing quote/paren: "Hello world" -> "Hello world."
+  // But don't add if it ends with ellipsis already
+  if (/\.\.\.$/.test(t)) return t;
+  return t + '.';
+}
+
 /** Strip a leading prog name that duplicated the separate `name` column.
  *  e.g. "Bbsguard . One of the best..." -> "One of the best...",
  *  "Bbsguard - One of..." -> "One of...",  "Kclhaad LHA tester..." -> "LHA tester..."
@@ -1402,6 +1439,11 @@ export function analyseDoor(input: DoorInput, groupTags: ReadonlySet<string>): D
     const alt2 = stripLeadingProg(description, baseForStrip);
     if (alt2 !== description && alt2 && alt2.length >= 20) description = alt2;
   }
+  // Strip door-type tokens like PPe/PPE that are metadata, not description.
+  // e.g. "Light Bar Enhancer PPe" -> "Light Bar Enhancer"
+  if (description) description = stripDoorTypeTokens(description);
+  // Ensure description ends with sentence punctuation.
+  if (description) description = ensureEndsWithPunctuation(description);
   if (!description) {
     // Everything the DIZ offered was a credit (KDZ!LUDB.LHA's only
     // prose line is "dONE bY sERAPH - !BUGFIXED VERSION", which moves
