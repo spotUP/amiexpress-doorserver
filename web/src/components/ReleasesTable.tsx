@@ -67,12 +67,17 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
     <>
       <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full border-collapse text-sm">
-          <thead>
+              <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-3 py-2 font-medium">File</th>
+              <th className="px-3 py-2 font-medium">Group</th>
               <th className="px-3 py-2 font-medium">Flag</th>
               <th className="px-3 py-2 font-medium">Size</th>
               <th className="px-3 py-2 font-medium">Date</th>
+              <th className="px-3 py-2 font-medium">Dir</th>
+              <th className="px-3 py-2 font-medium">Ver</th>
+              <th className="px-3 py-2 font-medium">Author</th>
+              <th className="px-3 py-2 font-medium">DLs</th>
               <th className="px-3 py-2 font-medium">Description</th>
               <th className="px-3 py-2 font-medium">File ID</th>
             </tr>
@@ -85,11 +90,23 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
                 onClick={() => setOpen(r)}
               >
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-[13px]">{r.filename}</td>
+                <td
+                  className="max-w-[12rem] truncate px-3 py-2 text-muted"
+                  title={r.releaseGroupFull ?? r.releaseGroup ?? ''}
+                >
+                  {r.releaseGroupFull ?? r.releaseGroup ?? '–'}
+                </td>
                 <td className="whitespace-nowrap px-3 py-2">{flagBadge(r.flag)}</td>
                 <td className="whitespace-nowrap px-3 py-2 text-muted">
                   {r.sizeBytes !== null ? formatSize(r.sizeBytes) : (r.sizeNote ?? '–')}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-muted">{r.dateIso}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-muted">#{r.dirNo}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-muted">{r.version ?? '–'}</td>
+                <td className="max-w-[10rem] truncate px-3 py-2 text-muted">{r.author ?? '–'}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-muted">
+                  {r.dlCount !== null ? String(r.dlCount) : '–'}
+                </td>
                 <td className="max-w-[28rem] truncate px-3 py-2 text-muted">{r.description ?? ''}</td>
                 <td className="px-3 py-2 align-top">
                   {r.rawDesc ? (
@@ -104,7 +121,7 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-muted">
+                <td colSpan={11} className="px-3 py-6 text-center text-muted">
                   No releases match.
                 </td>
               </tr>
