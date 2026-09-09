@@ -8,6 +8,7 @@ import { doorRepoCors } from './cors';
 import { createAchievementsRouter } from './achievements/router';
 import { createRequestsRouter } from './requests/router';
 import { createReleasesRouter } from './releases/router';
+import { createIntegrationsRouter } from './integrations/router';
 import type { ServerConfig } from './config';
 
 export function createApp(cfg: ServerConfig): express.Express {
@@ -53,6 +54,10 @@ export function createApp(cfg: ServerConfig): express.Express {
   if (cfg.releases) {
     app.use('/releases/v1', createReleasesRouter(cfg, cfg.releases));
   }
+  // The integrations surface (external scene APIs for operator chats):
+  // read-only, no keys, main database. Mounted before the SPA catch-all
+  // like every other /api surface.
+  app.use('/api/integrations/v1', doorRepoCors(), createIntegrationsRouter(cfg));
   mountWebUi(app);
   return app;
 }

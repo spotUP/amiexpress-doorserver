@@ -1,0 +1,2182 @@
+{
+    "success": true,
+    "prods": [
+        {
+            "id": "107004",
+            "name": "PSYCNEXT",
+            "type": "1k",
+            "addedUser": {
+                "id": "3318",
+                "nickname": "RCL",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "asm_only.gif",
+                "glops": "294",
+                "registerDate": "2002-10-22 17:39:12",
+                "udlogin": null,
+                "thumbups": "240",
+                "thumbdowns": "2",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-09 08:18:01",
+            "releaseDate": null,
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/virtualvision.group\/prods\/PsycNext.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "16089",
+                    "name": "Otomata Labs",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "https:\/\/otomatalabs.net\/",
+                    "addedUser": "97858",
+                    "addedDate": "2024-09-03 15:41:11",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "719",
+                    "name": "Serzhsoft",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "499",
+                    "addedDate": "2001-04-18 11:55:48",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "1584",
+                    "name": "Virtual Vision Group",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "794",
+                    "addedDate": "2002-01-08 16:51:06",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "1k"
+            ],
+            "placings": [],
+            "platforms": {
+                "156": {
+                    "name": "ZX Enhanced",
+                    "icon": "k_zxenhanced.gif",
+                    "slug": "zxenhanced"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "popularity": 0,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00107\/00107004.png"
+        },
+        {
+            "id": "107003",
+            "name": "Perehelion - Secret Part",
+            "type": "intro",
+            "addedUser": {
+                "id": "2783",
+                "nickname": "iTeC",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "a_jul.gif",
+                "glops": "192",
+                "registerDate": "2002-07-28 05:58:06",
+                "udlogin": null,
+                "thumbups": "95",
+                "thumbdowns": "1",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-09 07:50:01",
+            "releaseDate": "1992-09-15",
+            "voteup": "0",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/www.aksevenfour.com\/crass\/cra-perehelion_secret.exe",
+            "party_compo": "16",
+            "party_place": "1",
+            "party_year": "1992",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1209",
+                    "name": "Crass",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/crass.keher.com.au",
+                    "addedUser": "900",
+                    "addedDate": "2001-07-11 06:44:11",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "intro"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "444",
+                        "name": "Alchemy OzCon 1",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "16",
+                    "ranking": "1",
+                    "year": "1992",
+                    "compo_name": "amiga demo"
+                }
+            ],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "444",
+                "name": "Alchemy OzCon 1",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 0,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00107\/00107003.jpg",
+            "party_compo_name": "amiga demo"
+        },
+        {
+            "id": "107002",
+            "name": "..and mayonnaise",
+            "type": "demo",
+            "addedUser": {
+                "id": "4600",
+                "nickname": "pasy",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "untitled-1.gif",
+                "glops": "1068",
+                "registerDate": "2003-07-06 22:41:10",
+                "udlogin": null,
+                "thumbups": "2694",
+                "thumbdowns": "185",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-08 22:04:41",
+            "releaseDate": "2026-08-15",
+            "voteup": "1",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/xenium26\/demo_pc\/pas_and_mayonnaise.zip",
+            "party_compo": "95",
+            "party_place": "8",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "13986",
+                    "name": "Pannonia Allstars",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "27385",
+                    "addedDate": "2018-08-19 17:15:46",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "95",
+                    "ranking": "8",
+                    "year": "2026",
+                    "compo_name": "pc demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 17.310996254655926,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00107\/00107002.jpg",
+            "party_compo_name": "pc demo"
+        },
+        {
+            "id": "107001",
+            "name": "Miami Twice",
+            "type": "demo",
+            "addedUser": {
+                "id": "108660",
+                "nickname": "WillHillfield",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "reboundguy.gif",
+                "glops": "20",
+                "registerDate": "2026-02-22 17:16:54",
+                "udlogin": null,
+                "thumbups": "16",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-08 16:27:27",
+            "releaseDate": "2026-09-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/byterapers40\/demos\/miamitwice_demo.zip",
+            "party_compo": "57",
+            "party_place": "6",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "2171",
+                        "name": "Byterapers 40 year anniversary",
+                        "web": "https:\/\/b40.byterapers.com\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "6",
+                    "year": "2026",
+                    "compo_name": "combined demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "2171",
+                "name": "Byterapers 40 year anniversary",
+                "web": "https:\/\/b40.byterapers.com\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 34.31733776195272,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00107\/00107001.jpg",
+            "party_compo_name": "combined demo"
+        },
+        {
+            "id": "107000",
+            "name": "Painepotut",
+            "type": "demo",
+            "addedUser": {
+                "id": "102626",
+                "nickname": "Loafis",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "breadbend1616.gif",
+                "glops": "48",
+                "registerDate": "2019-09-01 18:39:37",
+                "udlogin": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-08 15:28:37",
+            "releaseDate": "2026-09-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/jumalautaparty26\/combined_demo_intro\/author_painepotut.zip",
+            "party_compo": "57",
+            "party_place": "5",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "16914",
+                    "name": "\ud83e\udd54",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "102626",
+                    "addedDate": "2026-04-06 17:21:48",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1738",
+                        "name": "Jumalauta Party",
+                        "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "5",
+                    "year": "2026",
+                    "compo_name": "combined demo"
+                }
+            ],
+            "platforms": {
+                "66": {
+                    "name": "Linux",
+                    "icon": "k_linux.gif",
+                    "slug": "linux"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1738",
+                "name": "Jumalauta Party",
+                "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 31.813191030518436,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00107\/00107000.jpg",
+            "party_compo_name": "combined demo"
+        },
+        {
+            "id": "106999",
+            "name": "Right Here",
+            "type": "wild",
+            "addedUser": {
+                "id": "35255",
+                "nickname": "Mysdee",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "b.gif",
+                "glops": "92",
+                "registerDate": "2008-08-02 15:15:11",
+                "udlogin": null,
+                "thumbups": "461",
+                "thumbdowns": "11",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-07 08:15:16",
+            "releaseDate": "2026-09-15",
+            "voteup": "2",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/partyman.byterapers.com\/media\/b40-anniversary-wild\/fc995903-da9a-4a90-ba80-eeb1c5ed536a\/right-here\/righthere03.mp4",
+            "party_compo": "127",
+            "party_place": "1",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "143",
+                    "name": "Byterapers",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.byterapers.scene.org\/",
+                    "addedUser": "16",
+                    "addedDate": "2000-09-05 09:52:43",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "wild"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "2171",
+                        "name": "Byterapers 40 year anniversary",
+                        "web": "https:\/\/b40.byterapers.com\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "127",
+                    "ranking": "1",
+                    "year": "2026",
+                    "compo_name": "wild demo"
+                }
+            ],
+            "platforms": {
+                "157": {
+                    "name": "Animation\/Video",
+                    "icon": "k_video.gif",
+                    "slug": "animationvideo"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "2171",
+                "name": "Byterapers 40 year anniversary",
+                "web": "https:\/\/b40.byterapers.com\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 43.875995463710346,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106999.png",
+            "party_compo_name": "wild demo"
+        },
+        {
+            "id": "106998",
+            "name": "part 2",
+            "type": "demo",
+            "addedUser": {
+                "id": "106784",
+                "nickname": "vurpo",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "buny.gif",
+                "glops": "91",
+                "registerDate": "2023-09-12 22:36:35",
+                "udlogin": null,
+                "thumbups": "178",
+                "thumbdowns": "3",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-07 03:49:41",
+            "releaseDate": "2026-09-15",
+            "voteup": "1",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/vurpo.fi\/part_2_freja.zip",
+            "party_compo": "57",
+            "party_place": "2",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1738",
+                        "name": "Jumalauta Party",
+                        "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "2",
+                    "year": "2026",
+                    "compo_name": "combined demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                },
+                "98": {
+                    "name": "JavaScript",
+                    "icon": "k_js.gif",
+                    "slug": "javascript"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1738",
+                "name": "Jumalauta Party",
+                "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 37.68703377543251,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106998.jpg",
+            "party_compo_name": "combined demo"
+        },
+        {
+            "id": "106997",
+            "name": "=^-^= aka A Cat Demo",
+            "type": "demo",
+            "addedUser": {
+                "id": "755",
+                "nickname": "sauli",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "raf16.gif",
+                "glops": "833",
+                "registerDate": "2001-05-26 16:37:10",
+                "udlogin": null,
+                "thumbups": "473",
+                "thumbdowns": "25",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-06 18:31:41",
+            "releaseDate": "2026-09-15",
+            "voteup": "5",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.8333",
+            "download": "https:\/\/files.hsdk.club\/jumalauta\/jml_cat_fixed.zip",
+            "party_compo": "57",
+            "party_place": "1",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "325",
+                    "name": "Jumalauta",
+                    "acronym": "JML",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.jumalauta.org",
+                    "addedUser": "192",
+                    "addedDate": "2000-11-09 07:26:01",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1738",
+                        "name": "Jumalauta Party",
+                        "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "1",
+                    "year": "2026",
+                    "compo_name": "combined demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1738",
+                "name": "Jumalauta Party",
+                "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 44.922309866012235,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106997.jpg",
+            "party_compo_name": "combined demo"
+        },
+        {
+            "id": "106996",
+            "name": "Vent",
+            "type": "wild",
+            "addedUser": {
+                "id": "359",
+                "nickname": "stonda",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "mattivirta_.gif",
+                "glops": "463",
+                "registerDate": "2000-11-29 21:46:10",
+                "udlogin": null,
+                "thumbups": "64",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-06 12:58:00",
+            "releaseDate": "2026-09-15",
+            "voteup": "4",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.8000",
+            "download": "https:\/\/ihku.net\/tom_of_lahti-vent.mp4",
+            "party_compo": "127",
+            "party_place": "1",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "325",
+                    "name": "Jumalauta",
+                    "acronym": "JML",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.jumalauta.org",
+                    "addedUser": "192",
+                    "addedDate": "2000-11-09 07:26:01",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "wild"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1738",
+                        "name": "Jumalauta Party",
+                        "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "127",
+                    "ranking": "1",
+                    "year": "2026",
+                    "compo_name": "wild demo"
+                }
+            ],
+            "platforms": {
+                "157": {
+                    "name": "Animation\/Video",
+                    "icon": "k_video.gif",
+                    "slug": "animationvideo"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1738",
+                "name": "Jumalauta Party",
+                "web": "http:\/\/jumalauta.untergrund.net\/jml15v\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 41.00656432995178,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106996.jpg",
+            "party_compo_name": "wild demo"
+        },
+        {
+            "id": "106995",
+            "name": "SAVONIAN TWIST",
+            "type": "demo",
+            "addedUser": {
+                "id": "106806",
+                "nickname": "OUTRON",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "violet_red_gradient.gif",
+                "glops": "89",
+                "registerDate": "2023-08-08 18:39:48",
+                "udlogin": null,
+                "thumbups": "390",
+                "thumbdowns": "1",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-06 12:04:16",
+            "releaseDate": "2026-09-15",
+            "voteup": "10",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.9091",
+            "download": "https:\/\/graymarchers.github.io\/savonian\/SAVONIAN_TWIST.zip",
+            "party_compo": "57",
+            "party_place": "1",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "16061",
+                    "name": "Gray Marchers",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "https:\/\/graymarchers.github.io\/",
+                    "addedUser": "106806",
+                    "addedDate": "2024-08-04 21:17:43",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "2171",
+                        "name": "Byterapers 40 year anniversary",
+                        "web": "https:\/\/b40.byterapers.com\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "1",
+                    "year": "2026",
+                    "compo_name": "combined demo"
+                }
+            ],
+            "platforms": {
+                "98": {
+                    "name": "JavaScript",
+                    "icon": "k_js.gif",
+                    "slug": "javascript"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "2171",
+                "name": "Byterapers 40 year anniversary",
+                "web": "https:\/\/b40.byterapers.com\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 47.45701534194167,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106995.jpg",
+            "party_compo_name": "combined demo"
+        },
+        {
+            "id": "106994",
+            "name": "(B)astiche",
+            "type": "demo",
+            "addedUser": {
+                "id": "100066",
+                "nickname": "poro",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "jxn.gif",
+                "glops": "75",
+                "registerDate": "2016-08-08 12:51:28",
+                "udlogin": null,
+                "thumbups": "89",
+                "thumbdowns": "1",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-06 07:54:35",
+            "releaseDate": "2026-09-15",
+            "voteup": "6",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.8571",
+            "download": "https:\/\/wl-bastiche.netlify.app\/Wide%20Load%20-%20(B)astiche.zip",
+            "party_compo": "57",
+            "party_place": "4",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "10178",
+                    "name": "Wide Load",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "4950",
+                    "addedDate": "2008-05-15 09:20:25",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "2171",
+                        "name": "Byterapers 40 year anniversary",
+                        "web": "https:\/\/b40.byterapers.com\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "4",
+                    "year": "2026",
+                    "compo_name": "combined demo"
+                }
+            ],
+            "platforms": {
+                "98": {
+                    "name": "JavaScript",
+                    "icon": "k_js.gif",
+                    "slug": "javascript"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "2171",
+                "name": "Byterapers 40 year anniversary",
+                "web": "https:\/\/b40.byterapers.com\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 41.71029438299475,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106994.png",
+            "party_compo_name": "combined demo"
+        },
+        {
+            "id": "106993",
+            "name": "PSYC48",
+            "type": "1k",
+            "addedUser": {
+                "id": "15177",
+                "nickname": "diver",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "stardust_logo16.gif",
+                "glops": "2821",
+                "registerDate": "2005-07-29 23:50:33",
+                "udlogin": null,
+                "thumbups": "1898",
+                "thumbdowns": "50",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-06 03:44:48",
+            "releaseDate": "2026-09-15",
+            "voteup": "2",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/bay6.retroscene.org\/files\/other\/psyc48.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "719",
+                    "name": "Serzhsoft",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "499",
+                    "addedDate": "2001-04-18 11:55:48",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "16089",
+                    "name": "Otomata Labs",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "https:\/\/otomatalabs.net\/",
+                    "addedUser": "97858",
+                    "addedDate": "2024-09-03 15:41:11",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "1k"
+            ],
+            "placings": [],
+            "platforms": {
+                "82": {
+                    "name": "ZX Spectrum",
+                    "icon": "k_zx.gif",
+                    "slug": "zxspectrum"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "popularity": 37.44901509045823,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106993.png"
+        },
+        {
+            "id": "106992",
+            "name": "ItaloDisco vol. 4",
+            "type": "demopack",
+            "addedUser": {
+                "id": "13554",
+                "nickname": "Z3k",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "amiga-ckoe.gif",
+                "glops": "61",
+                "registerDate": "2018-09-18 22:04:59",
+                "udlogin": null,
+                "thumbups": "25",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 22:56:06",
+            "releaseDate": "2026-09-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/www.trinityhq.eu\/ita4\/Italodisco4.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1869",
+                    "name": "Trinity",
+                    "acronym": "",
+                    "disambiguation": "amiga\/.it",
+                    "web": "https:\/\/www.trinityhq.eu\/",
+                    "addedUser": "2347",
+                    "addedDate": "2002-04-28 10:35:45",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demopack"
+            ],
+            "placings": [],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "popularity": 40.443074819198124,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106992.jpg"
+        },
+        {
+            "id": "106991",
+            "name": "Loosen up",
+            "type": "demo",
+            "addedUser": {
+                "id": "110056",
+                "nickname": "Demolee",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "gwain.gif",
+                "glops": "9",
+                "registerDate": "2026-08-07 12:16:11",
+                "udlogin": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 22:50:04",
+            "releaseDate": "2026-08-15",
+            "voteup": "3",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/xenium26\/demo_amiga\/amigademo_abuse_loosen_up.zip",
+            "party_compo": "16",
+            "party_place": "5",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1785",
+                    "name": "Abuse",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "2100",
+                    "addedDate": "2002-03-24 21:34:50",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "16",
+                    "ranking": "5",
+                    "year": "2026",
+                    "compo_name": "amiga demo"
+                }
+            ],
+            "platforms": {
+                "71": {
+                    "name": "Amiga AGA",
+                    "icon": "k_amiga_aga.gif",
+                    "slug": "amigaaga"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 36.90469824181017,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106991.jpg",
+            "party_compo_name": "amiga demo"
+        },
+        {
+            "id": "106990",
+            "name": "Double-Sided",
+            "type": "musicdisk",
+            "addedUser": {
+                "id": "105600",
+                "nickname": "minebrandon",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "cone.gif",
+                "glops": "362",
+                "registerDate": "2022-05-18 23:15:36",
+                "udlogin": null,
+                "thumbups": "3",
+                "thumbdowns": "1",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 22:21:07",
+            "releaseDate": "2026-08-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/xenium26\/wild\/wild_noscarletofmine_doublesided.zip",
+            "party_compo": "127",
+            "party_place": "7",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "musicdisk"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "127",
+                    "ranking": "7",
+                    "year": "2026",
+                    "compo_name": "wild demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 22.314996380397652,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106990.jpg",
+            "party_compo_name": "wild demo"
+        },
+        {
+            "id": "106989",
+            "name": "A Crack Intro For Scoopex",
+            "type": "16k,cracktro",
+            "addedUser": {
+                "id": "5308",
+                "nickname": "hitchhikr",
+                "level": "gloperator",
+                "permissionOpenBBS": "1",
+                "avatar": "hitchhikr.gif",
+                "glops": "14985",
+                "registerDate": "2003-11-05 00:26:49",
+                "udlogin": null,
+                "thumbups": "2594",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 21:50:24",
+            "releaseDate": "2026-09-15",
+            "voteup": "16",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.9412",
+            "download": "https:\/\/hitchhikr.net\/scxintro.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "415",
+                    "name": "Scoopex",
+                    "acronym": "SCX",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.scoopex.us\/",
+                    "addedUser": "268",
+                    "addedDate": "2000-12-07 10:37:25",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "4574",
+                    "name": "Neural",
+                    "acronym": "NRL",
+                    "disambiguation": "",
+                    "web": "http:\/\/neural.untergrund.net\/",
+                    "addedUser": "5308",
+                    "addedDate": "2005-06-15 17:27:30",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "6644",
+                    "name": "The Frog Buds",
+                    "acronym": "TFB",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "20312",
+                    "addedDate": "2006-10-06 22:06:23",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "16k",
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "popularity": 46.57892967726418,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106989.png"
+        },
+        {
+            "id": "106988",
+            "name": "RSync Packet Kaksi",
+            "type": "invitation",
+            "addedUser": {
+                "id": "5062",
+                "nickname": "franky--",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "pouet-avatar-mario.gif",
+                "glops": "656",
+                "registerDate": "2003-09-21 01:07:38",
+                "udlogin": null,
+                "thumbups": "312",
+                "thumbdowns": "28",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 20:55:47",
+            "releaseDate": "2026-09-15",
+            "voteup": "2",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/rbbs.be\/files\/rbbs-rsync_packet_kaksi.zip",
+            "party_compo": "57",
+            "party_place": "9",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "4774",
+                    "name": "Royal Belgian Beer Squadron",
+                    "acronym": "RBBS",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.rbbs.be",
+                    "addedUser": "5062",
+                    "addedDate": "2005-08-28 13:25:19",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "invitation"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "2171",
+                        "name": "Byterapers 40 year anniversary",
+                        "web": "https:\/\/b40.byterapers.com\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "9",
+                    "year": "2026",
+                    "compo_name": "combined demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "2171",
+                "name": "Byterapers 40 year anniversary",
+                "web": "https:\/\/b40.byterapers.com\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 39.41409179101807,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106988.png",
+            "party_compo_name": "combined demo"
+        },
+        {
+            "id": "106987",
+            "name": "TV Lies",
+            "type": "64k",
+            "addedUser": {
+                "id": "108992",
+                "nickname": "chester_ame",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "rss1.gif",
+                "glops": "5",
+                "registerDate": "2026-08-31 16:17:32",
+                "udlogin": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 16:36:39",
+            "releaseDate": "2026-08-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/xenium26\/intro_pc_64k\/pc_64kb_intro_amnesty_tv_lies.zip",
+            "party_compo": "96",
+            "party_place": "2",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1142",
+                    "name": "Amnesty",
+                    "acronym": "AME",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "900",
+                    "addedDate": "2001-07-11 05:52:05",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "64k"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "96",
+                    "ranking": "2",
+                    "year": "2026",
+                    "compo_name": "pc intro"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 32.95115318161319,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106987.jpg",
+            "party_compo_name": "pc intro"
+        },
+        {
+            "id": "106986",
+            "name": "Radio Taiso 64",
+            "type": "game",
+            "addedUser": {
+                "id": "110283",
+                "nickname": "AdvancingDevelop",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "pxar.gif",
+                "glops": "5",
+                "registerDate": "2026-09-05 10:11:14",
+                "udlogin": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 16:21:51",
+            "releaseDate": "2026-09-15",
+            "voteup": "1",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/github.com\/AdvancingDevelopment\/c64radiotaiso\/releases\/download\/v1.0\/RadioTaiso64_v1.0.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "17004",
+                    "name": "Advancing Development",
+                    "acronym": "ADVD",
+                    "disambiguation": "Denver, Colorado, USA",
+                    "web": "",
+                    "addedUser": "110283",
+                    "addedDate": "2026-09-05 16:07:18",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "game"
+            ],
+            "placings": [],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "popularity": 34.31733776195272,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106986.png"
+        },
+        {
+            "id": "106985",
+            "name": "canal life",
+            "type": "demo",
+            "addedUser": {
+                "id": "109038",
+                "nickname": "m4v .aka filippp",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "dot_demogroup_filippp.gif",
+                "glops": "23",
+                "registerDate": "2025-10-02 18:57:12",
+                "udlogin": null,
+                "thumbups": "21",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-05 09:16:14",
+            "releaseDate": "2026-08-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/xenium26\/fantasy_console\/fantasy_console____a.dot_-_canal_life.zip",
+            "party_compo": "173",
+            "party_place": "4",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "16827",
+                    "name": ".dot",
+                    "acronym": ".",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "108084",
+                    "addedDate": "2025-08-27 09:42:51",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "173",
+                    "ranking": "4",
+                    "year": "2026",
+                    "compo_name": "fantasy console demo"
+                }
+            ],
+            "platforms": {
+                "160": {
+                    "name": "TIC-80",
+                    "icon": "k_tic80.png",
+                    "slug": "tic80"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 31.544119656526476,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106985.png",
+            "party_compo_name": "fantasy console demo"
+        },
+        {
+            "id": "106984",
+            "name": "tosdemo",
+            "type": "demo",
+            "addedUser": {
+                "id": "100043",
+                "nickname": "reality404",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "darko.gif",
+                "glops": "138",
+                "registerDate": "2016-07-22 18:26:32",
+                "udlogin": null,
+                "thumbups": "160",
+                "thumbdowns": "6",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-04 18:06:53",
+            "releaseDate": "2017-03-15",
+            "voteup": "3",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/artists\/tsheikhs\/tosdemo.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "demo"
+            ],
+            "placings": [],
+            "platforms": {
+                "77": {
+                    "name": "Wild",
+                    "icon": "k_wild.gif",
+                    "slug": "wild"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "popularity": 34.37930592068685,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106984.jpg"
+        },
+        {
+            "id": "106983",
+            "name": "Arch Linux ARM Intro #2",
+            "type": "intro",
+            "addedUser": {
+                "id": "109740",
+                "nickname": "danct12",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "ghayh.gif",
+                "glops": "24",
+                "registerDate": "2026-04-09 14:34:10",
+                "udlogin": null,
+                "thumbups": "9",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-04 12:15:27",
+            "releaseDate": "2026-09-15",
+            "voteup": "2",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/groups\/danctnix\/alintro2.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "16915",
+                    "name": "DanctNIX",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "https:\/\/danctnix.org",
+                    "addedUser": "109740",
+                    "addedDate": "2026-04-11 07:04:48",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "intro"
+            ],
+            "placings": [],
+            "platforms": {
+                "66": {
+                    "name": "Linux",
+                    "icon": "k_linux.gif",
+                    "slug": "linux"
+                },
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                },
+                "103": {
+                    "name": "Nintendo 64",
+                    "icon": "k_n64.gif",
+                    "slug": "nintendo64"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "popularity": 45.83599732101707,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106983.png"
+        },
+        {
+            "id": "106982",
+            "name": "Unstable Signal",
+            "type": "demo",
+            "addedUser": {
+                "id": "456",
+                "nickname": "XTD",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "pixtd2.gif",
+                "glops": "11",
+                "registerDate": "2001-01-14 13:24:37",
+                "udlogin": null,
+                "thumbups": "793",
+                "thumbdowns": "18",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-03 08:47:29",
+            "releaseDate": "2026-08-15",
+            "voteup": "14",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/www.xtdmusic.eu\/extra\/LMS_Unstable_Signal.zip",
+            "party_compo": "95",
+            "party_place": "3",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "827",
+                    "name": "Lamers",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "499",
+                    "addedDate": "2001-05-20 23:47:40",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "95",
+                    "ranking": "3",
+                    "year": "2026",
+                    "compo_name": "pc demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 47.82075749922986,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106982.jpg",
+            "party_compo_name": "pc demo"
+        },
+        {
+            "id": "106981",
+            "name": "11 Fingers",
+            "type": "demo",
+            "addedUser": {
+                "id": "456",
+                "nickname": "XTD",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "pixtd2.gif",
+                "glops": "11",
+                "registerDate": "2001-01-14 13:24:37",
+                "udlogin": null,
+                "thumbups": "793",
+                "thumbdowns": "18",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-03 08:41:55",
+            "releaseDate": "2026-08-15",
+            "voteup": "22",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/www.xtdmusic.eu\/extra\/LMS_11_Fingers.zip",
+            "party_compo": "95",
+            "party_place": "5",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "827",
+                    "name": "Lamers",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "499",
+                    "addedDate": "2001-05-20 23:47:40",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "95",
+                    "ranking": "5",
+                    "year": "2026",
+                    "compo_name": "pc demo"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 48.78834784065919,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106981.jpg",
+            "party_compo_name": "pc demo"
+        },
+        {
+            "id": "106980",
+            "name": "Loophole",
+            "type": "1k",
+            "addedUser": {
+                "id": "4324",
+                "nickname": "jazzcat",
+                "level": "user",
+                "permissionOpenBBS": "1",
+                "avatar": "jazzcat.gif",
+                "glops": "437",
+                "registerDate": "2003-04-29 20:06:26",
+                "udlogin": null,
+                "thumbups": "2494",
+                "thumbdowns": "21",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "stats": []
+            },
+            "addedDate": "2026-09-02 21:45:19",
+            "releaseDate": "2026-08-15",
+            "voteup": "3",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2026\/xenium26\/intro_oldschool\/loophole.zip",
+            "party_compo": "93",
+            "party_place": "3",
+            "party_year": "2026",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "11247",
+                    "name": "Casyopea",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "20312",
+                    "addedDate": "2011-01-15 23:13:14",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "1k"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "227",
+                        "name": "Xenium",
+                        "web": "https:\/\/xenium.rocks\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "93",
+                    "ranking": "3",
+                    "year": "2026",
+                    "compo_name": "oldskool intro"
+                }
+            ],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "227",
+                "name": "Xenium",
+                "web": "https:\/\/xenium.rocks\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "popularity": 43.859418542153456,
+            "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00106\/00106980.jpg",
+            "party_compo_name": "oldskool intro"
+        }
+    ]
+}

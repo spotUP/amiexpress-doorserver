@@ -1,0 +1,76 @@
+{
+    "success": true,
+    "prod": {
+        "id": "78903",
+        "name": "Analect 09",
+        "type": "demopack",
+        "addedUser": {
+            "id": "98791",
+            "nickname": "100bit",
+            "level": "user",
+            "permissionOpenBBS": "1",
+            "avatar": "rocket.gif",
+            "glops": "17906",
+            "registerDate": "2014-11-19 17:17:25",
+            "udlogin": null,
+            "thumbups": "16",
+            "thumbdowns": "0",
+            "ojuice": null,
+            "slengpung": null,
+            "csdb": null,
+            "zxdemo": null,
+            "demozoo": null,
+            "stats": []
+        },
+        "addedDate": "2018-11-14 19:17:29",
+        "releaseDate": "1994-00-15",
+        "voteup": "1",
+        "votepig": "0",
+        "votedown": "0",
+        "voteavg": "1.0000",
+        "download": "http:\/\/ftp.amigascne.org\/pub\/amiga\/Packdisks\/Dual4Mat\/Dual4Mat-Analect09.lha",
+        "party_compo": null,
+        "party_place": "0",
+        "party_year": "0",
+        "sceneorg": "0",
+        "demozoo": "195734",
+        "csdb": "0",
+        "zxdemo": "0",
+        "invitation": null,
+        "invitationyear": "0",
+        "boardID": null,
+        "rank": "89001",
+        "groups": [
+            {
+                "id": "3308",
+                "name": "Dual Format",
+                "acronym": "",
+                "disambiguation": "",
+                "web": "",
+                "addedUser": "794",
+                "addedDate": "2004-03-05 13:34:26",
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null
+            }
+        ],
+        "types": [
+            "demopack"
+        ],
+        "placings": [],
+        "platforms": {
+            "71": {
+                "name": "Amiga AGA",
+                "icon": "k_amiga_aga.gif",
+                "slug": "amigaaga"
+            }
+        },
+        "awards": [],
+        "party": null,
+        "cdc": 0,
+        "popularity": 45.31263444587477,
+        "screenshot": "https:\/\/content.pouet.net\/files\/screenshots\/00078\/00078903.jpg",
+        "downloadLinks": [],
+        "credits": []
+    }
+}

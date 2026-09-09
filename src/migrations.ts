@@ -337,6 +337,42 @@ export const MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_bji_job ON batch_job_items(job_id)');
     },
   },
+  {
+    version: 16,
+    name: 'integration_config_secrets_cache',
+    // External scene APIs for the operator chats (Pouet, Demozoo-live,
+    // AsciiArena, IA, ...), managed from the admin panel. Config and the
+    // cache are readable; secrets are write-only (no read path returns
+    // them - see src/integrations/store.ts).
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS integration_config (
+          source        TEXT PRIMARY KEY,
+          enabled       INTEGER NOT NULL DEFAULT 1,
+          settings_json TEXT NOT NULL DEFAULT '{}',
+          updated_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        )
+      `);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS integration_secrets (
+          source     TEXT NOT NULL,
+          key_name   TEXT NOT NULL,
+          secret     TEXT NOT NULL,
+          updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+          PRIMARY KEY (source, key_name)
+        )
+      `);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS integration_cache (
+          cache_key   TEXT PRIMARY KEY,
+          body        TEXT NOT NULL,
+          fetched_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+          ttl_seconds INTEGER NOT NULL DEFAULT 3600
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_integration_cache_age ON integration_cache(fetched_at)');
+    },
+  },
 ];
 
 function appliedVersions(db: Database.Database): Set<number> {
