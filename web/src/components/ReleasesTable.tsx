@@ -90,13 +90,11 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-muted">{r.dateIso}</td>
                 <td className="max-w-[28rem] truncate px-3 py-2 text-muted">{r.description ?? ''}</td>
-                <td className="max-w-[30rem] px-3 py-2 align-top">
+                <td className="px-3 py-2 align-top">
                   {r.rawDesc ? (
-                    <div className="max-h-44 overflow-auto rounded border border-line/50 bg-bg">
-                      <pre className="w-max px-2 py-1 font-amiga text-[15px] leading-[1.2] text-muted">
-                        {r.rawDesc}
-                      </pre>
-                    </div>
+                    <pre className="w-max px-2 py-1 font-amiga text-[15px] leading-[1.2] text-muted">
+                      {r.rawDesc}
+                    </pre>
                   ) : (
                     <span className="text-muted">–</span>
                   )}
