@@ -101,6 +101,44 @@ describe('releases surface', () => {
     expect((await request(app).get('/releases/v1/files/nope')).status).toBe(404);
   });
 
+  it('pages deltas with ?since= in ascending id order', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const app = createApp(cfg);
+    const res = await request(app).get('/releases/v1/list?since=1');
+    expect(res.body.total).toBe(2);
+    expect(res.body.rows.map((r: { id: number }) => r.id)).toEqual([2, 3]);
+    // since forces asc even when desc is asked for
+    const forced = await request(app).get('/releases/v1/list?since=1&order=desc');
+    expect(forced.body.rows.map((r: { id: number }) => r.id)).toEqual([2, 3]);
+  });
+
+  it('selects columns with ?fields= and always keeps id', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const app = createApp(cfg);
+    const res = await request(app).get('/releases/v1/list?fields=filename,flag&limit=1');
+    expect(res.body.rows[0]).toEqual({ id: 1, filename: 'BETTER.WRP', flag: 'N' });
+    const junk = await request(app).get('/releases/v1/list?fields=filename,nope&limit=1');
+    expect(junk.body.rows[0]).toEqual({ id: 1, filename: 'BETTER.WRP' });
+  });
+
+  it('dumps NDJSON slim by default and resumes from ?since=', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const app = createApp(cfg);
+    const full = await request(app).get('/releases/v1/dump');
+    expect(full.headers['content-type']).toContain('x-ndjson');
+    const lines = full.text.trim().split('\n');
+    expect(lines).toHaveLength(3);
+    expect(JSON.parse(lines[0]).filename).toBe('BETTER.WRP');
+    expect('rawDesc' in JSON.parse(lines[0])).toBe(false);
+    const resumed = await request(app).get('/releases/v1/dump?since=2');
+    expect(resumed.text.trim().split('\n')).toHaveLength(1);
+    const art = await request(app).get('/releases/v1/dump?fields=filename,rawDesc&limit=1');
+    expect('rawDesc' in JSON.parse(art.text.trim())).toBe(true);
+  });
+
   it('serves list.txt in the house format', async () => {
     const cfg = makeCfg();
     seedReleases(cfg);

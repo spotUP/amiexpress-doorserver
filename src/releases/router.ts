@@ -13,9 +13,16 @@
  * reason the achievements mount is (the SPA catch-all only exempts /api/).
  */
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { RELEASES_CONTRACT_VERSION } from '../../contract/release-types';
+import { RELEASES_CONTRACT_VERSION, type ReleaseField } from '../../contract/release-types';
 import { esc, oneLine, toLatin1Safe } from '../text-format';
-import { getReleaseById, getReleasesCount, getReleasesRevision, queryReleases } from './store';
+import {
+  DUMP_DEFAULT_FIELDS,
+  getReleaseById,
+  getReleasesCount,
+  getReleasesRevision,
+  queryReleases,
+  streamReleases,
+} from './store';
 import type { ReleasesConfig } from './config';
 import type { ServerConfig } from '../config';
 
@@ -27,6 +34,10 @@ function parseQuery(req: Request) {
     return Number.isFinite(n) ? n : undefined;
   };
   const order = req.query.order === 'desc' ? 'desc' : 'asc';
+  const fields =
+    typeof req.query.fields === 'string'
+      ? (req.query.fields.split(',').map((f) => f.trim()).filter(Boolean) as ReleaseField[])
+      : undefined;
   return {
     q: str(req.query.q),
     flag: str(req.query.flag),
@@ -36,6 +47,8 @@ function parseQuery(req: Request) {
     order: order as 'asc' | 'desc',
     limit: num(req.query.limit),
     offset: num(req.query.offset),
+    since: num(req.query.since),
+    fields,
   };
 }
 
@@ -85,15 +98,55 @@ export function createReleasesRouter(_cfg: ServerConfig, rel: ReleasesConfig): e
   // Same escaping rules as list.txt (pipe → !, one row per line, Latin-1,
   // CRLF incl. after the last row) and the same append-only promise.
   router.get('/list.txt', (req: Request, res: Response) => {
-    const { rows } = queryReleases(rel, { ...parseQuery(req), limit: 500, offset: 0 });
+    // Full columns: a field subset could leave a hole in a positional format.
+    const { rows } = queryReleases(rel, { ...parseQuery(req), fields: undefined, limit: 500, offset: 0 });
     const lines = [`RELEASE|1|${getReleasesRevision(rel)}|${rows.length}`];
     for (const r of rows) {
-      const filename = toLatin1Safe(esc(oneLine(r.filename)));
+      const filename = toLatin1Safe(esc(oneLine(r.filename ?? '')));
       const desc = toLatin1Safe(esc(oneLine(r.description ?? ''))).slice(0, 120);
-      lines.push(`${r.id}|${filename}|${r.flag}|${r.sizeBytes ?? ''}|${r.dateIso}|${desc}`);
+      lines.push(`${r.id}|${filename}|${r.flag ?? ''}|${r.sizeBytes ?? ''}|${r.dateIso}|${desc}`);
     }
     res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
     res.send(Buffer.from(lines.join('\r\n') + '\r\n', 'latin1'));
+  });
+
+  // Bulk pull for bots: every matching row as NDJSON (one JSON object per
+  // line), slim columns by default (no art block — fetch /files/:id for
+  // that). Same filters as /list; resume a broken pull with ?since=<last id>
+  // (?limit caps the response for chunking; default uncapped).
+  router.get('/dump', (req: Request, res: Response) => {
+    const q = parseQuery(req);
+    res.set('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.set('X-Releases-Total', String(getReleasesCount(rel)));
+    let first = true;
+    const write = (row: object): void => {
+      if (!first) res.write('\n');
+      first = false;
+      res.write(JSON.stringify(row));
+    };
+    try {
+      const { rows } = streamReleases(
+        rel,
+        {
+          q: q.q,
+          flag: q.flag,
+          dir: q.dir,
+          from: q.from,
+          to: q.to,
+          since: q.since,
+          limit: q.limit,
+          fields: q.fields ?? DUMP_DEFAULT_FIELDS,
+        },
+        write
+      );
+      void rows;
+    } catch {
+      // A mid-stream failure cannot become a status code; end the stream and
+      // let the row count tell the bot it is short. Resume with ?since=.
+      res.end();
+      return;
+    }
+    res.end();
   });
 
   router.get('/files/:id', (req: Request, res: Response) => {

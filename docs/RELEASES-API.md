@@ -23,11 +23,26 @@ Every response carries `X-Releases-Contract` (currently `1`) and
 | GET | `/health` | `{status, contractVersion, revision, files}` |
 | GET | `/list` | paged rows with filters (below) |
 | GET | `/list.txt` | first 500 rows in house text format (Latin-1, CRLF) |
-| GET | `/files/:id` | one row, or 404 `{error:"not_found"}` |
+| GET | `/dump` | every matching row as NDJSON, slim columns, resumable (below) |
+| GET | `/files/:id` | one full row incl. `rawDesc`, or 404 `{error:"not_found"}` |
+
+### Bot recipe (full pull + stay current)
+
+No auth. Poll `GET /health` and compare `revision`; when it moves:
+
+1. Full pull: `GET /dump` — one JSON object per line, slim columns (no art
+   block). For the art too, add `?fields=` naming `rawDesc`, or fetch
+   `/files/:id` per row.
+2. Broken pull: resume with `?since=<last id seen>` (add `?limit=` to chunk).
+3. Stay current: `GET /list?since=<last id seen>` — ascending ids only.
+4. A mid-stream failure cannot become a status code on `/dump`; a short
+   stream (fewer lines than `X-Releases-Total`) means resume with `?since=`.
 
 `GET /list` query: `q` (filename + description substring), `flag` (`N`/`P`/`D`/…),
 `dir` (dir number), `from`/`to` (`YYYY-MM-DD` on the entry date), `order`
-(`asc`/`desc` by id), `limit` (default 100, max 500), `offset`.
+(`asc`/`desc` by id), `limit` (default 100, max 500), `offset`,
+`since` (only `id` greater than this — forces ascending order, ignores offset),
+`fields` (comma list of row keys; unknown names ignored, `id` always kept).
 Answers `{contractVersion, revision, total, offset, limit, rows[]}`.
 
 `GET /list.txt` takes the same filters and answers:

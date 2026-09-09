@@ -48,6 +48,26 @@ export interface ReleaseListResponse {
   rows: ReleaseRow[];
 }
 
+/**
+ * Column selector for list/dump (`?fields=id,filename,flag`). Appended
+ * under the append-only promise: no contract bump.
+ */
+export type ReleaseField =
+  | 'id'
+  | 'dirNo'
+  | 'fileNo'
+  | 'filename'
+  | 'flag'
+  | 'sizeBytes'
+  | 'sizeNote'
+  | 'dateIso'
+  | 'dlCount'
+  | 'uploader'
+  | 'description'
+  | 'version'
+  | 'author'
+  | 'rawDesc';
+
 export interface ReleaseHealth {
   status: 'ok';
   contractVersion: string;
