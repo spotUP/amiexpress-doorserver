@@ -10,6 +10,7 @@ Bases (HTTPS; plain HTTP serves the same paths):
 
 - Doors: `https://doors.uprough.net/api/door-repo`
 - Releases (BBS file listing): `https://doors.uprough.net/releases/v1`
+- Integrations (external scene APIs for chats): `https://doors.uprough.net/api/integrations/v1`
 
 Every releases response carries `X-Releases-Contract: 1` and
 `X-Releases-Revision: r<count>-t<max-id>` (poll `/health` and compare
@@ -34,6 +35,11 @@ doors/files (`no such door`, `not_found`).
 | Listing stats | `GET /stats` (flags, top groups/**uploaders**/authors, sizes, months) |
 | Fun facts / first DIZ / records | `GET /facts` (date span, first art-DIZ **with `rawDesc`**, peak year/month, DMS→LHA crossover year, weekday counts, biggest/longest/most-downloaded, median size) |
 | All files for offline use | `GET /dump` (NDJSON, slim columns; resume broken pulls with `?since=<last id>`); doors equivalent: `GET /export.csv` |
+| Tell me about / find prod X | `GET /api/integrations/v1/answer?q=X` (fans out to Pouët, Demozoo, AsciiArena, Internet Archive, demoparty.net, artpacks, radio + keyed/custom sources when configured) |
+| Surprise me (scene) | `GET /api/integrations/v1/answer?q=X&mode=random` (one random hit per source that offers it) |
+| Latest scene arrivals | `GET /api/integrations/v1/answer?q=X&mode=latest` |
+| Is this download link alive | `GET /api/integrations/v1/check?url=<https-url>` (`{url, ok, status}` — HEAD-checked; private hosts refused) |
+| Which sources are up | `GET /api/integrations/v1/status` (per-source `ok`, `latencyMs`, `detail`; keyed sources report `no api_key stored` when dark) |
 
 ## Shapes (trimmed)
 
@@ -72,6 +78,29 @@ one such row.
 - Hidden/removed doors are invisible: no list, detail 404s. Do not reveal
   their existence.
 
+## Integrations field notes (quote these to users when relevant)
+
+- `/answer` returns `{query, mode, results, sources, stale}`. Every result
+  carries `source` (Pouët, Demozoo, AsciiArena, Internet Archive,
+  demoparty.net, artpacks, radio, or a custom name) — always attribute.
+- `sources[]` says who answered (`ok`, `ms`) and who did not (`detail`).
+  When a source is down, say so with attribution ("Pouët is down, here's
+  Demozoo") — never present another source's hits as its own.
+- `stale: true` means everything failed and this is the last-known answer.
+  Say so.
+- Keyed sources (ModArchive, TMDB, OMDb) are dark until the curator stores
+  a key in the admin panel; `/status` reports `no api_key stored`. Custom
+  curator sources appear with their own names.
+- AsciiArena links go to the on-site viewer (`html_url`) — never paste
+  `text` art into chat; auto-detected (`manual: false`) bounds are
+  approximate anyway.
+- Demozoo `?q=` matches broadly (a `?` title means the query hit comments
+  or credits, not the title) — prefer the top hits, link `demozoo_url`.
+- Artpack hits are ZIP download links (raw bytes, CP437-safe because they
+  are never transcoded), not viewable text.
+- Radio answers "what is playing" only when the curator configured a
+  station; otherwise it contributes nothing.
+
 ## Pagination, sorting, limits
 
 - Doors list: `?page=` (1-based), `?per_page=` (max 200, default 50);
@@ -101,4 +130,10 @@ curl 'https://doors.uprough.net/releases/v1/list?q=tracker&from=1995-01-01&to=19
 
 # headline facts (first DIZ, peaks, records)
 curl 'https://doors.uprough.net/releases/v1/facts'
+
+# scene-wide answer with attribution
+curl 'https://doors.uprough.net/api/integrations/v1/answer?q=revision'
+
+# is a download link alive before handing it out
+curl 'https://doors.uprough.net/api/integrations/v1/check?url=https://files.scene.org/'
 ```
