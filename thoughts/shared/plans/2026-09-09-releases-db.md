@@ -98,8 +98,13 @@ owner confirmed it is not needed. Store `dir_no` + `file_no` for identity only; 
       `docs/RELEASES-API.md`, verified against all 299,437 rows (5/8)
 - [x] P5 — `typecheck` + `test:ci` green (663 passed); also fixed 3 pre-existing
       stale expectations (capitalization) found failing on clean HEAD (6/8)
-- [ ] P6 — Deploy (compose `RELEASES_DB` line in; needs live env + import) (7/8)
-- [ ] P7 — Import on live host from the real file; verify counts + rows live (8/8)
+- [x] P6 — Deployed: compose defaults `RELEASES_DB=/data/releases.db` (no secret
+      needed; empty DB serves empty listing), rebuilt, healthy (7/8)
+- [x] P7 — Imported live: file scp'd to host, 299,437/299,437 rows; health
+      `r299437-t299437`; spot-checks pass. Known notes: same filename in several
+      dirs = separate rows (correct); no-binary-name rows can keep a `Prog .`
+      prefix the doors pipeline strips (no binary names in a listing — accepted).
+      (8/8)
 
 ## 5. Owner answers (2026-09-09 — all resolved)
 
