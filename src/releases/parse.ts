@@ -88,27 +88,31 @@ const UPLOADER_RE = /^\s*(\S[^<>]*?)\s*>>(.+)<<\s*$/;
  * downloads out of harm's way — DIZ prose never indents that deep.
  */
 const DL_STAMP_RE = /^( {15,})DL's: (\d\d)(?=\s)/;
+
+/**
+ * Repair double-encoded text baked into the capture (`Â¬` for `¬`, `Ã©`
+ * for `é`): some tool read Latin-1 bytes as characters and UTF-8-encoded
+ * them again, so the file holds C3 82 C2 A9 where C2 A9 belongs. 607k
+ * `Â`+symbol and 56k `Ã`+symbol runs measured 2026-09-10, almost all box
+ * art (`Â·`, `Â¯`, `Â»`, `Ã·`, `Ã¸`).
+ *
+ * Only the printable range is repaired: hits decoding to C1 controls
+ * (8k, e.g. `Ã\x8d`) are left alone — those are likelier art bytes than
+ * text, and "fixing" them would mint control characters. A legit `Â`
+ * followed by ASCII (`Âge`) or a symbol outside the range never matches.
+ */
+export function repairDoubleEncoded(s: string): string {
+  if (!s || (s.indexOf('Â') === -1 && s.indexOf('Ã') === -1)) return s;
+  return s
+    .replace(/Â([\u00a0-\u00bf])/g, (_m, c: string) => String.fromCharCode((c as string).charCodeAt(0)))
+    .replace(/Ã([\u00a0-\u00bf])/g, (_m, c: string) =>
+      String.fromCharCode(0xc0 | ((c as string).charCodeAt(0) & 0x3f))
+    );
+}
 /** AquaScan's own ornament (`_¸,ø*¤…_¸_`) and its date line — the next entry's
  *  header, not this entry's description. Only ever stripped from the END of a
  *  block, so identical glyphs inside real art are untouched. */
 const ORNAMENT_RE = /¸,ø\*¤|^\s*¸.*\d{2}-\d{2}-\d{2}\s*$/;
-
-/** True when a line reads as box art rather than prose: mostly punctuation /
- *  high-bit drawing chars. Used to align an art block's trimmed first line
- *  with its siblings; prose paragraphs must never be re-indented. The gate
- *  sits at 0.3 because sparse art lines carry wide gaps that dilute the
- *  ratio (`T ___ \         | | / /` scores 0.35); prose with punctuation
- *  stays near 0.05, so the margin holds. */
-function looksLikeArt(line: string): boolean {
-  const t = line.trim();
-  if (t.length < 4) return false;
-  let odd = 0;
-  for (const ch of t) {
-    const code = ch.charCodeAt(0);
-    if (code > 0x7f || !/[A-Za-z0-9 ]/.test(ch)) odd++;
-  }
-  return odd / t.length > 0.3;
-}
 
 export interface ParsedEntryLine {
   filename: string;
@@ -126,7 +130,7 @@ export interface ParsedEntryLine {
  * fixed columns → flagless fallback → `[DELETED]` fallback.
  */
 export function parseEntryLine(line: string): ParsedEntryLine | null {
-  const noNl = line.replace(/[\r\n]+$/, '');
+  const noNl = repairDoubleEncoded(line.replace(/[\r\n]+$/, ''));
   // 1. Fixed columns: 13-char name, flag letter-or-blank at col 13.
   if (noNl.length > 30) {
     const nameField = noNl.slice(0, 13);
@@ -269,32 +273,35 @@ export async function parseLines(
     while (kept.length && (ORNAMENT_RE.test(kept[kept.length - 1]) || !kept[kept.length - 1].trim())) {
       kept.pop();
     }
-    // The entry line's own art row was trimmed to column 0 while its
-    // siblings kept their source indent (BK-HL1.DMS: first row at 0, rest
-    // at 33). Re-indent it to the first art sibling so the picture lines
-    // up; prose is never touched (looksLikeArt gate). This pairs with the
-    // dedent below: pad lifts row 1 to the sibling level, dedent then
-    // strips the uniform padding off every row.
+    // The entry line's own row was trimmed to column 0 while its siblings
+    // kept their source indent. Lift it to the first content sibling (any
+    // sibling at 4+, art or prose — ragged prose titles like
+    // `Hillsea Lido …[1/2]` over an 8-space `(c) …` line read as broken
+    // otherwise); single-space offsets pass through untouched.
     if (kept.length >= 2 && !kept[0].startsWith(' ')) {
       const next = kept.slice(1).find((l) => l.trim());
       if (next) {
         const indent = next.length - next.trimStart().length;
-        if (indent >= 15 && looksLikeArt(next)) {
+        if (indent >= 4) {
           kept[0] = ' '.repeat(indent) + kept[0];
         }
       }
     }
     // Strip uniform BBS column padding: when every content line shares a
-    // deep indent (the 33-space listing column), it is padding, not art —
-    // removing it left-aligns the picture without touching relative
-    // alignment. Mixed/prose blocks have min indent 0 and pass through.
+    // deep, near-equal indent (the 33-space listing column), it is padding,
+    // not art — removing it left-aligns the picture without touching
+    // relative alignment. Ragged blocks (shallow min, or lines spread over
+    // more than 4 columns) keep their source shape, first-line pad included.
     {
       let min = Infinity;
+      let max = 0;
       for (const l of kept) {
         if (!l.trim()) continue;
-        min = Math.min(min, l.length - l.trimStart().length);
+        const ind = l.length - l.trimStart().length;
+        min = Math.min(min, ind);
+        max = Math.max(max, ind);
       }
-      if (min !== Infinity && min > 0) {
+      if (min !== Infinity && min >= 15 && max - min <= 4) {
         for (let i = 0; i < kept.length; i++) kept[i] = kept[i].slice(min);
       }
     }
@@ -324,7 +331,7 @@ export async function parseLines(
   };
 
   for await (const raw of lines) {
-    const line = (raw as string).replace(/[\r\n]+$/, '');
+    const line = repairDoubleEncoded((raw as string).replace(/[\r\n]+$/, ''));
     const scan = line.match(/^Scanning dir (\d+)/);
     if (scan) {
       flush();

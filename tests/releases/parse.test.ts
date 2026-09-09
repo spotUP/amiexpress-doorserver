@@ -131,9 +131,10 @@ describe('parseLines blocks', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].dlCount).toBe(14);
     expect(entries[0].uploader).toBe('Bigophone');
+    // Uniform 33-padding lifts then strips: net left-aligned
     expect(entries[0].descLines).toEqual([
       'Double Dragon - Just like the arcade!',
-      '                                 Graphics could be a lot better though.',
+      'Graphics could be a lot better though.',
     ]);
   });
 
@@ -198,7 +199,7 @@ describe('parseLines blocks', () => {
       `${pad}| | / /_______  ! l/ /_______  _  ___`,
     ].join('\n');
     const { entries } = await collect(text);
-    // Second line scores 0.35 art-density (gap-diluted); the 0.3 gate catches it
+    // Uniform padding lifts then strips: net aligned at 0
     expect(entries[0].descLines[0]).toBe('______          __   __');
   });
 
@@ -222,6 +223,28 @@ describe('parseLines blocks', () => {
     ].join('\n');
     const { entries } = await collect(text);
     expect(entries[0].descLines[0]).toBe('Double Dragon!');
+  });
+
+  it('indents a ragged prose title to its sibling, no dedent under 15', async () => {
+    const text = [
+      '[ File #6325 ]                  ·===============·',
+      'HF-HSL1.DMS  P 420799  11-30-95  Hillsea Lido ECS/AGA Disk [1/2]',
+      '                    (c) Vulcan Software',
+      '                              Iggy, The Newcomer..',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries[0].descLines).toEqual([
+      '                    Hillsea Lido ECS/AGA Disk [1/2]',
+      '                    (c) Vulcan Software',
+      '                              Iggy, The Newcomer..',
+    ]);
+  });
+
+  it('repairs double-encoded Latin-1 (Â¬ -> ¬, Ã© -> é)', () => {
+    expect(parseEntryLine('SUPERSKI.WRP P 397436  06-14-90  Super Ski [ Â© 1988 ]')?.firstDesc).toBe(
+      'Super Ski [ © 1988 ]'
+    );
+    expect(parseEntryLine('FOO.LHA P 1  01-01-90  Grüße Âge Ã©')?.firstDesc).toBe('Grüße Âge é');
   });
 
   it('drops trailing ornament and date lines of the next entry', async () => {
