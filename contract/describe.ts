@@ -415,7 +415,45 @@ export function describeBlock(diz: string | null, cap = 70, prog?: string | null
     if (text.endsWith('-') && /^[A-Za-zÀ-ÿ]/.test(next)) {
       text = text + next;
     } else {
-      text = `${text} ${next}`;
+      // Fix broken words split across lines without hyphen: "requester" + "s," -> "requesters,"
+      const broken = next.match(/^([a-zA-Z]{1,3})([.,]?)(\s+.*)?$/);
+      const prevLastWord = text.split(/\s+/).pop() || '';
+      // Debug for BBSG203
+      // if (prevLastWord === 'requester' && broken) console.log("broken", broken, "prev", prevLastWord, "next", JSON.stringify(next.slice(0,20)));
+      if (
+        broken &&
+        prevLastWord.length >= 4 &&
+        /^[a-z]{1,3}$/i.test(broken[1]) &&
+        /^(s|es|ed|ing|ers|est|ly|en|ion|ions|er|or|ment)$/i.test(broken[1]) &&
+        !/^[.!?]$/.test(text.trim().slice(-1))
+      ) {
+        const frag = broken[1];
+        const punct = broken[2] || '';
+        const rest = (broken[3] || '').trim();
+        const combined = prevLastWord + frag;
+        if (combined.length >= 5 && !prevLastWord.toLowerCase().endsWith('s') && frag.toLowerCase() === 's') {
+          const words = text.split(/\s+/);
+          words[words.length - 1] = combined + punct;
+          text = words.join(' ') + (rest ? ' ' + rest : '');
+        } else if (frag.length <= 3) {
+          if (broken[1].length <= 2 && rest.length > 0) {
+            const w2 = text.split(/\s+/);
+            w2[w2.length - 1] = combined + punct;
+            const candidate = w2.join(' ') + (rest ? ' ' + rest : '');
+            if (/^[a-z]/.test(rest) || rest === '') {
+              text = candidate;
+            } else {
+              text = `${text} ${next}`;
+            }
+          } else {
+            text = `${text} ${next}`;
+          }
+        } else {
+          text = `${text} ${next}`;
+        }
+      } else {
+        text = `${text} ${next}`;
+      }
     }
     if (text.length >= cap) break;
   }
