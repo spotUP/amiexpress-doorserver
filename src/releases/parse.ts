@@ -77,6 +77,17 @@ const DELETED_RE = /^(\S+(?: \S+)*?)\s*\[DELETED\]\s+(\d{2})-(\d{2})-(\d{2})\s?(
 const FLAGLESS_RE = /^(.+?)\s+(\d[\d,]*)\s+(\d{2})-(\d{2})-(\d{2})\s?(.*)$/;
 const DL_RE = /d\/L tIMES:\s*(\d+)/;
 const UPLOADER_RE = /^\s*(\S[^<>]*?)\s*>>(.+)<<\s*$/;
+/**
+ * Inline download-count stamp the BBS burns into art lines at a fixed column:
+ * `                       DL's: 10  \  ___//…` — the same art one dir over
+ * (e.g. dir 16's copy of FLT-TT2.DMS) has plain spaces there. The stamp is
+ * always `DL's: NN` (zero-padded, 8 chars) after 15+ spaces, followed by 2+
+ * spaces and art. Replacing it with equal spaces restores the art byte-exact
+ * (proved against the unstamped twin) and yields the download count.
+ * The 15-space minimum keeps a hypothetical legit DIZ line mentioning
+ * downloads out of harm's way — DIZ prose never indents that deep.
+ */
+const DL_STAMP_RE = /^( {15,})DL's: (\d\d)(?=\s)/;
 
 export interface ParsedEntryLine {
   filename: string;
@@ -209,9 +220,20 @@ export async function parseLines(
     let uploader: string | null = null;
     const kept: string[] = [];
     if (entryLine.firstDesc.trim()) kept.push(entryLine.firstDesc);
-    for (const dl of descLines) {
+    for (const rawDl of descLines) {
+      // Strip an inline DL's stamp first; the restored spaces keep the art
+      // columns identical to the unstamped twin (same file, another dir).
+      let dl = rawDl;
+      const sm = dl.match(DL_STAMP_RE);
+      if (sm) {
+        dlCount = dlCount ?? Number(sm[2]);
+        dl = sm[1] + '        ' + dl.slice(sm[0].length);
+        // A stamp with no art after it is metadata, not a picture line.
+        if (!dl.trim()) continue;
+      }
       const dm = dl.match(DL_RE);
-      if (dm && dlCount === null) {
+      if (dm) {
+        // The explicit d/L line wins over a stamp when both exist.
         dlCount = Number(dm[1]);
         continue;
       }

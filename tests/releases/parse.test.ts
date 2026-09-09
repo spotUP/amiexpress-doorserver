@@ -149,6 +149,31 @@ describe('parseLines blocks', () => {
     expect(entries[0].descLines.join('\n')).toContain('Prism2v2.Device for WiFi!');
   });
 
+  it('strips an inline DL\'s stamp, keeps art columns and the count', async () => {
+    const text = [
+      '[ File #3376 ]                   ·===============·',
+      'FLT-TT2.DMS  DUMMY-SIZE  00-00-00  _______  /\\  _____',
+      "                       DL's: 10  \\  ___//\\\\/ _  //",
+      '                                 d/L tIMES: 14',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries).toHaveLength(1);
+    // d/L line wins over the stamp; stamp spaces restore the art columns
+    expect(entries[0].dlCount).toBe(14);
+    expect(entries[0].descLines[1]).toBe('                                 \\  ___//\\\\/ _  //');
+  });
+
+  it('takes the stamp count when no d/L line exists', async () => {
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'FOO.LHA      P 1234  01-01-90  _______  /\\',
+      "                       DL's: 07      / __  /\\",
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries[0].dlCount).toBe(7);
+    expect(entries[0].descLines[1]).toBe('                                     / __  /\\');
+  });
+
   it('records an anomaly when no entry line follows a marker', async () => {
     const { entries, anomalies } = await collect('[ File #9 ]\n[ End of File List ]\n');
     expect(entries).toHaveLength(0);

@@ -47,7 +47,9 @@ field promise identical to `list.txt`.
   `>>OLD<<`, …). `N`/`P` meanings are unconfirmed and stored raw.
 - `dateIso` is the entry-line date (`MM-DD-YY`, pivot YY≥80 → 19YY).
 - `dlCount` (`d/L tIMES:`) exists on newer entries only; `uploader`
-  (`Name >>note<<` trailer) is best-effort.
+  (`Name >>note<<` trailer) is best-effort. A `DL's: NN` stamp burned into
+  art lines at a fixed column is stripped (columns restored) and counted
+  when no `d/L` line exists.
 - `description`/`version`/`author` come from `contract/describe.ts` over the
   entry's description lines — the same extractor as doors, so fixes land here too.
 - `rawDesc` (on `/files/:id` only, not the list) is the description block verbatim,
