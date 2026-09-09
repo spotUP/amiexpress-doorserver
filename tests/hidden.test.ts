@@ -56,7 +56,7 @@ beforeEach(async () => {
     port: 3010,
     adminKeys: [{ label: 'spot', key: 'correct horse battery staple' }],
     jwtSecret: SECRET, learnKey: null,
-    achievements: null,
+    achievements: null, releases: null,
   };
   const db = openDb(cfg);
   applySchema(db);

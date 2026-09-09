@@ -37,7 +37,7 @@ beforeEach(async () => {
     port: 3010,
     adminKeys: [{ label: 'spot', key: 'correct horse battery staple' }],
     jwtSecret: SECRET, learnKey: null,
-    achievements: null,
+    achievements: null, releases: null,
   };
   const db = openDb(cfg);
   applySchema(db);
@@ -83,7 +83,7 @@ describe('GET /admin/doors/:archiveName', () => {
     expect(res.status).toBe(200);
     // The scanned description is box art; the derived one is the door's line.
     expect(res.body.fields.description.scanned).toBe('__ ART __');
-    expect(res.body.fields.description.derived).toContain('edits user accounts');
+    expect(res.body.fields.description.derived).toContain('Edits user accounts');
     expect(res.body.fields.description.isEdited).toBe(false);
     expect(res.body.fields.requires_bbs.derived).toBe('AmiExpress');
     expect(res.body.fileIdDiz).toContain('Account Editor v1.0');
@@ -213,7 +213,7 @@ describe('POST /admin/doors/:archiveName/redescribe', () => {
     await request(app()).patch(admin('/doors/ACC-V103.LHA')).set(auth()).send({ description: 'mine' });
     const res = await request(app()).post(admin('/doors/ACC-V103.LHA/redescribe')).set(auth());
     expect(res.status).toBe(200);
-    expect(res.body.description).toContain('edits user accounts');
+    expect(res.body.description).toContain('Edits user accounts');
     expect(res.body.requiresBbs).toBe('AmiExpress');
     // The human's text is still what the public API serves.
     expect((await request(app()).get('/api/door-repo/doors?q=ACC')).body.rows[0].description).toBe('mine');

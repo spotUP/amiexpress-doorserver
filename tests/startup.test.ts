@@ -29,7 +29,7 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 function cfgFor(dbPath: string): ServerConfig {
-  return { dbPath, archivesRoot: dir, port: 3010, adminKeys: [], jwtSecret: null, learnKey: null, achievements: null };
+  return { dbPath, archivesRoot: dir, port: 3010, adminKeys: [], jwtSecret: null, learnKey: null, achievements: null, releases: null };
 }
 
 describe('assertCatalogUsable', () => {

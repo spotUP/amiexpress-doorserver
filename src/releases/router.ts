@@ -1,0 +1,114 @@
+/**
+ * The releases surface: read-only HTTP over releases.db, beside the door repo.
+ *
+ *   GET /health        { status, contractVersion, revision, files }
+ *   GET /list          JSON ReleaseListResponse (?q=&flag=&dir=&from=&to=&order=&limit=&offset=)
+ *   GET /list.txt      house plain-text index (same filters, ISO-8859-1/CRLF)
+ *   GET /files/:id     one ReleaseRow, or 404 { error: "not_found" }
+ *
+ * Every response carries X-Releases-Contract + X-Releases-Revision (errors
+ * included). CORS is deliberately open (Allow-Origin *, no credentials),
+ * exactly like the door repo: a public, read-only listing anyone may read,
+ * including from a browser. Mounted BEFORE mountWebUi in app.ts for the same
+ * reason the achievements mount is (the SPA catch-all only exempts /api/).
+ */
+import express, { type NextFunction, type Request, type Response } from 'express';
+import { RELEASES_CONTRACT_VERSION } from '../../contract/release-types';
+import { esc, oneLine, toLatin1Safe } from '../text-format';
+import { getReleaseById, getReleasesCount, getReleasesRevision, queryReleases } from './store';
+import type { ReleasesConfig } from './config';
+import type { ServerConfig } from '../config';
+
+function parseQuery(req: Request) {
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
+  const num = (v: unknown): number | undefined => {
+    if (typeof v !== 'string' || !v.trim()) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const order = req.query.order === 'desc' ? 'desc' : 'asc';
+  return {
+    q: str(req.query.q),
+    flag: str(req.query.flag),
+    dir: num(req.query.dir),
+    from: str(req.query.from),
+    to: str(req.query.to),
+    order: order as 'asc' | 'desc',
+    limit: num(req.query.limit),
+    offset: num(req.query.offset),
+  };
+}
+
+export function createReleasesRouter(_cfg: ServerConfig, rel: ReleasesConfig): express.Router {
+  const router = express.Router();
+
+  router.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, X-Releases-Revision');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('X-Releases-Contract', RELEASES_CONTRACT_VERSION);
+    res.setHeader('X-Releases-Revision', getReleasesRevision(rel));
+    next();
+  });
+
+  router.options(/.*/, (_req: Request, res: Response) => {
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'If-None-Match, Range, Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.status(204).end();
+  });
+
+  router.get('/health', (_req: Request, res: Response) => {
+    res.json({
+      status: 'ok',
+      contractVersion: RELEASES_CONTRACT_VERSION,
+      revision: getReleasesRevision(rel),
+      files: getReleasesCount(rel),
+    });
+  });
+
+  router.get('/list', (req: Request, res: Response) => {
+    const { total, rows, limit, offset } = queryReleases(rel, parseQuery(req));
+    res.json({
+      contractVersion: RELEASES_CONTRACT_VERSION,
+      revision: getReleasesRevision(rel),
+      total,
+      offset,
+      limit,
+      rows,
+    });
+  });
+
+  // House plain-text index for 68K clients without a JSON parser:
+  //   RELEASE|1|<revision>|<count>
+  //   <id>|<filename>|<flag>|<sizeBytes>|<dateIso>|<description>
+  // Same escaping rules as list.txt (pipe → !, one row per line, Latin-1,
+  // CRLF incl. after the last row) and the same append-only promise.
+  router.get('/list.txt', (req: Request, res: Response) => {
+    const { rows } = queryReleases(rel, { ...parseQuery(req), limit: 500, offset: 0 });
+    const lines = [`RELEASE|1|${getReleasesRevision(rel)}|${rows.length}`];
+    for (const r of rows) {
+      const filename = toLatin1Safe(esc(oneLine(r.filename)));
+      const desc = toLatin1Safe(esc(oneLine(r.description ?? ''))).slice(0, 120);
+      lines.push(`${r.id}|${filename}|${r.flag}|${r.sizeBytes ?? ''}|${r.dateIso}|${desc}`);
+    }
+    res.set('Content-Type', 'text/plain; charset=ISO-8859-1');
+    res.send(Buffer.from(lines.join('\r\n') + '\r\n', 'latin1'));
+  });
+
+  router.get('/files/:id', (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const row = getReleaseById(rel, id);
+    if (!row) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    res.json(row);
+  });
+
+  return router;
+}

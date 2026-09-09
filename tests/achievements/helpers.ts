@@ -119,6 +119,7 @@ export function makeAchievementsFixture(opts: FixtureOptions = {}): Achievements
     jwtSecret: opts.admin ? TEST_JWT_SECRET : null,
     learnKey: null,
     achievements: ach,
+    releases: null,
   };
 
   // One door, so the catalog half of the server is usable and a test can

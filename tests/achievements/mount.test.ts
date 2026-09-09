@@ -24,7 +24,7 @@ beforeEach(() => {
 afterEach(() => fx.cleanup());
 
 /** The same server, configured by a sysop who never wanted achievements. */
-const withoutAchievements = () => createApp({ ...fx.cfg, achievements: null });
+const withoutAchievements = () => createApp({ ...fx.cfg, achievements: null, releases: null });
 
 describe('the achievements surface, where it is mounted', () => {
   it('answers on /achievements/v1, not under /api/door-repo', async () => {

@@ -7,6 +7,7 @@ import { createPublicRouter } from './public-routes';
 import { doorRepoCors } from './cors';
 import { createAchievementsRouter } from './achievements/router';
 import { createRequestsRouter } from './requests/router';
+import { createReleasesRouter } from './releases/router';
 import type { ServerConfig } from './config';
 
 export function createApp(cfg: ServerConfig): express.Express {
@@ -45,6 +46,12 @@ export function createApp(cfg: ServerConfig): express.Express {
     // would answer index.html and a 200. Gated on the same config: a sysop who
     // never configured achievements gets neither surface.
     app.use('/requests/v1', createRequestsRouter(cfg, cfg.achievements));
+  }
+  // The releases surface (AquaScan file listing): read-only, no keys, its own
+  // database. Same mount rule as above — before the SPA catch-all — and the
+  // same supported-absent semantics: unset RELEASES_DB, nothing mounted.
+  if (cfg.releases) {
+    app.use('/releases/v1', createReleasesRouter(cfg, cfg.releases));
   }
   mountWebUi(app);
   return app;

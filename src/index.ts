@@ -6,6 +6,7 @@ import { openDb } from './db';
 import { runMigrations } from './migrations';
 import { bootstrapAdmins } from './auth';
 import { initAchievementsDb } from './achievements/db';
+import { initReleasesDb } from './releases/db';
 import { smtpMailer, startMailDrain, MAIL_DRAIN_INTERVAL_MS } from './achievements/mail';
 import { ensureQuarantine } from './submissions';
 
@@ -83,6 +84,20 @@ function main(): void {
     }
   } else {
     console.log('[INFO] achievements surface disabled: ACHIEVEMENTS_DB is not set');
+  }
+
+  // Own file, own schema, own migrations — a failure here names RELEASES_DB.
+  if (cfg.releases) {
+    try {
+      for (const step of initReleasesDb(cfg.releases)) {
+        console.log(`[INFO] releases migration ${step}`);
+      }
+    } catch (err) {
+      console.error(`[ERROR] initialising ${cfg.releases.dbPath} failed: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  } else {
+    console.log('[INFO] releases surface disabled: RELEASES_DB is not set');
   }
 
   let doors: number;

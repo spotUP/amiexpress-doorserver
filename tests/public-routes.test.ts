@@ -26,7 +26,7 @@ beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-pub-'));
   const dbPath = path.join(dir, 'doors.db');
   fs.writeFileSync(dbPath, '');
-  cfg = { dbPath, archivesRoot: dir, port: 3010, adminKeys: [], jwtSecret: null, learnKey: null, achievements: null };
+  cfg = { dbPath, archivesRoot: dir, port: 3010, adminKeys: [], jwtSecret: null, learnKey: null, achievements: null, releases: null };
   const db = openDb(cfg);
   applySchema(db);
   runMigrations(db);
@@ -63,7 +63,7 @@ describe('GET /doors', () => {
 
   it('describes each door from its DIZ, and says where that came from', async () => {
     const res = await get('/doors?q=ACC');
-    expect(res.body.rows[0].description).toContain('edits every field');
+    expect(res.body.rows[0].description).toContain('Edits every field');
     expect(res.body.rows[0].descriptionSource).toBe('diz');
   });
 

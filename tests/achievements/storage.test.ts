@@ -32,7 +32,7 @@ function seedDoorsDb(dbPath: string, archivesRoot: string): void {
     adminKeys: [],
     jwtSecret: null,
     learnKey: null,
-    achievements: null,
+    achievements: null, releases: null,
   });
   applySchema(db);
   runMigrations(db);

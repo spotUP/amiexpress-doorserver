@@ -9,6 +9,8 @@
 import * as fs from 'fs';
 import { loadAchievementsConfig } from './achievements/config';
 import type { AchievementsConfig } from './achievements/config';
+import { loadReleasesConfig } from './releases/config';
+import type { ReleasesConfig } from './releases/config';
 
 export class ConfigError extends Error {}
 
@@ -35,6 +37,12 @@ export interface ServerConfig {
    * (D7).
    */
   achievements: AchievementsConfig | null;
+  /**
+   * The releases surface (AquaScan file listing), or null when not mounted.
+   * Same supported-absent semantics as achievements: unset RELEASES_DB, no
+   * surface, door repo unaffected.
+   */
+  releases: ReleasesConfig | null;
 }
 
 const DEFAULT_PORT = 3010;
@@ -88,5 +96,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     jwtSecret,
     learnKey: env.DOORREPO_LEARN_KEY?.trim() || null,
     achievements: loadAchievementsConfig(env),
+    releases: loadReleasesConfig(env),
   };
 }

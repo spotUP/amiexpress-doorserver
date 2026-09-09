@@ -75,7 +75,7 @@ describe('REACHED.tsv', () => {
     const spy = jest.spyOn(router, 'createAchievementsRouter');
     createApp(fx.cfg);
     expect(spy).toHaveBeenCalledTimes(1);
-    createApp({ ...fx.cfg, achievements: null });
+    createApp({ ...fx.cfg, achievements: null, releases: null });
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
