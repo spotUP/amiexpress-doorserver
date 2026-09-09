@@ -83,7 +83,7 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
                 className="cursor-pointer border-b border-line/50 last:border-0 hover:bg-raised"
                 onClick={() => setOpen(r)}
               >
-                <td className="break-all px-3 py-2 font-mono text-[13px]">{r.filename}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-mono text-[13px]">{r.filename}</td>
                 <td className="whitespace-nowrap px-3 py-2">{flagBadge(r.flag)}</td>
                 <td className="whitespace-nowrap px-3 py-2 text-muted">
                   {r.sizeBytes !== null ? formatSize(r.sizeBytes) : (r.sizeNote ?? '–')}

@@ -272,7 +272,9 @@ export async function parseLines(
     // The entry line's own art row was trimmed to column 0 while its
     // siblings kept their source indent (BK-HL1.DMS: first row at 0, rest
     // at 33). Re-indent it to the first art sibling so the picture lines
-    // up; prose is never touched (looksLikeArt gate).
+    // up; prose is never touched (looksLikeArt gate). This pairs with the
+    // dedent below: pad lifts row 1 to the sibling level, dedent then
+    // strips the uniform padding off every row.
     if (kept.length >= 2 && !kept[0].startsWith(' ')) {
       const next = kept.slice(1).find((l) => l.trim());
       if (next) {
@@ -280,6 +282,20 @@ export async function parseLines(
         if (indent >= 15 && looksLikeArt(next)) {
           kept[0] = ' '.repeat(indent) + kept[0];
         }
+      }
+    }
+    // Strip uniform BBS column padding: when every content line shares a
+    // deep indent (the 33-space listing column), it is padding, not art —
+    // removing it left-aligns the picture without touching relative
+    // alignment. Mixed/prose blocks have min indent 0 and pass through.
+    {
+      let min = Infinity;
+      for (const l of kept) {
+        if (!l.trim()) continue;
+        min = Math.min(min, l.length - l.trimStart().length);
+      }
+      if (min !== Infinity && min > 0) {
+        for (let i = 0; i < kept.length; i++) kept[i] = kept[i].slice(min);
       }
     }
     onEntry({

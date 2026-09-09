@@ -160,7 +160,7 @@ describe('parseLines blocks', () => {
     expect(entries).toHaveLength(1);
     // d/L line wins over the stamp; stamp spaces restore the art columns
     expect(entries[0].dlCount).toBe(14);
-    expect(entries[0].descLines[1]).toBe('                                 \\  ___//\\\\/ _  //');
+    expect(entries[0].descLines[1]).toBe('\\  ___//\\\\/ _  //');
   });
 
   it('takes the stamp count when no d/L line exists', async () => {
@@ -171,7 +171,7 @@ describe('parseLines blocks', () => {
     ].join('\n');
     const { entries } = await collect(text);
     expect(entries[0].dlCount).toBe(7);
-    expect(entries[0].descLines[1]).toBe('                                     / __  /\\');
+    expect(entries[0].descLines[1]).toBe('/ __  /\\');
   });
 
   it('re-indents an art first line to its siblings, leaves prose alone', async () => {
@@ -185,7 +185,7 @@ describe('parseLines blocks', () => {
       `${pad}Graphics could be a lot better though.`,
     ].join('\n');
     const { entries } = await collect(text);
-    expect(entries[0].descLines[0]).toBe(`${pad}_|__  ___  __|_`);
+    expect(entries[0].descLines[0]).toBe('_|__  ___  __|_');
     expect(entries[1].descLines[0]).toBe('Double Dragon!');
   });
 
@@ -199,7 +199,29 @@ describe('parseLines blocks', () => {
     ].join('\n');
     const { entries } = await collect(text);
     // Second line scores 0.35 art-density (gap-diluted); the 0.3 gate catches it
-    expect(entries[0].descLines[0]).toBe(`${pad}______          __   __`);
+    expect(entries[0].descLines[0]).toBe('______          __   __');
+  });
+
+  it('dedents uniform BBS column padding, keeping relative alignment', async () => {
+    const pad = ' '.repeat(33);
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'BK-HL1.DMS   P 856845  02-02-96  _|__  ___',
+      `${pad}\\___)(___\\`,
+      `${pad}  indented-two-deeper`,
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries[0].descLines).toEqual(['_|__  ___', '\\___)(___\\', '  indented-two-deeper']);
+  });
+
+  it('leaves prose and mixed-indent blocks alone', async () => {
+    const text = [
+      '[ File #1 ]                     ·===============·',
+      'DRAGON.WRP   N 756736  12-31-88  Double Dragon!',
+      '                                 Graphics here.',
+    ].join('\n');
+    const { entries } = await collect(text);
+    expect(entries[0].descLines[0]).toBe('Double Dragon!');
   });
 
   it('drops trailing ornament and date lines of the next entry', async () => {
@@ -213,10 +235,7 @@ describe('parseLines blocks', () => {
       '[ File #6450 ]                  ·===============·',
     ].join('\n');
     const { entries } = await collect(text);
-    expect(entries[0].descLines).toEqual([
-      '                                 Turbo Trax info',
-      '                                 :::[ MDR ]:::',
-    ]);
+    expect(entries[0].descLines).toEqual(['Turbo Trax info', ':::[ MDR ]:::']);
   });
 
   it('records an anomaly when no entry line follows a marker', async () => {
