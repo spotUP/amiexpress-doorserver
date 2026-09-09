@@ -33,4 +33,7 @@ CREATE TABLE IF NOT EXISTS release_files (
 CREATE INDEX IF NOT EXISTS idx_release_files_filename ON release_files(filename);
 CREATE INDEX IF NOT EXISTS idx_release_files_date ON release_files(date_iso);
 CREATE INDEX IF NOT EXISTS idx_release_files_flag ON release_files(flag);
-CREATE INDEX IF NOT EXISTS idx_release_files_group ON release_files(release_group);
+-- NOTE: no index on release_group here. applySchema runs on every boot
+-- before migrations, and CREATE INDEX IF NOT EXISTS only skips when the
+-- INDEX exists — on a database from before migration v1 it would fail with
+-- "no such column" and crash-loop the server. Migration v1 owns that index.
