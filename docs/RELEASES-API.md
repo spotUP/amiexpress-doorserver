@@ -25,6 +25,7 @@ Every response carries `X-Releases-Contract` (currently `1`) and
 | GET | `/list.txt` | first 500 rows in house text format (Latin-1, CRLF) |
 | GET | `/dump` | every matching row as NDJSON, slim columns, resumable (below) |
 | GET | `/files/:id` | one full row incl. `rawDesc`, or 404 `{error:"not_found"}` |
+| GET | `/groups` | `{groups: [{abbreviation, fullName, files}]}` by file count |
 
 ### Bot recipe (full pull + stay current)
 
@@ -39,7 +40,8 @@ No auth. Poll `GET /health` and compare `revision`; when it moves:
    stream (fewer lines than `X-Releases-Total`) means resume with `?since=`.
 
 `GET /list` query: `q` (filename + description substring), `flag` (`N`/`P`/`D`/…),
-`dir` (dir number), `from`/`to` (`YYYY-MM-DD` on the entry date), `order`
+`dir` (dir number), `group` (exact abbreviation, e.g. `FLT`),
+`from`/`to` (`YYYY-MM-DD` on the entry date), `order`
 (`asc`/`desc` by id), `limit` (default 100, max 500), `offset`,
 `since` (only `id` greater than this — forces ascending order, ignores offset),
 `fields` (comma list of row keys; unknown names ignored, `id` always kept).
@@ -67,6 +69,9 @@ field promise identical to `list.txt`.
   when no `d/L` line exists.
 - `description`/`version`/`author` come from `contract/describe.ts` over the
   entry's description lines — the same extractor as doors, so fixes land here too.
+- `releaseGroup`/`releaseGroupFull` come from the filename prefix via the
+  `release_groups` lookup at import time (only known abbreviations — never
+  invented, same rule as the doors filename backfill).
 - `rawDesc` (on `/files/:id` only, not the list) is the description block verbatim,
   art included — the file_id equivalent. The web UI renders it as-is.
 

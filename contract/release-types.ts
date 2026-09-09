@@ -30,6 +30,9 @@ export interface ReleaseRow {
   description: string | null;
   version: string | null;
   author: string | null;
+  /** Filename prefix via release_groups (null when unknown — never invented). */
+  releaseGroup: string | null;
+  releaseGroupFull: string | null;
   /**
    * The entry's description block verbatim (first-line words +
    * continuations, art included) — the file_id equivalent. d/L tIMES and
@@ -66,6 +69,8 @@ export type ReleaseField =
   | 'description'
   | 'version'
   | 'author'
+  | 'releaseGroup'
+  | 'releaseGroupFull'
   | 'rawDesc';
 
 export interface ReleaseHealth {

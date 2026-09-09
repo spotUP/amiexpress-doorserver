@@ -20,6 +20,7 @@ import {
   getReleaseById,
   getReleasesCount,
   getReleasesRevision,
+  listReleaseGroups,
   queryReleases,
   streamReleases,
 } from './store';
@@ -41,6 +42,7 @@ function parseQuery(req: Request) {
   return {
     q: str(req.query.q),
     flag: str(req.query.flag),
+    group: str(req.query.group),
     dir: num(req.query.dir),
     from: str(req.query.from),
     to: str(req.query.to),
@@ -130,6 +132,7 @@ export function createReleasesRouter(_cfg: ServerConfig, rel: ReleasesConfig): e
         {
           q: q.q,
           flag: q.flag,
+          group: q.group,
           dir: q.dir,
           from: q.from,
           to: q.to,
@@ -147,6 +150,14 @@ export function createReleasesRouter(_cfg: ServerConfig, rel: ReleasesConfig): e
       return;
     }
     res.end();
+  });
+
+  router.get('/groups', (_req: Request, res: Response) => {
+    res.json({
+      contractVersion: RELEASES_CONTRACT_VERSION,
+      revision: getReleasesRevision(rel),
+      groups: listReleaseGroups(rel),
+    });
   });
 
   router.get('/files/:id', (req: Request, res: Response) => {

@@ -15,7 +15,12 @@
  * and this script learns to skip it.
  *
  * Usage:
- *   npx tsx scripts/import-bbs-filelist.ts --db <releases.db> --file <list.txt> [--dry-run]
+ *   npx tsx scripts/import-bbs-filelist.ts --db <releases.db> --file <list.txt> [--doors-db <doors.db>] [--dry-run]
+ *
+ * --doors-db points at the doors database whose release_groups table names
+ * the filename prefixes (Fairlight for FLT-, Paradox for PDX-). Only known
+ * abbreviations are written, never invented — same rule as the doors
+ * filename backfill. Without it, group columns stay NULL.
  *
  * Dry-run parses and reports counts without writing.
  */
@@ -36,11 +41,39 @@ function arg(name: string): string | null {
 async function main(): Promise<void> {
   const dbPath = arg('--db');
   const filePath = arg('--file');
+  const doorsDbPath = arg('--doors-db');
   const dryRun = process.argv.includes('--dry-run');
   if (!dbPath || !filePath) {
-    console.error('usage: import-bbs-filelist.ts --db <releases.db> --file <list.txt> [--dry-run]');
+    console.error(
+      'usage: import-bbs-filelist.ts --db <releases.db> --file <list.txt> [--doors-db <doors.db>] [--dry-run]'
+    );
     process.exit(1);
   }
+
+  // Scene-group lookup for filename prefixes. Map only, read once.
+  const groups = new Map<string, string>();
+  if (doorsDbPath) {
+    const doorsDb = new Database(doorsDbPath, { readonly: true });
+    try {
+      for (const r of doorsDb.prepare('SELECT abbreviation, full_name FROM release_groups').all() as {
+        abbreviation: string;
+        full_name: string;
+      }[]) {
+        groups.set(r.abbreviation.toUpperCase(), r.full_name);
+      }
+    } finally {
+      doorsDb.close();
+    }
+    console.error(`[import] ${groups.size} known groups for prefix matching`);
+  }
+
+  const groupPrefix = /^([A-Za-z0-9!$^&]{1,5})[-_^!]/;
+  const matchGroup = (filename: string): { abbrev: string; full: string } | null => {
+    const m = groupPrefix.exec(filename);
+    if (!m) return null;
+    const full = groups.get(m[1].toUpperCase());
+    return full ? { abbrev: m[1].toUpperCase(), full } : null;
+  };
 
   // Pass 1: filenames for corpus group tags (same rule as doors: a prefix
   // counts as a release tag only on 3+ archives, derived from THIS corpus).
@@ -59,15 +92,19 @@ async function main(): Promise<void> {
     const upsert = db.prepare(`
       INSERT INTO release_files
         (dir_no, file_no, filename, flag, size_bytes, size_note, date_iso,
-         dl_count, uploader, description, version, author, raw_desc)
+         dl_count, uploader, description, version, author,
+         release_group, release_group_full, raw_desc)
       VALUES (@dirNo, @fileNo, @filename, @flag, @sizeBytes, @sizeNote, @dateIso,
-         @dlCount, @uploader, @description, @version, @author, @rawDesc)
+         @dlCount, @uploader, @description, @version, @author,
+         @releaseGroup, @releaseGroupFull, @rawDesc)
       ON CONFLICT(dir_no, file_no, filename) DO UPDATE SET
         filename = excluded.filename, flag = excluded.flag,
         size_bytes = excluded.size_bytes, size_note = excluded.size_note,
         date_iso = excluded.date_iso, dl_count = excluded.dl_count,
         uploader = excluded.uploader, description = excluded.description,
         version = excluded.version, author = excluded.author,
+        release_group = excluded.release_group,
+        release_group_full = excluded.release_group_full,
         raw_desc = excluded.raw_desc
     `);
 
@@ -83,6 +120,7 @@ async function main(): Promise<void> {
         { dizText: e.descLines.join('\n'), name: null, archiveName: e.filename, binaryName: null },
         groupTags
       );
+      const group = matchGroup(e.filename);
       return {
         dirNo: e.dirNo,
         fileNo: e.fileNo,
@@ -96,6 +134,8 @@ async function main(): Promise<void> {
         description: facts.description,
         version: facts.version || null,
         author: facts.author || null,
+        releaseGroup: group?.abbrev ?? null,
+        releaseGroupFull: group?.full ?? null,
         rawDesc: e.descLines.join('\n'),
       };
     };

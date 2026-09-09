@@ -22,12 +22,15 @@ CREATE TABLE IF NOT EXISTS release_files (
   dl_count    INTEGER,              -- "d/L tIMES:" value, newer entries only
   uploader    TEXT,                 -- "Name >>note<<" trailer, best-effort
   description TEXT,                 -- analyseDoor over the desc lines
-  version     TEXT,
-  author      TEXT,
-  raw_desc    TEXT NOT NULL,        -- desc lines joined, before extraction
+  version TEXT,
+  author TEXT,
+  release_group TEXT,            -- filename prefix via release_groups (import time)
+  release_group_full TEXT,       -- denormalised so reads never touch doors.db
+  raw_desc TEXT NOT NULL,        -- desc lines joined, before extraction
   UNIQUE (dir_no, file_no, filename)
 );
 
 CREATE INDEX IF NOT EXISTS idx_release_files_filename ON release_files(filename);
 CREATE INDEX IF NOT EXISTS idx_release_files_date ON release_files(date_iso);
 CREATE INDEX IF NOT EXISTS idx_release_files_flag ON release_files(flag);
+CREATE INDEX IF NOT EXISTS idx_release_files_group ON release_files(release_group);

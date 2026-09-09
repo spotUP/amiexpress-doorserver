@@ -46,12 +46,13 @@ function seedReleases(cfg: ServerConfig): void {
     applyReleasesSchema(db);
     const ins = db.prepare(
       `INSERT INTO release_files
-        (dir_no, file_no, filename, flag, size_bytes, size_note, date_iso, dl_count, uploader, description, version, author, raw_desc)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (dir_no, file_no, filename, flag, size_bytes, size_note, date_iso, dl_count, uploader, description, version, author, release_group, release_group_full, raw_desc)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    ins.run(1, 1, 'BETTER.WRP', 'N', 324864, null, '1988-12-12', null, null, 'Dead than Alien! Kool game.', null, null, 'Better Dead than Alien! Kool game!');
-    ins.run(2, 1, 'SCAPEMAK.DMS', 'D', null, '>NUKED<', '1992-03-28', null, null, 'Scape Maker.', '1.3', null, 'Scape Maker v1.3');
-    ins.run(61, 2, 'PRISM2V2.LHA', 'P', 420431, null, '2020-01-03', 5, null, 'Prism2v2.Device for WiFi!', null, null, 'Prism2v2.Device for WiFi!');
+    ins.run(1, 1, 'BETTER.WRP', 'N', 324864, null, '1988-12-12', null, null, 'Dead than Alien! Kool game.', null, null, null, null, 'Better Dead than Alien! Kool game!');
+    ins.run(2, 1, 'SCAPEMAK.DMS', 'D', null, '>NUKED<', '1992-03-28', null, null, 'Scape Maker.', '1.3', null, null, null, 'Scape Maker v1.3');
+    ins.run(61, 2, 'STORM-TR.LHA', 'P', 420431, null, '2020-01-03', 5, null, 'Storm tracker.', null, null, 'STORM', 'Storm', 'Storm tracker.');
+    ins.run(61, 3, 'PRISM2V2.LHA', 'P', 420431, null, '2020-01-03', 5, null, 'Prism2v2.Device for WiFi!', null, null, null, null, 'Prism2v2.Device for WiFi!');
   } finally {
     db.close();
   }
@@ -67,9 +68,9 @@ describe('releases surface', () => {
     seedReleases(cfg);
     const res = await request(createApp(cfg)).get('/releases/v1/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', contractVersion: '1', revision: 'r3-t3', files: 3 });
+    expect(res.body).toEqual({ status: 'ok', contractVersion: '1', revision: 'r4-t4', files: 4 });
     expect(res.headers['x-releases-contract']).toBe('1');
-    expect(res.headers['x-releases-revision']).toBe('r3-t3');
+    expect(res.headers['x-releases-revision']).toBe('r4-t4');
   });
 
   it('lists with filters and pagination', async () => {
@@ -77,7 +78,7 @@ describe('releases surface', () => {
     seedReleases(cfg);
     const app = createApp(cfg);
     const all = await request(app).get('/releases/v1/list');
-    expect(all.body.total).toBe(3);
+    expect(all.body.total).toBe(4);
     const nuked = await request(app).get('/releases/v1/list?flag=D');
     expect(nuked.body.total).toBe(1);
     expect(nuked.body.rows[0].filename).toBe('SCAPEMAK.DMS');
@@ -106,11 +107,11 @@ describe('releases surface', () => {
     seedReleases(cfg);
     const app = createApp(cfg);
     const res = await request(app).get('/releases/v1/list?since=1');
-    expect(res.body.total).toBe(2);
-    expect(res.body.rows.map((r: { id: number }) => r.id)).toEqual([2, 3]);
+    expect(res.body.total).toBe(3);
+    expect(res.body.rows.map((r: { id: number }) => r.id)).toEqual([2, 3, 4]);
     // since forces asc even when desc is asked for
     const forced = await request(app).get('/releases/v1/list?since=1&order=desc');
-    expect(forced.body.rows.map((r: { id: number }) => r.id)).toEqual([2, 3]);
+    expect(forced.body.rows.map((r: { id: number }) => r.id)).toEqual([2, 3, 4]);
   });
 
   it('selects columns with ?fields= and always keeps id', async () => {
@@ -130,13 +131,24 @@ describe('releases surface', () => {
     const full = await request(app).get('/releases/v1/dump');
     expect(full.headers['content-type']).toContain('x-ndjson');
     const lines = full.text.trim().split('\n');
-    expect(lines).toHaveLength(3);
+    expect(lines).toHaveLength(4);
     expect(JSON.parse(lines[0]).filename).toBe('BETTER.WRP');
     expect('rawDesc' in JSON.parse(lines[0])).toBe(false);
     const resumed = await request(app).get('/releases/v1/dump?since=2');
-    expect(resumed.text.trim().split('\n')).toHaveLength(1);
+    expect(resumed.text.trim().split('\n')).toHaveLength(2);
     const art = await request(app).get('/releases/v1/dump?fields=filename,rawDesc&limit=1');
     expect('rawDesc' in JSON.parse(art.text.trim())).toBe(true);
+  });
+
+  it('filters by group and lists groups with counts', async () => {
+    const cfg = makeCfg();
+    seedReleases(cfg);
+    const app = createApp(cfg);
+    const g = await request(app).get('/releases/v1/groups');
+    expect(g.body.groups).toEqual([{ abbreviation: 'STORM', fullName: 'Storm', files: 1 }]);
+    const f = await request(app).get('/releases/v1/list?group=storm');
+    expect(f.body.total).toBe(1);
+    expect(f.body.rows[0].releaseGroup).toBe('STORM');
   });
 
   it('serves list.txt in the house format', async () => {
@@ -146,8 +158,8 @@ describe('releases surface', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('ISO-8859-1');
     const lines = res.text.split('\r\n').filter((l: string) => l.length > 0);
-    expect(lines[0]).toMatch(/^RELEASE\|1\|r3-t3\|3$/);
-    expect(lines).toHaveLength(4);
+    expect(lines[0]).toMatch(/^RELEASE\|1\|r4-t4\|4$/);
+    expect(lines).toHaveLength(5);
   });
 
   it('is absent without RELEASES_DB and answers CORS openly when present', async () => {

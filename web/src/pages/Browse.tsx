@@ -22,7 +22,7 @@ import {
 } from '../api/queries';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client';
 import { api } from '../api/client';
-import { useReleases } from '../api/releases';
+import { useReleases, useReleaseGroups } from '../api/releases';
 import type { AdminUser, Door } from '../api/types';
 import { DoorTable, type SortState } from '../components/DoorTable';
 import { ReleasesTable } from '../components/ReleasesTable';
@@ -50,6 +50,7 @@ export function Browse() {
   );
   const isReleases = src === 'releases';
   const [relFlag, setRelFlag] = useState('');
+  const [relGroup, setRelGroup] = useState('');
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [system, setSystem] = useState('');
@@ -129,10 +130,11 @@ export function Browse() {
   const { data, isLoading } = useDoors(query);
   const { data: facets } = useFacets();
   const relQuery = useMemo(
-    () => ({ q, flag: relFlag || undefined, page, perPage: PER_PAGE }),
-    [q, relFlag, page]
+    () => ({ q, flag: relFlag || undefined, group: relGroup || undefined, page, perPage: PER_PAGE }),
+    [q, relFlag, relGroup, page]
   );
   const { data: relData, isLoading: relLoading } = useReleases(relQuery, isReleases);
+  const { data: relGroups } = useReleaseGroups(isReleases);
 
   // Transient feedback for the batch actions that have no other visible
   // result (no progress bar, no job) - they used to succeed or fail in
@@ -384,6 +386,18 @@ export function Browse() {
               BBS Files
             </button>
           </div>
+          {isReleases && (
+            <Select
+              ariaLabel="Filter by release group"
+              placeholder="Any group"
+              value={relGroup}
+              onChange={(v) => { setRelGroup(v); setPage(1); }}
+              options={(relGroups?.groups ?? []).map((g) => ({
+                value: g.abbreviation,
+                label: `${g.abbreviation} — ${g.fullName} (${g.files})`,
+              }))}
+            />
+          )}
           {isReleases && (
             <Select
               ariaLabel="Filter by listing flag"

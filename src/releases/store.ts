@@ -10,6 +10,7 @@ import type { ReleaseField, ReleaseRow } from '../../contract/release-types';
 export interface ReleaseQuery {
   q?: string;
   flag?: string;
+  group?: string;
   dir?: number;
   from?: string;
   to?: string;
@@ -32,6 +33,7 @@ export const LIST_MAX_LIMIT = 500;
 const ALL_COLUMNS = `id, dir_no AS dirNo, file_no AS fileNo, filename, flag,
   size_bytes AS sizeBytes, size_note AS sizeNote, date_iso AS dateIso,
   dl_count AS dlCount, uploader, description, version, author,
+  release_group AS releaseGroup, release_group_full AS releaseGroupFull,
   raw_desc AS rawDesc`;
 
 /** Slim default for bulk pulls: everything except the art block. */
@@ -49,6 +51,8 @@ export const DUMP_DEFAULT_FIELDS: ReleaseField[] = [
   'description',
   'version',
   'author',
+  'releaseGroup',
+  'releaseGroupFull',
 ];
 
 const FIELD_TO_COLUMN: Record<ReleaseField, string> = {
@@ -65,6 +69,8 @@ const FIELD_TO_COLUMN: Record<ReleaseField, string> = {
   description: 'description',
   version: 'version',
   author: 'author',
+  releaseGroup: 'release_group AS releaseGroup',
+  releaseGroupFull: 'release_group_full AS releaseGroupFull',
   rawDesc: 'raw_desc AS rawDesc',
 };
 
@@ -95,6 +101,10 @@ function whereOf(q: ReleaseQuery): { clause: string; params: (string | number)[]
   if (q.flag) {
     conds.push('flag = ?');
     params.push(q.flag.toUpperCase());
+  }
+  if (q.group) {
+    conds.push('release_group = ?');
+    params.push(q.group.toUpperCase());
   }
   if (q.dir !== undefined) {
     conds.push('dir_no = ?');
@@ -199,6 +209,21 @@ export function streamReleases(
     { readonly: true }
   );
   return { rows };
+}
+
+export function listReleaseGroups(rel: ReleasesConfig): { abbreviation: string; fullName: string; files: number }[] {
+  return withReleasesDb(
+    rel,
+    (db) =>
+      db
+        .prepare(
+          `SELECT release_group AS abbreviation, release_group_full AS fullName, COUNT(*) AS files
+             FROM release_files WHERE release_group IS NOT NULL
+             GROUP BY release_group ORDER BY files DESC`
+        )
+        .all() as { abbreviation: string; fullName: string; files: number }[],
+    { readonly: true }
+  );
 }
 
 export function getReleaseById(rel: ReleasesConfig, id: number): ReleaseRow | null {

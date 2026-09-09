@@ -24,6 +24,8 @@ export interface ReleaseFile {
   description: string | null;
   version: string | null;
   author: string | null;
+  releaseGroup: string | null;
+  releaseGroupFull: string | null;
   rawDesc: string;
 }
 
@@ -39,6 +41,7 @@ export interface ReleasePage {
 export interface ReleaseQuery {
   q?: string;
   flag?: string;
+  group?: string;
   dir?: number;
   order?: 'asc' | 'desc';
   page?: number;
@@ -58,6 +61,7 @@ export function toReleaseSearch(query: ReleaseQuery): string {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.flag) params.set('flag', query.flag);
+  if (query.group) params.set('group', query.group);
   if (query.dir) params.set('dir', String(query.dir));
   if (query.order === 'desc') params.set('order', 'desc');
   if (query.page && query.page > 1) params.set('offset', String((query.page - 1) * (query.perPage ?? 50)));
@@ -70,6 +74,21 @@ export const releaseKeys = {
   all: ['releases'] as const,
   list: (query: ReleaseQuery) => ['releases', 'list', query] as const,
 };
+
+export interface ReleaseGroup {
+  abbreviation: string;
+  fullName: string;
+  files: number;
+}
+
+export function useReleaseGroups(enabled = true) {
+  return useQuery({
+    queryKey: [...releaseKeys.all, 'groups'] as const,
+    queryFn: () =>
+      get<{ contractVersion: string; revision: string; groups: ReleaseGroup[] }>('/groups'),
+    enabled,
+  });
+}
 
 export function useReleases(query: ReleaseQuery, enabled = true) {
   return useQuery({

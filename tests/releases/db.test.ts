@@ -25,7 +25,7 @@ describe('releases db', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-rel-'));
     try {
       const rel = { dbPath: path.join(dir, 'releases.db') };
-      expect(initReleasesDb(rel)).toEqual([]);
+      expect(initReleasesDb(rel)).toEqual(['1:release_files group columns']);
       const tables = withReleasesDb(
         rel,
         (db) =>

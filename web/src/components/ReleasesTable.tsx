@@ -25,6 +25,7 @@ function ReleaseDetailDialog({ row, onClose }: { row: ReleaseFile | null; onClos
     ['Date', row.dateIso],
     ['Version', row.version ?? '–'],
     ['Author', row.author ?? '–'],
+    ['Group', row.releaseGroupFull ?? row.releaseGroup ?? '–'],
     ['Downloads', row.dlCount !== null ? String(row.dlCount) : '–'],
     ['Uploader', row.uploader ?? '–'],
   ];
