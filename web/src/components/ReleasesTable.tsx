@@ -73,6 +73,7 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
               <th className="px-3 py-2 font-medium">Size</th>
               <th className="px-3 py-2 font-medium">Date</th>
               <th className="px-3 py-2 font-medium">Description</th>
+              <th className="px-3 py-2 font-medium">File ID</th>
             </tr>
           </thead>
           <tbody>
@@ -89,6 +90,14 @@ export function ReleasesTable({ rows }: { rows: ReleaseFile[] }) {
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-muted">{r.dateIso}</td>
                 <td className="max-w-[28rem] truncate px-3 py-2 text-muted">{r.description ?? ''}</td>
+                <td className="max-w-[24rem] px-3 py-2 align-top">
+                  <pre
+                    className="max-h-24 overflow-hidden font-amiga text-[15px] leading-[1.2] text-muted"
+                    style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+                  >
+                    {r.rawDesc.split('\n').slice(0, 4).join('\n')}
+                  </pre>
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
