@@ -23,7 +23,8 @@ export const LIST_MAX_LIMIT = 500;
 
 const COLUMNS = `id, dir_no AS dirNo, file_no AS fileNo, filename, flag,
   size_bytes AS sizeBytes, size_note AS sizeNote, date_iso AS dateIso,
-  dl_count AS dlCount, uploader, description, version, author`;
+  dl_count AS dlCount, uploader, description, version, author,
+  raw_desc AS rawDesc`;
 
 function whereOf(q: ReleaseQuery): { clause: string; params: (string | number)[] } {
   const conds: string[] = [];

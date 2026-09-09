@@ -24,6 +24,7 @@ export interface ReleaseFile {
   description: string | null;
   version: string | null;
   author: string | null;
+  rawDesc: string;
 }
 
 export interface ReleasePage {

@@ -50,6 +50,8 @@ field promise identical to `list.txt`.
   (`Name >>note<<` trailer) is best-effort.
 - `description`/`version`/`author` come from `contract/describe.ts` over the
   entry's description lines — the same extractor as doors, so fixes land here too.
+- `rawDesc` (on `/files/:id` only, not the list) is the description block verbatim,
+  art included — the file_id equivalent. The web UI renders it as-is.
 
 ## Configuration
 

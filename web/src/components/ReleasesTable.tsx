@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import type { ReleaseFile } from '../api/releases';
 import { Badge, Button, formatSize } from './ui';
+import { DizView } from './DizView';
 
 function flagBadge(flag: string): React.ReactNode {
   if (flag === 'D') return <Badge tone="warn">nuked</Badge>;
@@ -40,6 +41,12 @@ function ReleaseDetailDialog({ row, onClose }: { row: ReleaseFile | null; onClos
           <Button variant="ghost" onClick={onClose}>Close</Button>
         </div>
         {row.description && <p className="mb-4 text-sm">{row.description}</p>}
+        {row.rawDesc ? (
+          <div className="mb-4">
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted">File description, verbatim</p>
+            <DizView text={row.rawDesc} label="file description" />
+          </div>
+        ) : null}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           {fields.map(([k, v]) => (
             <div key={k} className="contents">

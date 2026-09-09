@@ -96,6 +96,7 @@ describe('releases surface', () => {
     const one = await request(app).get('/releases/v1/files/1');
     expect(one.status).toBe(200);
     expect(one.body.filename).toBe('BETTER.WRP');
+    expect(one.body.rawDesc).toContain('Better Dead than Alien');
     expect((await request(app).get('/releases/v1/files/999')).status).toBe(404);
     expect((await request(app).get('/releases/v1/files/nope')).status).toBe(404);
   });

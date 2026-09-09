@@ -30,6 +30,13 @@ export interface ReleaseRow {
   description: string | null;
   version: string | null;
   author: string | null;
+  /**
+   * The entry's description block verbatim (first-line words +
+   * continuations, art included) — the file_id equivalent. d/L tIMES and
+   * uploader trailers are parsed into their own columns, not repeated here.
+   * Appended under the append-only promise: no contract bump.
+   */
+  rawDesc: string;
 }
 
 export interface ReleaseListResponse {
