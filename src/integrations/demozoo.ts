@@ -24,13 +24,29 @@ interface DemozooProd {
 function toItem(p: DemozooProd): AnswerItem {
   const by = (p.author_nicks ?? []).map((a) => a.name).filter(Boolean).join(', ') || 'unknown';
   const plats = (p.platforms ?? []).map((x) => x.name).filter(Boolean).join('/');
+  const types = (p.types ?? []).map((x) => x.name).filter(Boolean);
+  // Demozoo holds genuinely untitled uploads (title "?" - usually
+  // tag/comment matches, not title matches). Rank them last and say
+  // what they are instead of quoting a question mark (2026-09-10 -
+  // the chat read "?" rows out loud).
+  const rawTitle = (p.title ?? '').trim();
+  const titled = rawTitle !== '' && rawTitle !== '?';
+  const title = titled ? rawTitle : `[untitled ${types[0] ?? 'production'}]`;
   const detail = [plats, p.release_date].filter(Boolean).join(' ');
   return {
     source: 'Demozoo',
-    title: cleanText(p.title ?? `prod ${p.id}`, 120),
+    title: cleanText(title, 120),
     detail: cleanText(`by ${by}${detail ? ` (${detail})` : ''}`, 200),
     url: p.demozoo_url ?? `https://demozoo.org/productions/${p.id}/`,
   };
+}
+
+function rank(rows: DemozooProd[]): DemozooProd[] {
+  const titled = (p: DemozooProd) => {
+    const t = (p.title ?? '').trim();
+    return t !== '' && t !== '?';
+  };
+  return [...rows].sort((a, b) => Number(titled(b)) - Number(titled(a)));
 }
 
 export const demozooAdapter: Adapter = {
@@ -42,7 +58,7 @@ export const demozooAdapter: Adapter = {
     const json = (await ctx.fetchJson(
       `${BASE}/productions/?q=${encodeURIComponent(q)}`
     )) as { results?: DemozooProd[] };
-    return (json.results ?? []).slice(0, 5).map(toItem);
+    return rank(json.results ?? []).slice(0, 5).map(toItem);
   },
 
   async latest(_ctx: AdapterContext): Promise<AnswerItem[]> {

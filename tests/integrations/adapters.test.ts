@@ -66,6 +66,15 @@ describe('demozoo adapter', () => {
     expect(items[0].url).toContain('demozoo.org');
   });
 
+  it('ranks titled rows first and names untitled ones', async () => {
+    const items = await demozooAdapter.search('logic', ctxOf(fetchJson));
+    expect(items[0].title).toBe('???');
+    expect(items.every((i) => i.title !== '?')).toBe(true);
+    const untitled = items.find((i) => i.title.startsWith('[untitled'));
+    expect(untitled?.title).toBe('[untitled Video]');
+    expect(untitled?.detail).toContain('Cong');
+  });
+
   it('pins prod 1 as the health check', async () => {
     const h = await demozooAdapter.health(ctxOf(fetchJson));
     expect(h.ok).toBe(true);
