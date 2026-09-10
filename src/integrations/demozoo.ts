@@ -30,7 +30,7 @@ function toItem(p: DemozooProd): AnswerItem {
   // what they are instead of quoting a question mark (2026-09-10 -
   // the chat read "?" rows out loud).
   const rawTitle = (p.title ?? '').trim();
-  const titled = rawTitle !== '' && rawTitle !== '?';
+  const titled = rawTitle !== '' && !/^[?]+$/.test(rawTitle);
   const title = titled ? rawTitle : `[untitled ${types[0] ?? 'production'}]`;
   const detail = [plats, p.release_date].filter(Boolean).join(' ');
   return {
@@ -44,7 +44,7 @@ function toItem(p: DemozooProd): AnswerItem {
 function rank(rows: DemozooProd[]): DemozooProd[] {
   const titled = (p: DemozooProd) => {
     const t = (p.title ?? '').trim();
-    return t !== '' && t !== '?';
+    return t !== '' && !/^[?]+$/.test(t);
   };
   return [...rows].sort((a, b) => Number(titled(b)) - Number(titled(a)));
 }

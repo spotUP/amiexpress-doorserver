@@ -68,11 +68,22 @@ describe('demozoo adapter', () => {
 
   it('ranks titled rows first and names untitled ones', async () => {
     const items = await demozooAdapter.search('logic', ctxOf(fetchJson));
-    expect(items[0].title).toBe('???');
-    expect(items.every((i) => i.title !== '?')).toBe(true);
+    expect(items.every((i) => i.title !== '?' && i.title !== '???')).toBe(true);
     const untitled = items.find((i) => i.title.startsWith('[untitled'));
     expect(untitled?.title).toBe('[untitled Video]');
     expect(untitled?.detail).toContain('Cong');
+  });
+
+  it('a real title outranks question marks', async () => {
+    const fake = ctxOf(async () => ({
+      results: [
+        { id: 1, title: '???', demozoo_url: 'https://demozoo.org/productions/1/', author_nicks: [] },
+        { id: 2, title: 'Logic Bomb', demozoo_url: 'https://demozoo.org/productions/2/', author_nicks: [{ name: 'a' }] },
+      ],
+    }));
+    const items = await demozooAdapter.search('logic', fake);
+    expect(items[0].title).toBe('Logic Bomb');
+    expect(items[1].title).toBe('[untitled production]');
   });
 
   it('pins prod 1 as the health check', async () => {
