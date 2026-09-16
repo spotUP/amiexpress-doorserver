@@ -192,8 +192,7 @@ describe('analyzeArchive', () => {
     expect(() => analyzeArchive(rarPath)).toThrow(/unsupported/i);
   });
 
-  it('ignores a bare "*" extra pattern instead of flagging every file as junk', () => {
-    // Ad-randomizers often name their payload a literal '*'. If that
+  it('ignores a bare "*" extra pattern instead of flagging every file as junk', () => {    // Ad-randomizers often name their payload a literal '*'. If that
     // filename is ever "learned" as a junk pattern (e.g. a bad row already
     // in learned_junk_patterns, or a future call site that forgets to
     // guard on write), analyzeArchive must not let it nuke every member of
@@ -210,6 +209,79 @@ describe('analyzeArchive', () => {
     // The literal '*' member is still caught on its own merits
     // (ILLEGAL_FILENAME_CHARS), just not via the poisoned glob.
     expect(result.stripped.map((e) => e.path)).toEqual(['*']);
+  });
+
+  it('collapses duplicate member names so a listing is stable across reads', () => {
+    // Real archives (5D!DP002.LHA: mastrb8.txt twice) repeat a member name.
+    // door_catalog_files is keyed (catalog_id, path), so the stored listing
+    // can only ever hold one copy - a fresh listing that keeps both
+    // disagrees with it on every read, re-bumping indexed_at (and the
+    // catalog revision) forever and poisoning byte-parity. First copy wins.
+    //
+    // AdmZip collapses same-name entries on write, so the duplication is
+    // hand-rolled: two stored-method members sharing one name, each with
+    // its own central-directory entry.
+    const crcTable = (() => {
+      const t = new Int32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+        t[n] = c;
+      }
+      return t;
+    })();
+    const crc32 = (b: Buffer): number => {
+      let c = -1;
+      for (const x of b) c = crcTable[(c ^ x) & 0xff] ^ (c >>> 8);
+      return (c ^ -1) >>> 0;
+    };
+    const parts: Buffer[] = [];
+    const central: Buffer[] = [];
+    let offset = 0;
+    const addStored = (name: string, content: string): void => {
+      const data = Buffer.from(content);
+      const nb = Buffer.from(name);
+      const lh = Buffer.alloc(30);
+      lh.writeUInt32LE(0x04034b50, 0);
+      lh.writeUInt16LE(20, 4);
+      lh.writeUInt16LE(0, 8);
+      lh.writeUInt32LE(crc32(data), 14);
+      lh.writeUInt32LE(data.length, 18);
+      lh.writeUInt32LE(data.length, 22);
+      lh.writeUInt16LE(nb.length, 26);
+      lh.writeUInt16LE(0, 28);
+      parts.push(lh, nb, data);
+      const ch = Buffer.alloc(46);
+      ch.writeUInt32LE(0x02014b50, 0);
+      ch.writeUInt16LE(20, 6);
+      ch.writeUInt16LE(0, 10);
+      ch.writeUInt32LE(crc32(data), 16);
+      ch.writeUInt32LE(data.length, 20);
+      ch.writeUInt32LE(data.length, 24);
+      ch.writeUInt16LE(nb.length, 28);
+      ch.writeUInt32LE(offset, 46 - 4);
+      central.push(ch, nb);
+      offset += lh.length + nb.length + data.length;
+    };
+    addStored('DOOR.FIM', 'binary door bytes');
+    addStored('mastrb8.txt', 'first copy');
+    addStored('mastrb8.txt', 'second copy');
+    const cdStart = offset;
+    const cd = Buffer.concat(central);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(3, 8);
+    end.writeUInt16LE(3, 10);
+    end.writeUInt32LE(cd.length, 12);
+    end.writeUInt32LE(cdStart, 16);
+    const zipPath = path.join(tmpDir, 'dups.zip');
+    fs.writeFileSync(zipPath, Buffer.concat([...parts, cd, end]));
+
+    const first = analyzeArchive(zipPath);
+    const second = analyzeArchive(zipPath);
+    const paths = [...first.kept, ...first.stripped].map((e) => e.path);
+    expect(paths.filter((p) => p === 'mastrb8.txt')).toHaveLength(1);
+    expect([...second.kept, ...second.stripped].map((e) => e.path).sort()).toEqual([...paths].sort());
   });
 });
 

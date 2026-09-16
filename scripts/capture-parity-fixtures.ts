@@ -142,7 +142,9 @@ async function main(): Promise<void> {
   }
   // Latin-1 archive name, percent-encoded the way an Amiga client encodes it
   // (%DF, not UTF-8's %C3%9F). Passed raw, NOT through encodeURIComponent.
-  captures.push(await capture('files-latin1-raw', '/files/%24CP-BU%DF1.LZX'));
+  // 2026-09-16: the .LZX this pointed at is gone from the corpus (the same
+  // door is now $CP-BUß1.lha); repointed, same encoding exercise.
+  captures.push(await capture('files-latin1-raw', '/files/%24CP-BU%DF1.lha'));
   // A capture run against a MISCONFIGURED server is the dangerous failure
   // here: if the BBS is not in owner mode the router is not mounted, every
   // request 404s, and the fixture set becomes 24 rows of "NOT FOUND" that

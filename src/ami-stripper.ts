@@ -359,7 +359,14 @@ function readArchiveFiles(
     }
 
     if (buf) {
-      files.push({ path: entry.path, size: entry.size, buf });
+      // Duplicate member names collapse: door_catalog_files is keyed
+      // (catalog_id, path), so a second same-name row can never persist -
+      // and a fresh listing that keeps it disagrees with the stored one on
+      // every read, re-bumping indexed_at (and the catalog revision) forever.
+      // First copy wins, matching the extractor above (first name match).
+      if (!files.some((f) => f.path === entry.path)) {
+        files.push({ path: entry.path, size: entry.size, buf });
+      }
     }
   }
 

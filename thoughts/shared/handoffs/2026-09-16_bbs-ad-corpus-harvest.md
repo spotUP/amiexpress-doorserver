@@ -29,9 +29,33 @@ status: final
 - 24 sampled risky names otherwise all ad-class. 632 dump files already matched pre-existing fingerprints.
 - JS archive reader OOMs on small zips (pht-kit.zip 13KB) — probe used system `unzip -p` for zips. Worth knowing, not yet filed.
 
-## Next steps (ordered)
+## Deploy 2026-09-16 ~20:25 UTC (1b8bb2a LIVE)
 
-1. Census finishes → `npx tsx scripts/demozoo-textads-import.ts --db data/bbs_ads.db` → `npx tsx scripts/harvest-bbs-ad-seeds.ts` (dedupe makes it incremental) → `npm run test:ci`.
+- Tarball treesync (`git archive HEAD`), checksum-verified, `docker compose up -d --build` with GIT_SHA=1b8bb2a. Secrets ride in `/app/doorserver/.env` (compose auto-loads; the manual re-export dance was redundant — first attempt failed on unquoted values, container still came up right via .env).
+- Live verified: health 5690 doors, achievements on, `aCI!!` flags 1 publicly. Deploy good.
+- **Parity recapture ABORTED**: live catalog is being concurrently written (indexed_at time-travel on -D-CALC/5D!DP002 between capture and pull, doors.db mtime moves, 6 root@notty sessions from 80.217.234.97). A stable capture+DB pair is impossible until quiet. Truncated recapture reverted; only the `$CP-BUß1.LZX→.lha` capture-script repoint remains (uncommitted).
+- Next: coordinate quiet window with whoever runs the catalog jobs, then capture → pull → parity → commit fixtures.
+
+## Dup-collapse fix 2026-09-16 ~21:30 UTC (UNDEPLOYED)
+
+- Root cause found (not reader nondeterminism): `door_catalog_files` PK is
+  (catalog_id, path), so stored listings hold one copy of a repeated member
+  name while fresh reads kept both → every `/files` read on a dup-archive
+  saw `changed=true` and re-bumped indexed_at forever. That was the live
+  time-travel AND the local A/B confusion.
+- Fix in `readArchiveFiles` (src/ami-stripper.ts): collapse same-path
+  members, first copy wins (matches the extractor + the DB key). Regression
+  test with hand-rolled dup-name zip (proper red/green). Full suite 776
+  passed, typecheck clean. Needs deploy to take effect live.
+- Parity-green verdict: NOT achievable by recapture alone. The 6
+  description-divergence tests rebuild with RAW descriptions and expect the
+  OLD-BBS captures — live-sourced fixtures fail them by design. Suite needs
+  redesign for the post-split world (or dual fixture sets). Recaptured live
+  fixtures were reverted; only the `$CP-BUß1.LZX→.lha` capture-script repoint
+  stays (old name is gone from the corpus).
+
+## Open follow-ups
+
 2. Tier-3 MEASURED 2026-09-16: single content signals are NOT viable for
    auto-strip. Recall/FP (3000 corpus files vs 5051 door docs + 5664 DIZes,
    hasAdSignals semantics = latin1 + regex):
