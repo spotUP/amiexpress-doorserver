@@ -35,6 +35,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { parseAd, maskPhone } from '../contract/bbsad';
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -186,7 +187,11 @@ function main(): void {
       text TEXT NOT NULL,
       page_url TEXT NOT NULL,
       imported_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-      size_mismatch INTEGER NOT NULL DEFAULT 0
+      size_mismatch INTEGER NOT NULL DEFAULT 0,
+      phones_json TEXT NOT NULL DEFAULT '[]',
+      nodes INTEGER,
+      handles_json TEXT NOT NULL DEFAULT '[]',
+      groups_json TEXT NOT NULL DEFAULT '[]'
     );
     CREATE INDEX idx_text_ad_bbs ON text_ad(bbs_id);
     CREATE VIRTUAL TABLE text_ad_fts USING fts5(filename, text, content='text_ad', content_rowid='ad_id');
@@ -197,8 +202,9 @@ function main(): void {
   );
   const insAd = d.prepare(
     `INSERT INTO text_ad(ad_id, bbs_id, filename, filesize, stored_filename, link_method,
-       content, sha1, size_bytes, is_ansi, encoding_used, text, page_url, size_mismatch)
-     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       content, sha1, size_bytes, is_ansi, encoding_used, text, page_url, size_mismatch,
+       phones_json, nodes, handles_json, groups_json)
+     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insFts = d.prepare(
     `INSERT INTO text_ad_fts(rowid, filename, text) VALUES(?, ?, ?)`
@@ -256,6 +262,7 @@ function main(): void {
     const buf = fs.readFileSync(path.join(dir, stored));
     const { text, encoding } = decodeScene(buf);
     const sizeMismatch = buf.length !== r.filesize ? 1 : 0;
+    const parsed = parseAd(text);
     insAd.run(
       r.ad_id,
       r.bbs_id,
@@ -270,7 +277,11 @@ function main(): void {
       encoding,
       text,
       r.page_url,
-      sizeMismatch
+      sizeMismatch,
+      JSON.stringify(parsed.phones.map(maskPhone)),
+      parsed.nodes,
+      JSON.stringify(parsed.handles),
+      JSON.stringify(parsed.groups)
     );
     insFts.run(r.ad_id, r.filename, text);
     usedFiles.add(stored);
