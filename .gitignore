@@ -7,3 +7,6 @@ dist/
 .DS_Store
 tests/tmp/
 db-backups/
+bbs_ads/
+data/demozoo-textads-index.jsonl
+data/bbs_ads.db
