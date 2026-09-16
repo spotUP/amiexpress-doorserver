@@ -54,7 +54,13 @@ status: final
   fixtures were reverted; only the `$CP-BUß1.LZX→.lha` capture-script repoint
   stays (old name is gone from the corpus).
 
-## Open follow-ups
+## Parity GREEN 2026-09-16 ~21:45 UTC (commit 9433d21)
+
+- 22 passed, 7 skipped (6 description + installed_as, need old-BBS fixtures), 0 failed. Fixtures recaptured live (5690 doors).
+- Procedure that works (harness is racy by construction — reads reclassify, revision embeds wall-clock): pre-settle 4 capture archives → capture → pull DB immediately → test. Local corpus stale for -D-CALC + $CP-BUß1.lha: used /tmp overlay (symlink farm + 2 live files, since removed).
+- Health test rewritten for the live world (key order + revision + on/off shapes; old digest math assumed no-achievements fixtures). installed_as skipped like the 6.
+- Read-path reclassification (classify.ts:232) means any verdict-changing read moves the revision — the harness needs a quiet minute, not just a quiet DB.
+- CI: 776 passed; one ratelimit flake under load (passes solo + on rerun, untouched files).
 
 2. Tier-3 MEASURED 2026-09-16: single content signals are NOT viable for
    auto-strip. Recall/FP (3000 corpus files vs 5051 door docs + 5664 DIZes,
