@@ -12,6 +12,8 @@ status: final
 - **Census COMPLETE**: 15,651 pages, 4,413 BBSes with ads, 11,078 ads (~58MB).
 - **DB**: `data/bbs_ads.db` — 10,554 ads (95.3% linked), 4,313 BBSes, FTS5 over filename+text, `link_method` audit column. 211 ambiguous (multi-candidate), 313 missing (dump gaps).
 - **Seeds FINAL**: patterns 4,565 → 11,942 (+7,377, dupes 0, HOLDOUT respected), fingerprints 148 → 10,783 (+10,635). Full suite 775 passed, typecheck clean.
+- **Parity**: A/B (live doorserver DB 5,905 doors + local DB) identical 26/3 with and without harvest — zero attributable drift. Captures' junk bytes reflect the BBS-side strip stack, not measured data. Per-archive `/files` A/B on the 4 capture archives: exactly ONE harvest true positive — `aCI!!` in 5D!DP002.LHA (2242B) is byte-identical to corpus ad `aCI` (md5 361587ed…), old stripper kept it (0), harvest flags it (1). Capture needs recapture, not a seeds revert.
+- **Reader flake (new finding, not fixed)**: `GET /files/*` nondeterministically duplicates `mastrb8.txt` across identical-code runs (FILES|11|8 vs 12|9; seen in 24STDCAL.LHA and 5D!DP002.LHA) — JS reader vs system-lha fallback disagree on duplicates. Poisons byte-parity regardless of seeds.
 
 ## Files
 
