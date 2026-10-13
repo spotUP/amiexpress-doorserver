@@ -239,7 +239,7 @@ describe('what a submission may be', () => {
 describe('what the archive says about itself', () => {
   /** A real LHA, taken from the corpus, or null when it is not to hand. */
   function corpusArchive(name: string): Buffer | null {
-    const candidate = path.join('/Users/spot/Code/amiexpress_doors/Archives/AmiExpress', name);
+    const candidate = path.join(process.env.CORPUS_ARCHIVES_ROOT ?? path.resolve(__dirname, '../../amiexpress_doors/Archives'), 'AmiExpress', name);
     return fs.existsSync(candidate) ? fs.readFileSync(candidate) : null;
   }
 
