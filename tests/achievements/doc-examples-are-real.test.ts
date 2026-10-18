@@ -10,7 +10,7 @@
  * with what the document holds.
  *
  * The comparison is NORMALIZED (doc-story.ts `normalize`): codes,
- * timestamps and revisions cannot repeat between two runs and are masked by
+ * timestamps, revisions and seasons cannot repeat between two runs and are masked by
  * SHAPE, while every key, count, tier, point value, rarity and id is
  * compared for real. Capturing exposed a defect the prose had described
  * correctly for weeks - see rarity-floor.test.ts.

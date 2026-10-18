@@ -30,7 +30,7 @@ The walk is re-run on every CI run by
 `tests/achievements/doc-examples-are-real.test.ts`, which fails if this
 document and the server disagree about any field, count or status - so an
 example here cannot go stale in the direction of the reader. Codes,
-timestamps and revisions differ every run and are compared by shape;
+timestamps, revisions and seasons differ every run and are compared by shape;
 everything else is compared exactly. A listing too long to print whole is
 cut, and the cut is stated under the fence.
 

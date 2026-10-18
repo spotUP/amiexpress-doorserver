@@ -511,8 +511,10 @@ export function applyCaptures(
  * everything that must not change kept.
  *
  * The masking is by VALUE SHAPE, never by field name: a timestamp, a
- * six-character code and a revision are the only things this walk cannot
- * reproduce - the fixture is otherwise deterministic, so counts, points,
+ * six-character code, a revision and a season are the only things this walk
+ * cannot reproduce. A season is the UTC calendar quarter the run falls in, so
+ * it read 2026Q3 when the document was captured and 2026Q4 a quarter later,
+ * and /health stopped matching without either side being wrong - the fixture is otherwise deterministic, so counts, points,
  * tiers, rarities and ids all repeat exactly and are compared for real. A
  * name-based mask would have hidden `boards: ["uprough"]` behind the same
  * token as `boards: 4` and stopped proving anything about either.
@@ -520,6 +522,7 @@ export function applyCaptures(
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const CODE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
 const REVISION = /^[al]\d+-t\d+$/;
+const SEASON = /^\d{4}Q[1-4]$/;
 
 export function normalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(normalize);
@@ -532,6 +535,7 @@ export function normalize(value: unknown): unknown {
     if (TIMESTAMP.test(value)) return '<timestamp>';
     if (CODE.test(value)) return '<code>';
     if (REVISION.test(value)) return '<revision>';
+    if (SEASON.test(value)) return '<season>';
   }
   return value;
 }
