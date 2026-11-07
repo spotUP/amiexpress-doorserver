@@ -67,7 +67,8 @@ export function requireMod(
   }
   if (isRoomStaff(db, room, ctx)) return;
   if (ctx.sysop && (!t || t.board === ctx.boardId)) return;
-  if (ctx.boardId && permsOf(db, ctx.boardId, ctx.handle)[perm]) return;
+  // A role is worn on its own board only: it never reaches users of another board.
+  if (ctx.boardId && (!t || t.board === ctx.boardId) && permsOf(db, ctx.boardId, ctx.handle)[perm]) return;
   throw new SurfaceError('forbidden', 403, 'you may not do that in this room');
 }
 

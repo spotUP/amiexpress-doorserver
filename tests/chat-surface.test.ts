@@ -6,6 +6,8 @@ import request from 'supertest';
 import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
+import { _resetRateLimitsForTests } from '../src/achievements/ratelimit';
+import { CHAT_LIMITS } from '../contract/chat-types';
 
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });
@@ -81,5 +83,19 @@ describe('chat surface', () => {
     expect((await api('get', '/nope', sid)).status).toBe(404);
     expect((await api('delete', '/sessions/current', sid)).status).toBe(200);
     expect((await api('get', '/rooms', sid)).status).toBe(401);
+  });
+
+  it('refuses the message after the per-session limit with 429 and Retry-After', async () => {
+    _resetRateLimitsForTests();
+    const sid = await login('flood');
+    const id = (await api('post', '/rooms', sid).send({ name: 'floodroom' })).body.id as string;
+    expect((await api('post', `/rooms/${id}/join`, sid)).status).toBe(200);
+    for (let i = 0; i < CHAT_LIMITS.messagesPerSession; i++) {
+      expect((await api('post', `/rooms/${id}/messages`, sid).send({ content: `m${i}`, clientId: `f${i}` })).status).toBe(201);
+    }
+    const over = await api('post', `/rooms/${id}/messages`, sid).send({ content: 'one too many', clientId: 'over' });
+    expect(over.status).toBe(429);
+    expect(Number(over.headers['retry-after'])).toBeGreaterThan(0);
+    _resetRateLimitsForTests();
   });
 });
