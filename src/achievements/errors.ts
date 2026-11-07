@@ -16,6 +16,7 @@
  */
 import type { ErrorCode } from '../../contract/achievement-types';
 import type { RequestErrorCode } from '../../contract/request-types';
+import type { ChatErrorCode } from '../../contract/chat-types';
 
 /**
  * The requests surface (src/requests/) throws the same SurfaceError with its
@@ -24,7 +25,7 @@ import type { RequestErrorCode } from '../../contract/request-types';
  * contract widens. A parallel RequestError would have been a second class and
  * a second branch in every router's error handler for no gain.
  */
-export type SurfaceErrorCode = ErrorCode | RequestErrorCode;
+export type SurfaceErrorCode = ErrorCode | RequestErrorCode | ChatErrorCode;
 
 /**
  * The statuses a REFUSAL carries. A 5xx is deliberately not among them: it

@@ -1,0 +1,268 @@
+# Chat API (`/chat/v1`)
+
+The federated live-chat surface of the door server. A board (a BBS, or the web
+door) talks to it with its board key; callers on different boards share rooms,
+direct messages, roles and presence. The TypeScript twin of this document is
+`contract/chat-types.ts`; `tests/chat-contract-mirror.test.ts` fails when the
+two disagree.
+
+Contract version: `1` (echoed on every response as `X-Chat-Contract`).
+
+## 1. Authentication and sessions
+
+Every request carries `Authorization: Board <boardId>.<secret>`, the same key
+the achievements and requests surfaces use. A missing or wrong key is 401
+`{"error":"unauthenticated"}`. A suspended board gets 403 `board_suspended` on
+every write; its reads still work.
+
+A server admin additionally sends `X-Admin-Token: Bearer <jwt>` (the token from
+the existing admin login) to moderate across boards. Without a session an admin
+may call the moderation, roles and `PUT /motd` endpoints.
+
+Everything except `POST /sessions` and `GET /health` needs a session id:
+`X-Chat-Session: <sid>`. A missing header is 401 `unauthorized`.
+
+A session is created with `POST /sessions` and dies after 90 seconds without
+any request; the server then emits `left` for every room it was in, and a later
+request with that sid is 401 `session_expired`. `DELETE /sessions/current`
+closes it at once. Presence is the set of live sessions. Obtain a board key
+from the door server operator (`createBoard`, the same key as achievements).
+
+Identity on the wire is `handle@BOARD`, where BOARD is the registered board id
+in upper case. The `sysop` flag is trusted from the board (a board vouches for
+its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
+
+## 2. Endpoints
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/health` | no key; counts only |
+| POST | `/sessions` | body `{handle, sysop?, client?}`; reply `{sid, user, expiresIn}` |
+| DELETE | `/sessions/current` | 204 |
+| GET | `/rooms.txt` | `?mine=1` optional; ROOMS rows |
+| GET | `/rooms` | the same as a JSON array |
+| POST | `/rooms` | `{name, topic?, visibility?}`; reply `{id, name, visibility}` |
+| POST | `/rooms/:id/join` | reply `{id, name, topic, members, ops, since}` |
+| POST | `/rooms/:id/leave` | 204 |
+| GET | `/rooms/:id/members.txt` | MEMBERS rows |
+| GET | `/rooms/:id/history.txt` | `?before=<seq>&limit=1..50` (default 20); HISTORY rows, oldest first |
+| POST | `/rooms/:id/messages` | `{content, clientId, replyTo?, threadId?}`; reply `{id, seq, at}` |
+| PUT | `/messages/:id` | `{content}`, author only; reply `{id, seq}` |
+| DELETE | `/messages/:id` | author, room op, owning-board sysop, role with perms, admin; 204 |
+| POST | `/messages/:id/react` | `{emoji}`; reply `{count}` |
+| DELETE | `/messages/:id/react/:emoji` | reply `{count}` |
+| GET | `/messages/:id/reactions.txt` | REACTIONS rows |
+| POST | `/messages/:id/thread` | `{content, clientId}`; threadId is the parent id |
+| GET | `/threads/:id.txt` | `?limit`; HISTORY rows, parent first |
+| GET | `/who.txt` | WHO rows across every room visible to the caller |
+| POST | `/rooms/:id/invites` | `{user}`; private rooms |
+| DELETE | `/rooms/:id/invites/:user` | revoke; 204 |
+| GET | `/dm.txt` | DM rows |
+| POST | `/dm/:peer` | `{content, clientId}`; peer is `handle@BOARD`; reply `{id, seq, threadId}` |
+| GET | `/dm/:threadId/history.txt` | `?before&limit`; HISTORY rows; marks the peer's messages read |
+| GET | `/events.txt` | `?since=<seq>&wait=0..25` long poll; EVENTS rows |
+| POST | `/rooms/:id/kick` | `{user}` |
+| POST | `/rooms/:id/ban` | `{user, reason?}` |
+| POST | `/rooms/:id/unban` | `{user}` |
+| POST | `/rooms/:id/mute` | `{user, minutes?}`; no minutes means until unmuted |
+| POST | `/rooms/:id/unmute` | `{user}` |
+| POST | `/rooms/:id/op` | `{user}` |
+| POST | `/rooms/:id/deop` | `{user}` |
+| PUT | `/rooms/:id/topic` | `{topic}` |
+| PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
+| DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
+| POST | `/rooms/:id/clear` | owning-board sysop or admin; emits `delete` per message; 204 |
+| GET | `/motd` | JSON `{text}` |
+| PUT | `/motd` | admin only; `{text}` |
+| GET | `/roles` | sysop session or admin; JSON array of roles |
+| POST | `/roles` | `{name, colorHex, colorAnsi, position?, perms?}` |
+| PUT | `/roles/:id` | the same body, replaces |
+| DELETE | `/roles/:id` | 204 |
+| GET | `/roles/assignments` | `[{handle, roleId}]` |
+| PUT | `/roles/assignments/:handle` | `{roleIds}` replaces the set |
+| GET | `/rooms/:id/pins` | optional, JSON |
+| POST | `/rooms/:id/pins` | `{messageId}`; room op |
+| DELETE | `/rooms/:id/pins/:messageId` | 204 |
+| GET | `/search` | optional, JSON; `?q=&room=&limit=` |
+| GET | `/emoji` | optional, JSON |
+| PUT | `/emoji/:name` | `{dataUrl}`; sysop of the owning board |
+| DELETE | `/emoji/:name` | 204 |
+
+A path that matches nothing is a JSON 404 from this API, never the web app.
+
+### Rooms and membership
+
+A room id is 12 hex characters. A room name is 1 to 32 characters of
+`A-Z a-z 0-9 _ . -`, unique without regard to case. A public room is listed to
+everyone and anyone not banned may join. A private room is listed only to its
+members, invitees and the creator; joining needs an invite, otherwise 403
+`invite_required`. The creator becomes the owner, an op, and an invitee.
+Creating a private room needs a sysop session or a role with `createPrivate`.
+
+Posting needs membership of the session (join first): 403 `not_member`.
+`clientId` is the caller's own id for the message (1 to 64 characters); the
+same `(room, user, clientId)` twice is 409 `conflict`, which makes a retry
+after a lost reply safe. Content is 1 to 500 characters, else 400 `too_long`.
+
+### Moderation
+
+Permission is: a room op, or a sysop session whose board owns the room, or an
+admin token, or a role of the caller's board that grants the action (`kick`,
+`ban`, `mute`, `topic`) in a room that board owns. Bans are by `handle@BOARD`.
+A kicked user may rejoin; a banned one gets 403 `banned` on join and post; a
+muted one gets 403 `muted` on post.
+
+## 3. Plain-text formats
+
+House format: one header line `FORMAT|1|<revision>|<count>`, then one row per
+line, CRLF after every line including the last, `Content-Type: text/plain;
+charset=ISO-8859-1`. A `|` inside a field is replaced by `!`, line breaks and
+tabs by a space, and any character above U+00FF by `?`. Every text reply
+carries `Content-Length` and `Connection: close` and is never chunked. A new
+field is only ever appended and the `1` never moves.
+
+Formats and their fields, in order:
+
+- ROOMS: `id|name|topic|visibility|members|owner`
+- MEMBERS: `user|sysop|op|roleColor|roleName`
+- HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text`
+- EVENTS: `seq|type|room|user|ref|at|roleColor|text`
+- REACTIONS: `emoji|count|mine`
+- WHO: `user|room|sysop|roleColor|idleSeconds`
+- DM: `threadId|peer|lastAt|unread`
+
+`at` is epoch seconds. `sysop`, `op` and `mine` are `1` or `0`. `roleColor` is
+the ANSI colour index 0 to 15 of the user's highest role on their own board, or
+empty. The revision is the newest event sequence number, except EVENTS and
+HISTORY where it is described below.
+
+```text example ROOMS
+ROOMS|1|412|2
+a1b2c3d4e5f6|lobby|Welcome to the board|public|7|spot@UPROUGH
+0f9e8d7c6b5a|sysops|Sysops only|private|2|spot@UPROUGH
+```
+
+```text example MEMBERS
+MEMBERS|1|412|2
+spot@UPROUGH|1|1|11|Sysop
+zed@FRIEND|0|0||
+```
+
+```text example HISTORY
+HISTORY|1|410|2
+409|m1a2b3c4d5e6|spot@UPROUGH|1762500000|||11|Hello everybody
+410|m6e5d4c3b2a1|zed@FRIEND|1762500005|m1a2b3c4d5e6||0|Hi spot!
+```
+
+```text example EVENTS
+EVENTS|1|413|2
+412|message|a1b2c3d4e5f6|zed@FRIEND|m6e5d4c3b2a1|1762500005||Hi spot!
+413|react|a1b2c3d4e5f6|spot@UPROUGH|m6e5d4c3b2a1|1762500007|11|thumbsup!1
+```
+
+```text example REACTIONS
+REACTIONS|1|413|1
+thumbsup|1|1
+```
+
+```text example WHO
+WHO|1|413|1
+spot@UPROUGH|lobby|1|11|4
+```
+
+```text example DM
+DM|1|413|1
+d1d2d3d4d5d6|zed@FRIEND|1762500100|2
+```
+
+An empty poll answers a header with count 0 and no rows:
+
+```text example EVENTS
+EVENTS|1|413|0
+```
+
+## 4. Event stream
+
+`GET /events.txt?since=<seq>&wait=<0..25>` (`wait` defaults to 20; a missing
+`since` means "from now"). The server answers as soon as an event with
+`seq > since` that the session may see exists, otherwise after `wait` seconds
+with an empty reply. At most 200 rows come back; the header's third field is
+the last sequence number returned (or `since` when none): store it as the
+next `since`. A held poll holds no database handle.
+
+Each held poll counts against its board: at most 64 per board and 1 per
+session. A second poll for the same session releases the first with its
+current rows. Over the board cap the answer is 429 `rate_limited` with
+`retryAfter`.
+
+Event types and what the columns mean (`text` is the last column and may
+itself hold `!`-escaped sub-fields):
+
+| Type | room | user | ref | text |
+|---|---|---|---|---|
+| `message` | room id, or `t:<parentId>` for a thread reply | author | message id | content |
+| `edit` | room id | author | message id | new content |
+| `delete` | room id | author | message id | empty |
+| `react`, `unreact` | room id | reactor | message id | `emoji!count` |
+| `joined`, `left` | room id | who | empty | empty |
+| `topic` | room id | who set it | empty | the topic |
+| `room_created`, `room_deleted` | room id | creator or deleter | empty | room name |
+| `kicked`, `unmuted`, `op`, `deop` | room id | the target | empty | the acting user |
+| `banned` | room id | the target | empty | `actor!reason` |
+| `muted` | room id | the target | empty | `actor!minutes` |
+| `dm` | `dm:<threadId>` | sender | message id | content |
+| `role` | room id, or empty | the user whose role changed | empty | `roleName!colorHex!colorAnsi` |
+| `motd` | empty | admin | empty | the message of the day |
+
+A session sees: events in rooms it has joined, direct messages to or from its
+user, events about its user, `room_created`, `room_deleted` and `topic` of
+public rooms, and `motd`. The pipe inside the `react`, `banned`, `muted` and
+`role` text is shown as `!` because `|` is escaped on the wire.
+
+## 5. Roles
+
+Roles belong to a board and apply to that board's users only. A user's colour
+is the colour of their highest `position` role. `colorAnsi` (0 to 15) is
+required because the 68K door and the telnet path render 16 colours;
+`colorHex` is `#RRGGBB` for the web door. Role `perms`
+(`kick`, `ban`, `mute`, `topic`, `createPrivate`) add to room-op permission in
+rooms the board owns. An assignment change emits a `role` event so clients
+recolour live.
+
+## 6. Errors and limits
+
+Errors are JSON `{"error": "<code>", "detail": "<text>", "retryAfter"?: n}`.
+Codes: `bad_request`, `unauthorized`, `session_expired`, `forbidden`,
+`banned`, `muted`, `not_member`, `invite_required`, `not_found`, `too_long`,
+`conflict`, `rate_limited`. A 429 also carries a `Retry-After` header.
+
+Limits (fixed windows in process): 20 messages per session per 10 seconds,
+300 messages per board per minute, 30 live sessions per board, 6 room
+creations per board per hour, 64 held polls per board. Reads other than
+`events.txt` are not limited. Environment overrides: `CHAT_POLL_MAX_WAIT`
+(default 25), `CHAT_SESSION_TTL` (default 90).
+
+## 7. The 68K polling recipe
+
+1. `POST /sessions` once; keep the `sid`.
+2. `POST /rooms/<id>/join`; keep `since` from the reply.
+3. Loop: `GET /events.txt?since=<since>&wait=20` with `X-Chat-Session`; parse
+   the header, then one row per line with a splitter that stops after seven
+   pipes (the eighth field is free text); set `since` to the header's third
+   field.
+4. Send a line with `POST /rooms/<id>/messages`, a fresh `clientId` per line.
+5. On 401 `session_expired`, start again at 1. On exit `DELETE /sessions/current`.
+
+The reply always has `Content-Length` and `Connection: close`, so a client
+that reads until the length is met, then closes, needs no chunked decoder.
+
+## 8. Optional endpoints
+
+Pins, full-text search and custom emoji images are web features, not part of
+the 68K door; they are small JSON endpoints.
+
+- `GET /rooms/:id/pins` returns `[{messageId, user, content, pinnedBy, at}]`.
+- `GET /search?q=<words>&room=<id>&limit=<1..50>` returns
+  `[{id, room, user, at, content}]` from rooms the caller may see.
+- `GET /emoji` returns `[{boardId, name, dataUrl}]`; `dataUrl` is a
+  `data:image/...` URL of at most 24 KB.
