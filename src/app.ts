@@ -7,6 +7,7 @@ import { createPublicRouter } from './public-routes';
 import { doorRepoCors } from './cors';
 import { createAchievementsRouter } from './achievements/router';
 import { createRequestsRouter } from './requests/router';
+import { createChatRouter } from './chat/router';
 import { createReleasesRouter } from './releases/router';
 import { createIntegrationsRouter } from './integrations/router';
 import type { ServerConfig } from './config';
@@ -47,6 +48,9 @@ export function createApp(cfg: ServerConfig): express.Express {
     // would answer index.html and a 200. Gated on the same config: a sysop who
     // never configured achievements gets neither surface.
     app.use('/requests/v1', createRequestsRouter(cfg, cfg.achievements));
+    // The federated live-chat surface: a third sibling API, same registry and
+    // database, its own tables (migration step 2).
+    app.use('/chat/v1', createChatRouter(cfg, cfg.achievements));
   }
   // The releases surface (AquaScan file listing): read-only, no keys, its own
   // database. Same mount rule as above — before the SPA catch-all — and the

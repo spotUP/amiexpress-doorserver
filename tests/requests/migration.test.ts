@@ -47,7 +47,7 @@ describe('the requests migration', () => {
   it('runs cleanly a second time on a database that already has the tables', () => {
     const first = new Database(dbPath);
     applyAchievementsSchema(first);
-    expect(runMigrations(first, ACHIEVEMENTS_MIGRATIONS)).toHaveLength(1);
+    expect(runMigrations(first, ACHIEVEMENTS_MIGRATIONS)).toHaveLength(2);
     first.close();
 
     // A fresh open of the same file, as a redeploy does. The step is already
@@ -64,6 +64,18 @@ describe('the requests migration', () => {
     applyAchievementsSchema(db);
     runMigrations(db, ACHIEVEMENTS_MIGRATIONS);
     expect(db.prepare('SELECT COUNT(*) AS n FROM requests').get()).toEqual({ n: 0 });
+    db.close();
+  });
+});
+
+describe('chat migration (step 2)', () => {
+  it('is idempotent and creates the chat tables', () => {
+    const db = new Database(dbPath);
+    applyAchievementsSchema(db);
+    runMigrations(db, ACHIEVEMENTS_MIGRATIONS);
+    expect(runMigrations(db, ACHIEVEMENTS_MIGRATIONS)).toHaveLength(0);
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map((r) => r.name);
+    for (const t of ['chat_rooms', 'chat_sessions', 'chat_messages', 'chat_events', 'chat_roles']) expect(tables).toContain(t);
     db.close();
   });
 });

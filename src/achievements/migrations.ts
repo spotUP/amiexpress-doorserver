@@ -64,4 +64,127 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
         )`);
     },
   },
+  {
+    version: 2,
+    name: 'chat: the federated live-chat surface',
+    // Rooms, sessions, messages, direct messages, the event log, roles, pins
+    // and emoji. Every statement is IF NOT EXISTS, so a re-run against a
+    // database that already has them is a no-op (the step is idempotent
+    // against the live achievements.db, like step 1). User columns are
+    // COLLATE NOCASE: identity is handle@BOARD and a handle's case is not an
+    // identity. chat_messages.seq and chat_dm_messages.seq equal the seq of
+    // the event that announced the message, which is what history paging and
+    // the "seq" field of every reply read.
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_rooms (
+          id          TEXT PRIMARY KEY,
+          name        TEXT NOT NULL,
+          name_key    TEXT NOT NULL UNIQUE,
+          owner_board TEXT NOT NULL,
+          owner_user  TEXT NOT NULL COLLATE NOCASE,
+          topic       TEXT NOT NULL DEFAULT '',
+          visibility  TEXT NOT NULL DEFAULT 'public' CHECK (visibility IN ('public','private')),
+          created_at  INTEGER NOT NULL,
+          deleted_at  INTEGER
+        )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_room_ops (
+          room_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (room_id, user))`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_invites (
+          room_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (room_id, user))`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_bans (
+          room_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE, reason TEXT NOT NULL DEFAULT '',
+          by_user TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (room_id, user))`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_mutes (
+          room_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE, until INTEGER,
+          by_user TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (room_id, user))`);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          sid        TEXT PRIMARY KEY,
+          board_id   TEXT NOT NULL,
+          handle     TEXT NOT NULL,
+          user       TEXT NOT NULL COLLATE NOCASE,
+          sysop      INTEGER NOT NULL DEFAULT 0,
+          client     TEXT NOT NULL DEFAULT '',
+          created_at INTEGER NOT NULL,
+          last_seen  INTEGER NOT NULL
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_sessions_board ON chat_sessions(board_id)');
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_members (
+          room_id TEXT NOT NULL, sid TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE,
+          joined_at INTEGER NOT NULL, PRIMARY KEY (room_id, sid))`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_members_sid ON chat_members(sid)');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id         TEXT PRIMARY KEY,
+          seq        INTEGER NOT NULL,
+          room_id    TEXT NOT NULL,
+          user       TEXT NOT NULL COLLATE NOCASE,
+          content    TEXT NOT NULL,
+          client_id  TEXT NOT NULL,
+          reply_to   TEXT,
+          thread_id  TEXT,
+          created_at INTEGER NOT NULL,
+          edited_at  INTEGER,
+          deleted_at INTEGER,
+          UNIQUE (room_id, user, client_id)
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_messages_room ON chat_messages(room_id, seq)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id, seq)');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_dm_messages (
+          id         TEXT PRIMARY KEY,
+          seq        INTEGER NOT NULL,
+          thread_id  TEXT NOT NULL,
+          dm_a       TEXT NOT NULL COLLATE NOCASE,
+          dm_b       TEXT NOT NULL COLLATE NOCASE,
+          sender     TEXT NOT NULL COLLATE NOCASE,
+          content    TEXT NOT NULL,
+          client_id  TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          read_at    INTEGER,
+          UNIQUE (sender, client_id)
+        )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_dm_thread ON chat_dm_messages(thread_id, seq)');
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_reactions (
+          message_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE, emoji TEXT NOT NULL,
+          at INTEGER NOT NULL, PRIMARY KEY (message_id, user, emoji))`);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_events (
+          seq       INTEGER PRIMARY KEY AUTOINCREMENT,
+          type      TEXT NOT NULL,
+          room_id   TEXT,
+          label     TEXT NOT NULL DEFAULT '',
+          user      TEXT NOT NULL DEFAULT '' COLLATE NOCASE,
+          ref       TEXT NOT NULL DEFAULT '',
+          at        INTEGER NOT NULL,
+          text      TEXT NOT NULL DEFAULT '',
+          dm_a      TEXT COLLATE NOCASE,
+          dm_b      TEXT COLLATE NOCASE
+        )`);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_roles (
+          id         TEXT PRIMARY KEY,
+          board_id   TEXT NOT NULL,
+          name       TEXT NOT NULL,
+          color_hex  TEXT NOT NULL,
+          color_ansi INTEGER NOT NULL,
+          position   INTEGER NOT NULL DEFAULT 0,
+          perms      TEXT NOT NULL DEFAULT '{}'
+        )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_role_assignments (
+          role_id TEXT NOT NULL, board_id TEXT NOT NULL, handle TEXT NOT NULL COLLATE NOCASE,
+          PRIMARY KEY (role_id, handle))`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_assign_handle ON chat_role_assignments(board_id, handle)');
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_pins (
+          room_id TEXT NOT NULL, message_id TEXT NOT NULL, pinned_by TEXT NOT NULL, at INTEGER NOT NULL,
+          PRIMARY KEY (room_id, message_id))`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_emoji (
+          board_id TEXT NOT NULL, name TEXT NOT NULL, data_url TEXT NOT NULL, PRIMARY KEY (board_id, name))`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_motd (
+          id INTEGER PRIMARY KEY CHECK (id = 1), text TEXT NOT NULL DEFAULT '')`);
+      db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS chat_messages_fts USING fts5(
+          content, content='chat_messages', content_rowid='rowid')`);
+    },
+  },
 ];
