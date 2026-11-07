@@ -49,6 +49,11 @@ jobs:
             # scoped to this repo - written to a 600 file rather than a command
             # line so it never appears in `ps` on the host. Anonymous stays as
             # the fallback, so a run with no token behaves exactly as before.
+            # The token is an HTTPS credential, so it is used against the HTTPS
+            # URL, never through `origin`: the host clone's origin is SSH, and
+            # the host's SSH key is a deploy key for amiexpress-web only, so
+            # every fetch through origin got "Repository not found" and no
+            # deploy landed from 2026-09-09 to 2026-11-07.
             CRED_FILE=""
             if [ -n "${GH_TOKEN:-}" ]; then
               CRED_FILE=$(mktemp)
@@ -59,7 +64,8 @@ jobs:
             for attempt in 1 2 3 4 5; do
               if [ -n "$CRED_FILE" ] \
                 && GIT_TERMINAL_PROMPT=0 git -c "credential.helper=store --file=$CRED_FILE" \
-                     fetch --prune origin main; then
+                     fetch --prune https://github.com/spotUP/amiexpress-doorserver.git \
+                     +main:refs/remotes/origin/main; then
                 FETCH_OK=1
                 break
               fi
