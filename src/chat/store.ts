@@ -120,7 +120,7 @@ export function leaveRoom(db: Database.Database, ctx: ChatCtx, id: string): void
   if (!isMember(db, id, ctx.user)) emitEvent(db, { type: 'left', roomId: id, user: ctx.user });
 }
 
-export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { user: string; sysop: boolean; op: boolean }[] {
+export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { user: string; sysop: boolean; op: boolean; status: string; statusText: string }[] {
   const room = getRoom(db, id);
   if (room.visibility === 'private' && !ctx.admin && !isMember(db, id, ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
   const rows = db
@@ -129,11 +129,18 @@ export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { 
         WHERE m.room_id = ? GROUP BY m.user ORDER BY m.user`
     )
     .all(id) as { user: string; sysop: number }[];
-  return rows.map((r) => ({ user: r.user, sysop: r.sysop === 1, op: isOp(db, id, r.user) || room.owner_user.toLowerCase() === r.user.toLowerCase() }));
+  const pres = presenceMap(db);
+  return rows.map((r) => ({
+    user: r.user,
+    sysop: r.sysop === 1,
+    op: isOp(db, id, r.user) || room.owner_user.toLowerCase() === r.user.toLowerCase(),
+    ...presenceFrom(pres, r.user),
+  }));
 }
 
-export function whoRows(db: Database.Database, ctx: ChatCtx): { user: string; room: string; sysop: boolean; idle: number }[] {
+export function whoRows(db: Database.Database, ctx: ChatCtx): { user: string; room: string; sysop: boolean; idle: number; status: string; statusText: string }[] {
   const now = nowSec();
+  const pres = presenceMap(db);
   const rows = db
     .prepare(
       `SELECT s.user, s.sysop, s.last_seen, r.name, r.visibility, r.id AS rid FROM chat_sessions s
@@ -147,7 +154,125 @@ export function whoRows(db: Database.Database, ctx: ChatCtx): { user: string; ro
     room: r.name && (r.visibility === 'public' || ctx.admin || (r.rid !== null && isMember(db, r.rid, ctx.user))) ? r.name : '',
     sysop: r.sysop === 1,
     idle: Math.max(0, now - r.last_seen),
+    ...presenceFrom(pres, r.user),
   }));
+}
+
+// ---- presence ----
+
+export const PRESENCE_STATUSES = ['online', 'away', 'busy', 'dnd'] as const;
+type Presence = { status: string; statusText: string };
+
+function presenceMap(db: Database.Database): Map<string, Presence> {
+  const rows = db.prepare('SELECT user, status, text FROM chat_presence').all() as { user: string; status: string; text: string }[];
+  return new Map(rows.map((r) => [r.user.toLowerCase(), { status: r.status, statusText: r.text }]));
+}
+
+function presenceFrom(map: Map<string, Presence>, user: string): Presence {
+  return map.get(user.toLowerCase()) ?? { status: 'online', statusText: '' };
+}
+
+/** Say `presence` in every room the user is in, or once with no room so the user's own sessions see it. */
+function emitPresence(db: Database.Database, user: string, p: Presence): void {
+  const rooms = db.prepare('SELECT DISTINCT room_id FROM chat_members WHERE user = ?').all(user) as { room_id: string }[];
+  const text = `${p.status}|${p.statusText}`;
+  if (rooms.length === 0) emitEvent(db, { type: 'presence', roomId: null, label: '', user, text });
+  for (const r of rooms) emitEvent(db, { type: 'presence', roomId: r.room_id, user, text });
+}
+
+/** Set (`/status`, `/away`) the caller's status. `online` with no text is the same as `/back`. */
+export function setPresence(db: Database.Database, ctx: ChatCtx, b: Body): Presence {
+  requireSession(ctx);
+  const status = b.status;
+  if (typeof status !== 'string' || !(PRESENCE_STATUSES as readonly string[]).includes(status)) {
+    throw new SurfaceError('bad_request', 400, 'status must be online, away, busy or dnd');
+  }
+  const text = b.text === undefined ? '' : str(b, 'text', CHAT_LIMITS.statusTextMax, { empty: true });
+  if (status === 'online' && text === '') return clearPresence(db, ctx);
+  db.prepare(
+    `INSERT INTO chat_presence (user, status, text, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(user) DO UPDATE SET status = excluded.status, text = excluded.text, updated_at = excluded.updated_at`
+  ).run(ctx.user, status, text, nowSec());
+  const out = { status, statusText: text };
+  emitPresence(db, ctx.user, out);
+  return out;
+}
+
+/** `/back`. */
+export function clearPresence(db: Database.Database, ctx: ChatCtx): Presence {
+  requireSession(ctx);
+  db.prepare('DELETE FROM chat_presence WHERE user = ?').run(ctx.user);
+  const out = { status: 'online', statusText: '' };
+  emitPresence(db, ctx.user, out);
+  return out;
+}
+
+// ---- profile ----
+
+export interface ProfileRec {
+  user: string; nick: string; board: string; status: string; statusText: string;
+  firstSeen: number; lastSeen: number; idle: number | ''; online: boolean; sharedRooms: string;
+}
+
+/** What the server already holds about a user: sessions, events, presence, room membership. Nothing new is stored. */
+export function profileOf(db: Database.Database, ctx: ChatCtx, userParam: string): ProfileRec {
+  requireSession(ctx);
+  const parts = splitUser(userParam);
+  if (!parts) throw new SurfaceError('bad_request', 400, 'user must be handle@BOARD');
+  const live = db.prepare('SELECT user, handle, MAX(last_seen) AS last_seen, MIN(created_at) AS created FROM chat_sessions WHERE user = ?').get(userParam) as
+    { user: string | null; handle: string | null; last_seen: number | null; created: number | null };
+  const ev = db.prepare('SELECT MIN(at) AS first, MAX(at) AS last, MIN(user) AS user FROM chat_events WHERE user = ?').get(userParam) as
+    { first: number | null; last: number | null; user: string | null };
+  if (live.user === null && ev.user === null) throw new SurfaceError('not_found', 404, 'no such chat user');
+  const canonical = live.user ?? ev.user ?? userParam;
+  const firsts = [live.created, ev.first].filter((x): x is number => x !== null);
+  const lasts = [live.last_seen, ev.last].filter((x): x is number => x !== null);
+  const online = live.user !== null;
+  const pres = online ? presenceFrom(presenceMap(db), canonical) : { status: 'offline', statusText: '' };
+  const shared = db
+    .prepare(
+      `SELECT DISTINCT r.id FROM chat_members a
+         JOIN chat_members b ON b.room_id = a.room_id AND b.user = ?
+         JOIN chat_rooms r ON r.id = a.room_id AND r.deleted_at IS NULL
+        WHERE a.user = ? ORDER BY r.name_key`
+    )
+    .all(canonical, ctx.user) as { id: string }[];
+  const split = splitUser(canonical)!;
+  return {
+    user: canonical,
+    nick: split.handle,
+    board: split.board.toUpperCase(),
+    ...pres,
+    firstSeen: Math.min(...firsts),
+    lastSeen: online ? nowSec() : Math.max(...lasts),
+    idle: online ? Math.max(0, nowSec() - (live.last_seen ?? nowSec())) : '',
+    online,
+    sharedRooms: shared.map((r) => r.id).join(','),
+  };
+}
+
+// ---- ignore list ----
+
+/** Storage only: the server does not filter anything; a door hides the ignored user's lines itself. */
+export function listIgnores(db: Database.Database, ctx: ChatCtx): { user: string; at: number }[] {
+  requireSession(ctx);
+  return db.prepare('SELECT target AS user, at FROM chat_ignores WHERE owner = ? ORDER BY at, target').all(ctx.user) as { user: string; at: number }[];
+}
+
+export function addIgnore(db: Database.Database, ctx: ChatCtx, b: Body): void {
+  requireSession(ctx);
+  const target = targetUser(b);
+  if (target.toLowerCase() === ctx.user.toLowerCase()) throw new SurfaceError('bad_request', 400, 'you cannot ignore yourself');
+  const have = (db.prepare('SELECT COUNT(*) AS n FROM chat_ignores WHERE owner = ?').get(ctx.user) as { n: number }).n;
+  if (have >= CHAT_LIMITS.ignoresPerUser && !db.prepare('SELECT 1 FROM chat_ignores WHERE owner = ? AND target = ?').get(ctx.user, target)) {
+    throw new SurfaceError('too_long', 400, `the ignore list is limited to ${CHAT_LIMITS.ignoresPerUser} users`);
+  }
+  db.prepare('INSERT OR IGNORE INTO chat_ignores (owner, target, at) VALUES (?, ?, ?)').run(ctx.user, target, nowSec());
+}
+
+export function removeIgnore(db: Database.Database, ctx: ChatCtx, target: string): void {
+  requireSession(ctx);
+  db.prepare('DELETE FROM chat_ignores WHERE owner = ? AND target = ?').run(ctx.user, target);
 }
 
 // ---- messages ----

@@ -44,7 +44,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms` | `{name, topic?, visibility?}`; reply `{id, name, visibility}` |
 | POST | `/rooms/:id/join` | reply `{id, name, topic, members, ops, since}` |
 | POST | `/rooms/:id/leave` | 204 |
-| GET | `/rooms/:id/members.txt` | MEMBERS rows |
+| GET | `/rooms/:id/members.txt` | MEMBERS rows; status fields appended |
 | GET | `/rooms/:id/history.txt` | `?before=<seq>&limit=1..50` (default 20); HISTORY rows, oldest first |
 | POST | `/rooms/:id/messages` | `{content, clientId, replyTo?, threadId?}`; reply `{id, seq, at}` |
 | PUT | `/messages/:id` | `{content}`, author only; reply `{id, seq}` |
@@ -54,7 +54,13 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | GET | `/messages/:id/reactions.txt` | REACTIONS rows |
 | POST | `/messages/:id/thread` | `{content, clientId}`; threadId is the parent id |
 | GET | `/threads/:id.txt` | `?limit`; HISTORY rows, parent first |
-| GET | `/who.txt` | WHO rows across every room visible to the caller |
+| GET | `/who.txt` | WHO rows across every room visible to the caller; status fields appended |
+| PUT | `/presence` | `{status, text?}`; status is `online`, `away`, `busy` or `dnd`, text up to 120 characters (the away message); `online` with no text is the same as DELETE; reply `{status, statusText}`; emits `presence` |
+| DELETE | `/presence` | `/back`: clears status and text; reply `{status:"online", statusText:""}`; emits `presence` |
+| GET | `/users/:user/profile.txt` | `:user` is `handle@BOARD`; one PROFILE row; 404 `not_found` when the server never saw the user |
+| GET | `/ignores.txt` | the caller's ignore list, IGNORES rows |
+| POST | `/ignores` | `{user}` (`handle@BOARD`); idempotent; 201; up to 200 per identity |
+| DELETE | `/ignores/:user` | remove; always 200 |
 | POST | `/rooms/:id/invites` | `{user}`; private rooms |
 | DELETE | `/rooms/:id/invites/:user` | revoke; 204 |
 | GET | `/dm.txt` | DM rows |
@@ -124,13 +130,31 @@ field is only ever appended and the `1` never moves.
 Formats and their fields, in order:
 
 - ROOMS: `id|name|topic|visibility|members|owner`
-- MEMBERS: `user|sysop|op|roleColor|roleName`
+- MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText`
 - HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text`
 - EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo` (`replyTo` is the
   message id a `message` event answers, empty otherwise)
 - REACTIONS: `emoji|count|mine`
-- WHO: `user|room|sysop|roleColor|idleSeconds`
+- WHO: `user|room|sysop|roleColor|idleSeconds|status|statusText`
 - DM: `threadId|peer|lastAt|unread`
+- PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`
+- IGNORES: `user|at`
+
+`status` and `statusText` (WHO, MEMBERS, PROFILE) were appended after the
+original fields, so a parser that reads the old positions keeps working.
+`status` is `online`, `away`, `busy` or `dnd` (PROFILE adds `offline`);
+`statusText` is the away message, empty when none. Presence is per user, not
+per session, and is dropped when the user's last session ends.
+
+PROFILE only repeats what the server already holds (sessions, the event log,
+presence, room membership): `nick` is the handle, `board` the board id,
+`firstSeen` the earliest session or event on record, `lastSeen` now while
+online, otherwise the newest event, `idleSeconds` empty when offline,
+`online` is `1` or `0`, and `sharedRooms` is a comma-separated list of room
+ids both the caller and the user are in (map them to names with `rooms.txt`).
+
+Ignore list: the server only stores it, per chat identity, across sessions.
+It filters nothing; the door hides an ignored user's lines itself.
 
 `at` is epoch seconds. `sysop`, `op` and `mine` are `1` or `0`. `roleColor` is
 the ANSI colour index 0 to 15 of the user's highest role on their own board, or
@@ -145,8 +169,8 @@ a1b2c3d4e5f6|lobby|Welcome to the board|public|7|spot@UPROUGH
 
 ```text example MEMBERS
 MEMBERS|1|412|2
-spot@UPROUGH|1|1|11|Sysop
-zed@FRIEND|0|0||
+spot@UPROUGH|1|1|11|Sysop|online|
+zed@FRIEND|0|0|||busy|deploying
 ```
 
 ```text example HISTORY
@@ -168,7 +192,17 @@ thumbsup|1|1
 
 ```text example WHO
 WHO|1|413|1
-spot@UPROUGH|lobby|1|11|4
+spot@UPROUGH|lobby|1|11|4|away|at lunch
+```
+
+```text example PROFILE
+PROFILE|1|413|1
+spot@UPROUGH|spot|UPROUGH|away|at lunch|1762400000|1762500100|42|1|room1a2b3c4d5e6f
+```
+
+```text example IGNORES
+IGNORES|1|413|1
+zed@FRIEND|1762500100
 ```
 
 ```text example DM
@@ -214,6 +248,7 @@ itself hold `!`-escaped sub-fields):
 | `dm` | `dm:<threadId>` | sender | message id | content |
 | `role` | room id, or empty | the user whose role changed | empty | `roleName!colorHex!colorAnsi` |
 | `motd` | empty | admin | empty | the message of the day |
+| `presence` | room id of each room the user is in (empty when in none) | the user | empty | `status!statusText` |
 
 A session sees: events in rooms it has joined, direct messages to or from its
 user, events about its user, `room_created`, `room_deleted` and `topic` of

@@ -131,7 +131,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.get('/rooms/:id/members.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => {
       const cache = new Map<string, string>();
-      const rows = store.roomMembers(db, ctx, p(req, 'id')).map((m) => [m.user, m.sysop ? 1 : 0, m.op ? 1 : 0, roleColor(db, cache, m.user), roleName(db, m.user)]);
+      const rows = store.roomMembers(db, ctx, p(req, 'id')).map((m) => [m.user, m.sysop ? 1 : 0, m.op ? 1 : 0, roleColor(db, cache, m.user), roleName(db, m.user), m.status, m.statusText]);
       return { rev: headSeq(db), rows };
     });
     sendText(res, renderText('MEMBERS', out.rev, out.rows));
@@ -177,9 +177,34 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.get('/who.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => {
       const cache = new Map<string, string>();
-      return { rev: headSeq(db), rows: store.whoRows(db, ctx).map((w) => [w.user, w.room, w.sysop ? 1 : 0, roleColor(db, cache, w.user), w.idle]) };
+      return { rev: headSeq(db), rows: store.whoRows(db, ctx).map((w) => [w.user, w.room, w.sysop ? 1 : 0, roleColor(db, cache, w.user), w.idle, w.status, w.statusText]) };
     });
     sendText(res, renderText('WHO', out.rev, out.rows));
+  });
+
+  // ---- presence, profile, ignore list ----
+  router.put('/presence', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => store.setPresence(db, ctx, body(req))));
+  });
+  router.delete('/presence', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => store.clearPresence(db, ctx)));
+  });
+  router.get('/users/:user/profile.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), pr: store.profileOf(db, ctx, p(req, 'user')) }));
+    const x = out.pr;
+    sendText(res, renderText('PROFILE', out.rev, [[x.user, x.nick, x.board, x.status, x.statusText, x.firstSeen, x.lastSeen, x.idle, x.online ? 1 : 0, x.sharedRooms]]));
+  });
+  router.get('/ignores.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), rows: store.listIgnores(db, ctx) }));
+    sendText(res, renderText('IGNORES', out.rev, out.rows.map((r) => [r.user, r.at])));
+  });
+  router.post('/ignores', (req: Request, res: Response) => {
+    run(req, true, (db, ctx) => store.addIgnore(db, ctx, body(req)));
+    res.status(201).json({ ok: true });
+  });
+  router.delete('/ignores/:user', (req: Request, res: Response) => {
+    run(req, true, (db, ctx) => store.removeIgnore(db, ctx, p(req, 'user')));
+    res.json({ ok: true });
   });
 
   // ---- invites ----

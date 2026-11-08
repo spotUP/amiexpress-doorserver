@@ -23,12 +23,14 @@ export const CHAT_TEXT_VERSION = '1';
  */
 export const CHAT_TEXT_FORMATS = {
   ROOMS: ['id', 'name', 'topic', 'visibility', 'members', 'owner'],
-  MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName'],
+  MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName', 'status', 'statusText'],
   HISTORY: ['seq', 'id', 'user', 'at', 'replyTo', 'threadId', 'roleColor', 'text'],
   EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo'],
   REACTIONS: ['emoji', 'count', 'mine'],
-  WHO: ['user', 'room', 'sysop', 'roleColor', 'idleSeconds'],
+  WHO: ['user', 'room', 'sysop', 'roleColor', 'idleSeconds', 'status', 'statusText'],
   DM: ['threadId', 'peer', 'lastAt', 'unread'],
+  PROFILE: ['user', 'nick', 'board', 'status', 'statusText', 'firstSeen', 'lastSeen', 'idleSeconds', 'online', 'sharedRooms'],
+  IGNORES: ['user', 'at'],
 } as const;
 export type ChatTextFormat = keyof typeof CHAT_TEXT_FORMATS;
 
@@ -53,6 +55,7 @@ export const CHAT_EVENT_TYPES = [
   'dm',
   'role',
   'motd',
+  'presence',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 
@@ -95,6 +98,8 @@ export const CHAT_LIMITS = {
   roomCreationsPerBoardPerHour: 6,
   heldPollsPerBoard: 64,
   eventsKept: 50000,
+  statusTextMax: 120,
+  ignoresPerUser: 200,
 } as const;
 
 export interface ChatApiError {
@@ -305,5 +310,11 @@ export const CHAT_ENDPOINTS = [
   'GET /emoji',
   'PUT /emoji/:name',
   'DELETE /emoji/:name',
+  'PUT /presence',
+  'DELETE /presence',
+  'GET /users/:user/profile.txt',
+  'GET /ignores.txt',
+  'POST /ignores',
+  'DELETE /ignores/:user',
 ] as const;
 export type ChatEndpoint = (typeof CHAT_ENDPOINTS)[number];

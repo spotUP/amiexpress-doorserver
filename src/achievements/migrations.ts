@@ -187,4 +187,24 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
           content, content='chat_messages', content_rowid='rowid')`);
     },
   },
+  {
+    version: 3,
+    name: 'chat: presence status and per-identity ignore list',
+    // chat_presence: one row per user while any session of that user lives
+    // (a missing row means online with no text); the row goes when the last
+    // session ends. chat_ignores: the ignore list of a chat identity, kept
+    // across sessions; the server only stores it, doors do the filtering.
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_presence (
+          user TEXT PRIMARY KEY COLLATE NOCASE,
+          status TEXT NOT NULL,
+          text TEXT NOT NULL DEFAULT '',
+          updated_at INTEGER NOT NULL)`);
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_ignores (
+          owner TEXT NOT NULL COLLATE NOCASE,
+          target TEXT NOT NULL COLLATE NOCASE,
+          at INTEGER NOT NULL,
+          PRIMARY KEY (owner, target))`);
+    },
+  },
 ];

@@ -47,7 +47,7 @@ describe('the requests migration', () => {
   it('runs cleanly a second time on a database that already has the tables', () => {
     const first = new Database(dbPath);
     applyAchievementsSchema(first);
-    expect(runMigrations(first, ACHIEVEMENTS_MIGRATIONS)).toHaveLength(2);
+    expect(runMigrations(first, ACHIEVEMENTS_MIGRATIONS)).toHaveLength(ACHIEVEMENTS_MIGRATIONS.length);
     first.close();
 
     // A fresh open of the same file, as a redeploy does. The step is already

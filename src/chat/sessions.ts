@@ -95,6 +95,9 @@ export function expireSession(db: Database.Database, sid: string): void {
   const rooms = db.prepare('SELECT room_id FROM chat_members WHERE sid = ?').all(sid) as { room_id: string }[];
   db.prepare('DELETE FROM chat_members WHERE sid = ?').run(sid);
   db.prepare('DELETE FROM chat_sessions WHERE sid = ?').run(sid);
+  if (!db.prepare('SELECT 1 FROM chat_sessions WHERE user = ?').get(s.user)) {
+    db.prepare('DELETE FROM chat_presence WHERE user = ?').run(s.user);
+  }
   for (const r of rooms) {
     const other = db.prepare('SELECT 1 FROM chat_members WHERE room_id = ? AND user = ?').get(r.room_id, s.user);
     if (!other) emitEvent(db, { type: 'left', roomId: r.room_id, user: s.user });
