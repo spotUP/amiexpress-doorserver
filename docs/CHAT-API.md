@@ -249,10 +249,11 @@ itself hold `!`-escaped sub-fields):
 | `role` | room id, or empty | the user whose role changed | empty | `roleName!colorHex!colorAnsi` |
 | `motd` | empty | admin | empty | the message of the day |
 | `presence` | room id of each room the user is in (empty when in none) | the user | empty | `status!statusText` |
+| `board_joined` | empty | empty | empty | the display name of the board that just opened its first chat session ever |
 
 A session sees: events in rooms it has joined, direct messages to or from its
 user, events about its user, `room_created`, `room_deleted` and `topic` of
-public rooms, and `motd`. The pipe inside the `react`, `banned`, `muted` and
+public rooms, `motd` and `board_joined`. `board_joined` is an event only (no room message is stored), is emitted once per board, never on admin mint or reconnect, and is not emitted for boards that had chatted before it was introduced. The pipe inside the `react`, `banned`, `muted` and
 `role` text is shown as `!` because `|` is escaped on the wire.
 
 ## 5. Roles

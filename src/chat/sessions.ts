@@ -85,6 +85,13 @@ export function createSession(
     `INSERT INTO chat_sessions (sid, board_id, handle, user, sysop, client, created_at, last_seen)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(sid, boardId, handle, user, body.sysop === true ? 1 : 0, client, now, now);
+  // The board's first chat session ever: the conditional UPDATE is the atomic
+  // claim, so only the call that changes the row announces the board.
+  const first = db.prepare('UPDATE boards SET chat_first_seen_at = ? WHERE id = ? AND chat_first_seen_at IS NULL').run(now, boardId);
+  if (first.changes === 1) {
+    const b = db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined;
+    emitEvent(db, { type: 'board_joined', roomId: null, user: '', text: b?.name ?? boardId });
+  }
   return { sid, user, expiresIn: cfg.sessionTtlSeconds };
 }
 

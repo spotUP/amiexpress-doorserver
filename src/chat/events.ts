@@ -55,7 +55,7 @@ export function headSeq(db: Database.Database): number {
 
 /**
  * What a session may see: its joined rooms, its direct messages, events about
- * its user, the lifecycle of public rooms, and the message of the day.
+ * its user, the lifecycle of public rooms, the message of the day, and board_joined.
  */
 export function fetchVisibleEvents(db: Database.Database, sid: string, user: string, since: number): EventRec[] {
   return db
@@ -65,7 +65,7 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
          FROM chat_events e
          LEFT JOIN chat_messages m ON e.type = 'message' AND m.id = e.ref
         WHERE e.seq > @since AND (
-              e.type = 'motd'
+              e.type IN ('motd','board_joined')
            OR e.room_id IN (SELECT room_id FROM chat_members WHERE sid = @sid)
            OR (e.dm_a IS NOT NULL AND (e.dm_a = @user OR e.dm_b = @user))
            OR e.user = @user

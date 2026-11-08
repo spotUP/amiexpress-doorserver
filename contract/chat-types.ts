@@ -56,6 +56,7 @@ export const CHAT_EVENT_TYPES = [
   'role',
   'motd',
   'presence',
+  'board_joined',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 

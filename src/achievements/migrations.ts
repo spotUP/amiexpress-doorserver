@@ -19,6 +19,20 @@
  */
 import type { Migration } from '../migrations';
 
+/**
+ * Mark every board that has ever used chat as already announced, so the
+ * board_joined event fires only for boards that first chat AFTER this ships.
+ * Evidence of past use: a live session row, or a chat identity (`handle@BOARD`)
+ * in messages or events (sessions are swept, so rows alone under-count).
+ */
+export function backfillChatFirstSeen(db: import('better-sqlite3').Database): void {
+  db.exec(`UPDATE boards SET chat_first_seen_at = CAST(strftime('%s','now') AS INTEGER)
+    WHERE chat_first_seen_at IS NULL AND (
+      id IN (SELECT board_id FROM chat_sessions)
+      OR EXISTS (SELECT 1 FROM chat_messages m WHERE m.user LIKE '%@' || upper(boards.id))
+      OR EXISTS (SELECT 1 FROM chat_events e WHERE e.user LIKE '%@' || upper(boards.id)))`);
+}
+
 export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
   {
     version: 1,
@@ -205,6 +219,17 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
           target TEXT NOT NULL COLLATE NOCASE,
           at INTEGER NOT NULL,
           PRIMARY KEY (owner, target))`);
+    },
+  },
+  {
+    version: 4,
+    name: 'chat: boards.chat_first_seen_at marks the first chat session of a board',
+    // NULL = the board has never opened a chat session; the first one sets it
+    // (atomically, in createSession) and announces board_joined. Boards that
+    // already chatted are backfilled so deploying announces nobody.
+    up: (db) => {
+      db.exec('ALTER TABLE boards ADD COLUMN chat_first_seen_at INTEGER');
+      backfillChatFirstSeen(db);
     },
   },
 ];
