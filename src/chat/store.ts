@@ -5,7 +5,7 @@
  */
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
-import { CHAT_LIMITS } from '../../contract/chat-types';
+import { CHAT_DEFAULT_ROOM_KEY, CHAT_LIMITS } from '../../contract/chat-types';
 import type {
   ChatVisibility, CreateRoomReply, DmPostReply, EditMessageReply, EmojiRow, JoinReply, PinRow,
   PostMessageReply, ReactReply, RoomRow, SearchHit,
@@ -68,9 +68,9 @@ export function listRooms(db: Database.Database, ctx: ChatCtx): RoomRow[] {
         WHERE r.deleted_at IS NULL AND (r.visibility = 'public' OR ? = 1
               OR r.owner_user = ? OR EXISTS (SELECT 1 FROM chat_members m WHERE m.room_id = r.id AND m.user = ?)
               OR EXISTS (SELECT 1 FROM chat_invites i WHERE i.room_id = r.id AND i.user = ?))
-        ORDER BY r.name_key`
+        ORDER BY r.name_key = ? DESC, r.name_key`
     )
-    .all(ctx.admin ? 1 : 0, ctx.user, ctx.user, ctx.user) as { id: string; name: string; topic: string; visibility: ChatVisibility; owner_user: string }[];
+    .all(ctx.admin ? 1 : 0, ctx.user, ctx.user, ctx.user, CHAT_DEFAULT_ROOM_KEY) as { id: string; name: string; topic: string; visibility: ChatVisibility; owner_user: string }[];
   return rows.map((r) => ({ id: r.id, name: r.name, topic: r.topic, visibility: r.visibility, members: countMembers(db, r.id), owner: r.owner_user }));
 }
 

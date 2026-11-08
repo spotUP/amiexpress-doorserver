@@ -7,7 +7,7 @@ import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { _resetRateLimitsForTests } from '../src/achievements/ratelimit';
-import { CHAT_LIMITS } from '../contract/chat-types';
+import { CHAT_DEFAULT_ROOM_KEY, CHAT_LIMITS } from '../contract/chat-types';
 
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });
@@ -55,6 +55,17 @@ describe('chat surface', () => {
     expect(h.text.startsWith('HISTORY|')).toBe(true);
     expect(h.text.match(/hello/g)).toHaveLength(1);
     expect(h.text.endsWith('\r\n')).toBe(true);
+  });
+
+  it('lists the default room first even when another room sorts before it', async () => {
+    const sid = await login('alice');
+    for (const name of ['zeta', 'amiga', CHAT_DEFAULT_ROOM_KEY]) {
+      expect((await api('post', '/rooms', sid).send({ name })).status).toBe(201);
+    }
+    const r = await api('get', '/rooms', sid);
+    expect(r.status).toBe(200);
+    const names = (r.body as { name: string }[]).map((x) => x.name);
+    expect(names).toEqual([CHAT_DEFAULT_ROOM_KEY, 'amiga', 'zeta']);
   });
 
   it('delivers a direct message to the peer thread list', async () => {

@@ -78,6 +78,13 @@ export const CHAT_ERROR_CODES = [
 export type ChatErrorCode = (typeof CHAT_ERROR_CODES)[number];
 
 /** Field and request limits, one object. The server's defaults; docs quote these numbers. */
+/**
+ * The federation's landing room. Room lists put it first, so every client
+ * that auto-joins the first listed room (LIVECHAT68 does) lands here, no
+ * matter which other rooms sort before it by name.
+ */
+export const CHAT_DEFAULT_ROOM_KEY = 'lobby';
+
 export const CHAT_LIMITS = {
   contentMax: 500,
   handleMax: 32,
