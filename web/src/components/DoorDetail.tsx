@@ -467,6 +467,8 @@ const DOOR_TYPE_OPTIONS = [
   { value: 'SIM', label: 'SIM' },
   { value: 'DD', label: 'DD' },
   { value: 'REXX', label: 'REXX' },
+  /** AmiExpress-Web TypeScript door (requires_bbs AmiExpress-Web); runs natively, not in the 68K emulator. */
+  { value: 'TS', label: 'TS (AmiExpress-Web TypeScript)' },
 ];
 
 /** Categories, sorted by frequency in the corpus. */
