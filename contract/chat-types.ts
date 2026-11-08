@@ -25,7 +25,7 @@ export const CHAT_TEXT_FORMATS = {
   ROOMS: ['id', 'name', 'topic', 'visibility', 'members', 'owner'],
   MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName'],
   HISTORY: ['seq', 'id', 'user', 'at', 'replyTo', 'threadId', 'roleColor', 'text'],
-  EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text'],
+  EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo'],
   REACTIONS: ['emoji', 'count', 'mine'],
   WHO: ['user', 'room', 'sysop', 'roleColor', 'idleSeconds'],
   DM: ['threadId', 'peer', 'lastAt', 'unread'],

@@ -126,7 +126,8 @@ Formats and their fields, in order:
 - ROOMS: `id|name|topic|visibility|members|owner`
 - MEMBERS: `user|sysop|op|roleColor|roleName`
 - HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text`
-- EVENTS: `seq|type|room|user|ref|at|roleColor|text`
+- EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo` (`replyTo` is the
+  message id a `message` event answers, empty otherwise)
 - REACTIONS: `emoji|count|mine`
 - WHO: `user|room|sysop|roleColor|idleSeconds`
 - DM: `threadId|peer|lastAt|unread`
@@ -156,8 +157,8 @@ HISTORY|1|410|2
 
 ```text example EVENTS
 EVENTS|1|413|2
-412|message|a1b2c3d4e5f6|zed@FRIEND|m6e5d4c3b2a1|1762500005||Hi spot!
-413|react|a1b2c3d4e5f6|spot@UPROUGH|m6e5d4c3b2a1|1762500007|11|thumbsup!1
+412|message|a1b2c3d4e5f6|zed@FRIEND|m6e5d4c3b2a1|1762500005||Hi spot!|m1a2b3c4d5e6
+413|react|a1b2c3d4e5f6|spot@UPROUGH|m6e5d4c3b2a1|1762500007|11|thumbsup!1|
 ```
 
 ```text example REACTIONS

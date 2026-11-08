@@ -21,6 +21,8 @@ export interface EventRec {
   ref: string;
   at: number;
   text: string;
+  /** The message a `message` event answers, '' otherwise. */
+  reply_to: string;
 }
 
 export interface NewEvent {
@@ -58,8 +60,10 @@ export function headSeq(db: Database.Database): number {
 export function fetchVisibleEvents(db: Database.Database, sid: string, user: string, since: number): EventRec[] {
   return db
     .prepare(
-      `SELECT e.seq, e.type, e.room_id, e.label, e.user, e.ref, e.at, e.text
+      `SELECT e.seq, e.type, e.room_id, e.label, e.user, e.ref, e.at, e.text,
+              COALESCE(m.reply_to, '') AS reply_to
          FROM chat_events e
+         LEFT JOIN chat_messages m ON e.type = 'message' AND m.id = e.ref
         WHERE e.seq > @since AND (
               e.type = 'motd'
            OR e.room_id IN (SELECT room_id FROM chat_members WHERE sid = @sid)

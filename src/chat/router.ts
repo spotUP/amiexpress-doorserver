@@ -230,7 +230,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
         // The session may have been replaced or have expired while held; touch it again.
         context(db, req, false);
         const cache = new Map<string, string>();
-        return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), e.text]);
+        return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), e.text, e.reply_to]);
       });
       const last = events.length > 0 ? events[events.length - 1].seq : since;
       sendText(res, renderText('EVENTS', last, out));

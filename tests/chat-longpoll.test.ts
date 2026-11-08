@@ -38,4 +38,16 @@ describe('chat long poll', () => {
     expect(Date.now() - started).toBeLessThan(10000);
     expect(r.text).toContain('wake up');
   });
+
+  it('carries replyTo as the last field of a message event', async () => {
+    const a = await login('alice');
+    const id = (await call('post', '/rooms', a).send({ name: 'lobby' })).body.id as string;
+    await call('post', `/rooms/${id}/join`, a);
+    const parent = (await call('post', `/rooms/${id}/messages`, a).send({ content: 'first', clientId: 'p1' })).body.id as string;
+    const since = (await call('get', '/events.txt?wait=0', a)).text.split('|')[2];
+    await call('post', `/rooms/${id}/messages`, a).send({ content: 'answer', clientId: 'p2', replyTo: parent });
+    const r = await call('get', `/events.txt?since=${since}&wait=0`, a);
+    const row = r.text.split(/\r?\n/).find((l) => l.includes('|message|'));
+    expect(row?.split('|').slice(7)).toEqual(['answer', parent]);
+  });
 });
