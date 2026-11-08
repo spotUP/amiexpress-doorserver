@@ -54,6 +54,10 @@ jobs:
             # the host's SSH key is a deploy key for amiexpress-web only, so
             # every fetch through origin got "Repository not found" and no
             # deploy landed from 2026-09-09 to 2026-11-07.
+            # No --prune on the HTTPS fetch: pruning against a bare URL with an
+            # explicit refspec deletes refs/remotes/origin/main and then fails
+            # to write it back ("cannot lock ref"), so attempt 1 always failed
+            # and fell through to the SSH origin (run 42491114919).
             CRED_FILE=""
             if [ -n "${GH_TOKEN:-}" ]; then
               CRED_FILE=$(mktemp)
@@ -64,7 +68,7 @@ jobs:
             for attempt in 1 2 3 4 5; do
               if [ -n "$CRED_FILE" ] \
                 && GIT_TERMINAL_PROMPT=0 git -c "credential.helper=store --file=$CRED_FILE" \
-                     fetch --prune https://github.com/spotUP/amiexpress-doorserver.git \
+                     fetch https://github.com/spotUP/amiexpress-doorserver.git \
                      +main:refs/remotes/origin/main; then
                 FETCH_OK=1
                 break
@@ -122,9 +126,22 @@ jobs:
               echo "[INFO] achievements surface off: ACHIEVEMENTS_SMTP_URL / ACHIEVEMENTS_MAIL_FROM not set"
             fi
             echo "== prune builder cache + dangling/unused images (host runs at 91% disk, 3.6 GB free) =="
-            docker builder prune -f
+            # The board's own deploy runs on this host and prunes too; Docker
+            # refuses a second prune with "a prune operation is already
+            # running", which failed the whole deploy after the code was
+            # already checked out (run 42491114919). Pruning is housekeeping:
+            # retry while the other one finishes, then go on without it.
+            prune_or_skip() {
+              for i in 1 2 3 4 5 6; do
+                if docker "$@" prune -f; then return 0; fi
+                echo "docker $1 prune busy; retry $i in 10s" >&2
+                sleep 10
+              done
+              echo "[WARN] docker $1 prune skipped: another prune kept running" >&2
+            }
+            prune_or_skip builder
             # Dangling layers only: -a would remove all unused images, dangerous on unattended live host
-            docker image prune -f
+            prune_or_skip image
             echo "== build + up =="
             GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
             echo "== health =="
