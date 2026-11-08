@@ -1221,7 +1221,7 @@ name (lowercase, other characters become `-`, at most 32 characters, `board`
 if fewer than 2 remain) and appends `-2` to `-99` when the id is taken. The
 `contact` column stores `<sysop>` or `<sysop> <contact>`.
 
-Answers `201`. With `Accept: text/plain` (the 68K door) the body is
+Answers 201 Created. With `Accept: text/plain` (the 68K door) the body is
 `OK <id>.<secret>\n`; otherwise `{"id": "...", "key": "<id>.<secret>"}`. The
 plaintext key is shown exactly once.
 
