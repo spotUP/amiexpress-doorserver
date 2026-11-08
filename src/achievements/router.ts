@@ -48,9 +48,11 @@ import {
   createBoard,
   getBoard,
   listBoards,
+  registerBoard,
   requireBoard,
   rotateBoardKey,
   setBoardSuspended,
+  validateRegistration,
 } from './boards';
 import type { BoardRequest, BoardRow } from './boards';
 import { ACHIEVEMENTS_CONTRACT_VERSION } from '../../contract/achievement-types';
@@ -98,6 +100,19 @@ export function createAchievementsRouter(
   // surface is alive, and every number here is a count, never a name.
   router.get('/health', (_req: Request, res: Response) => {
     res.json(achievementsHealth(ach));
+  });
+
+  // Self-service registration: no key, no approval, no rate limit (sysop
+  // decision). The board is active at once; the plaintext key is shown once.
+  // A 68K door sends Accept: text/plain and gets "OK <id>.<secret>\n".
+  router.post('/boards/register', (req: Request, res: Response) => {
+    const reg = validateRegistration(req.body);
+    const minted = withAchievementsDb(ach, (db) => registerBoard(db, reg));
+    if (req.accepts(['json', 'text/plain']) === 'text/plain') {
+      res.status(201).type('text/plain').send(`OK ${minted.key}\n`);
+      return;
+    }
+    res.status(201).json(minted);
   });
 
   // ---------------------------------------------------------------------

@@ -1209,6 +1209,22 @@ creation and at rotation; only its scrypt hash is stored. A board id must
 match `^[a-z0-9][a-z0-9-]{1,31}$`, and creating one that already exists is
 `409 board_exists` - the stored hash is not touched.
 
+### Self-service registration
+
+`POST /boards/register` needs no key and no token: a board asks for one and
+the key is active at once (no approval step, no rate limit). Body:
+`{"name": "Up Rough", "sysop": "Spot", "contact": "optional"}`. `name` and
+`sysop` are 1 to 40 printable ASCII characters (0x20-0x7E), `contact` is at
+most 80; anything else is `400 bad_request`. The name is shown in every chat
+log when the board first joins chat. The server derives the board id from the
+name (lowercase, other characters become `-`, at most 32 characters, `board`
+if fewer than 2 remain) and appends `-2` to `-99` when the id is taken. The
+`contact` column stores `<sysop>` or `<sysop> <contact>`.
+
+Answers `201`. With `Accept: text/plain` (the 68K door) the body is
+`OK <id>.<secret>\n`; otherwise `{"id": "...", "key": "<id>.<secret>"}`. The
+plaintext key is shown exactly once.
+
 These routes answer `503` when the admin API is switched off, which is what
 the door server already does when no JWT signing secret is configured.
 

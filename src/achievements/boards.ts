@@ -88,6 +88,91 @@ export function createBoard(
   return { id, key: `${id}.${secret}` };
 }
 
+/** Printable ASCII only: the name is shown in every chat log via board_joined. */
+const PRINTABLE_ASCII = /^[\x20-\x7E]+$/;
+const NAME_MAX = 40;
+const CONTACT_MAX = 80;
+const SLUG_MAX = 32;
+const SUFFIX_MAX = 99;
+
+export interface BoardRegistration {
+  name: string;
+  sysop: string;
+  /** What lands in boards.contact: "<sysop>" or "<sysop> <contact>". */
+  contact: string;
+}
+
+function badRegistration(detail: string): SurfaceError {
+  return new SurfaceError('bad_request', 400, detail);
+}
+
+/**
+ * Validate a self-service registration body. Pure. name and sysop are 1-40
+ * printable ASCII characters (no control characters, no high bytes), contact
+ * is optional and at most 80 printable ASCII characters.
+ */
+export function validateRegistration(body: unknown): BoardRegistration {
+  const b = (body ?? {}) as { name?: unknown; sysop?: unknown; contact?: unknown };
+  const field = (label: string, v: unknown, max: number, required: boolean): string => {
+    if (v === undefined || v === null || v === '') {
+      if (required) throw badRegistration(`${label} is required`);
+      return '';
+    }
+    if (typeof v !== 'string') throw badRegistration(`${label} must be a string`);
+    const t = v.trim();
+    if (t.length === 0 && required) throw badRegistration(`${label} is required`);
+    if (t.length > max) throw badRegistration(`${label} is at most ${max} characters`);
+    if (t.length > 0 && !PRINTABLE_ASCII.test(t)) {
+      throw badRegistration(`${label} must be printable ASCII (no control characters)`);
+    }
+    return t;
+  };
+  const name = field('name', b.name, NAME_MAX, true);
+  const sysop = field('sysop', b.sysop, NAME_MAX, true);
+  const contact = field('contact', b.contact, CONTACT_MAX, false);
+  return { name, sysop, contact: contact ? `${sysop} ${contact}` : sysop };
+}
+
+/** Lowercase, non [a-z0-9] -> '-', collapsed and trimmed, max 32; under 2 chars -> 'board'. */
+export function deriveBoardSlug(name: string, maxLen: number = SLUG_MAX): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .slice(0, maxLen)
+    .replace(/-+$/, '');
+  return slug.length < 2 ? 'board' : slug;
+}
+
+/** The base slug, then base-2 .. base-99, each kept within 32 characters. */
+export function slugCandidates(name: string): string[] {
+  const base = deriveBoardSlug(name);
+  const out = [base];
+  for (let n = 2; n <= SUFFIX_MAX; n += 1) {
+    const suffix = `-${n}`;
+    out.push(base.slice(0, SLUG_MAX - suffix.length).replace(/-+$/, '') + suffix);
+  }
+  return out;
+}
+
+/** Mint a board for a validated registration, retrying the slug on collision. */
+export function registerBoard(
+  db: Database.Database,
+  reg: BoardRegistration
+): { id: string; key: string } {
+  for (const id of slugCandidates(reg.name)) {
+    try {
+      const minted = createBoard(db, id, reg.name, reg.contact);
+      auditBoard(db, minted.id, 'board:register', 1);
+      return minted;
+    } catch (e) {
+      if (e instanceof SurfaceError && e.code === 'board_exists') continue;
+      throw e;
+    }
+  }
+  throw new SurfaceError('board_exists', 409, 'no free board id for that name');
+}
+
 /** A fresh secret for an existing board. The old key stops on the next request. */
 export function rotateBoardKey(db: Database.Database, id: string): { id: string; key: string } {
   const secret = newSecret();
