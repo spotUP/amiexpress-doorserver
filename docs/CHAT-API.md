@@ -42,7 +42,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | GET | `/rooms.txt` | `?mine=1` optional; ROOMS rows |
 | GET | `/rooms` | the same as a JSON array |
 | POST | `/rooms` | `{name, topic?, visibility?}`; reply `{id, name, visibility}` |
-| POST | `/rooms/:id/join` | reply `{id, name, topic, members, ops, since}` |
+| POST | `/rooms/:id/join` | reply `{id, name, topic, motd, members, ops, since}` |
 | POST | `/rooms/:id/leave` | 204 |
 | GET | `/rooms/:id/members.txt` | MEMBERS rows; status fields appended |
 | GET | `/rooms/:id/history.txt` | `?before=<seq>&limit=1..50` (default 20); HISTORY rows, oldest first |
@@ -75,6 +75,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/op` | `{user}` |
 | POST | `/rooms/:id/deop` | `{user}` |
 | PUT | `/rooms/:id/topic` | `{topic}` |
+| PUT | `/rooms/:id/motd` | `{motd}` (at most 500 characters, empty clears); room owner or moderator |
 | PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
 | DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
 | POST | `/rooms/:id/clear` | owning-board sysop or admin; emits `delete` per message; 204 |
@@ -244,6 +245,7 @@ itself hold `!`-escaped sub-fields):
 | `react`, `unreact` | room id | reactor | message id | `emoji!count` |
 | `joined`, `left` | room id | who | empty | empty |
 | `topic` | room id | who set it | empty | the topic |
+| `room_motd` | room id | who set it | empty | the room's message of the day (empty = cleared) |
 | `room_created`, `room_deleted` | room id | creator or deleter | empty | room name |
 | `kicked`, `unmuted`, `op`, `deop` | room id | the target | empty | the acting user |
 | `banned` | room id | the target | empty | `actor!reason` |

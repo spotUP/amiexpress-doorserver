@@ -252,4 +252,13 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('ALTER TABLE chat_events ADD COLUMN board_id TEXT');
     },
   },
+  {
+    version: 7,
+    name: 'chat: chat_rooms.motd holds a per-room message of the day',
+    // The TS LiveChat door's /motd sets a message for one room, shown on
+    // join and broadcast to its members; the board-wide chat_motd stays.
+    up: (db) => {
+      db.exec("ALTER TABLE chat_rooms ADD COLUMN motd TEXT NOT NULL DEFAULT ''");
+    },
+  },
 ];

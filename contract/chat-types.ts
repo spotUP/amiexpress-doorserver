@@ -44,6 +44,7 @@ export const CHAT_EVENT_TYPES = [
   'joined',
   'left',
   'topic',
+  'room_motd',
   'room_created',
   'room_deleted',
   'kicked',
@@ -169,6 +170,8 @@ export interface JoinReply {
   id: string;
   name: string;
   topic: string;
+  /** The room's message of the day; empty when none is set. */
+  motd: string;
   members: number;
   ops: string[];
   since: number;
@@ -314,6 +317,7 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/op',
   'POST /rooms/:id/deop',
   'PUT /rooms/:id/topic',
+  'PUT /rooms/:id/motd',
   'PUT /rooms/:id/visibility',
   'DELETE /rooms/:id',
   'POST /rooms/:id/clear',

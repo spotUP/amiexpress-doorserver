@@ -110,7 +110,7 @@ export function joinRoom(db: Database.Database, ctx: ChatCtx, id: string): JoinR
   db.prepare('INSERT OR IGNORE INTO chat_members (room_id, sid, user, joined_at) VALUES (?, ?, ?, ?)').run(id, ctx.sid, ctx.user, nowSec());
   if (first) emitEvent(db, { type: 'joined', roomId: id, user: ctx.user });
   const ops = (db.prepare('SELECT user FROM chat_room_ops WHERE room_id = ? ORDER BY user').all(id) as { user: string }[]).map((r) => r.user);
-  return { id, name: room.name, topic: room.topic, members: countMembers(db, id), ops, since: headSeq(db) };
+  return { id, name: room.name, topic: room.topic, motd: room.motd, members: countMembers(db, id), ops, since: headSeq(db) };
 }
 
 export function leaveRoom(db: Database.Database, ctx: ChatCtx, id: string): void {
@@ -562,6 +562,15 @@ export function setTopic(db: Database.Database, ctx: ChatCtx, id: string, b: Bod
   const topic = str(b, 'topic', CHAT_LIMITS.topicMax, { empty: true });
   db.prepare('UPDATE chat_rooms SET topic = ? WHERE id = ?').run(topic, id);
   emitEvent(db, { type: 'topic', roomId: id, user: ctx.user || 'admin', text: topic });
+}
+
+/** The room's message of the day (the TS door's /motd): moderators and the owner only, empty clears it. */
+export function setRoomMotd(db: Database.Database, ctx: ChatCtx, id: string, b: Body): void {
+  const room = getRoom(db, id);
+  requireMod(db, room, ctx, 'topic');
+  const motd = str(b, 'motd', CHAT_LIMITS.contentMax, { empty: true });
+  db.prepare('UPDATE chat_rooms SET motd = ? WHERE id = ?').run(motd, id);
+  emitEvent(db, { type: 'room_motd', roomId: id, user: ctx.user || 'admin', text: motd });
 }
 
 export function setVisibility(db: Database.Database, ctx: ChatCtx, id: string, b: Body): void {
