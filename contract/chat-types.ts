@@ -55,6 +55,8 @@ export const CHAT_EVENT_TYPES = [
   'deop',
   /** A /mode change; text = the applied modes, e.g. `+i +o alice@BOARD`. */
   'mode',
+  /** A member's whole input buffer while typing; text empty = stopped. Trimmed to 200 characters. */
+  'typing',
   'dm',
   'role',
   'motd',
@@ -333,6 +335,7 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/unmute',
   'POST /rooms/:id/op',
   'POST /rooms/:id/mode',
+  'POST /rooms/:id/typing',
   'POST /rooms/:id/deop',
   'PUT /rooms/:id/topic',
   'PUT /rooms/:id/motd',

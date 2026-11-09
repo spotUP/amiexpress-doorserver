@@ -626,6 +626,15 @@ export function setTopic(db: Database.Database, ctx: ChatCtx, id: string, b: Bod
   emitEvent(db, { type: 'topic', roomId: id, user: ctx.user || 'admin', text: topic });
 }
 
+/** POST /rooms/:id/typing {text}: the caller's whole input buffer ('' = stopped). Members only; text is trimmed to 200 characters. */
+export const TYPING_TEXT_MAX = 200;
+export function setTyping(db: Database.Database, ctx: ChatCtx, id: string, b: Body): void {
+  const room = getRoom(db, id);
+  requireMemberOf(db, room.id, ctx);
+  const text = str(b, 'text', Number.MAX_SAFE_INTEGER, { empty: true }).slice(0, TYPING_TEXT_MAX);
+  emitEvent(db, { type: 'typing', roomId: id, user: ctx.user, text });
+}
+
 /** The room's message of the day (the TS door's /motd): moderators and the owner only, empty clears it. */
 export function setRoomMotd(db: Database.Database, ctx: ChatCtx, id: string, b: Body): void {
   const room = getRoom(db, id);

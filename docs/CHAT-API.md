@@ -76,6 +76,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/deop` | `{user}` |
 | PUT | `/rooms/:id/topic` | `{topic}` |
 | POST | `/rooms/:id/mode` | `{modes, params?}` (TS `/mode`): modes like `+i`, `-m`, `+ov`; params is the space-separated `handle@BOARD` list the `o`, `v`, `b` flags take in order. `i` = invite-only (private visibility), `m` = moderated (only staff and voiced users speak, else `moderated`), `o` = op, `v` = voice, `b` = mute until unmuted. Room staff only. Reply `{applied, errors}`: applied modes space-separated, per-flag errors `\|`-separated; flags after a bad one still apply |
+| POST | `/rooms/:id/typing` | `{text}`: the caller's whole input buffer, empty = stopped typing; trimmed to 200 characters, no error. Room members only (no +m check). Emits a `typing` event; senders throttle to one per 400 ms and always send the final empty text |
 | PUT | `/rooms/:id/motd` | `{motd}` (at most 500 characters, empty clears); room owner or moderator |
 | PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
 | DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
@@ -250,6 +251,7 @@ itself hold `!`-escaped sub-fields):
 | `room_created`, `room_deleted` | room id | creator or deleter | empty | room name |
 | `kicked`, `unmuted`, `op`, `deop` | room id | the target | empty | the acting user |
 | `mode` | room id | who set it | empty | the applied modes, e.g. `+i +o alice@BOARD` |
+| `typing` | room id | the typer | empty | the typer's whole input buffer (empty = stopped); receivers expire it after 5 s |
 | `banned` | room id | the target | empty | `actor!reason` |
 | `muted` | room id | the target | empty | `actor!minutes` |
 | `dm` | `dm:<threadId>` | sender | message id | content |
