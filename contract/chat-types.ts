@@ -53,6 +53,8 @@ export const CHAT_EVENT_TYPES = [
   'unmuted',
   'op',
   'deop',
+  /** A /mode change; text = the applied modes, e.g. `+i +o alice@BOARD`. */
+  'mode',
   'dm',
   'role',
   'motd',
@@ -84,6 +86,8 @@ export const CHAT_ERROR_CODES = [
   'too_long',
   'conflict',
   'rate_limited',
+  /** The room is moderated (+m) and the caller has neither voice (+v) nor op (+o). */
+  'moderated',
 ] as const;
 export type ChatErrorCode = (typeof CHAT_ERROR_CODES)[number];
 
@@ -328,6 +332,7 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/mute',
   'POST /rooms/:id/unmute',
   'POST /rooms/:id/op',
+  'POST /rooms/:id/mode',
   'POST /rooms/:id/deop',
   'PUT /rooms/:id/topic',
   'PUT /rooms/:id/motd',

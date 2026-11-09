@@ -14,7 +14,7 @@ import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
 import { nowSec } from './config';
 import { emitEvent, headSeq } from './events';
-import { getRoom, isMember, isOp, isOwnerLevel, requireMod, requireOwner, requireSysop } from './permissions';
+import { getRoom, isMember, isOp, isOwnerLevel, isRoomStaff, requireMod, requireOwner, requireSysop } from './permissions';
 import type { RoomRec } from './permissions';
 import { permsOf } from './roles';
 import { newId, splitUser, validHandle } from './sessions';
@@ -299,6 +299,13 @@ function requireNotMuted(db: Database.Database, roomId: string, user: string): v
   if (m && (m.until === null || m.until > nowSec())) throw new SurfaceError('muted', 403, 'you are muted in this room');
 }
 
+/** +m (moderated): only the room's staff and voiced users may speak. */
+function requireVoice(db: Database.Database, room: RoomRec, ctx: ChatCtx): void {
+  if (!room.moderated || isRoomStaff(db, room, ctx)) return;
+  if (db.prepare('SELECT 1 FROM chat_room_voices WHERE room_id = ? AND user = ?').get(room.id, ctx.user) !== undefined) return;
+  throw new SurfaceError('moderated', 403, 'Room is moderated (+m); you need voice (+v) or op (+o) to speak');
+}
+
 function indexFts(db: Database.Database, id: string): void {
   db.prepare("INSERT INTO chat_messages_fts(rowid, content) SELECT rowid, content FROM chat_messages WHERE id = ?").run(id);
 }
@@ -317,6 +324,7 @@ export function postMessage(db: Database.Database, ctx: ChatCtx, roomId: string,
   if (dup) return { id: dup.id, seq: dup.seq, at: dup.created_at };
   requireMemberOf(db, roomId, ctx);
   requireNotMuted(db, roomId, ctx.user);
+  requireVoice(db, room, ctx);
   chargeMessage(ctx);
   let replyTo: string | null = null;
   if (typeof b.replyTo === 'string' && b.replyTo) {
@@ -556,6 +564,58 @@ export function setOp(db: Database.Database, ctx: ChatCtx, id: string, b: Body, 
   if (on) db.prepare('INSERT OR IGNORE INTO chat_room_ops (room_id, user) VALUES (?, ?)').run(id, user);
   else db.prepare('DELETE FROM chat_room_ops WHERE room_id = ? AND user = ?').run(id, user);
   emitEvent(db, { type: on ? 'op' : 'deop', roomId: id, user, ref: ctx.user || 'admin' });
+}
+
+/** Mode flags that take a user parameter, as the TS door's parseModeString. */
+const MODE_TAKES_USER: Record<string, boolean> = { o: true, v: true, b: true };
+
+/**
+ * POST /rooms/:id/mode {modes, params}: the TS door's /mode. Flags apply in
+ * order; a bad flag is reported and skipped, the rest still apply.
+ *   i  invite-only = private visibility     m  moderated
+ *   o  op   v  voice   b  mute (until unmuted), each with a handle@BOARD param
+ * Room staff only. One `mode` event carries what was applied.
+ */
+export function setMode(db: Database.Database, ctx: ChatCtx, id: string, b: Body): { applied: string; errors: string } {
+  const room = getRoom(db, id);
+  if (!isRoomStaff(db, room, ctx)) throw new SurfaceError('forbidden', 403, 'Only moderators can change modes');
+  const modes = str(b, 'modes', 64);
+  if (!/^[+\-][a-zA-Z]/.test(modes)) throw new SurfaceError('bad_request', 400, 'Mode string must start with + or -');
+  const params = typeof b.params === 'string' ? b.params.split(' ').filter((s) => s !== '') : [];
+  const actor = ctx.user || 'admin';
+  const applied: string[] = [];
+  const errors: string[] = [];
+  let sign = '+';
+  let p = 0;
+  for (const flag of modes) {
+    if (flag === '+' || flag === '-') { sign = flag; continue; }
+    if (!/[a-zA-Z]/.test(flag)) continue;
+    const on = sign === '+';
+    const param = MODE_TAKES_USER[flag] && p < params.length ? params[p++] : undefined;
+    if (flag === 'i') {
+      db.prepare('UPDATE chat_rooms SET visibility = ? WHERE id = ?').run(on ? 'private' : 'public', id);
+      applied.push(`${sign}i`);
+    } else if (flag === 'm') {
+      db.prepare('UPDATE chat_rooms SET moderated = ? WHERE id = ?').run(on ? 1 : 0, id);
+      applied.push(`${sign}m`);
+    } else if (MODE_TAKES_USER[flag]) {
+      if (!param) { errors.push(`Mode ${sign}${flag} requires a username`); continue; }
+      if (!splitUser(param)) { errors.push(`User ${param} not found`); continue; }
+      if (flag !== 'v' && room.owner_user.toLowerCase() === param.toLowerCase() && !ctx.admin) {
+        errors.push(`Mode ${sign}${flag} ${param}: the room owner cannot be moderated`);
+        continue;
+      }
+      const table = flag === 'o' ? 'chat_room_ops' : 'chat_room_voices';
+      if (flag === 'b') {
+        if (on) db.prepare('INSERT OR REPLACE INTO chat_mutes (room_id, user, until, by_user, at) VALUES (?, ?, NULL, ?, ?)').run(id, param, actor, nowSec());
+        else db.prepare('DELETE FROM chat_mutes WHERE room_id = ? AND user = ?').run(id, param);
+      } else if (on) db.prepare(`INSERT OR IGNORE INTO ${table} (room_id, user) VALUES (?, ?)`).run(id, param);
+      else db.prepare(`DELETE FROM ${table} WHERE room_id = ? AND user = ?`).run(id, param);
+      applied.push(`${sign}${flag} ${param}`);
+    } else errors.push(`Unknown mode flag: ${flag}`);
+  }
+  if (applied.length > 0) emitEvent(db, { type: 'mode', roomId: id, user: actor, text: applied.join(' ') });
+  return { applied: applied.join(' '), errors: errors.join('|') };
 }
 
 export function setTopic(db: Database.Database, ctx: ChatCtx, id: string, b: Body): void {

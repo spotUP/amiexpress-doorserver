@@ -279,6 +279,9 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     run(req, true, (db, ctx) => store.setOp(db, ctx, p(req, 'id'), body(req), false));
     res.json({ ok: true });
   });
+  router.post('/rooms/:id/mode', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => store.setMode(db, ctx, p(req, 'id'), body(req))));
+  });
   router.put('/rooms/:id/motd', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.setRoomMotd(db, ctx, p(req, 'id'), body(req)));
     res.json({ ok: true });

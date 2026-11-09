@@ -272,4 +272,16 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec("UPDATE chat_rooms SET kind = 'art' WHERE name_key LIKE 'art:%'");
     },
   },
+  {
+    version: 9,
+    name: 'chat: room modes +m (moderated) and +v (voiced users)',
+    // The TS LiveChat door's /mode sets IRC-style room modes. +i maps onto the
+    // existing private visibility (a private room already needs an invite) and
+    // +o/+b onto ops and mutes; +m and +v had no home, so they get one here.
+    up: (db) => {
+      db.exec('ALTER TABLE chat_rooms ADD COLUMN moderated INTEGER NOT NULL DEFAULT 0');
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_room_voices (
+          room_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (room_id, user))`);
+    },
+  },
 ];

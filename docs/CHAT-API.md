@@ -75,6 +75,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/op` | `{user}` |
 | POST | `/rooms/:id/deop` | `{user}` |
 | PUT | `/rooms/:id/topic` | `{topic}` |
+| POST | `/rooms/:id/mode` | `{modes, params?}` (TS `/mode`): modes like `+i`, `-m`, `+ov`; params is the space-separated `handle@BOARD` list the `o`, `v`, `b` flags take in order. `i` = invite-only (private visibility), `m` = moderated (only staff and voiced users speak, else `moderated`), `o` = op, `v` = voice, `b` = mute until unmuted. Room staff only. Reply `{applied, errors}`: applied modes space-separated, per-flag errors `\|`-separated; flags after a bad one still apply |
 | PUT | `/rooms/:id/motd` | `{motd}` (at most 500 characters, empty clears); room owner or moderator |
 | PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
 | DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
@@ -248,6 +249,7 @@ itself hold `!`-escaped sub-fields):
 | `room_motd` | room id | who set it | empty | the room's message of the day (empty = cleared) |
 | `room_created`, `room_deleted` | room id | creator or deleter | empty | room name |
 | `kicked`, `unmuted`, `op`, `deop` | room id | the target | empty | the acting user |
+| `mode` | room id | who set it | empty | the applied modes, e.g. `+i +o alice@BOARD` |
 | `banned` | room id | the target | empty | `actor!reason` |
 | `muted` | room id | the target | empty | `actor!minutes` |
 | `dm` | `dm:<threadId>` | sender | message id | content |
@@ -277,7 +279,7 @@ recolour live.
 Errors are JSON `{"error": "<code>", "detail": "<text>", "retryAfter"?: n}`.
 Codes: `bad_request`, `unauthorized`, `session_expired`, `forbidden`,
 `banned`, `muted`, `not_member`, `invite_required`, `not_found`, `too_long`,
-`conflict`, `rate_limited`. A 429 also carries a `Retry-After` header.
+`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op). A 429 also carries a `Retry-After` header.
 
 Limits (fixed windows in process): 20 messages per session per 10 seconds,
 300 messages per board per minute, 30 live sessions per board, 6 room

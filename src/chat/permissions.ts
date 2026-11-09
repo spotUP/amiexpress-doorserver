@@ -23,11 +23,12 @@ export interface RoomRec {
   topic: string;
   motd: string;
   visibility: 'public' | 'private';
+  moderated: number;
 }
 
 export function getRoom(db: Database.Database, id: string): RoomRec {
   const r = db
-    .prepare('SELECT id, name, owner_board, owner_user, topic, motd, visibility FROM chat_rooms WHERE id = ? AND deleted_at IS NULL')
+    .prepare('SELECT id, name, owner_board, owner_user, topic, motd, visibility, moderated FROM chat_rooms WHERE id = ? AND deleted_at IS NULL')
     .get(id) as RoomRec | undefined;
   if (!r) throw new SurfaceError('not_found', 404, 'no such room');
   return r;
