@@ -232,4 +232,14 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       backfillChatFirstSeen(db);
     },
   },
+  {
+    version: 5,
+    name: 'chat: custom emoji carry a display glyph and an ascii fallback',
+    // The TS LiveChat door stores {name, display, ascii}; the image shape
+    // (data_url) stays. A row has one shape or the other, the unused columns are ''.
+    up: (db) => {
+      db.exec("ALTER TABLE chat_emoji ADD COLUMN display TEXT NOT NULL DEFAULT ''");
+      db.exec("ALTER TABLE chat_emoji ADD COLUMN ascii TEXT NOT NULL DEFAULT ''");
+    },
+  },
 ];

@@ -645,18 +645,33 @@ export function search(db: Database.Database, ctx: ChatCtx, q: { q?: unknown; ro
 }
 
 export function listEmoji(db: Database.Database): EmojiRow[] {
-  const rows = db.prepare('SELECT board_id, name, data_url FROM chat_emoji ORDER BY board_id, name').all() as { board_id: string; name: string; data_url: string }[];
-  return rows.map((r) => ({ boardId: r.board_id, name: r.name, dataUrl: r.data_url }));
+  const rows = db.prepare('SELECT board_id, name, data_url, display, ascii FROM chat_emoji ORDER BY board_id, name').all() as
+    { board_id: string; name: string; data_url: string; display: string; ascii: string }[];
+  return rows.map((r) => ({ boardId: r.board_id, name: r.name, dataUrl: r.data_url, display: r.display, ascii: r.ascii }));
 }
 
+function checkEmojiText(v: unknown, what: string): string {
+  if (typeof v !== 'string' || v.length === 0 || Buffer.byteLength(v, 'utf8') > CHAT_LIMITS.emojiMaxBytes || /[|\r\n]/.test(v)) {
+    throw new SurfaceError('bad_request', 400, `${what} must be 1 to 32 bytes without | or line breaks`);
+  }
+  return v;
+}
+
+/** Body is {display, ascii} (the LiveChat door's custom emoji) or {dataUrl} (an image). */
 export function putEmoji(db: Database.Database, ctx: ChatCtx, name: string, b: Body, boardId: string): void {
   requireSysop(ctx);
   if (!/^[A-Za-z0-9_]{1,32}$/.test(name)) throw new SurfaceError('bad_request', 400, 'emoji name must be 1 to 32 letters, digits or _');
+  if (b.dataUrl === undefined && (b.display !== undefined || b.ascii !== undefined)) {
+    const display = checkEmojiText(b.display, 'display');
+    const ascii = checkEmojiText(b.ascii, 'ascii');
+    db.prepare("INSERT OR REPLACE INTO chat_emoji (board_id, name, data_url, display, ascii) VALUES (?, ?, '', ?, ?)").run(boardId, name, display, ascii);
+    return;
+  }
   const url = b.dataUrl;
   if (typeof url !== 'string' || url.length > 24000 || !/^data:image\/(png|gif|jpeg);base64,[A-Za-z0-9+/=]+$/.test(url)) {
-    throw new SurfaceError('bad_request', 400, 'dataUrl must be a base64 png, gif or jpeg data URL under 24000 characters');
+    throw new SurfaceError('bad_request', 400, 'send {display, ascii} or a base64 png, gif or jpeg dataUrl under 24000 characters');
   }
-  db.prepare('INSERT OR REPLACE INTO chat_emoji (board_id, name, data_url) VALUES (?, ?, ?)').run(boardId, name, url);
+  db.prepare("INSERT OR REPLACE INTO chat_emoji (board_id, name, data_url, display, ascii) VALUES (?, ?, ?, '', '')").run(boardId, name, url);
 }
 
 export function deleteEmoji(db: Database.Database, ctx: ChatCtx, name: string, boardId: string): void {

@@ -262,7 +262,12 @@ export interface SearchHit {
 export interface EmojiRow {
   boardId: string;
   name: string;
+  /** Image shape; '' for a text emoji. */
   dataUrl: string;
+  /** Text shape: what a web caller sees; '' for an image emoji. */
+  display: string;
+  /** Text shape: what a telnet or SSH caller sees; '' for an image emoji. */
+  ascii: string;
 }
 
 /** Every endpoint under /chat/v1, as "METHOD /path". docs/CHAT-API.md lists exactly these. */
