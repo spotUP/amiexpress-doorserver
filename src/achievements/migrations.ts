@@ -242,4 +242,14 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec("ALTER TABLE chat_emoji ADD COLUMN ascii TEXT NOT NULL DEFAULT ''");
     },
   },
+  {
+    version: 6,
+    name: 'chat: chat_events.board_id scopes board-local events',
+    // A board relays its own BBS activity (logins, uploads, doors) as `bbs`
+    // events; only sessions of that board see them, as the TS LiveChat door
+    // only hears its own backend. NULL = an event of the whole federation.
+    up: (db) => {
+      db.exec('ALTER TABLE chat_events ADD COLUMN board_id TEXT');
+    },
+  },
 ];

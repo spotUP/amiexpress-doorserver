@@ -248,7 +248,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
       res.on('close', () => abort.abort());
       const events: EventRec[] = await waitForEvents({
         sid, board, waitMs: waitSec * 1000, maxHeldPerBoard: chat.heldPollsPerBoard, signal: abort.signal,
-        fetch: () => withAchievementsDb(ach, (db) => fetchVisibleEvents(db, sid, user, since), { readonly: true }),
+        fetch: () => withAchievementsDb(ach, (db) => fetchVisibleEvents(db, sid, user, since, board), { readonly: true }),
       });
       if (abort.signal.aborted) return;
       const out = withAchievementsDb(ach, (db) => {
@@ -355,6 +355,12 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.get('/emoji.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db) => ({ rev: headSeq(db), rows: store.listEmoji(db) }));
     sendText(res, renderText('EMOJI', out.rev, out.rows.map((r) => [r.name, r.display, r.ascii])));
+  });
+  // A board relays its own BBS activity; board auth only, no chat session.
+  router.post('/bbs-events', (req: Request, res: Response) => {
+    const boardId = (req as BoardRequest).board!.id;
+    withAchievementsDb(ach, (db) => db.transaction(() => store.relayBbsEvent(db, boardId, body(req)))());
+    res.status(204).end();
   });
   router.put('/emoji/:name', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.putEmoji(db, ctx, p(req, 'name'), body(req), roleBoard(req, ctx)));

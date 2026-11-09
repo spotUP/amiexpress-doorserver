@@ -35,15 +35,17 @@ export interface NewEvent {
   text?: string;
   dmA?: string;
   dmB?: string;
+  /** Set for board-local events: only sessions of this board see them. */
+  boardId?: string;
 }
 
 export function emitEvent(db: Database.Database, e: NewEvent): number {
   const res = db
     .prepare(
-      `INSERT INTO chat_events (type, room_id, label, user, ref, at, text, dm_a, dm_b)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO chat_events (type, room_id, label, user, ref, at, text, dm_a, dm_b, board_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(e.type, e.roomId ?? null, e.label ?? e.roomId ?? '', e.user, e.ref ?? '', nowSec(), e.text ?? '', e.dmA ?? null, e.dmB ?? null);
+    .run(e.type, e.roomId ?? null, e.label ?? e.roomId ?? '', e.user, e.ref ?? '', nowSec(), e.text ?? '', e.dmA ?? null, e.dmB ?? null, e.boardId ?? null);
   scheduleWake();
   return Number(res.lastInsertRowid);
 }
@@ -55,9 +57,10 @@ export function headSeq(db: Database.Database): number {
 
 /**
  * What a session may see: its joined rooms, its direct messages, events about
- * its user, the lifecycle of public rooms, the message of the day, and board_joined.
+ * its user, the lifecycle of public rooms, the message of the day, board_joined,
+ * and the `bbs` events of its own board (never another board's, even for the same user name).
  */
-export function fetchVisibleEvents(db: Database.Database, sid: string, user: string, since: number): EventRec[] {
+export function fetchVisibleEvents(db: Database.Database, sid: string, user: string, since: number, board: string): EventRec[] {
   return db
     .prepare(
       `SELECT e.seq, e.type, e.room_id, e.label, e.user, e.ref, e.at, e.text,
@@ -65,16 +68,18 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
          FROM chat_events e
          LEFT JOIN chat_messages m ON e.type = 'message' AND m.id = e.ref
         WHERE e.seq > @since AND (
+              (e.type = 'bbs' AND e.board_id = @board)
+           OR (e.type <> 'bbs' AND (
               e.type IN ('motd','board_joined')
            OR e.room_id IN (SELECT room_id FROM chat_members WHERE sid = @sid)
            OR (e.dm_a IS NOT NULL AND (e.dm_a = @user OR e.dm_b = @user))
            OR e.user = @user
            OR (e.type IN ('room_created','room_deleted','topic')
                AND e.room_id IN (SELECT id FROM chat_rooms WHERE visibility = 'public'))
-        )
+        )))
         ORDER BY e.seq LIMIT @limit`
     )
-    .all({ since, sid, user, limit: CHAT_LIMITS.eventsPerPoll }) as EventRec[];
+    .all({ since, sid, user, board, limit: CHAT_LIMITS.eventsPerPoll }) as EventRec[];
 }
 
 /** Keep the newest `keep` events. */

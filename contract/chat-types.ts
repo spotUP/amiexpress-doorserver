@@ -57,8 +57,17 @@ export const CHAT_EVENT_TYPES = [
   'motd',
   'presence',
   'board_joined',
+  /** Board-local BBS activity (ref = the BBS event type); see BBS_EVENT_TYPES. */
+  'bbs',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
+
+/** The BBS event types a board may relay through POST /bbs-events: the web backend's bbsEventEmitter set. */
+export const BBS_EVENT_TYPES = ['user_login', 'user_logout', 'upload', 'download', 'door_activity', 'custom_door_event', 'command'] as const;
+export type BbsEventType = (typeof BBS_EVENT_TYPES)[number];
+
+/** The `data` keys a relayed BBS event keeps; they travel urlencoded in the event's text field. */
+export const BBS_EVENT_DATA_KEYS = ['location', 'duration', 'fileName', 'fileSize', 'conferenceName', 'action', 'doorName', 'eventType', 'message', 'isPersonalBest'] as const;
 
 /** Every error string a chat reply can put in `ChatApiError.error`. Never removed, only added. */
 export const CHAT_ERROR_CODES = [
@@ -322,6 +331,7 @@ export const CHAT_ENDPOINTS = [
   'GET /search',
   'GET /emoji',
   'GET /emoji.txt',
+  'POST /bbs-events',
   'PUT /emoji/:name',
   'DELETE /emoji/:name',
   'PUT /presence',

@@ -5,7 +5,7 @@
  */
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
-import { CHAT_DEFAULT_ROOM_KEY, CHAT_LIMITS } from '../../contract/chat-types';
+import { BBS_EVENT_DATA_KEYS, BBS_EVENT_TYPES, CHAT_DEFAULT_ROOM_KEY, CHAT_LIMITS } from '../../contract/chat-types';
 import type {
   ChatVisibility, CreateRoomReply, DmPostReply, EditMessageReply, EmojiRow, JoinReply, PinRow,
   PostMessageReply, ReactReply, RoomRow, SearchHit,
@@ -672,6 +672,30 @@ export function putEmoji(db: Database.Database, ctx: ChatCtx, name: string, b: B
     throw new SurfaceError('bad_request', 400, 'send {display, ascii} or a base64 png, gif or jpeg dataUrl under 24000 characters');
   }
   db.prepare("INSERT OR REPLACE INTO chat_emoji (board_id, name, data_url, display, ascii) VALUES (?, ?, ?, '', '')").run(boardId, name, url);
+}
+
+/**
+ * A board relays one of its own BBS events (the backend's bbsEventEmitter
+ * payload). Only whitelisted data keys are kept, urlencoded into the text
+ * field, so the plain-text events feed stays one row per event.
+ */
+export function relayBbsEvent(db: Database.Database, boardId: string, b: Body): number {
+  const type = str(b, 'type', 32);
+  if (!(BBS_EVENT_TYPES as readonly string[]).includes(type)) {
+    throw new SurfaceError('bad_request', 400, `type must be one of ${BBS_EVENT_TYPES.join(', ')}`);
+  }
+  const username = str(b, 'username', 64);
+  const node = b.nodeId;
+  if (typeof node !== 'number' || !Number.isInteger(node) || node < 0 || node > 999) {
+    throw new SurfaceError('bad_request', 400, 'nodeId must be an integer from 0 to 999');
+  }
+  const data = (b.data !== null && typeof b.data === 'object' ? b.data : {}) as Body;
+  const params = new URLSearchParams();
+  for (const k of BBS_EVENT_DATA_KEYS) {
+    const v = data[k];
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') params.set(k, String(v).slice(0, 200));
+  }
+  return emitEvent(db, { type: 'bbs', boardId, label: String(node), user: username, ref: type, text: params.toString() });
 }
 
 export function deleteEmoji(db: Database.Database, ctx: ChatCtx, name: string, boardId: string): void {
