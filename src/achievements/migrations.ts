@@ -284,4 +284,16 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
           room_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE, PRIMARY KEY (room_id, user))`);
     },
   },
+  {
+    version: 10,
+    name: 'chat: chat_dm_members holds the members of a group direct message',
+    // A group DM thread ('dg' + hash of its members) keeps its rows in
+    // chat_dm_messages with empty dm_a/dm_b; who may read it lives here.
+    // 1:1 threads stay pairwise and are not backfilled.
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_dm_members (
+          thread_id TEXT NOT NULL, user TEXT NOT NULL COLLATE NOCASE,
+          last_read_seq INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (thread_id, user))`);
+    },
+  },
 ];

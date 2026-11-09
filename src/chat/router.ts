@@ -225,6 +225,9 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.post('/dm/:peer', (req: Request, res: Response) => {
     res.status(201).json(run(req, true, (db, ctx) => store.postDm(db, ctx, p(req, 'peer'), body(req))));
   });
+  router.post('/dm-group', (req: Request, res: Response) => {
+    res.status(201).json(run(req, true, (db, ctx) => store.postDmGroup(db, ctx, body(req))));
+  });
   router.get('/dm/:threadId/history.txt', (req: Request, res: Response) => {
     const out = run(req, true, (db, ctx) => {
       const cache = new Map<string, string>();

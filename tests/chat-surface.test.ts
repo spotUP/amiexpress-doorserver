@@ -78,6 +78,45 @@ describe('chat surface', () => {
     expect(list.text).toContain('alice');
   });
 
+  describe('group direct messages', () => {
+    const ppl = ['bob@UPROUGH', 'carol@UPROUGH'];
+    it('a 3-member post reaches both recipients and not a non-member', async () => {
+      const a = await login('alice'); const b = await login('bob'); const c = await login('carol'); const d = await login('dave');
+      const r = await api('post', '/dm-group', a).send({ participants: ppl, content: 'hi trio', clientId: 'g1' });
+      expect(r.status).toBe(201);
+      expect(r.body.threadId).toMatch(/^dg[0-9a-f]{12}$/);
+      const dup = await api('post', '/dm-group', a).send({ participants: ppl, content: 'hi trio', clientId: 'g1' });
+      expect(dup.body.id).toBe(r.body.id);
+      for (const sid of [b, c]) {
+        const ev = await api('get', '/events.txt?since=0&wait=0', sid);
+        expect(ev.text).toContain(`|dm|${r.body.threadId}|alice@UPROUGH|`);
+        expect(ev.text).toContain('hi trio');
+      }
+      const evD = await api('get', '/events.txt?since=0&wait=0', d);
+      expect(evD.text).not.toContain('hi trio');
+    });
+    it('rejects a group that has fewer than 3 unique members with the exact text', async () => {
+      const a = await login('alice');
+      const r = await api('post', '/dm-group', a).send({ participants: ['bob@UPROUGH', 'alice@UPROUGH'], content: 'x', clientId: 'g2' });
+      expect(r.status).toBe(400);
+      expect(JSON.stringify(r.body)).toContain('Group DM needs 3+ unique participants (use /msg for 1:1)');
+    });
+    it('dm.txt lists the group with comma-joined peers and history is member-only', async () => {
+      const a = await login('alice'); const b = await login('bob'); await login('carol'); const d = await login('dave');
+      const r = await api('post', '/dm-group', a).send({ participants: ppl, content: 'secret', clientId: 'g3' });
+      const list = await api('get', '/dm.txt', b);
+      expect(list.text).toContain(`${r.body.threadId}|alice@UPROUGH,carol@UPROUGH|`);
+      expect(list.text).toMatch(new RegExp(`${r.body.threadId}\\|alice@UPROUGH,carol@UPROUGH\\|\\d+\\|1`));
+      const h = await api('get', `/dm/${r.body.threadId}/history.txt`, b);
+      expect(h.status).toBe(200);
+      expect(h.text).toContain('secret');
+      expect((await api('get', '/dm.txt', b)).text).toMatch(new RegExp(`${r.body.threadId}\\|[^|]*\\|\\d+\\|0`));
+      const denied = await api('get', `/dm/${r.body.threadId}/history.txt`, d);
+      expect(denied.status).toBe(403);
+      expect((await api('get', '/dm.txt', d)).text).not.toContain(r.body.threadId);
+    });
+  });
+
   it('a non-member cannot moderate; the owner can kick', async () => {
     const a = await login('alice');
     const b = await login('bob');

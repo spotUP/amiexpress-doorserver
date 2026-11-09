@@ -73,6 +73,7 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
               e.type IN ('motd','board_joined')
            OR e.room_id IN (SELECT room_id FROM chat_members WHERE sid = @sid)
            OR (e.dm_a IS NOT NULL AND (e.dm_a = @user OR e.dm_b = @user))
+           OR (e.type = 'dm' AND e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE user = @user))
            OR e.user = @user
            OR (e.type IN ('room_created','room_deleted','topic')
                AND e.room_id IN (SELECT id FROM chat_rooms WHERE visibility = 'public'))

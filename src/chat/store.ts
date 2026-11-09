@@ -480,6 +480,42 @@ export function postDm(db: Database.Database, ctx: ChatCtx, peer: string, b: Bod
   return { id, seq, threadId };
 }
 
+const GROUP_DM_MAX_MEMBERS = 10;
+
+export function dmGroupThreadId(members: string[]): string {
+  const key = members.map((m) => m.toLowerCase()).sort().join('|');
+  return 'dg' + crypto.createHash('sha1').update(key).digest('hex').slice(0, 12);
+}
+
+export function postDmGroup(db: Database.Database, ctx: ChatCtx, b: Body): DmPostReply {
+  requireSession(ctx);
+  const raw = (b as { participants?: unknown }).participants;
+  if (!Array.isArray(raw) || raw.length < 2) throw new SurfaceError('bad_request', 400, 'participants must be an array of 2 or more');
+  for (const x of raw) if (typeof x !== 'string' || !splitUser(x)) throw new SurfaceError('bad_request', 400, 'peer must be handle@BOARD');
+  const seen = new Map<string, string>();
+  for (const m of [ctx.user, ...(raw as string[])]) if (!seen.has(m.toLowerCase())) seen.set(m.toLowerCase(), m);
+  const members = [...seen.values()];
+  if (members.length < 3) throw new SurfaceError('bad_request', 400, 'Group DM needs 3+ unique participants (use /msg for 1:1)');
+  if (members.length > GROUP_DM_MAX_MEMBERS) throw new SurfaceError('bad_request', 400, `Group DM allows at most ${GROUP_DM_MAX_MEMBERS} members`);
+  const content = str(b, 'content', CHAT_LIMITS.contentMax);
+  const cid = clientId(b);
+  const dup = db.prepare('SELECT id, seq, thread_id FROM chat_dm_messages WHERE sender = ? AND client_id = ?').get(ctx.user, cid) as
+    | { id: string; seq: number; thread_id: string } | undefined;
+  if (dup) return { id: dup.id, seq: dup.seq, threadId: dup.thread_id };
+  chargeMessage(ctx);
+  const threadId = dmGroupThreadId(members);
+  const addMember = db.prepare('INSERT OR IGNORE INTO chat_dm_members (thread_id, user) VALUES (?, ?)');
+  for (const m of members) addMember.run(threadId, m);
+  const id = newId('d');
+  db.prepare("INSERT INTO chat_dm_messages (id, seq, thread_id, dm_a, dm_b, sender, content, client_id, created_at) VALUES (?, 0, ?, '', '', ?, ?, ?, ?)").run(
+    id, threadId, ctx.user, content, cid, nowSec()
+  );
+  const seq = emitEvent(db, { type: 'dm', label: threadId, user: ctx.user, ref: id, text: content });
+  db.prepare('UPDATE chat_dm_messages SET seq = ? WHERE id = ?').run(seq, id);
+  db.prepare('UPDATE chat_dm_members SET last_read_seq = ? WHERE thread_id = ? AND user = ?').run(seq, threadId, ctx.user);
+  return { id, seq, threadId };
+}
+
 export function dmThreads(db: Database.Database, ctx: ChatCtx): { threadId: string; peer: string; lastAt: number; unread: number }[] {
   const rows = db
     .prepare(
@@ -488,17 +524,43 @@ export function dmThreads(db: Database.Database, ctx: ChatCtx): { threadId: stri
          FROM chat_dm_messages WHERE dm_a = ? OR dm_b = ? GROUP BY thread_id ORDER BY last_at DESC`
     )
     .all(ctx.user, ctx.user, ctx.user, ctx.user) as { thread_id: string; peer: string; last_at: number; unread: number }[];
-  return rows.map((r) => ({ threadId: r.thread_id, peer: r.peer, lastAt: r.last_at, unread: r.unread }));
+  const out = rows.map((r) => ({ threadId: r.thread_id, peer: r.peer, lastAt: r.last_at, unread: r.unread }));
+  const groups = db
+    .prepare(
+      `SELECT mm.thread_id, mm.last_read_seq,
+              (SELECT MAX(created_at) FROM chat_dm_messages WHERE thread_id = mm.thread_id) AS last_at,
+              (SELECT COUNT(*) FROM chat_dm_messages WHERE thread_id = mm.thread_id AND sender <> ? AND seq > mm.last_read_seq) AS unread
+         FROM chat_dm_members mm WHERE mm.user = ?`
+    )
+    .all(ctx.user, ctx.user) as { thread_id: string; last_at: number | null; unread: number }[];
+  for (const g of groups) {
+    const peers = (db.prepare('SELECT user FROM chat_dm_members WHERE thread_id = ? AND user <> ?').all(g.thread_id, ctx.user) as { user: string }[])
+      .map((r) => r.user)
+      .sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase()));
+    out.push({ threadId: g.thread_id, peer: peers.join(','), lastAt: g.last_at ?? 0, unread: g.unread });
+  }
+  return out.sort((x, y) => y.lastAt - x.lastAt);
 }
 
 export function dmHistory(db: Database.Database, ctx: ChatCtx, threadId: string, q: { before?: unknown; limit?: unknown }): HistoryRec[] {
   const { before, limit } = pageArgs(q);
+  if (threadId.startsWith('dg')) return dmGroupHistory(db, ctx, threadId, before, limit);
   const rows = db
     .prepare('SELECT * FROM chat_dm_messages WHERE thread_id = ? AND (dm_a = ? OR dm_b = ?) AND seq < ? ORDER BY seq DESC LIMIT ?')
     .all(threadId, ctx.user, ctx.user, before, limit) as { id: string; seq: number; sender: string; content: string; created_at: number }[];
   db.prepare('UPDATE chat_dm_messages SET read_at = ? WHERE thread_id = ? AND sender <> ? AND read_at IS NULL AND (dm_a = ? OR dm_b = ?)').run(
     nowSec(), threadId, ctx.user, ctx.user, ctx.user
   );
+  return rows.reverse().map((m) => ({ seq: m.seq, id: m.id, user: m.sender, at: m.created_at, replyTo: '', threadId, text: m.content }));
+}
+
+function dmGroupHistory(db: Database.Database, ctx: ChatCtx, threadId: string, before: number, limit: number): HistoryRec[] {
+  const member = db.prepare('SELECT 1 FROM chat_dm_members WHERE thread_id = ? AND user = ?').get(threadId, ctx.user);
+  if (!member) throw new SurfaceError('forbidden', 403, 'not a member of this group');
+  const rows = db
+    .prepare('SELECT * FROM chat_dm_messages WHERE thread_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?')
+    .all(threadId, before, limit) as { id: string; seq: number; sender: string; content: string; created_at: number }[];
+  db.prepare('UPDATE chat_dm_members SET last_read_seq = (SELECT COALESCE(MAX(seq), 0) FROM chat_dm_messages WHERE thread_id = ?) WHERE thread_id = ? AND user = ?').run(threadId, threadId, ctx.user);
   return rows.reverse().map((m) => ({ seq: m.seq, id: m.id, user: m.sender, at: m.created_at, replyTo: '', threadId, text: m.content }));
 }
 

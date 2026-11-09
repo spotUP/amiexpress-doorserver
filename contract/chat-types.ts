@@ -326,6 +326,7 @@ export const CHAT_ENDPOINTS = [
   'DELETE /rooms/:id/invites/:user',
   'GET /dm.txt',
   'POST /dm/:peer',
+  'POST /dm-group',
   'GET /dm/:threadId/history.txt',
   'GET /events.txt',
   'POST /rooms/:id/kick',
