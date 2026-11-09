@@ -321,6 +321,7 @@ export const CHAT_ENDPOINTS = [
   'DELETE /rooms/:id/pins/:messageId',
   'GET /search',
   'GET /emoji',
+  'GET /emoji.txt',
   'PUT /emoji/:name',
   'DELETE /emoji/:name',
   'PUT /presence',
