@@ -35,4 +35,16 @@ describe('custom emoji', () => {
     expect((await call('put', '/emoji/pic', sys).send({ dataUrl: url })).status).toBeLessThan(300);
     expect((await call('get', '/emoji', sys)).body).toEqual([expect.objectContaining({ name: 'pic', dataUrl: url, display: '', ascii: '' })]);
   });
+
+  it('lists name|display|ascii rows on /emoji.txt, without image data', async () => {
+    const sys = await login('sysop', true);
+    await call('put', '/emoji/pic', sys).send({ dataUrl: 'data:image/png;base64,AAAA' });
+    await call('put', '/emoji/party', sys).send({ display: 'PARTY', ascii: '\\o/' });
+    const res = await call('get', '/emoji.txt', sys);
+    expect(res.status).toBe(200);
+    const lines = res.text.split(/\r?\n/);
+    expect(lines).toContain('party|PARTY|\\o/');
+    expect(lines).toContain('pic||');
+    expect(res.text).not.toContain('base64');
+  });
 });

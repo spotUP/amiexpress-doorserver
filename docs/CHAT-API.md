@@ -91,6 +91,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | DELETE | `/rooms/:id/pins/:messageId` | 204 |
 | GET | `/search` | optional, JSON; `?q=&room=&limit=` |
 | GET | `/emoji` | optional, JSON |
+| GET | `/emoji.txt` | EMOJI rows: `name|display|ascii` (image emoji list with empty text fields) |
 | PUT | `/emoji/:name` | `{display, ascii}` or `{dataUrl}`; sysop of the owning board |
 | DELETE | `/emoji/:name` | 204 |
 
@@ -135,6 +136,7 @@ Formats and their fields, in order:
 - EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo` (`replyTo` is the
   message id a `message` event answers, empty otherwise)
 - REACTIONS: `emoji|count|mine`
+- EMOJI: `name|display|ascii`
 - WHO: `user|room|sysop|roleColor|idleSeconds|status|statusText`
 - DM: `threadId|peer|lastAt|unread`
 - PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`

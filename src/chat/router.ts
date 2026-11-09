@@ -351,6 +351,11 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.get('/emoji', (req: Request, res: Response) => {
     res.json(run(req, false, (db) => store.listEmoji(db)));
   });
+  // The 68K door's list: image data URLs do not fit its reply buffer, so the text form carries only the text fields.
+  router.get('/emoji.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db) => ({ rev: headSeq(db), rows: store.listEmoji(db) }));
+    sendText(res, renderText('EMOJI', out.rev, out.rows.map((r) => [r.name, r.display, r.ascii])));
+  });
   router.put('/emoji/:name', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.putEmoji(db, ctx, p(req, 'name'), body(req), roleBoard(req, ctx)));
     res.json({ ok: true });
