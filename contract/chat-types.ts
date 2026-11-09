@@ -22,7 +22,7 @@ export const CHAT_TEXT_VERSION = '1';
  * never moves.
  */
 export const CHAT_TEXT_FORMATS = {
-  ROOMS: ['id', 'name', 'topic', 'visibility', 'members', 'owner'],
+  ROOMS: ['id', 'name', 'topic', 'visibility', 'members', 'owner', 'kind'],
   MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName', 'status', 'statusText'],
   HISTORY: ['seq', 'id', 'user', 'at', 'replyTo', 'threadId', 'roleColor', 'text'],
   EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo'],
@@ -128,6 +128,14 @@ export interface ChatApiError {
 
 export type ChatVisibility = 'public' | 'private';
 
+/**
+ * What a room is for, chosen when it is created. `text` is plain chat,
+ * `voice` a voice channel, `art` a shared drawing room. Stored on the room,
+ * so no client has to infer it from the name.
+ */
+export const CHAT_ROOM_KINDS = ['text', 'voice', 'art'] as const;
+export type ChatRoomKind = (typeof CHAT_ROOM_KINDS)[number];
+
 /** Per-role permission flags. They ADD to room-op permission, on the role's own board. */
 export interface ChatRolePerms {
   kick: boolean;
@@ -155,16 +163,19 @@ export interface RoomRow {
   visibility: ChatVisibility;
   members: number;
   owner: string;
+  kind: ChatRoomKind;
 }
 export interface CreateRoomRequest {
   name: string;
   topic?: string;
   visibility?: ChatVisibility;
+  kind?: ChatRoomKind;
 }
 export interface CreateRoomReply {
   id: string;
   name: string;
   visibility: ChatVisibility;
+  kind: ChatRoomKind;
 }
 export interface JoinReply {
   id: string;

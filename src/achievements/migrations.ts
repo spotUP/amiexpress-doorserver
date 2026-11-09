@@ -261,4 +261,15 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec("ALTER TABLE chat_rooms ADD COLUMN motd TEXT NOT NULL DEFAULT ''");
     },
   },
+  {
+    version: 8,
+    name: 'chat: chat_rooms.kind records whether a room is text, voice or art',
+    // Creating a channel now asks for its type. Rooms made before this were
+    // plain chat, except the TS door's drawing rooms, which it marked only by
+    // an "art:" name prefix; those become kind 'art'.
+    up: (db) => {
+      db.exec("ALTER TABLE chat_rooms ADD COLUMN kind TEXT NOT NULL DEFAULT 'text'");
+      db.exec("UPDATE chat_rooms SET kind = 'art' WHERE name_key LIKE 'art:%'");
+    },
+  },
 ];

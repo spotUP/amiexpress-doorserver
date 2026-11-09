@@ -5,9 +5,9 @@
  */
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
-import { BBS_EVENT_DATA_KEYS, BBS_EVENT_TYPES, CHAT_DEFAULT_ROOM_KEY, CHAT_LIMITS } from '../../contract/chat-types';
+import { BBS_EVENT_DATA_KEYS, BBS_EVENT_TYPES, CHAT_DEFAULT_ROOM_KEY, CHAT_LIMITS, CHAT_ROOM_KINDS } from '../../contract/chat-types';
 import type {
-  ChatVisibility, CreateRoomReply, DmPostReply, EditMessageReply, EmojiRow, JoinReply, PinRow,
+  ChatRoomKind, ChatVisibility, CreateRoomReply, DmPostReply, EditMessageReply, EmojiRow, JoinReply, PinRow,
   PostMessageReply, ReactReply, RoomRow, SearchHit,
 } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
@@ -64,14 +64,14 @@ function countMembers(db: Database.Database, roomId: string): number {
 export function listRooms(db: Database.Database, ctx: ChatCtx): RoomRow[] {
   const rows = db
     .prepare(
-      `SELECT r.id, r.name, r.topic, r.visibility, r.owner_user FROM chat_rooms r
+      `SELECT r.id, r.name, r.topic, r.visibility, r.owner_user, r.kind FROM chat_rooms r
         WHERE r.deleted_at IS NULL AND (r.visibility = 'public' OR ? = 1
               OR r.owner_user = ? OR EXISTS (SELECT 1 FROM chat_members m WHERE m.room_id = r.id AND m.user = ?)
               OR EXISTS (SELECT 1 FROM chat_invites i WHERE i.room_id = r.id AND i.user = ?))
         ORDER BY r.name_key = ? DESC, r.name_key`
     )
-    .all(ctx.admin ? 1 : 0, ctx.user, ctx.user, ctx.user, CHAT_DEFAULT_ROOM_KEY) as { id: string; name: string; topic: string; visibility: ChatVisibility; owner_user: string }[];
-  return rows.map((r) => ({ id: r.id, name: r.name, topic: r.topic, visibility: r.visibility, members: countMembers(db, r.id), owner: r.owner_user }));
+    .all(ctx.admin ? 1 : 0, ctx.user, ctx.user, ctx.user, CHAT_DEFAULT_ROOM_KEY) as { id: string; name: string; topic: string; visibility: ChatVisibility; owner_user: string; kind: ChatRoomKind }[];
+  return rows.map((r) => ({ id: r.id, name: r.name, topic: r.topic, visibility: r.visibility, members: countMembers(db, r.id), owner: r.owner_user, kind: r.kind }));
 }
 
 export function createRoom(db: Database.Database, ctx: ChatCtx, b: Body): CreateRoomReply {
@@ -81,6 +81,8 @@ export function createRoom(db: Database.Database, ctx: ChatCtx, b: Body): Create
   const topic = b.topic === undefined ? '' : str(b, 'topic', CHAT_LIMITS.topicMax, { empty: true });
   const vis = b.visibility === undefined ? 'public' : b.visibility;
   if (vis !== 'public' && vis !== 'private') throw new SurfaceError('bad_request', 400, 'visibility must be public or private');
+  const kind = b.kind === undefined ? 'text' : b.kind;
+  if (!(CHAT_ROOM_KINDS as readonly unknown[]).includes(kind)) throw new SurfaceError('bad_request', 400, `kind must be one of ${CHAT_ROOM_KINDS.join(', ')}`);
   if (vis === 'private' && !ctx.sysop && !permsOf(db, ctx.boardId, ctx.handle).createPrivate) {
     throw new SurfaceError('forbidden', 403, 'you may not create private rooms');
   }
@@ -88,11 +90,11 @@ export function createRoom(db: Database.Database, ctx: ChatCtx, b: Body): Create
   const key = name.toLowerCase();
   if (db.prepare('SELECT 1 FROM chat_rooms WHERE name_key = ?').get(key)) throw new SurfaceError('conflict', 409, 'a room with that name exists');
   const id = newId('room');
-  db.prepare('INSERT INTO chat_rooms (id, name, name_key, owner_board, owner_user, topic, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-    id, name, key, ctx.boardId, ctx.user, topic, vis, nowSec()
+  db.prepare('INSERT INTO chat_rooms (id, name, name_key, owner_board, owner_user, topic, visibility, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    id, name, key, ctx.boardId, ctx.user, topic, vis, kind, nowSec()
   );
   emitEvent(db, { type: 'room_created', roomId: id, user: ctx.user, text: name });
-  return { id, name, visibility: vis };
+  return { id, name, visibility: vis, kind: kind as ChatRoomKind };
 }
 
 function canEnter(db: Database.Database, room: RoomRec, ctx: ChatCtx): boolean {

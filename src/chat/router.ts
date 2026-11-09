@@ -113,7 +113,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   // ---- rooms ----
   router.get('/rooms.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), rows: store.listRooms(db, ctx) }));
-    sendText(res, renderText('ROOMS', out.rev, out.rows.map((r) => [r.id, r.name, r.topic, r.visibility, r.members, r.owner])));
+    sendText(res, renderText('ROOMS', out.rev, out.rows.map((r) => [r.id, r.name, r.topic, r.visibility, r.members, r.owner, r.kind])));
   });
   router.get('/rooms', (req: Request, res: Response) => {
     res.json(run(req, false, (db, ctx) => store.listRooms(db, ctx)));

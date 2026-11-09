@@ -41,7 +41,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | DELETE | `/sessions/current` | 204 |
 | GET | `/rooms.txt` | `?mine=1` optional; ROOMS rows |
 | GET | `/rooms` | the same as a JSON array |
-| POST | `/rooms` | `{name, topic?, visibility?}`; reply `{id, name, visibility}` |
+| POST | `/rooms` | `{name, topic?, visibility?, kind?}`; kind is `text` (default), `voice` or `art`; reply `{id, name, visibility, kind}` |
 | POST | `/rooms/:id/join` | reply `{id, name, topic, motd, members, ops, since}` |
 | POST | `/rooms/:id/leave` | 204 |
 | GET | `/rooms/:id/members.txt` | MEMBERS rows; status fields appended |
@@ -132,7 +132,7 @@ field is only ever appended and the `1` never moves.
 
 Formats and their fields, in order:
 
-- ROOMS: `id|name|topic|visibility|members|owner`
+- ROOMS: `id|name|topic|visibility|members|owner|kind` (kind: `text`, `voice` or `art`)
 - MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText`
 - HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text`
 - EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo` (`replyTo` is the
@@ -167,8 +167,8 @@ HISTORY where it is described below.
 
 ```text example ROOMS
 ROOMS|1|412|2
-a1b2c3d4e5f6|lobby|Welcome to the board|public|7|spot@UPROUGH
-0f9e8d7c6b5a|sysops|Sysops only|private|2|spot@UPROUGH
+a1b2c3d4e5f6|lobby|Welcome to the board|public|7|spot@UPROUGH|text
+0f9e8d7c6b5a|sysops|Sysops only|private|2|spot@UPROUGH|text
 ```
 
 ```text example MEMBERS
