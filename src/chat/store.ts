@@ -618,9 +618,9 @@ export function listPins(db: Database.Database, ctx: ChatCtx, id: string): PinRo
   const room = getRoom(db, id);
   if (room.visibility === 'private' && !ctx.admin) requireMemberOf(db, id, ctx);
   const rows = db
-    .prepare('SELECT p.message_id, m.user, m.content, p.pinned_by, p.at FROM chat_pins p JOIN chat_messages m ON m.id = p.message_id WHERE p.room_id = ? AND m.deleted_at IS NULL ORDER BY p.at')
-    .all(id) as { message_id: string; user: string; content: string; pinned_by: string; at: number }[];
-  return rows.map((r) => ({ messageId: r.message_id, user: r.user, content: r.content, pinnedBy: r.pinned_by, at: r.at }));
+    .prepare('SELECT p.message_id, m.user, m.content, m.created_at, p.pinned_by, p.at FROM chat_pins p JOIN chat_messages m ON m.id = p.message_id WHERE p.room_id = ? AND m.deleted_at IS NULL ORDER BY p.at')
+    .all(id) as { message_id: string; user: string; content: string; created_at: number; pinned_by: string; at: number }[];
+  return rows.map((r) => ({ messageId: r.message_id, user: r.user, content: r.content, pinnedBy: r.pinned_by, at: r.at, messageAt: r.created_at }));
 }
 
 export function pin(db: Database.Database, ctx: ChatCtx, id: string, b: Body, on: boolean, messageId?: string): void {
@@ -636,21 +636,25 @@ export function pin(db: Database.Database, ctx: ChatCtx, id: string, b: Body, on
   }
 }
 
-export function search(db: Database.Database, ctx: ChatCtx, q: { q?: unknown; room?: unknown; limit?: unknown }): SearchHit[] {
+export function search(db: Database.Database, ctx: ChatCtx, q: { q?: unknown; room?: unknown; user?: unknown; limit?: unknown }): SearchHit[] {
   const words = typeof q.q === 'string' ? q.q.match(/[\p{L}\p{N}_]+/gu) ?? [] : [];
   if (words.length === 0) throw new SurfaceError('bad_request', 400, 'q is required');
   const match = words.slice(0, 8).map((w) => `"${w}"`).join(' ');
   const limit = Math.min(Math.max(Number(q.limit) || 20, 1), CHAT_LIMITS.historyMax);
+  const room = typeof q.room === 'string' ? q.room : '';
+  // A handle alone ("spot") matches that handle on every board; "spot@UPROUGH" matches one.
+  const user = typeof q.user === 'string' ? q.user.trim() : '';
   const rows = db
     .prepare(
       `SELECT m.id, m.room_id, r.name, m.user, m.created_at, m.content
          FROM chat_messages_fts f JOIN chat_messages m ON m.rowid = f.rowid JOIN chat_rooms r ON r.id = m.room_id
         WHERE chat_messages_fts MATCH ? AND m.deleted_at IS NULL AND r.deleted_at IS NULL
           AND (? = '' OR m.room_id = ?)
+          AND (? = '' OR lower(m.user) = lower(?) OR lower(substr(m.user, 1, instr(m.user, '@') - 1)) = lower(?))
           AND (r.visibility = 'public' OR ? = 1 OR EXISTS (SELECT 1 FROM chat_members c WHERE c.room_id = r.id AND c.user = ?))
         ORDER BY m.seq DESC LIMIT ?`
     )
-    .all(match, typeof q.room === 'string' ? q.room : '', typeof q.room === 'string' ? q.room : '', ctx.admin ? 1 : 0, ctx.user, limit) as
+    .all(match, room, room, user, user, user, ctx.admin ? 1 : 0, ctx.user, limit) as
     { id: string; room_id: string; name: string; user: string; created_at: number; content: string }[];
   return rows.map((r) => ({ id: r.id, room: r.name, user: r.user, at: r.created_at, content: r.content }));
 }

@@ -274,6 +274,8 @@ export interface PinRow {
   content: string;
   pinnedBy: string;
   at: number;
+  /** When the pinned message was posted (unix seconds); `at` is when it was pinned. */
+  messageAt: number;
 }
 export interface SearchHit {
   id: string;

@@ -90,7 +90,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | GET | `/rooms/:id/pins` | optional, JSON |
 | POST | `/rooms/:id/pins` | `{messageId}`; room op |
 | DELETE | `/rooms/:id/pins/:messageId` | 204 |
-| GET | `/search` | optional, JSON; `?q=&room=&limit=` |
+| GET | `/search` | optional, JSON; `?q=&room=&user=&limit=` |
 | GET | `/emoji` | optional, JSON |
 | GET | `/emoji.txt` | EMOJI rows: `name|display|ascii` (image emoji list with empty text fields) |
 | PUT | `/emoji/:name` | `{display, ascii}` or `{dataUrl}`; sysop of the owning board |
@@ -304,8 +304,9 @@ that reads until the length is met, then closes, needs no chunked decoder.
 Pins, full-text search and custom emoji images are web features, not part of
 the 68K door; they are small JSON endpoints.
 
-- `GET /rooms/:id/pins` returns `[{messageId, user, content, pinnedBy, at}]`.
-- `GET /search?q=<words>&room=<id>&limit=<1..50>` returns
+- `GET /rooms/:id/pins` returns `[{messageId, user, content, pinnedBy, at, messageAt}]`;
+  `at` is when the message was pinned, `messageAt` when it was posted.
+- `GET /search?q=<words>&room=<id>&user=<handle or handle@BOARD>&limit=<1..50>` returns
   `[{id, room, user, at, content}]` from rooms the caller may see.
 - `GET /emoji` returns `[{boardId, name, dataUrl, display, ascii}]`; an image
   emoji has `dataUrl` (a `data:image/...` URL of at most 24 KB) and empty
