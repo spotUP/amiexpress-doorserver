@@ -3,6 +3,7 @@
  * idempotent send, text replies framed with Content-Length, DMs, moderation.
  */
 import request from 'supertest';
+import { openAchievementsDb } from '../src/achievements/db';
 import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
@@ -76,6 +77,40 @@ describe('chat surface', () => {
     const list = await api('get', '/dm.txt', b);
     expect(list.status).toBe(200);
     expect(list.text).toContain('alice');
+  });
+
+  describe('direct messages refuse unknown targets', () => {
+    function count(table: string): number {
+      const db = openAchievementsDb(fx.ach, { readonly: true });
+      try { return (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n; } finally { db.close(); }
+    }
+    const dmCount = (): number => count('chat_dm_messages');
+    it('unknown board -> 404 not_found', async () => {
+      const a = await login('alice');
+      const r = await api('post', '/dm/bob@NOSUCHBOARD', a).send({ content: 'x', clientId: 'u1' });
+      expect(r.status).toBe(404);
+      expect(r.body.error).toBe('not_found');
+      expect(dmCount()).toBe(0);
+    });
+    it('known board, user never seen -> 404; once seen (any case) -> 201', async () => {
+      const a = await login('alice');
+      const miss = await api('post', '/dm/ghost@UPROUGH', a).send({ content: 'x', clientId: 'u2' });
+      expect(miss.status).toBe(404);
+      expect(miss.body.error).toBe('not_found');
+      await login('ghost');
+      const hit = await api('post', '/dm/GHOST@uprough', a).send({ content: 'x', clientId: 'u3' });
+      expect(hit.status).toBe(201);
+    });
+    it('a group with one unknown member is refused whole, names the member, inserts nothing', async () => {
+      const a = await login('alice'); await login('bob');
+      const r = await api('post', '/dm-group', a).send({ participants: ['bob@UPROUGH', 'nobody@UPROUGH'], content: 'x', clientId: 'u4' });
+      expect(r.status).toBe(404);
+      expect(r.body.error).toBe('not_found');
+      expect(r.body.detail).toContain('nobody@UPROUGH');
+      expect(r.body.detail).not.toContain('bob@');
+      expect(dmCount()).toBe(0);
+      expect(count('chat_dm_members')).toBe(0);
+    });
   });
 
   describe('group direct messages', () => {

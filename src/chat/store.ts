@@ -460,9 +460,37 @@ export function dmThreadId(a: string, b: string): string {
   return 'dm' + crypto.createHash('sha1').update(`${x}|${y}`).digest('hex').slice(0, 12);
 }
 
+/**
+ * A DM target must be a real person: the board is registered and the user has
+ * been seen in chat (a session, a room message or an earlier DM). Returns the
+ * targets that fail, so the caller can name them. Board ids are stored
+ * lower-case (splitUser lower-cases them); user columns are COLLATE NOCASE.
+ */
+function unknownDmTargets(db: Database.Database, ctx: ChatCtx, targets: string[]): string[] {
+  const boardOk = db.prepare('SELECT 1 FROM boards WHERE id = ?');
+  const userSeen = db.prepare(
+    `SELECT 1 WHERE EXISTS (SELECT 1 FROM chat_sessions WHERE user = @u)
+              OR EXISTS (SELECT 1 FROM chat_messages WHERE user = @u)
+              OR EXISTS (SELECT 1 FROM chat_dm_messages WHERE sender = @u OR dm_a = @u OR dm_b = @u)
+              OR EXISTS (SELECT 1 FROM chat_dm_members WHERE user = @u)`
+  );
+  return targets.filter((t) => {
+    if (t.toLowerCase() === ctx.user.toLowerCase()) return false;
+    const parts = splitUser(t)!;
+    return !boardOk.get(parts.board) || !userSeen.get({ u: t });
+  });
+}
+
+function requireKnownDmTargets(db: Database.Database, ctx: ChatCtx, targets: string[]): void {
+  const bad = unknownDmTargets(db, ctx, targets);
+  if (bad.length === 0) return;
+  throw new SurfaceError('not_found', 404, `unknown user: ${bad.join(', ')}`);
+}
+
 export function postDm(db: Database.Database, ctx: ChatCtx, peer: string, b: Body): DmPostReply {
   requireSession(ctx);
   if (!splitUser(peer)) throw new SurfaceError('bad_request', 400, 'peer must be handle@BOARD');
+  requireKnownDmTargets(db, ctx, [peer]);
   const content = str(b, 'content', CHAT_LIMITS.contentMax);
   const cid = clientId(b);
   const threadId = dmThreadId(ctx.user, peer);
@@ -497,6 +525,7 @@ export function postDmGroup(db: Database.Database, ctx: ChatCtx, b: Body): DmPos
   const members = [...seen.values()];
   if (members.length < 3) throw new SurfaceError('bad_request', 400, 'Group DM needs 3+ unique participants (use /msg for 1:1)');
   if (members.length > GROUP_DM_MAX_MEMBERS) throw new SurfaceError('bad_request', 400, `Group DM allows at most ${GROUP_DM_MAX_MEMBERS} members`);
+  requireKnownDmTargets(db, ctx, members);
   const content = str(b, 'content', CHAT_LIMITS.contentMax);
   const cid = clientId(b);
   const dup = db.prepare('SELECT id, seq, thread_id FROM chat_dm_messages WHERE sender = ? AND client_id = ?').get(ctx.user, cid) as
