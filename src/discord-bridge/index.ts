@@ -1,10 +1,12 @@
 /**
  * Entry point of the Discord bridge process (dist/src/discord-bridge/index.js).
- * Phase 2 skeleton: config, hub session, stored seq. Phases 3-5 plug in the
- * Discord side; until then events are only logged.
+ * Phase 3: hub events go to Discord through channel webhooks. Phases 4-5 add
+ * the Discord gateway side.
  */
 import { loadBridgeConfig, BridgeConfigError } from './config';
 import { startBridge } from './bridge';
+import { RestDiscordOut } from './discord-out';
+import { createOutbound } from './outbound';
 
 async function main(): Promise<void> {
   let config;
@@ -17,12 +19,17 @@ async function main(): Promise<void> {
     }
     throw err;
   }
-  const bridge = await startBridge(config, {
-    onEvent: (ev) => console.log(`[INFO] event ${ev.seq} ${ev.type} room=${ev.room} user=${ev.user}`),
-  });
+  const out = RestDiscordOut.fromToken(config.discordToken);
+  await out.prepare(config.rooms.values());
+  const bridge = await startBridge(config, (hub, state) => ({
+    onEvent: createOutbound({ rooms: config.rooms, state, out, fetchBoards: () => hub.mirrorBoards() }),
+  }));
   console.log(`[OK] discord bridge up, ${config.rooms.size} room(s), hub ${config.hubUrl}`);
   const shutdown = (): void => {
-    void bridge.stop().then(() => process.exit(0));
+    void bridge.stop().then(() => {
+      out.close();
+      process.exit(0);
+    });
   };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

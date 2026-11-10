@@ -3,7 +3,7 @@
  * `bridge` (user bridge@DISCORD), joined to the mapped rooms, then a long
  * poll of /events.txt. A 401 (session_expired) opens a new session.
  */
-import { decodeBody, parseEvents } from './wire';
+import { decodeBody, parseEvents, parseTextTable } from './wire';
 import type { BridgeEvent } from './wire';
 
 export class HubError extends Error {
@@ -56,6 +56,14 @@ export class HubClient {
     const created = JSON.parse((await this.send('POST', '/sessions', { handle: this.handle }, signal)).toString('utf8')) as { sid: string };
     this.sid = created.sid;
     for (const room of this.rooms) await this.send('POST', `/rooms/${encodeURIComponent(room)}/join`, {}, signal);
+  }
+
+  /** Upper-cased ids of the boards whose chat may be mirrored (discord_mirror on), with the list's rev. */
+  async mirrorBoards(signal?: AbortSignal): Promise<{ rev: number; boards: Set<string> }> {
+    if (!this.sid) await this.open(signal);
+    const t = parseTextTable(decodeBody(await this.send('GET', '/discord/boards.txt', undefined, signal)));
+    if (t.name !== 'DISCORD') throw new Error(`expected DISCORD, got ${t.name}`);
+    return { rev: t.revision, boards: new Set(t.rows.map((r) => r[0].toUpperCase())) };
   }
 
   /** Long-poll. `since` undefined asks the hub for its head (no replay on first run). */

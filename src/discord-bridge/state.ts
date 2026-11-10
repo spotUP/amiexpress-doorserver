@@ -10,6 +10,9 @@ export interface MessageLink {
   discordMessageId: string;
   roomId: string;
   createdAt: number;
+  /** Display label and text of the hub message, so a later reply can quote it. */
+  authorLabel?: string;
+  content?: string;
 }
 
 export class BridgeState {
@@ -24,10 +27,16 @@ export class BridgeState {
         hub_message_id TEXT PRIMARY KEY,
         discord_message_id TEXT NOT NULL UNIQUE,
         room_id TEXT NOT NULL,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        author_label TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT ''
       );
       CREATE INDEX IF NOT EXISTS message_map_created ON message_map(created_at);
     `);
+    // A phase 2 file has no quote columns; add them in place.
+    const cols = (this.db.prepare('PRAGMA table_info(message_map)').all() as { name: string }[]).map((c) => c.name);
+    if (!cols.includes('author_label')) this.db.exec("ALTER TABLE message_map ADD COLUMN author_label TEXT NOT NULL DEFAULT ''");
+    if (!cols.includes('content')) this.db.exec("ALTER TABLE message_map ADD COLUMN content TEXT NOT NULL DEFAULT ''");
   }
 
   get(key: string): string | undefined {
@@ -51,12 +60,20 @@ export class BridgeState {
 
   putLink(link: MessageLink): void {
     this.db
-      .prepare('INSERT OR REPLACE INTO message_map(hub_message_id, discord_message_id, room_id, created_at) VALUES(?, ?, ?, ?)')
-      .run(link.hubMessageId, link.discordMessageId, link.roomId, link.createdAt);
+      .prepare('INSERT OR REPLACE INTO message_map(hub_message_id, discord_message_id, room_id, created_at, author_label, content) VALUES(?, ?, ?, ?, ?, ?)')
+      .run(link.hubMessageId, link.discordMessageId, link.roomId, link.createdAt, link.authorLabel ?? '', link.content ?? '');
   }
 
-  private fromRow(r: { hub_message_id: string; discord_message_id: string; room_id: string; created_at: number } | undefined): MessageLink | undefined {
-    return r && { hubMessageId: r.hub_message_id, discordMessageId: r.discord_message_id, roomId: r.room_id, createdAt: r.created_at };
+  setContent(hubMessageId: string, content: string): void {
+    this.db.prepare('UPDATE message_map SET content = ? WHERE hub_message_id = ?').run(content, hubMessageId);
+  }
+
+  removeByHub(hubMessageId: string): void {
+    this.db.prepare('DELETE FROM message_map WHERE hub_message_id = ?').run(hubMessageId);
+  }
+
+  private fromRow(r: { hub_message_id: string; discord_message_id: string; room_id: string; created_at: number; author_label: string; content: string } | undefined): MessageLink | undefined {
+    return r && { hubMessageId: r.hub_message_id, discordMessageId: r.discord_message_id, roomId: r.room_id, createdAt: r.created_at, authorLabel: r.author_label, content: r.content };
   }
 
   byHub(hubMessageId: string): MessageLink | undefined {

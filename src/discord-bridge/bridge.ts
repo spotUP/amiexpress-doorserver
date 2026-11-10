@@ -22,7 +22,13 @@ export interface BridgeOptions {
   /** Backoff after a hub error, doubling up to maxBackoffMs. */
   minBackoffMs?: number;
   maxBackoffMs?: number;
+  /** Attempts per event before it is logged, skipped and the seq advances. */
+  eventAttempts?: number;
+  /** First delay between attempts on one event; doubles each retry. */
+  eventBackoffMs?: number;
 }
+
+export type HandlersFactory = (hub: HubClient, state: BridgeState) => BridgeHandlers;
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -41,13 +47,16 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
  * Open the hub session, settle the starting seq (stored, else the hub's head
  * so a first run never replays history), then run the loop in the background.
  */
-export async function startBridge(config: BridgeConfig, handlers: BridgeHandlers, opts: BridgeOptions = {}): Promise<BridgeHandle> {
+export async function startBridge(config: BridgeConfig, handlersOrFactory: BridgeHandlers | HandlersFactory, opts: BridgeOptions = {}): Promise<BridgeHandle> {
   const log = opts.log ?? ((l: string) => console.log(l));
   const minBackoff = opts.minBackoffMs ?? 500;
   const maxBackoff = opts.maxBackoffMs ?? 30000;
   const state = new BridgeState(config.dbPath);
   const hub = new HubClient(config.hubUrl, config.boardKey, config.handle, config.rooms.keys());
   const abort = new AbortController();
+  const handlers = typeof handlersOrFactory === 'function' ? handlersOrFactory(hub, state) : handlersOrFactory;
+  const attempts = opts.eventAttempts ?? 5;
+  const eventBackoff = opts.eventBackoffMs ?? 500;
 
   let since = state.getSeq();
   try {
@@ -69,12 +78,30 @@ export async function startBridge(config: BridgeConfig, handlers: BridgeHandlers
         const batch = await hub.poll(seq, config.waitSeconds, abort.signal);
         backoff = minBackoff;
         for (const ev of batch.events) {
-          try {
-            await handlers.onEvent(ev);
-          } catch (err) {
-            log(`[ERROR] handler failed on event ${ev.seq} (${ev.type}): ${(err as Error).message}`);
+          // A failed event is retried; the stored seq never passes it until it
+          // succeeds or the attempts run out (then it is skipped, not stalled on).
+          for (let attempt = 1; ; attempt++) {
+            try {
+              await handlers.onEvent(ev);
+              break;
+            } catch (err) {
+              if (abort.signal.aborted) break;
+              const msg = `event ${ev.seq} (${ev.type}) attempt ${attempt}/${attempts}: ${(err as Error).message}`;
+              if (attempt >= attempts) {
+                log(`[ERROR] giving up on ${msg}; skipping`);
+                break;
+              }
+              log(`[WARN] ${msg}; retrying`);
+              await sleep(eventBackoff * 2 ** (attempt - 1), abort.signal);
+            }
+          }
+          if (abort.signal.aborted) break;
+          if (ev.seq > seq) {
+            seq = ev.seq;
+            state.setSeq(seq);
           }
         }
+        if (abort.signal.aborted) break;
         if (batch.last > seq) {
           seq = batch.last;
           state.setSeq(seq);
