@@ -46,7 +46,8 @@ function targetUser(b: Body): string {
 
 function chargeMessage(ctx: ChatCtx): void {
   charge([
-    { key: `chat:msg:${ctx.sid ?? ctx.user}`, limit: { max: CHAT_LIMITS.messagesPerSession, windowSeconds: CHAT_LIMITS.messagesPerSessionWindowSeconds } },
+    // A relay session carries many authors: each one gets its own allowance.
+    { key: `chat:msg:${ctx.relayOf ? `${ctx.sid}:${ctx.user}` : ctx.sid ?? ctx.user}`, limit: { max: CHAT_LIMITS.messagesPerSession, windowSeconds: CHAT_LIMITS.messagesPerSessionWindowSeconds } },
     { key: `chat:board:${ctx.boardId}`, limit: { max: CHAT_LIMITS.messagesPerBoardPerMinute, windowSeconds: 60 } },
   ]);
 }
@@ -291,7 +292,12 @@ function getMessage(db: Database.Database, id: string): MsgRow {
 }
 
 function requireMemberOf(db: Database.Database, roomId: string, ctx: ChatCtx): void {
-  if (!isMember(db, roomId, ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
+  // A relayed author is never a member itself: the relay session is, and a
+  // room ban on the author (which evicts ordinary users) is checked here.
+  if (!isMember(db, roomId, ctx.relayOf ?? ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
+  if (ctx.relayOf && db.prepare('SELECT 1 FROM chat_bans WHERE room_id = ? AND user = ?').get(roomId, ctx.user)) {
+    throw new SurfaceError('banned', 403, 'you are banned from this room');
+  }
 }
 
 function requireNotMuted(db: Database.Database, roomId: string, user: string): void {
@@ -879,3 +885,44 @@ export function deleteEmoji(db: Database.Database, ctx: ChatCtx, name: string, b
 }
 
 export { validHandle };
+
+// ---- Discord mirror (per-board opt-in, D2/D5/D6) ----
+
+export function getDiscordMirror(db: Database.Database, ctx: ChatCtx): boolean {
+  const r = db.prepare('SELECT discord_mirror FROM boards WHERE id = ?').get(ctx.boardId) as { discord_mirror: number } | undefined;
+  return r?.discord_mirror === 1;
+}
+
+/** `/discord on|off`: the board's sysop decides whether its callers are copied to Discord. */
+export function setDiscordMirror(db: Database.Database, ctx: ChatCtx, b: Body): boolean {
+  requireSession(ctx);
+  if (!ctx.sysop) throw new SurfaceError('forbidden', 403, 'sysop only');
+  if (typeof b.on !== 'boolean') throw new SurfaceError('bad_request', 400, 'on must be true or false');
+  const res = db.prepare('UPDATE boards SET discord_mirror = ? WHERE id = ? AND discord_mirror <> ?').run(b.on ? 1 : 0, ctx.boardId, b.on ? 1 : 0);
+  if (res.changes > 0) emitEvent(db, { type: 'discord_mirror', user: ctx.user, ref: ctx.boardId.toUpperCase(), text: b.on ? '1' : '0' });
+  return b.on;
+}
+
+/**
+ * Everyone joined to any of `roomIds`, for the D7 label clash set only. No
+ * permission check: the caller already holds rows from these rooms, and the
+ * names are used to decide a label, never returned as rows.
+ */
+/** The room a message lives in; 404 when the message is gone. */
+export function roomOfMessage(db: Database.Database, id: string): string {
+  return getMessage(db, id).room_id;
+}
+
+export function memberUsers(db: Database.Database, roomIds: Iterable<string>): string[] {
+  const ids = [...new Set(roomIds)].filter((x) => x);
+  if (ids.length === 0) return [];
+  const q = db.prepare('SELECT DISTINCT user FROM chat_members WHERE room_id = ?');
+  const out = new Set<string>();
+  for (const id of ids) for (const r of q.all(id) as { user: string }[]) out.add(r.user);
+  return [...out];
+}
+
+/** The boards whose callers the bridge may copy to Discord, upper-cased as in user ids. */
+export function discordMirrorBoards(db: Database.Database): string[] {
+  return (db.prepare('SELECT id FROM boards WHERE discord_mirror = 1 ORDER BY id').all() as { id: string }[]).map((r) => r.id.toUpperCase());
+}

@@ -296,4 +296,18 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
           last_read_seq INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (thread_id, user))`);
     },
   },
+  {
+    version: 11,
+    name: 'chat: boards.chat_relay (relay board may post as its own users) and boards.discord_mirror',
+    // chat_relay is set by the server admin only: a relay board's session may
+    // post, edit, delete and react with an `as` handle (user = as@<board>),
+    // which is how the Discord bridge speaks for many Discord users through
+    // one session. discord_mirror is each board's own opt-in (sysop command
+    // /discord on|off): off means the bridge never copies that board's
+    // callers to Discord. Both default off.
+    up: (db) => {
+      db.exec('ALTER TABLE boards ADD COLUMN chat_relay INTEGER NOT NULL DEFAULT 0');
+      db.exec('ALTER TABLE boards ADD COLUMN discord_mirror INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];

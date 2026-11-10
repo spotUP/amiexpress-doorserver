@@ -172,6 +172,10 @@ export interface AchievementsHealthSummary {
 export interface BoardSummary {
   id: string; name: string; contact: string | null;
   createdAt: string; suspendedAt: string | null;
+  /** Relay board (Discord bridge): its chat session may post `as` its own users. */
+  chatRelay: boolean;
+  /** The board's sysop opted its callers into the Discord mirror (/discord on). */
+  discordMirror: boolean;
 }
 export interface BoardCreateRequest { id: string; name: string; contact?: string | null }
 /** The plaintext key is returned ONCE, at creation and at rotation. */
@@ -262,5 +266,7 @@ export const ADMIN_ENDPOINTS = [
   'POST /admin/boards/<id>/rotate',
   'POST /admin/boards/<id>/suspend',
   'POST /admin/boards/<id>/resume',
+  'POST /admin/boards/<id>/relay',
+  'POST /admin/boards/<id>/unrelay',
 ] as const;
 export type AdminEndpoint = (typeof ADMIN_ENDPOINTS)[number];

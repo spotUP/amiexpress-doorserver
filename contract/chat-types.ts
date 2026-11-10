@@ -23,11 +23,13 @@ export const CHAT_TEXT_VERSION = '1';
  */
 export const CHAT_TEXT_FORMATS = {
   ROOMS: ['id', 'name', 'topic', 'visibility', 'members', 'owner', 'kind'],
-  MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName', 'status', 'statusText'],
-  HISTORY: ['seq', 'id', 'user', 'at', 'replyTo', 'threadId', 'roleColor', 'text'],
-  EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo'],
+  MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName', 'status', 'statusText', 'label'],
+  HISTORY: ['seq', 'id', 'user', 'at', 'replyTo', 'threadId', 'roleColor', 'text', 'label'],
+  EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo', 'label'],
   REACTIONS: ['emoji', 'count', 'mine'],
-  WHO: ['user', 'room', 'sysop', 'roleColor', 'idleSeconds', 'status', 'statusText'],
+  WHO: ['user', 'room', 'sysop', 'roleColor', 'idleSeconds', 'status', 'statusText', 'label'],
+  /** The boards whose callers the Discord bridge may copy (discord_mirror on), upper-cased. */
+  DISCORD: ['board'],
   DM: ['threadId', 'peer', 'lastAt', 'unread'],
   PROFILE: ['user', 'nick', 'board', 'status', 'statusText', 'firstSeen', 'lastSeen', 'idleSeconds', 'online', 'sharedRooms'],
   IGNORES: ['user', 'at'],
@@ -64,6 +66,8 @@ export const CHAT_EVENT_TYPES = [
   'board_joined',
   /** Board-local BBS activity (ref = the BBS event type); see BBS_EVENT_TYPES. */
   'bbs',
+  /** A board's sysop switched the Discord mirror; ref = the board id upper-cased, text = '1' on / '0' off. Seen by every session. */
+  'discord_mirror',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 
@@ -90,6 +94,8 @@ export const CHAT_ERROR_CODES = [
   'rate_limited',
   /** The room is moderated (+m) and the caller has neither voice (+v) nor op (+o). */
   'moderated',
+  /** The request carried `as` but the board is not a relay board (boards.chat_relay). */
+  'not_relay',
 ] as const;
 export type ChatErrorCode = (typeof CHAT_ERROR_CODES)[number];
 
@@ -100,6 +106,11 @@ export type ChatErrorCode = (typeof CHAT_ERROR_CODES)[number];
  * matter which other rooms sort before it by name.
  */
 export const CHAT_DEFAULT_ROOM_KEY = 'lobby';
+
+/** The board id the Discord bridge registers as; its users are `name@DISCORD`. */
+export const CHAT_DISCORD_BOARD = 'discord';
+/** Appended to the text of a Discord-origin message in the .txt rows (D7). */
+export const CHAT_DISCORD_MARKER = ' [Discord]';
 
 export const CHAT_LIMITS = {
   contentMax: 500,
@@ -207,6 +218,20 @@ export interface PostMessageReply {
 }
 export interface EditMessageRequest {
   content: string;
+}
+/**
+ * Relay boards only (boards.chat_relay, set by the server admin): post, edit,
+ * delete, react, unreact and thread posts may carry `as` (body, or query on
+ * DELETE) to act as `as@<own board>`. Any other board gets 403 not_relay.
+ */
+export interface RelayActing {
+  as?: string;
+}
+export interface DiscordMirrorRequest {
+  on: boolean;
+}
+export interface DiscordMirrorReply {
+  on: boolean;
 }
 export interface EditMessageReply {
   id: string;
@@ -345,6 +370,9 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/clear',
   'GET /motd',
   'PUT /motd',
+  'GET /discord',
+  'PUT /discord',
+  'GET /discord/boards.txt',
   'GET /roles',
   'POST /roles',
   'PUT /roles/:id',

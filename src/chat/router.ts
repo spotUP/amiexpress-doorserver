@@ -20,9 +20,9 @@ import type Database from 'better-sqlite3';
 import { loadChatConfig } from './config';
 import { fetchVisibleEvents, headSeq, heldPollCount, waitForEvents } from './events';
 import type { EventRec } from './events';
-import { renderText, sendText } from './render';
+import { displayLabels, markOrigin, renderText, sendText } from './render';
 import * as roles from './roles';
-import { createSession, expireSession, resolveSession, startSweeper } from './sessions';
+import { actingCtx, createSession, expireSession, resolveSession, startSweeper } from './sessions';
 import type { ChatCtx } from './sessions';
 import * as store from './store';
 import type { Body } from './store';
@@ -85,6 +85,15 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     });
   }
 
+  /**
+   * `run` for the message verbs a relay board may perform for its users:
+   * `as` (body, or query on DELETE) swaps in the relayed author (actingCtx).
+   */
+  function runAs<T>(req: Request, fn: (db: Database.Database, ctx: ChatCtx) => T): T {
+    const as = body(req).as ?? req.query.as;
+    return run(req, true, (db, ctx) => fn(db, actingCtx(db, ctx, as)));
+  }
+
   const body = (req: Request): Body => (req.body && typeof req.body === 'object' ? (req.body as Body) : {});
   const p = (req: Request, k: string): string => String(req.params[k] ?? '');
   const roleColor = (db: Database.Database, cache: Map<string, string>, user: string): string => {
@@ -131,53 +140,62 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.get('/rooms/:id/members.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => {
       const cache = new Map<string, string>();
-      const rows = store.roomMembers(db, ctx, p(req, 'id')).map((m) => [m.user, m.sysop ? 1 : 0, m.op ? 1 : 0, roleColor(db, cache, m.user), roleName(db, m.user), m.status, m.statusText]);
+      const members = store.roomMembers(db, ctx, p(req, 'id'));
+      const labels = displayLabels(members.map((m) => m.user));
+      const rows = members.map((m) => [m.user, m.sysop ? 1 : 0, m.op ? 1 : 0, roleColor(db, cache, m.user), roleName(db, m.user), m.status, m.statusText, labels.get(m.user) ?? m.user]);
       return { rev: headSeq(db), rows };
     });
     sendText(res, renderText('MEMBERS', out.rev, out.rows));
   });
-  const historyText = (name: 'HISTORY', fetch: (db: Database.Database, ctx: ChatCtx) => store.HistoryRec[]) => (req: Request, res: Response) => {
+  /** HISTORY rows with the D7 label column and ` [Discord]` marker; `present` adds the room's members to the clash set. */
+  const historyRows = (db: Database.Database, recs: store.HistoryRec[], present: string[]): (string | number)[][] => {
+    const cache = new Map<string, string>();
+    const labels = displayLabels([...recs.map((h) => h.user), ...present]);
+    return recs.map((h) => [h.seq, h.id, h.user, h.at, h.replyTo, h.threadId, roleColor(db, cache, h.user), markOrigin(h.user, h.text), labels.get(h.user) ?? h.user]);
+  };
+  const historyText = (fetch: (db: Database.Database, ctx: ChatCtx) => { recs: store.HistoryRec[]; rooms: string[] }) => (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => {
-      const cache = new Map<string, string>();
-      const rows = fetch(db, ctx).map((h) => [h.seq, h.id, h.user, h.at, h.replyTo, h.threadId, roleColor(db, cache, h.user), h.text]);
-      return { rev: headSeq(db), rows };
+      const got = fetch(db, ctx);
+      return { rev: headSeq(db), rows: historyRows(db, got.recs, store.memberUsers(db, got.rooms)) };
     });
-    sendText(res, renderText(name, out.rev, out.rows));
+    sendText(res, renderText('HISTORY', out.rev, out.rows));
   };
   router.get('/rooms/:id/history.txt', (req: Request, res: Response) =>
-    historyText('HISTORY', (db, ctx) => store.roomHistory(db, ctx, p(req, 'id'), req.query))(req, res));
+    historyText((db, ctx) => ({ recs: store.roomHistory(db, ctx, p(req, 'id'), req.query), rooms: [p(req, 'id')] }))(req, res));
   router.post('/rooms/:id/messages', (req: Request, res: Response) => {
-    res.status(201).json(run(req, true, (db, ctx) => store.postMessage(db, ctx, p(req, 'id'), body(req))));
+    res.status(201).json(runAs(req, (db, ctx) => store.postMessage(db, ctx, p(req, 'id'), body(req))));
   });
 
   // ---- messages ----
   router.put('/messages/:id', (req: Request, res: Response) => {
-    res.json(run(req, true, (db, ctx) => store.editMessage(db, ctx, p(req, 'id'), body(req))));
+    res.json(runAs(req, (db, ctx) => store.editMessage(db, ctx, p(req, 'id'), body(req))));
   });
   router.delete('/messages/:id', (req: Request, res: Response) => {
-    run(req, true, (db, ctx) => store.deleteMessage(db, ctx, p(req, 'id')));
+    runAs(req, (db, ctx) => store.deleteMessage(db, ctx, p(req, 'id')));
     res.json({ ok: true });
   });
   router.post('/messages/:id/react', (req: Request, res: Response) => {
-    res.json(run(req, true, (db, ctx) => store.react(db, ctx, p(req, 'id'), body(req))));
+    res.json(runAs(req, (db, ctx) => store.react(db, ctx, p(req, 'id'), body(req))));
   });
   router.delete('/messages/:id/react/:emoji', (req: Request, res: Response) => {
-    res.json(run(req, true, (db, ctx) => store.unreact(db, ctx, p(req, 'id'), p(req, 'emoji'))));
+    res.json(runAs(req, (db, ctx) => store.unreact(db, ctx, p(req, 'id'), p(req, 'emoji'))));
   });
   router.get('/messages/:id/reactions.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), rows: store.reactionRows(db, ctx, p(req, 'id')) }));
     sendText(res, renderText('REACTIONS', out.rev, out.rows.map((r) => [r.emoji, r.count, r.mine ? 1 : 0])));
   });
   router.post('/messages/:id/thread', (req: Request, res: Response) => {
-    res.status(201).json(run(req, true, (db, ctx) => store.postThread(db, ctx, p(req, 'id'), body(req))));
+    res.status(201).json(runAs(req, (db, ctx) => store.postThread(db, ctx, p(req, 'id'), body(req))));
   });
   router.get('/threads/:id.txt', (req: Request, res: Response) =>
-    historyText('HISTORY', (db, ctx) => store.threadHistory(db, ctx, p(req, 'id')))(req, res));
+    historyText((db, ctx) => ({ recs: store.threadHistory(db, ctx, p(req, 'id')), rooms: [store.roomOfMessage(db, p(req, 'id'))] }))(req, res));
 
   router.get('/who.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => {
       const cache = new Map<string, string>();
-      return { rev: headSeq(db), rows: store.whoRows(db, ctx).map((w) => [w.user, w.room, w.sysop ? 1 : 0, roleColor(db, cache, w.user), w.idle, w.status, w.statusText]) };
+      const who = store.whoRows(db, ctx);
+      const labels = displayLabels(who.map((w) => w.user));
+      return { rev: headSeq(db), rows: who.map((w) => [w.user, w.room, w.sysop ? 1 : 0, roleColor(db, cache, w.user), w.idle, w.status, w.statusText, labels.get(w.user) ?? w.user]) };
     });
     sendText(res, renderText('WHO', out.rev, out.rows));
   });
@@ -229,10 +247,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     res.status(201).json(run(req, true, (db, ctx) => store.postDmGroup(db, ctx, body(req))));
   });
   router.get('/dm/:threadId/history.txt', (req: Request, res: Response) => {
-    const out = run(req, true, (db, ctx) => {
-      const cache = new Map<string, string>();
-      return { rev: headSeq(db), rows: store.dmHistory(db, ctx, p(req, 'threadId'), req.query).map((h) => [h.seq, h.id, h.user, h.at, h.replyTo, h.threadId, roleColor(db, cache, h.user), h.text]) };
-    });
+    const out = run(req, true, (db, ctx) => ({ rev: headSeq(db), rows: historyRows(db, store.dmHistory(db, ctx, p(req, 'threadId'), req.query), []) }));
     sendText(res, renderText('HISTORY', out.rev, out.rows));
   });
 
@@ -258,7 +273,9 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
         // The session may have been replaced or have expired while held; touch it again.
         context(db, req, false);
         const cache = new Map<string, string>();
-        return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), e.text, e.reply_to]);
+        const labels = displayLabels([...events.map((e) => e.user), ...store.memberUsers(db, events.map((e) => e.room_id ?? ''))]);
+        const text = (e: EventRec): string => (e.type === 'message' || e.type === 'edit' ? markOrigin(e.user, e.text) : e.text);
+        return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), text(e), e.reply_to, e.user ? labels.get(e.user) ?? e.user : '']);
       });
       const last = events.length > 0 ? events[events.length - 1].seq : since;
       sendText(res, renderText('EVENTS', last, out));
@@ -317,6 +334,18 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.put('/motd', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.setMotd(db, ctx, body(req)));
     res.json({ ok: true });
+  });
+
+  // ---- Discord mirror: the board sysop's /discord on|off; the bridge reads the board list ----
+  router.get('/discord', (req: Request, res: Response) => {
+    res.json({ on: run(req, false, (db, ctx) => store.getDiscordMirror(db, ctx)) });
+  });
+  router.put('/discord', (req: Request, res: Response) => {
+    res.json({ on: run(req, true, (db, ctx) => store.setDiscordMirror(db, ctx, body(req))) });
+  });
+  router.get('/discord/boards.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db) => ({ rev: headSeq(db), rows: store.discordMirrorBoards(db).map((b) => [b]) }));
+    sendText(res, renderText('DISCORD', out.rev, out.rows));
   });
 
   // ---- roles: the sysop of a board manages that board's roles; an admin names ?board= ----

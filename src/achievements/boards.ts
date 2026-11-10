@@ -40,6 +40,10 @@ export interface BoardRow {
   key_hash: string;
   created_at: number;
   suspended_at: number | null;
+  /** 1 = a relay board: its chat session may speak `as` its own users (Discord bridge). Admin-set. */
+  chat_relay: number;
+  /** 1 = the board's sysop opted its callers into the Discord mirror. */
+  discord_mirror: number;
 }
 
 /** The board a request proved it is, attached by requireBoard. */
@@ -192,9 +196,16 @@ export function setBoardSuspended(db: Database.Database, id: string, suspended: 
   }
 }
 
+export function setBoardRelay(db: Database.Database, id: string, relay: boolean): void {
+  const res = db.prepare('UPDATE boards SET chat_relay = ? WHERE id = ?').run(relay ? 1 : 0, id);
+  if (res.changes === 0) {
+    throw new SurfaceError('bad_request', 400, `board "${id}" does not exist`);
+  }
+}
+
 export function getBoard(db: Database.Database, id: string): BoardRow | null {
   const row = db
-    .prepare('SELECT id, name, contact, key_hash, created_at, suspended_at FROM boards WHERE id = ?')
+    .prepare('SELECT id, name, contact, key_hash, created_at, suspended_at, chat_relay, discord_mirror FROM boards WHERE id = ?')
     .get(id) as BoardRow | undefined;
   return row ?? null;
 }
@@ -202,7 +213,7 @@ export function getBoard(db: Database.Database, id: string): BoardRow | null {
 export function listBoards(db: Database.Database): BoardRow[] {
   return db
     .prepare(
-      'SELECT id, name, contact, key_hash, created_at, suspended_at FROM boards ORDER BY id'
+      'SELECT id, name, contact, key_hash, created_at, suspended_at, chat_relay, discord_mirror FROM boards ORDER BY id'
     )
     .all() as BoardRow[];
 }

@@ -46,16 +46,16 @@ describe('presence', () => {
     const who = rowsOf((await api('get', '/who.txt', a)).text);
     const bob = who.find((r) => r[0] === 'bob@UPROUGH')!;
     expect(bob.slice(0, 5)).toEqual(['bob@UPROUGH', 'lobby', '0', '', expect.stringMatching(/^\d+$/)]);
-    expect(bob.slice(5)).toEqual(['away', 'at lunch']);
+    expect(bob.slice(5)).toEqual(['away', 'at lunch', 'bob']);
     const mem = rowsOf((await api('get', `/rooms/${id}/members.txt`, a)).text);
     const mb = mem.find((r) => r[0] === 'bob@UPROUGH')!;
     expect(mb).toHaveLength(CHAT_TEXT_FORMATS.MEMBERS.length);
     expect(mb.slice(0, 5)).toEqual(['bob@UPROUGH', '0', '0', '', '']);
-    expect(mb.slice(5)).toEqual(['away', 'at lunch']);
+    expect(mb.slice(5)).toEqual(['away', 'at lunch', 'bob']);
 
     expect((await api('delete', '/presence', b)).body).toEqual({ status: 'online', statusText: '' });
     const after = rowsOf((await api('get', '/who.txt', a)).text).find((r) => r[0] === 'bob@UPROUGH')!;
-    expect(after.slice(5)).toEqual(['online', '']);
+    expect(after.slice(5)).toEqual(['online', '', 'bob']);
   });
 
   it('emits a presence event to room members and validates input', async () => {
@@ -86,7 +86,7 @@ describe('presence', () => {
     const id = (await api('get', '/rooms', a)).body[0].id as string;
     await api('post', `/rooms/${id}/join`, b2);
     const row = rowsOf((await api('get', '/who.txt', a)).text).find((r) => r[0] === 'bob@UPROUGH')!;
-    expect(row.slice(5)).toEqual(['online', '']);
+    expect(row.slice(5)).toEqual(['online', '', 'bob']);
   });
 });
 

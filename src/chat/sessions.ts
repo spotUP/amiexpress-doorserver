@@ -24,6 +24,13 @@ export interface ChatCtx {
   user: string;
   sysop: boolean;
   admin: boolean;
+  /**
+   * Set when a relay board's session speaks `as` one of its users: the
+   * session's own user (`bridge@DISCORD`). `user`/`handle` are then the
+   * relayed author; room membership is the session's, bans and mutes the
+   * author's.
+   */
+  relayOf?: string;
 }
 
 const HANDLE = /^[^\s|@]{1,32}$/;
@@ -169,4 +176,19 @@ export function startSweeper(ach: AchievementsConfig, cfg: ChatConfig): void {
 export function _stopChatSweepersForTests(): void {
   for (const t of sweepers.values()) clearInterval(t);
   sweepers.clear();
+}
+
+/**
+ * The identity a request acts as. No `as`: the session itself. With `as`: the
+ * board must be a relay board (admin-set boards.chat_relay) and `as` a valid
+ * bare handle; the author becomes `as@<this board>`, never another board's
+ * user, and loses the session's sysop/admin standing.
+ */
+export function actingCtx(db: Database.Database, ctx: ChatCtx, as: unknown): ChatCtx {
+  if (as === undefined || as === null || as === '') return ctx;
+  if (!ctx.sid) throw new SurfaceError('unauthorized', 401, 'this needs a chat session');
+  const b = db.prepare('SELECT chat_relay FROM boards WHERE id = ?').get(ctx.boardId) as { chat_relay: number } | undefined;
+  if (b?.chat_relay !== 1) throw new SurfaceError('not_relay', 403, 'only a relay board may speak as another user');
+  if (!validHandle(as)) throw new SurfaceError('bad_request', 400, 'as must be a bare handle (no @, |, or spaces)');
+  return { sid: ctx.sid, boardId: ctx.boardId, handle: as, user: userOf(ctx.boardId, as), sysop: false, admin: false, relayOf: ctx.user };
 }

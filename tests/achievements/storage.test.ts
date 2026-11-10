@@ -158,9 +158,10 @@ describe('the achievements database, as an operator meets it', () => {
     const first = initAchievementsDb(ach);
     const second = initAchievementsDb(ach);
 
-    // The first start applies the one migration ACHIEVEMENTS_MIGRATIONS now
-    // carries (the global-requests tables, step 1); the second applies none.
-    expect(first).toEqual(['1:requests: the global-requests surface']);
+    // The first start applies every migration ACHIEVEMENTS_MIGRATIONS carries,
+    // in version order; the second applies none.
+    expect(first).toEqual(ACHIEVEMENTS_MIGRATIONS.map((m) => `${m.version}:${m.name}`));
+    expect(first[0]).toBe('1:requests: the global-requests surface');
     expect(second).toEqual([]);
 
     // Prove the RUNNER is genuinely wired to this database and to its own

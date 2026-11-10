@@ -42,10 +42,10 @@ describe('board_joined', () => {
     await login(newAuth, 'carol');
     const rows = await joinedRows(fx.auth, alice, 'New BBS');
     expect(rows).toHaveLength(1);
-    // seq|type|room|user|ref|at|roleColor|text|replyTo
+    // seq|type|room|user|ref|at|roleColor|text|replyTo|label
     expect(rows[0].slice(1, 5)).toEqual(['board_joined', '', '', '']);
     expect(rows[0][5]).toMatch(/^\d+$/);
-    expect(rows[0].slice(6)).toEqual(['', 'New BBS', '']);
+    expect(rows[0].slice(6)).toEqual(['', 'New BBS', '', '']);
 
     await login(newAuth, 'dave'); // second session of the same board
     expect(await joinedRows(fx.auth, alice, 'New BBS')).toHaveLength(1);

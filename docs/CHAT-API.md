@@ -46,7 +46,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/leave` | 204 |
 | GET | `/rooms/:id/members.txt` | MEMBERS rows; status fields appended |
 | GET | `/rooms/:id/history.txt` | `?before=<seq>&limit=1..50` (default 20); HISTORY rows, oldest first |
-| POST | `/rooms/:id/messages` | `{content, clientId, replyTo?, threadId?}`; reply `{id, seq, at}` |
+| POST | `/rooms/:id/messages` | `{content, clientId, replyTo?, threadId?, as?}`; reply `{id, seq, at}`. `as` (relay boards only, see below) |
 | PUT | `/messages/:id` | `{content}`, author only; reply `{id, seq}` |
 | DELETE | `/messages/:id` | author, room op, owning-board sysop, role with perms, admin; 204 |
 | POST | `/messages/:id/react` | `{emoji}`; reply `{count}` |
@@ -65,6 +65,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | DELETE | `/rooms/:id/invites/:user` | revoke; 204 |
 | GET | `/dm.txt` | DM rows |
 | POST | `/dm/:peer` | `{content, clientId}`; peer is `handle@BOARD`; reply `{id, seq, threadId}` |
+| POST | `/dm-group` | `{participants, content, clientId}`; participants are 2 or more `handle@BOARD` besides the sender (3+ unique members in all); reply `{id, seq, threadId}` |
 | GET | `/dm/:threadId/history.txt` | `?before&limit`; HISTORY rows; marks the peer's messages read |
 | GET | `/events.txt` | `?since=<seq>&wait=0..25` long poll; EVENTS rows |
 | POST | `/rooms/:id/kick` | `{user}` |
@@ -83,6 +84,9 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/clear` | owning-board sysop or admin; emits `delete` per message; 204 |
 | GET | `/motd` | JSON `{text}` |
 | PUT | `/motd` | admin only; `{text}` |
+| GET | `/discord` | JSON `{on}`: whether the caller's board is mirrored to Discord |
+| PUT | `/discord` | `{on: true\|false}` (door `/discord on\|off`); sysop session of the board only, else `forbidden`; reply `{on}`; emits `discord_mirror` when the value changes. Default off: a board that never opted in is never copied to Discord |
+| GET | `/discord/boards.txt` | DISCORD rows: the board ids (upper-cased) whose callers the Discord bridge may copy |
 | GET | `/roles` | sysop session or admin; JSON array of roles |
 | POST | `/roles` | `{name, colorHex, colorAnsi, position?, perms?}` |
 | PUT | `/roles/:id` | the same body, replaces |
@@ -135,13 +139,14 @@ field is only ever appended and the `1` never moves.
 Formats and their fields, in order:
 
 - ROOMS: `id|name|topic|visibility|members|owner|kind` (kind: `text`, `voice` or `art`)
-- MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText`
-- HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text`
-- EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo` (`replyTo` is the
+- MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText|label`
+- HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text|label`
+- EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo|label` (`replyTo` is the
   message id a `message` event answers, empty otherwise)
 - REACTIONS: `emoji|count|mine`
 - EMOJI: `name|display|ascii`
-- WHO: `user|room|sysop|roleColor|idleSeconds|status|statusText`
+- WHO: `user|room|sysop|roleColor|idleSeconds|status|statusText|label`
+- DISCORD: `board`
 - DM: `threadId|peer|lastAt|unread`
 - PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`
 - IGNORES: `user|at`
@@ -159,6 +164,24 @@ online, otherwise the newest event, `idleSeconds` empty when offline,
 `online` is `1` or `0`, and `sharedRooms` is a comma-separated list of room
 ids both the caller and the user are in (map them to names with `rooms.txt`).
 
+`label` (MEMBERS, HISTORY, EVENTS, WHO) is the name to show for `user`: the
+bare handle, or the full `handle@BOARD` only when two different users with
+that handle are present in the reply or in the rooms it covers. `user` stays
+the identity for bans, ignores and DMs; `label` is display only. The text of a
+message whose author is `name@DISCORD` (HISTORY rows, EVENTS `message` and
+`edit` rows) ends in ` [Discord]`; the marker is never stored and never in
+JSON replies.
+
+Relay boards: a board the server admin marked as a relay (`POST
+/admin/boards/:id/relay`; the Discord bridge is one) may add `as` to
+`POST /rooms/:id/messages`, `PUT /messages/:id`, `DELETE /messages/:id`,
+`POST /messages/:id/react`, `DELETE /messages/:id/react/:emoji` and
+`POST /messages/:id/thread` (body, or `?as=` on DELETE). The request then acts
+as `as@<relay board>`: that user's room membership comes from the relay
+session, but bans, mutes, `+m` voice, author-only edit and delete, and the
+per-session rate limit apply to the relayed user. `as` can never name another
+board's user. Any other board sending `as` gets 403 `not_relay`.
+
 Ignore list: the server only stores it, per chat identity, across sessions.
 It filters nothing; the door hides an ignored user's lines itself.
 
@@ -175,20 +198,20 @@ a1b2c3d4e5f6|lobby|Welcome to the board|public|7|spot@UPROUGH|text
 
 ```text example MEMBERS
 MEMBERS|1|412|2
-spot@UPROUGH|1|1|11|Sysop|online|
-zed@FRIEND|0|0|||busy|deploying
+spot@UPROUGH|1|1|11|Sysop|online||spot
+zed@FRIEND|0|0|||busy|deploying|zed
 ```
 
 ```text example HISTORY
 HISTORY|1|410|2
-409|m1a2b3c4d5e6|spot@UPROUGH|1762500000|||11|Hello everybody
-410|m6e5d4c3b2a1|zed@FRIEND|1762500005|m1a2b3c4d5e6||0|Hi spot!
+409|m1a2b3c4d5e6|spot@UPROUGH|1762500000|||11|Hello everybody|spot
+410|m6e5d4c3b2a1|zed@DISCORD|1762500005|m1a2b3c4d5e6||0|Hi spot! [Discord]|zed
 ```
 
 ```text example EVENTS
 EVENTS|1|413|2
-412|message|a1b2c3d4e5f6|zed@FRIEND|m6e5d4c3b2a1|1762500005||Hi spot!|m1a2b3c4d5e6
-413|react|a1b2c3d4e5f6|spot@UPROUGH|m6e5d4c3b2a1|1762500007|11|thumbsup!1|
+412|message|a1b2c3d4e5f6|zed@FRIEND|m6e5d4c3b2a1|1762500005||Hi spot!|m1a2b3c4d5e6|zed
+413|react|a1b2c3d4e5f6|spot@UPROUGH|m6e5d4c3b2a1|1762500007|11|thumbsup!1||spot
 ```
 
 ```text example REACTIONS
@@ -198,7 +221,7 @@ thumbsup|1|1
 
 ```text example WHO
 WHO|1|413|1
-spot@UPROUGH|lobby|1|11|4|away|at lunch
+spot@UPROUGH|lobby|1|11|4|away|at lunch|spot
 ```
 
 ```text example PROFILE
@@ -214,6 +237,12 @@ zed@FRIEND|1762500100
 ```text example DM
 DM|1|413|1
 d1d2d3d4d5d6|zed@FRIEND|1762500100|2
+```
+
+```text example DISCORD
+DISCORD|1|413|2
+AEW
+UPROUGH
 ```
 
 An empty poll answers a header with count 0 and no rows:
@@ -259,11 +288,12 @@ itself hold `!`-escaped sub-fields):
 | `motd` | empty | admin | empty | the message of the day |
 | `presence` | room id of each room the user is in (empty when in none) | the user | empty | `status!statusText` |
 | `board_joined` | empty | empty | empty | the display name of the board that just opened its first chat session ever |
+| `discord_mirror` | empty | the sysop who switched it | the board id, upper-cased | `1` mirror on, `0` off |
 | `bbs` | the node id | the BBS user | the BBS event type (`user_login`, `user_logout`, `upload`, `download`, `door_activity`, `custom_door_event`, `command`) | the whitelisted `data` keys, urlencoded (`location`, `duration`, `fileName`, `fileSize`, `conferenceName`, `action`, `doorName`, `eventType`, `message`, `isPersonalBest`) |
 
 A session sees: events in rooms it has joined, direct messages to or from its
 user, events about its user, `room_created`, `room_deleted` and `topic` of
-public rooms, `motd` and `board_joined`, and `bbs` events of its own board only (another board never sees them). `board_joined` is an event only (no room message is stored), is emitted once per board, never on admin mint or reconnect, and is not emitted for boards that had chatted before it was introduced. The pipe inside the `react`, `banned`, `muted` and
+public rooms, `motd`, `board_joined` and `discord_mirror`, and `bbs` events of its own board only (another board never sees them). `board_joined` is an event only (no room message is stored), is emitted once per board, never on admin mint or reconnect, and is not emitted for boards that had chatted before it was introduced. The pipe inside the `react`, `banned`, `muted` and
 `role` text is shown as `!` because `|` is escaped on the wire.
 
 ## 5. Roles
@@ -281,7 +311,7 @@ recolour live.
 Errors are JSON `{"error": "<code>", "detail": "<text>", "retryAfter"?: n}`.
 Codes: `bad_request`, `unauthorized`, `session_expired`, `forbidden`,
 `banned`, `muted`, `not_member`, `invite_required`, `not_found`, `too_long`,
-`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op). A 429 also carries a `Retry-After` header.
+`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op), `not_relay` (the request carried `as` but the board is not a relay board). A 429 also carries a `Retry-After` header.
 
 Limits (fixed windows in process): 20 messages per session per 10 seconds,
 300 messages per board per minute, 30 live sessions per board, 6 room

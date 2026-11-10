@@ -52,6 +52,7 @@ import {
   requireBoard,
   rotateBoardKey,
   setBoardSuspended,
+  setBoardRelay,
   validateRegistration,
 } from './boards';
 import type { BoardRequest, BoardRow } from './boards';
@@ -72,6 +73,8 @@ function summarise(row: BoardRow): BoardSummary {
     contact: row.contact,
     createdAt: iso(row.created_at) ?? new Date(0).toISOString(),
     suspendedAt: iso(row.suspended_at),
+    chatRelay: row.chat_relay === 1,
+    discordMirror: row.discord_mirror === 1,
   };
 }
 
@@ -168,6 +171,27 @@ export function createAchievementsRouter(
           return;
         }
         setBoardSuspended(db, row.id, suspended);
+        auditBoard(db, row.id, action, 1);
+        res.json(summarise(getBoard(db, row.id) as BoardRow));
+      });
+    });
+  }
+
+  // Relay boards (the Discord bridge) speak `as` many of their own users
+  // through one chat session. Only the server admin may grant that.
+  for (const [path, relay, action] of [
+    ['/boards/:id/relay', true, 'board:relay'],
+    ['/boards/:id/unrelay', false, 'board:unrelay'],
+  ] as const) {
+    admin.post(path, (req: Request, res: Response) => {
+      const id = String(req.params.id);
+      withAchievementsDb(ach, (db) => {
+        const row = getBoard(db, id);
+        if (!row) {
+          res.status(404).json({ error: 'bad_request', detail: 'no such board' });
+          return;
+        }
+        setBoardRelay(db, row.id, relay);
         auditBoard(db, row.id, action, 1);
         res.json(summarise(getBoard(db, row.id) as BoardRow));
       });

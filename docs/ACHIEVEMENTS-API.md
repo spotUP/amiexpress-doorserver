@@ -1201,6 +1201,13 @@ gated by the door server's existing ADMIN TOKEN
 | POST | `/admin/boards/<id>/rotate` |
 | POST | `/admin/boards/<id>/suspend` |
 | POST | `/admin/boards/<id>/resume` |
+| POST | `/admin/boards/<id>/relay` |
+| POST | `/admin/boards/<id>/unrelay` |
+
+`relay` / `unrelay` set or clear the board's chat relay flag (the Discord
+bridge's board): a relay board's chat requests may carry `as` to act as
+`<as>@<that board>`, never as another board's user (docs/CHAT-API.md).
+Board summaries carry `chatRelay` and `discordMirror`.
 
 `POST /admin/boards` takes `{"id": "uprough", "name": "Up Rough",
 "contact": "sysop@example.com"}` and answers `{"id": "uprough", "key":
