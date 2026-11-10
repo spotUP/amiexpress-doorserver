@@ -5,6 +5,8 @@
  * Same rule as src/config.ts: configured, or refuse to start with a message
  * that names the variable. The bridge never reads the hub's own config.
  */
+import { dirname, join } from 'node:path';
+
 export class BridgeConfigError extends Error {}
 
 export interface BridgeConfig {
@@ -22,6 +24,8 @@ export interface BridgeConfig {
   waitSeconds: number;
   /** Handle of the bridge's own hub user (`bridge@DISCORD`). */
   handle: string;
+  /** Health file, rewritten after every hub poll (health.ts). */
+  healthPath: string;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -54,13 +58,15 @@ export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeCo
   } catch {
     throw new BridgeConfigError(`DISCORD_BRIDGE_HUB_URL is not a URL: ${hubUrl}`);
   }
+  const dbPath = required(env, 'DISCORD_BRIDGE_DB');
   return {
     hubUrl,
     boardKey: required(env, 'DISCORD_BRIDGE_BOARD_KEY'),
     rooms: parseRoomMap(required(env, 'DISCORD_BRIDGE_ROOMS')),
     discordToken: required(env, 'DISCORD_BOT_TOKEN'),
-    dbPath: required(env, 'DISCORD_BRIDGE_DB'),
+    dbPath,
     waitSeconds: 25,
     handle: 'bridge',
+    healthPath: env.DISCORD_BRIDGE_HEALTH?.trim() || join(dirname(dbPath), 'discord-bridge.health'),
   };
 }

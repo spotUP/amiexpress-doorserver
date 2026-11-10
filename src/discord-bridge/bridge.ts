@@ -26,6 +26,8 @@ export interface BridgeOptions {
   eventAttempts?: number;
   /** First delay between attempts on one event; doubles each retry. */
   eventBackoffMs?: number;
+  /** Called after every successful hub poll, with the seq the bridge has reached. */
+  onPolled?: (seq: number) => void;
 }
 
 export type HandlersFactory = (hub: HubClient, state: BridgeState) => BridgeHandlers;
@@ -71,6 +73,7 @@ export async function startBridge(config: BridgeConfig, handlersOrFactory: Bridg
   }
 
   let seq: number = since;
+  opts.onPolled?.(seq);
   const loop = (async (): Promise<void> => {
     let backoff = minBackoff;
     while (!abort.signal.aborted) {
@@ -106,6 +109,7 @@ export async function startBridge(config: BridgeConfig, handlersOrFactory: Bridg
           seq = batch.last;
           state.setSeq(seq);
         }
+        opts.onPolled?.(seq);
       } catch (err) {
         if (abort.signal.aborted) break;
         log(`[ERROR] hub: ${(err as Error).message}; retrying in ${backoff} ms`);

@@ -30,12 +30,17 @@ jobs:
           ACHIEVEMENTS_DB: ${{ secrets.ACHIEVEMENTS_DB }}
           ACHIEVEMENTS_SMTP_URL: ${{ secrets.ACHIEVEMENTS_SMTP_URL }}
           ACHIEVEMENTS_MAIL_FROM: ${{ secrets.ACHIEVEMENTS_MAIL_FROM }}
+          # LiveChat <> Discord bridge (docs/DISCORD-BRIDGE.md). The bot token
+          # switches it on; without it the bridge service is never started.
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_BRIDGE_BOARD_KEY: ${{ secrets.DISCORD_BRIDGE_BOARD_KEY }}
+          DISCORD_BRIDGE_ROOMS: ${{ secrets.DISCORD_BRIDGE_ROOMS }}
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: root
           key: ${{ secrets.HETZNER_SSH_KEY }}
           command_timeout: 30m
-          envs: DOORSERVER_JWT_SECRET,ACHIEVEMENTS_DB,ACHIEVEMENTS_SMTP_URL,ACHIEVEMENTS_MAIL_FROM,GH_TOKEN
+          envs: DOORSERVER_JWT_SECRET,ACHIEVEMENTS_DB,ACHIEVEMENTS_SMTP_URL,ACHIEVEMENTS_MAIL_FROM,DISCORD_BOT_TOKEN,DISCORD_BRIDGE_BOARD_KEY,DISCORD_BRIDGE_ROOMS,GH_TOKEN
           script: |
             set -euo pipefail
             cd /app/doorserver
@@ -125,6 +130,22 @@ jobs:
             else
               echo "[INFO] achievements surface off: ACHIEVEMENTS_SMTP_URL / ACHIEVEMENTS_MAIL_FROM not set"
             fi
+            # Discord bridge: all three or none. The bridge refuses to start
+            # with any one missing, so a partial set would only crash-loop it.
+            if [ -n "${DISCORD_BOT_TOKEN:-}" ] && [ -n "${DISCORD_BRIDGE_BOARD_KEY:-}" ] && [ -n "${DISCORD_BRIDGE_ROOMS:-}" ]; then
+              printf 'DISCORD_BOT_TOKEN=%s\n' "${DISCORD_BOT_TOKEN}" >> .env
+              printf 'DISCORD_BRIDGE_BOARD_KEY=%s\n' "${DISCORD_BRIDGE_BOARD_KEY}" >> .env
+              printf 'DISCORD_BRIDGE_ROOMS=%s\n' "${DISCORD_BRIDGE_ROOMS}" >> .env
+              printf 'COMPOSE_PROFILES=discord\n' >> .env
+              export COMPOSE_PROFILES=discord
+              echo "[OK] discord bridge configured ($(printf '%s' "${DISCORD_BRIDGE_ROOMS}" | tr ',' '\n' | wc -l | tr -d ' ') rooms)"
+            else
+              # A bridge left running from an earlier deploy would keep
+              # talking with stale settings; profile off means stopped.
+              docker compose --profile discord stop discord-bridge 2>/dev/null || true
+              docker compose --profile discord rm -f discord-bridge 2>/dev/null || true
+              echo "[INFO] discord bridge off: DISCORD_BOT_TOKEN / DISCORD_BRIDGE_BOARD_KEY / DISCORD_BRIDGE_ROOMS not all set"
+            fi
             echo "== prune builder cache + dangling/unused images (host runs at 91% disk, 3.6 GB free) =="
             # The board's own deploy runs on this host and prunes too; Docker
             # refuses a second prune with "a prune operation is already
@@ -147,6 +168,11 @@ jobs:
             echo "== health =="
             sleep 10
             curl -fsS http://localhost:3010/api/door-repo/health
+            if [ "${COMPOSE_PROFILES:-}" = "discord" ]; then
+              echo "== discord bridge =="
+              docker compose ps discord-bridge
+              docker compose logs --tail 20 discord-bridge
+            fi
             echo "== achievements: plain HTTP must reach the surface =="
             # The host's Caddyfile serves EVERY path of doors.uprough.net over
             # plain HTTP by design (Amiga stacks cannot do TLS; the block is

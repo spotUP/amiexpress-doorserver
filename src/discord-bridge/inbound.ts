@@ -173,6 +173,11 @@ export class GatewayDiscordIn implements DiscordIn {
     await this.client.login(this.token);
   }
 
+  /** True once the gateway session is up (discord.js resumes on its own after drops). */
+  get ready(): boolean {
+    return this.client.isReady();
+  }
+
   async close(): Promise<void> {
     await this.client.destroy();
   }

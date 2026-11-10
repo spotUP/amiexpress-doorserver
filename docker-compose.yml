@@ -1,5 +1,7 @@
 services:
   doorserver:
+    # Named so the discord-bridge service below runs the same build.
+    image: amiexpress-doorserver:latest
     build:
       context: .
       args:
@@ -48,6 +50,36 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # LiveChat <> Discord bridge (docs/DISCORD-BRIDGE.md). Off unless the
+  # profile is on: the deploy workflow writes COMPOSE_PROFILES=discord into
+  # .env only when the three DISCORD_* secrets exist. Same image as the
+  # hub, own process; it talks to the hub over HTTP like any federated board.
+  discord-bridge:
+    image: amiexpress-doorserver:latest
+    pull_policy: never
+    profiles: [discord]
+    command: ["node", "dist/src/discord-bridge/index.js"]
+    restart: unless-stopped
+    depends_on:
+      doorserver:
+        condition: service_healthy
+    volumes:
+      - doorserver-data:/data
+    environment:
+      DISCORD_BRIDGE_HUB_URL: http://doorserver:3010
+      DISCORD_BRIDGE_DB: /data/discord-bridge.db
+      DISCORD_BRIDGE_BOARD_KEY: ${DISCORD_BRIDGE_BOARD_KEY:-}
+      DISCORD_BRIDGE_ROOMS: ${DISCORD_BRIDGE_ROOMS:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+    # Health file is rewritten after every hub poll (25 s long-poll); stale
+    # past 80 s or a gateway that is not ready marks the container unhealthy.
+    healthcheck:
+      test: ["CMD", "node", "dist/src/discord-bridge/health.js", "/data/discord-bridge.health", "80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 networks:
   # Shared with the amiexpress-web (bbs) stack so the bbs container can

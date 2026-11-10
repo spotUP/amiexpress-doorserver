@@ -70,6 +70,7 @@ describe('bridge against the real hub', () => {
       rooms: new Map([[room, '111222333']]),
       discordToken: 'unused',
       dbPath: path.join(stateDir, 'bridge.db'),
+      healthPath: path.join(stateDir, 'bridge.health'),
       waitSeconds: 1,
       handle: 'bridge',
     };
@@ -77,9 +78,12 @@ describe('bridge against the real hub', () => {
     const handlers = { onEvent: (ev: BridgeEvent) => { seen.push(ev); } };
     const messages = () => seen.filter((e) => e.type === 'message');
 
-    const first = await startBridge(config, handlers, { log: () => undefined });
+    const polled: number[] = [];
+    const first = await startBridge(config, handlers, { log: () => undefined, onPolled: (seq) => polled.push(seq) });
+    expect(polled.length).toBe(1);
     await say('first message');
     await until(() => messages().length === 1);
+    await until(() => polled.includes(messages()[0].seq));
     expect(messages()[0].room).toBe(room);
     expect(messages()[0].text).toBe('first message');
     expect(messages()[0].user).toBe('alice@UPROUGH');
@@ -104,7 +108,7 @@ describe('bridge against the real hub', () => {
     await callAs('post', `/rooms/${room}/join`);
     const config: BridgeConfig = {
       hubUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, boardKey: discordKey, rooms: new Map([[room, 'c']]),
-      discordToken: 'x', dbPath: path.join(stateDir, 'b.db'), waitSeconds: 1, handle: 'bridge',
+      discordToken: 'x', dbPath: path.join(stateDir, 'b.db'), waitSeconds: 1, handle: 'bridge', healthPath: path.join(stateDir, 'b.health'),
     };
     const seen: BridgeEvent[] = [];
     const errors: string[] = [];

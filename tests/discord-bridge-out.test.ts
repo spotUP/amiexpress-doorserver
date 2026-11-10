@@ -113,6 +113,7 @@ describe('hub -> Discord through the bridge', () => {
       rooms: new Map([[room, '777']]),
       discordToken: 'unused',
       dbPath: path.join(stateDir, 'bridge.db'),
+      healthPath: path.join(stateDir, 'bridge.health'),
       waitSeconds: 1,
       handle: 'bridge',
     };
