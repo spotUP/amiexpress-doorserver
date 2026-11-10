@@ -7,6 +7,7 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import type { Message, PartialMessage } from 'discord.js';
 import { validHandle } from '../chat/sessions';
+import { CHAT_LIMITS } from '../../contract/chat-types';
 import { HubError } from './hub-client';
 import type { HubClient } from './hub-client';
 import { discordToHub, pickMember, type MentionNames } from './text';
@@ -23,6 +24,8 @@ export interface InboundMessage {
   webhookId?: string | null;
   content: string;
   attachmentUrls: string[];
+  /** The same attachments with the metadata the file copy needs. */
+  attachments?: { id: string; name: string; size: number; url: string }[];
   /** Id of the Discord message this one replies to. */
   referenceId?: string | null;
   /** Names for the user, role and channel ids the content mentions. */
@@ -60,7 +63,7 @@ export function toHandle(username: string, authorId: string): string {
 
 export interface InboundDeps {
   rooms: ReadonlyMap<string, string>;
-  hub: Pick<HubClient, 'postAs' | 'editAs' | 'deleteAs'>;
+  hub: Pick<HubClient, 'postAs' | 'editAs' | 'deleteAs' | 'uploadFileAs'>;
   state: BridgeState;
   log?: (line: string) => void;
   now?: () => number;
@@ -88,6 +91,21 @@ export function createInbound(deps: InboundDeps): InboundSink {
     }
   }
 
+  /** Download one attachment and store it in the hub as `handle`. Never throws: the message text is already posted. */
+  async function copyAttachment(room: string, handle: string, a: { id: string; name: string; size: number; url: string }): Promise<void> {
+    if (a.size > CHAT_LIMITS.fileMaxBytes) return;
+    try {
+      const res = await fetch(a.url);
+      if (!res.ok) return log(`[ERROR] attachment ${a.id}: download ${res.status}`);
+      const data = Buffer.from(await res.arrayBuffer());
+      if (data.length === 0 || data.length > CHAT_LIMITS.fileMaxBytes) return;
+      await deps.hub.uploadFileAs(room, handle, a.name, data, a.id.slice(0, 64));
+    } catch (err) {
+      if (err instanceof HubError && err.status >= 400 && err.status < 500) return log(`[INFO] hub refused attachment ${a.id}: ${err.message}`);
+      log(`[ERROR] attachment ${a.id}: ${(err as Error).message}`);
+    }
+  }
+
   return {
     async create(m) {
       const room = accepted(m);
@@ -104,6 +122,8 @@ export function createInbound(deps: InboundDeps): InboundSink {
         const hubId = await deps.hub.postAs(room, handle, text, `discord:${m.id}`.slice(0, 64), replyTo);
         deps.state.putLink({ hubMessageId: hubId, discordMessageId: m.id, roomId: room, createdAt: now(), authorLabel: handle, content: text });
       });
+      // Discord CDN links expire; keep a copy in the hub file store. After the text so it reads first.
+      for (const a of m.attachments ?? []) await copyAttachment(room, handle, a);
     },
     async update(m) {
       if (!accepted(m) || !m.contentChanged) return;
@@ -138,6 +158,7 @@ const toInbound = (m: Message | PartialMessage): InboundMessage => ({
   webhookId: m.webhookId,
   content: m.content ?? '',
   attachmentUrls: [...(m.attachments?.values() ?? [])].map((a) => a.url),
+  attachments: [...(m.attachments?.values() ?? [])].map((a) => ({ id: a.id, name: a.name ?? 'file', size: a.size, url: a.url })),
   referenceId: m.reference?.messageId,
   mentions: mentionNames(m),
 });

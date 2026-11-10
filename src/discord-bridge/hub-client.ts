@@ -3,6 +3,7 @@
  * `bridge` (user bridge@DISCORD), joined to the mapped rooms, then a long
  * poll of /events.txt. A 401 (session_expired) opens a new session.
  */
+import { CHAT_LIMITS } from '../../contract/chat-types';
 import { decodeBody, parseEvents, parseTextTable } from './wire';
 import type { BridgeEvent } from './wire';
 
@@ -32,17 +33,18 @@ export class HubClient {
     this.rooms = [...rooms];
   }
 
-  private headers(): Record<string, string> {
-    const h: Record<string, string> = { Authorization: `Board ${this.boardKey}`, 'Content-Type': 'application/json' };
+  private headers(contentType = 'application/json'): Record<string, string> {
+    const h: Record<string, string> = { Authorization: `Board ${this.boardKey}`, 'Content-Type': contentType };
     if (this.sid) h['X-Chat-Session'] = this.sid;
     return h;
   }
 
   private async send(method: string, path: string, body: unknown, signal?: AbortSignal): Promise<Buffer> {
+    const raw = Buffer.isBuffer(body);
     const res = await fetch(`${this.hubUrl}/chat/v1${path}`, {
       method,
-      headers: this.headers(),
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: this.headers(raw ? 'application/octet-stream' : 'application/json'),
+      body: body === undefined ? undefined : raw ? new Uint8Array(body) : JSON.stringify(body),
       signal,
     });
     const buf = Buffer.from(await res.arrayBuffer());
@@ -82,6 +84,39 @@ export class HubClient {
 
   async deleteAs(messageId: string, as: string): Promise<void> {
     await this.call('DELETE', `/messages/${encodeURIComponent(messageId)}?as=${encodeURIComponent(as)}`);
+  }
+
+  /** Start a file upload in `room` as `as@DISCORD`; `clientId` dedupes a retry. */
+  async beginFileAs(room: string, as: string, name: string, size: number, clientId: string): Promise<{ id: string; chunkMax: number; received: number }> {
+    const out = await this.call('POST', `/rooms/${encodeURIComponent(room)}/files`, { as, name, size, clientId });
+    return JSON.parse(out.toString('utf8')) as { id: string; chunkMax: number; received: number };
+  }
+
+  /** One raw chunk at `offset` (at most the hub's chunkMax). The route has no JSON body, so `as` rides the query. */
+  async chunkAs(fileId: string, as: string, offset: number, data: Buffer): Promise<void> {
+    await this.call('PUT', `/files/${encodeURIComponent(fileId)}/chunk?offset=${offset}&as=${encodeURIComponent(as)}`, data);
+  }
+
+  async finishFileAs(fileId: string, as: string): Promise<{ id: string; sha256: string; kind: string }> {
+    const out = await this.call('POST', `/files/${encodeURIComponent(fileId)}/finish`, { as });
+    return JSON.parse(out.toString('utf8')) as { id: string; sha256: string; kind: string };
+  }
+
+  async deleteFileAs(fileId: string, as: string): Promise<void> {
+    await this.call('DELETE', `/files/${encodeURIComponent(fileId)}?as=${encodeURIComponent(as)}`);
+  }
+
+  /** begin, chunks (resuming at `received`), finish. A failure after begin deletes the partial upload. */
+  async uploadFileAs(room: string, as: string, name: string, data: Buffer, clientId: string): Promise<{ id: string; sha256: string; kind: string }> {
+    const begun = await this.beginFileAs(room, as, name, data.length, clientId);
+    const step = Math.min(begun.chunkMax || CHAT_LIMITS.fileChunkMax, CHAT_LIMITS.fileChunkMax);
+    try {
+      for (let off = begun.received; off < data.length; off += step) await this.chunkAs(begun.id, as, off, data.subarray(off, off + step));
+      return await this.finishFileAs(begun.id, as);
+    } catch (err) {
+      await this.deleteFileAs(begun.id, as).catch(() => undefined);
+      throw err;
+    }
   }
 
   /** Upper-cased ids of the boards whose chat may be mirrored (discord_mirror on), with the list's rev. */

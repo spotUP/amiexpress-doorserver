@@ -213,6 +213,7 @@ describe('Discord -> hub through the bridge', () => {
         postAs: async () => { posts.push('x'); throw new (await import('../src/discord-bridge/hub-client')).HubError('POST -> 403 muted', 403); },
         editAs: async () => undefined,
         deleteAs: async () => undefined,
+        uploadFileAs: async () => ({ id: 'f', sha256: '', kind: 'other' }),
       },
       state: { byDiscord: () => undefined, putLink: () => undefined } as never,
       log: (l) => posts.push(l),
