@@ -24,6 +24,8 @@ import { clampMaxBytes, displayLabels, fitRows, markOrigin, renderText, sendText
 import * as roles from './roles';
 import { actingCtx, createSession, expireSession, resolveSession, startSweeper } from './sessions';
 import type { ChatCtx } from './sessions';
+import * as files from './files';
+import * as fs from 'fs';
 import * as store from './store';
 import type { Body } from './store';
 import { requireSysop } from './permissions';
@@ -33,12 +35,15 @@ const ADMIN_CTX: ChatCtx = { sid: null, boardId: '', handle: 'admin', user: '', 
 export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): express.Router {
   const chat = loadChatConfig();
   const router = express.Router();
-  startSweeper(ach, chat);
+  const filesDir = cfg.chatFilesDir ?? null;
+  startSweeper(ach, chat, filesDir);
 
   router.use((_req: Request, res: Response, next: NextFunction) => {
     res.set('X-Chat-Contract', CHAT_CONTRACT_VERSION);
     next();
   });
+  // File chunks are raw bytes, capped at one chunk; every JSON route stays at 32 KB.
+  router.use('/files/:id/chunk', express.raw({ type: 'application/octet-stream', limit: CHAT_LIMITS.fileChunkMax }));
   router.use(express.json({ limit: '32kb' }));
 
   router.get('/health', (_req: Request, res: Response) => {
@@ -333,12 +338,75 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     res.json({ ok: true });
   });
   router.delete('/rooms/:id', (req: Request, res: Response) => {
-    run(req, true, (db, ctx) => store.deleteRoom(db, ctx, p(req, 'id')));
+    run(req, true, (db, ctx) => store.deleteRoom(db, ctx, p(req, 'id'), filesDir));
     res.json({ ok: true });
   });
   router.post('/rooms/:id/clear', (req: Request, res: Response) => {
-    run(req, true, (db, ctx) => store.clearRoom(db, ctx, p(req, 'id')));
+    run(req, true, (db, ctx) => store.clearRoom(db, ctx, p(req, 'id'), filesDir));
     res.json({ ok: true });
+  });
+
+  // ---- files ----
+  router.post('/rooms/:id/files', (req: Request, res: Response) => {
+    res.json(runAs(req, (db, ctx) => files.beginUpload(db, filesDir, ctx, p(req, 'id'), body(req))));
+  });
+  router.put('/files/:id/chunk', (req: Request, res: Response) => {
+    const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    const offset = req.query.offset === undefined ? undefined : Number(req.query.offset);
+    const out = runAs(req, (db, ctx) => files.uploadChunk(db, filesDir, ctx, p(req, 'id'), offset, raw));
+    if (out.ok) res.json({ received: out.received });
+    else if ('conflict' in out) res.status(409).json({ error: 'conflict', detail: 'offset does not match what was received', received: out.received });
+    else res.status(507).json({ error: 'quota', detail: 'the hub could not store the chunk; the upload was cancelled' });
+  });
+  router.post('/files/:id/finish', (req: Request, res: Response) => {
+    res.json(runAs(req, (db, ctx) => files.finishUpload(db, filesDir, ctx, p(req, 'id'))));
+  });
+  router.delete('/files/:id', (req: Request, res: Response) => {
+    runAs(req, (db, ctx) => files.deleteFile(db, filesDir, ctx, p(req, 'id')));
+    res.json({ ok: true });
+  });
+  router.get('/rooms/:id/files.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db, ctx) => ({ rows: files.listFiles(db, ctx, p(req, 'id'), filesDir !== null), rev: headSeq(db) }));
+    sendText(res, renderText('FILES', out.rev, out.rows.map((r) => [r.id, r.name, r.size, r.uploader, r.created_at, r.label])));
+  });
+  router.get('/rooms/:id/files', (req: Request, res: Response) => {
+    const rows = run(req, false, (db, ctx) => files.listFiles(db, ctx, p(req, 'id'), filesDir !== null));
+    res.json({
+      files: rows.map((r) => ({ id: r.id, name: r.name, size: r.size, uploader: r.uploader, at: r.created_at, label: r.label, kind: r.kind, sha256: r.sha256 })),
+    });
+  });
+  router.get('/files/:id', (req: Request, res: Response, next: NextFunction) => {
+    let dl: files.Download;
+    try {
+      dl = run(req, false, (db, ctx) => files.openDownload(db, filesDir, ctx, p(req, 'id')));
+    } catch (err) {
+      next(err);
+      return;
+    }
+    let start = 0;
+    let end = dl.size - 1;
+    let status = 200;
+    const m = /^bytes=(\d+)-(\d*)$/.exec(String(req.headers.range ?? ''));
+    if (m) {
+      start = Number(m[1]);
+      if (m[2]) end = Math.min(Number(m[2]), dl.size - 1);
+      if (start > end || start >= dl.size) {
+        res.status(416).set('Content-Range', `bytes */${dl.size}`).json({ error: 'bad_request', detail: 'range not satisfiable' });
+        return;
+      }
+      status = 206;
+      res.set('Content-Range', `bytes ${start}-${end}/${dl.size}`);
+    }
+    res.status(status);
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Content-Disposition', `attachment; filename="${dl.name}"`);
+    res.set('Content-Length', String(end - start + 1));
+    res.set('Accept-Ranges', 'bytes');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Connection', 'close');
+    const stream = fs.createReadStream(dl.path, { start, end });
+    stream.on('error', () => res.destroy());
+    stream.pipe(res);
   });
 
   // ---- motd ----
@@ -440,6 +508,10 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     if (err instanceof SurfaceError) {
       if (err.retryAfter !== undefined) res.set('Retry-After', String(err.retryAfter));
       res.status(err.status).json({ error: err.code, detail: err.message, ...(err.retryAfter !== undefined ? { retryAfter: err.retryAfter } : {}) });
+      return;
+    }
+    if ((err as { type?: string }).type === 'entity.too.large') {
+      res.status(413).json({ error: 'too_large', detail: 'request body is too large' });
       return;
     }
     const status = (err as { status?: number }).status;

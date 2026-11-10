@@ -43,6 +43,12 @@ export interface ServerConfig {
    * surface, door repo unaffected.
    */
   releases: ReleasesConfig | null;
+  /**
+   * CHAT_FILES_DIR: where shared chat files wait (<id>.part, <id>.bin), beside
+   * the database and never inside a served directory. null or absent: the
+   * /chat/v1 file routes answer 503 files_disabled.
+   */
+  chatFilesDir?: string | null;
 }
 
 const DEFAULT_PORT = 3010;
@@ -77,6 +83,18 @@ function parseAdminKeys(raw: string | undefined): AdminKey[] {
     });
 }
 
+/** CHAT_FILES_DIR, created if missing (the quarantineDir handling); unset means the file surface is off. */
+function loadChatFilesDir(env: NodeJS.ProcessEnv): string | null {
+  const dir = env.CHAT_FILES_DIR?.trim();
+  if (!dir) return null;
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    throw new ConfigError(`CHAT_FILES_DIR points at ${dir}, which cannot be created: ${(err as Error).message}`);
+  }
+  return dir;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const dbPath = mustExist('DOORSERVER_DB', required(env, 'DOORSERVER_DB'));
   const archivesRoot = mustExist('DOOR_ARCHIVES_ROOT', required(env, 'DOOR_ARCHIVES_ROOT'));
@@ -97,5 +115,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     learnKey: env.DOORREPO_LEARN_KEY?.trim() || null,
     achievements: loadAchievementsConfig(env),
     releases: loadReleasesConfig(env),
+    chatFilesDir: loadChatFilesDir(env),
   };
 }

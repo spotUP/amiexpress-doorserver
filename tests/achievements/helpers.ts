@@ -42,6 +42,8 @@ export const TEST_ADMIN = { username: 'spot', password: 'correct horse battery s
 const TEST_JWT_SECRET = 'a-test-secret-that-is-long-enough-to-pass';
 
 export interface FixtureOptions {
+  /** Give the chat hub a CHAT_FILES_DIR inside the fixture directory. */
+  chatFiles?: boolean;
   /**
    * Switch the admin API on: a signing secret and one bootstrapped account,
    * so the curation routes under /achievements/v1/admin can be driven. Off
@@ -120,7 +122,9 @@ export function makeAchievementsFixture(opts: FixtureOptions = {}): Achievements
     learnKey: null,
     achievements: ach,
     releases: null,
+    chatFilesDir: opts.chatFiles ? path.join(dir, 'chat-files') : null,
   };
+  if (cfg.chatFilesDir) fs.mkdirSync(cfg.chatFilesDir);
 
   // One door, so the catalog half of the server is usable and a test can
   // tell "the achievements surface is missing" apart from "the whole server

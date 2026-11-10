@@ -33,7 +33,7 @@ export type SurfaceErrorCode = ErrorCode | RequestErrorCode | ChatErrorCode;
  * (ACHIEVEMENTS-API.md, section 6), so it is never thrown - it is what the
  * router answers when something unexpected reached it.
  */
-export type RefusalStatus = 400 | 401 | 403 | 404 | 409 | 413 | 422 | 429;
+export type RefusalStatus = 400 | 401 | 403 | 404 | 409 | 413 | 422 | 429 | 503 | 507;
 
 export class SurfaceError extends Error {
   constructor(

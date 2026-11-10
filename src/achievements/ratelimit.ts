@@ -101,6 +101,14 @@ export function charge(charges: Charge[]): void {
   for (const p of planned) p.w.count += p.cost;
 }
 
+/** Give back what `charge` took, for a charge whose work was abandoned (an upload cancelled or dropped). */
+export function refund(charges: Charge[]): void {
+  for (const c of charges) {
+    const w = windows.get(c.key);
+    if (w) w.count = Math.max(0, w.count - (c.cost ?? 1));
+  }
+}
+
 const emailKey = (email: unknown): string | null =>
   typeof email === 'string' && email.trim().length > 0 ? email.trim().toLowerCase() : null;
 

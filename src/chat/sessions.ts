@@ -16,6 +16,7 @@ import type { AchievementsConfig } from '../achievements/config';
 import { nowSec } from './config';
 import type { ChatConfig } from './config';
 import { emitEvent, pruneEvents } from './events';
+import { sweepFiles } from './files';
 
 export interface ChatCtx {
   sid: string | null;
@@ -155,13 +156,14 @@ const sweepers = new Map<string, NodeJS.Timeout>();
 const SWEEP_MS = 15_000;
 const PRUNE_EVERY = 240; // sweeps: hourly
 
-export function startSweeper(ach: AchievementsConfig, cfg: ChatConfig): void {
+export function startSweeper(ach: AchievementsConfig, cfg: ChatConfig, filesDir: string | null = null): void {
   if (sweepers.has(ach.dbPath)) return;
   let ticks = 0;
   const timer = setInterval(() => {
     try {
       withAchievementsDb(ach, (db) => {
         sweepSessions(db, cfg);
+        sweepFiles(db, filesDir);
         ticks += 1;
         if (ticks % PRUNE_EVERY === 1) pruneEvents(db, cfg.eventsKept ?? CHAT_LIMITS.eventsKept);
       });

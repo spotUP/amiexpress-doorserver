@@ -35,6 +35,8 @@ export const CHAT_TEXT_FORMATS = {
   IGNORES: ['user', 'at'],
   /** One canvas row: `y` 0-23, `cells` in the canvas wire encoding (docs/CHAT-API.md). */
   CANVAS: ['y', 'cells'],
+  /** One ready file of a room, newest first; `at` is the epoch second it was shared, `label` the uploader's board label. */
+  FILES: ['id', 'name', 'size', 'uploader', 'at', 'label'],
 } as const;
 export type ChatTextFormat = keyof typeof CHAT_TEXT_FORMATS;
 
@@ -72,6 +74,10 @@ export const CHAT_EVENT_TYPES = [
   'discord_mirror',
   /** One edit of an art room's shared canvas; ref = the new revision, text = the ops (canvas wire encoding). Never relayed to Discord. */
   'canvas',
+  /** A file finished uploading to a room; ref = the file id, text = `name|size|kind`. */
+  'file_shared',
+  /** A shared file went away; ref = the file id, text = `name|why` (uploader, op, sysop, expired or room-cleared). */
+  'file_deleted',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 
@@ -100,6 +106,14 @@ export const CHAT_ERROR_CODES = [
   'moderated',
   /** The request carried `as` but the board is not a relay board (boards.chat_relay). */
   'not_relay',
+  /** A file is larger than fileMaxBytes (also the answer to a chunk over fileChunkMax). */
+  'too_large',
+  /** A file quota (per user or board per day, or the hub's disk ceiling) is used up. */
+  'quota',
+  /** The file was deleted or expired. */
+  'file_gone',
+  /** The hub has no CHAT_FILES_DIR: the file surface answers 503. */
+  'files_disabled',
 ] as const;
 export type ChatErrorCode = (typeof CHAT_ERROR_CODES)[number];
 
@@ -148,6 +162,22 @@ export const CHAT_LIMITS = {
   canvasCellsMax: 1920,
   /** A text reply stops before it passes this many bytes (68K reply buffers are 8192). */
   replyMaxBytes: 7680,
+  /** Largest shared file, in bytes (2 MB). */
+  fileMaxBytes: 2097152,
+  /** Largest chunk of one PUT /files/:id/chunk, in bytes. */
+  fileChunkMax: 32768,
+  /** Ready files kept per room; the oldest expire first. */
+  filesPerRoomKept: 200,
+  /** Upload bytes one user may start per day (10 MB). */
+  fileBytesPerUserPerDay: 10485760,
+  /** Upload bytes one board may start per day (100 MB). */
+  fileBytesPerBoardPerDay: 104857600,
+  /** Days a ready file is kept. */
+  fileRetentionDays: 14,
+  /** An unfinished upload with no chunk for this long is dropped. */
+  fileUploadIdleSeconds: 600,
+  /** Hard ceiling on bytes held by the hub (5 GB); begin refuses with `quota` past it. */
+  hubFileBytesMax: 5368709120,
 } as const;
 
 export interface ChatApiError {
@@ -411,5 +441,12 @@ export const CHAT_ENDPOINTS = [
   'GET /ignores.txt',
   'POST /ignores',
   'DELETE /ignores/:user',
+  'POST /rooms/:id/files',
+  'PUT /files/:id/chunk',
+  'POST /files/:id/finish',
+  'DELETE /files/:id',
+  'GET /rooms/:id/files.txt',
+  'GET /rooms/:id/files',
+  'GET /files/:id',
 ] as const;
 export type ChatEndpoint = (typeof CHAT_ENDPOINTS)[number];

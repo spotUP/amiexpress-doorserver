@@ -18,12 +18,13 @@ import { getRoom, isMember, isOp, isOwnerLevel, isRoomStaff, requireCanvasClear,
 import { applyParsed, blankCanvas, CANVAS_ROWS, CanvasGrammarError, encodeRow, parseOps } from './canvas-codec';
 import type { RoomRec } from './permissions';
 import { permsOf } from './roles';
+import { removeRoomFiles } from './files';
 import { newId, splitUser, validHandle } from './sessions';
 import type { ChatCtx } from './sessions';
 
 export type Body = Record<string, unknown>;
 
-function str(b: Body, k: string, max: number, opts: { empty?: boolean } = {}): string {
+export function str(b: Body, k: string, max: number, opts: { empty?: boolean } = {}): string {
   const v = b[k];
   if (typeof v !== 'string') throw new SurfaceError('bad_request', 400, `${k} must be a string`);
   if (!opts.empty && v.trim().length === 0) throw new SurfaceError('bad_request', 400, `${k} must not be empty`);
@@ -31,7 +32,7 @@ function str(b: Body, k: string, max: number, opts: { empty?: boolean } = {}): s
   return v;
 }
 
-function clientId(b: Body): string {
+export function clientId(b: Body): string {
   const v = b.clientId;
   if (typeof v !== 'string' || v.length === 0) throw new SurfaceError('bad_request', 400, 'clientId is required');
   if (v.length > CHAT_LIMITS.clientIdMax) throw new SurfaceError('too_long', 400, 'clientId is too long');
@@ -45,7 +46,7 @@ function targetUser(b: Body): string {
   return u as string;
 }
 
-function chargeMessage(ctx: ChatCtx): void {
+export function chargeMessage(ctx: ChatCtx): void {
   charge([
     // A relay session carries many authors: each one gets its own allowance.
     { key: `chat:msg:${ctx.relayOf ? `${ctx.sid}:${ctx.user}` : ctx.sid ?? ctx.user}`, limit: { max: CHAT_LIMITS.messagesPerSession, windowSeconds: CHAT_LIMITS.messagesPerSessionWindowSeconds } },
@@ -53,7 +54,7 @@ function chargeMessage(ctx: ChatCtx): void {
   ]);
 }
 
-function requireSession(ctx: ChatCtx): void {
+export function requireSession(ctx: ChatCtx): void {
   if (!ctx.sid) throw new SurfaceError('unauthorized', 401, 'this needs a chat session');
 }
 
@@ -292,7 +293,7 @@ function getMessage(db: Database.Database, id: string): MsgRow {
   return m;
 }
 
-function requireMemberOf(db: Database.Database, roomId: string, ctx: ChatCtx): void {
+export function requireMemberOf(db: Database.Database, roomId: string, ctx: ChatCtx): void {
   // A relayed author is never a member itself: the relay session is, and a
   // room ban on the author (which evicts ordinary users) is checked here.
   if (!isMember(db, roomId, ctx.relayOf ?? ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
@@ -301,13 +302,13 @@ function requireMemberOf(db: Database.Database, roomId: string, ctx: ChatCtx): v
   }
 }
 
-function requireNotMuted(db: Database.Database, roomId: string, user: string): void {
+export function requireNotMuted(db: Database.Database, roomId: string, user: string): void {
   const m = db.prepare('SELECT until FROM chat_mutes WHERE room_id = ? AND user = ?').get(roomId, user) as { until: number | null } | undefined;
   if (m && (m.until === null || m.until > nowSec())) throw new SurfaceError('muted', 403, 'you are muted in this room');
 }
 
 /** +m (moderated): only the room's staff and voiced users may speak. */
-function requireVoice(db: Database.Database, room: RoomRec, ctx: ChatCtx): void {
+export function requireVoice(db: Database.Database, room: RoomRec, ctx: ChatCtx): void {
   if (!room.moderated || isRoomStaff(db, room, ctx)) return;
   if (db.prepare('SELECT 1 FROM chat_room_voices WHERE room_id = ? AND user = ?').get(room.id, ctx.user) !== undefined) return;
   throw new SurfaceError('moderated', 403, 'Room is moderated (+m); you need voice (+v) or op (+o) to speak');
@@ -774,7 +775,7 @@ export function setVisibility(db: Database.Database, ctx: ChatCtx, id: string, b
   db.prepare('UPDATE chat_rooms SET visibility = ? WHERE id = ?').run(b.visibility, id);
 }
 
-export function deleteRoom(db: Database.Database, ctx: ChatCtx, id: string): void {
+export function deleteRoom(db: Database.Database, ctx: ChatCtx, id: string, filesDir: string | null = null): void {
   const room = getRoom(db, id);
   requireOwner(room, ctx);
   emitEvent(db, { type: 'room_deleted', roomId: id, user: ctx.user || 'admin', text: room.name });
@@ -782,9 +783,10 @@ export function deleteRoom(db: Database.Database, ctx: ChatCtx, id: string): voi
   db.prepare('DELETE FROM chat_members WHERE room_id = ?').run(id);
   // The room row is only soft-deleted, so the cascade never fires: the canvas goes with the room here.
   db.prepare('DELETE FROM chat_canvas WHERE room_id = ?').run(id);
+  removeRoomFiles(db, filesDir, id, ctx.user || 'admin', false);
 }
 
-export function clearRoom(db: Database.Database, ctx: ChatCtx, id: string): void {
+export function clearRoom(db: Database.Database, ctx: ChatCtx, id: string, filesDir: string | null = null): void {
   const room = getRoom(db, id);
   requireOwner(room, ctx);
   const ids = db.prepare('SELECT id FROM chat_messages WHERE room_id = ? AND deleted_at IS NULL').all(id) as { id: string }[];
@@ -792,6 +794,7 @@ export function clearRoom(db: Database.Database, ctx: ChatCtx, id: string): void
   db.prepare('UPDATE chat_messages SET deleted_at = ? WHERE room_id = ? AND deleted_at IS NULL').run(nowSec(), id);
   db.prepare('DELETE FROM chat_pins WHERE room_id = ?').run(id);
   emitEvent(db, { type: 'delete', roomId: id, user: ctx.user || 'admin', ref: '*' });
+  removeRoomFiles(db, filesDir, id, ctx.user || 'admin', true);
 }
 
 // ---- motd, pins, search, emoji ----

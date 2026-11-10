@@ -81,6 +81,13 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/typing` | `{text}`: the caller's whole input buffer, empty = stopped typing; trimmed to 200 characters, no error. Room members only (no +m check). Emits a `typing` event; senders throttle to one per 400 ms and always send the final empty text |
 | GET | `/rooms/:id/canvas.txt` | `?from=0&count=24&maxBytes=7680`; the shared 80x24 canvas of an **art** room as CANVAS rows, one per canvas row. Members only. Stops before the reply passes `maxBytes` (never above 7680) and reports the rows sent in the header count; ask again from the next row. A room that is not `kind` `art`: 403 `forbidden`. The row is created blank on first use |
 | POST | `/rooms/:id/canvas` | `{base, ops}`: apply `ops` (the canvas wire encoding below) to an art room's canvas; reply `{rev}`. Members only. `base` is the revision the caller last saw: informational, never a reason to refuse. Posts apply in arrival order, last writer wins per cell, `rev` goes up by one per post. An `X` (clear) op needs the room owner or a room op, else 403 `forbidden`. 403 on a room that is not an art room; 413 `too_long` over 512 bytes; 422 `bad_request` for bad grammar (the detail names the byte offset) or more than 1920 cells; 429 `rate_limited` over 40 posts per session per 10 seconds. Emits one `canvas` event |
+| POST | `/rooms/:id/files` | `{name, size, clientId, as?}`: start an upload of `size` bytes (1 to 2097152) into the room; reply `{id, chunkMax, received, name}`. Members only, with voice in a +m room. `name` is rebuilt by the hub (last path part, accents folded, spaces to `_`, only `A-Za-z0-9._-`, 30 characters at most); a clash in the room gets `_2`, `_3`. The same `clientId` returns the same upload. One unfinished upload per user per room (409 `conflict`). 413 `too_large` over 2 MB; 429 `quota` over 10 MB per user or 100 MB per board per day (`Retry-After` set); 507 `quota` when the hub store is full; 503 `files_disabled` when `CHAT_FILES_DIR` is not set |
+| PUT | `/files/:id/chunk` | `?offset=N`, body `application/octet-stream` of 1 to 32768 bytes: append at `offset`. Reply `{received}`. An offset that is not the bytes already received: 409 `conflict` with `received`, send from there. 413 `too_large` over 32768 bytes; 507 `quota` when the hub could not store it (the upload is cancelled). Uploader only |
+| POST | `/files/:id/finish` | `{as?}`: close the upload; reply `{id, sha256, kind, name, size}`. 409 `conflict` unless every byte arrived. `kind` is `lha`, `lzx`, `dms`, `zip`, `program` (Amiga hunk executable), `image`, `text` or `binary`. Emits `file_shared`. Calling it again returns the same reply |
+| DELETE | `/files/:id` | cancel an unfinished upload, or delete a shared file (`?as=` for a relay board). The uploader, a room op or moderator, or a sysop may. 404 `file_gone` when already deleted. Emits `file_deleted` |
+| GET | `/rooms/:id/files.txt` | the room's shared files, newest first, as FILES rows (at most 200). Members only |
+| GET | `/rooms/:id/files` | the same list as JSON `{files: [{id, name, size, uploader, at, label, kind, sha256}]}`. Members only |
+| GET | `/files/:id` | the file bytes. Members only (403 `not_member`); 404 `file_gone` for a deleted or expired file. Always `application/octet-stream` with `Content-Disposition: attachment` and an exact `Content-Length`; `Range: bytes=N-` or `N-M` answers 206 with `Content-Range`. The hub has no virus scanner: treat every file as untrusted |
 | PUT | `/rooms/:id/motd` | `{motd}` (at most 500 characters, empty clears); room owner or moderator |
 | PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
 | DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
@@ -154,6 +161,7 @@ Formats and their fields, in order:
 - PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`
 - IGNORES: `user|at`
 - CANVAS: `y|cells` (`y` is the canvas row 0 to 23, `cells` the row in the canvas wire encoding)
+- FILES: `id|name|size|uploader|at|label`
 
 `status` and `statusText` (WHO, MEMBERS, PROFILE) were appended after the
 original fields, so a parser that reads the old positions keeps working.
@@ -253,6 +261,12 @@ IGNORES|1|413|1
 zed@FRIEND|1762500100
 ```
 
+```text example FILES
+FILES|1|17|2
+fa1b2c3d4e5f6|demo.lha|48213|alice@BOARD|1760000000|alice
+f0f9e8d7c6b5|notes.txt|912|bob@OTHER|1759990000|bob@OTHER
+```
+
 ```text example CANVAS
 CANVAS|1|17|2
 3|^40#*19;^70 *59;
@@ -307,6 +321,8 @@ itself hold `!`-escaped sub-fields):
 | `mode` | room id | who set it | empty | the applied modes, e.g. `+i +o alice@BOARD` |
 | `typing` | room id | the typer | empty | the typer's whole input buffer (empty = stopped); receivers expire it after 5 s |
 | `canvas` | room id | the drawer | the new canvas revision | the ops, in the canvas wire encoding; every member of the room gets it (their own echo too); never relayed to Discord |
+| `file_shared` | room id | the uploader | the file id | `name!size!kind` (the field separator is escaped like any event text) |
+| `file_deleted` | room id | who deleted it (`system` for expiry) | the file id | `name!why`; `why` is `uploader`, `op`, `sysop`, `expired` or `room-cleared` |
 | `banned` | room id | the target | empty | `actor!reason` |
 | `muted` | room id | the target | empty | `actor!minutes` |
 | `dm` | `dm:<threadId>` | sender | message id | content |
@@ -366,14 +382,19 @@ recolour live.
 Errors are JSON `{"error": "<code>", "detail": "<text>", "retryAfter"?: n}`.
 Codes: `bad_request`, `unauthorized`, `session_expired`, `forbidden`,
 `banned`, `muted`, `not_member`, `invite_required`, `not_found`, `too_long`,
-`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op), `not_relay` (the request carried `as` but the board is not a relay board). A 429 also carries a `Retry-After` header.
+`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op), `not_relay` (the request carried `as` but the board is not a relay board), `too_large` (413; a file or chunk over its limit), `quota` (429 daily upload quota, 507 hub store full), `file_gone` (404; the file was deleted or expired), `files_disabled` (503; the hub has no `CHAT_FILES_DIR`). A 429 also carries a `Retry-After` header.
 
 Limits (fixed windows in process): 20 messages per session per 10 seconds,
 300 messages per board per minute, 30 live sessions per board, 6 room
 creations per board per hour, 64 held polls per board, 40 canvas posts per
 session per 10 seconds. Reads other than
 `events.txt` are not limited. Environment overrides: `CHAT_POLL_MAX_WAIT`
-(default 25), `CHAT_SESSION_TTL` (default 90).
+(default 25), `CHAT_SESSION_TTL` (default 90), `CHAT_FILES_DIR` (where file blobs live, outside any served directory; unset turns file sharing off).
+
+File limits: 2 MB per file, 32 KB per chunk, 10 MB per user and 100 MB per board
+per day (a relay `as` upload charges the board only), 200 files kept per room,
+files expire after 14 days, an idle unfinished upload is dropped after 10 minutes,
+clearing or deleting a room deletes its files.
 
 ## 7. The 68K polling recipe
 

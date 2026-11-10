@@ -76,16 +76,45 @@ export function sniffArchive(head: Buffer): string | null {
 }
 
 /**
- * A filename this server is willing to write. Rebuilt from the submitted
- * one rather than sanitised: anything not in the allowed set is dropped, so
- * no traversal, no separators, no control bytes can survive.
+ * The shared half of every "rebuild, never sanitise" filename rule: take the
+ * last path component (split on `separators`) and keep only the characters
+ * `keep` matches. Anything else is dropped, so no traversal, no separators and
+ * no control bytes can survive.
  */
+export function rebuildBasename(submitted: string, keep: RegExp, separators: RegExp = /\//): string {
+  const parts = submitted.split(separators);
+  return (parts[parts.length - 1] ?? '').replace(keep, '');
+}
+
+/** A filename this server is willing to write, for an archive submission. */
 export function safeArchiveName(submitted: string): string | null {
-  const base = path.basename(submitted).replace(/[^A-Za-z0-9!$^&._-]/g, '');
+  const base = rebuildBasename(path.basename(submitted), /[^A-Za-z0-9!$^&._-]/g);
   if (!base || base.length > 40 || base.startsWith('.')) return null;
   const ext = path.extname(base).toLowerCase();
   if (!ALLOWED_EXTENSIONS.has(ext)) return null;
   return base;
+}
+
+/**
+ * What a shared chat file is, from its first bytes: an archive kind from
+ * `sniffArchive`, then Amiga hunk executables (magic 000003F3), images
+ * (GIF, PNG, JPEG, IFF), text (no NUL, mostly printable), else `binary`.
+ */
+export function sniffFileKind(head: Buffer): 'lha' | 'lzx' | 'dms' | 'zip' | 'program' | 'image' | 'text' | 'binary' {
+  const archive = sniffArchive(head);
+  if (archive) return archive as 'lha' | 'lzx' | 'dms' | 'zip';
+  if (head.length >= 4 && head.readUInt32BE(0) === 0x000003f3) return 'program';
+  const m4 = head.length >= 4 ? head.toString('latin1', 0, 4) : '';
+  if (m4 === 'GIF8' || m4 === 'FORM' || m4 === '\x89PNG' || (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff)) return 'image';
+  if (head.length > 0) {
+    let ok = 0;
+    for (const b of head) {
+      if (b === 0) return 'binary';
+      if (b === 9 || b === 10 || b === 13 || (b >= 32 && b < 127) || b >= 160) ok += 1;
+    }
+    if (ok / head.length >= 0.95) return 'text';
+  }
+  return 'binary';
 }
 
 /**

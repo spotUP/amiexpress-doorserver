@@ -324,4 +324,41 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
           updated_at INTEGER NOT NULL)`);
     },
   },
+  {
+    version: 13,
+    name: 'chat: chat_files holds the files shared in a room (blobs live in CHAT_FILES_DIR)',
+    // One row per upload. `uploading` rows have a <id>.part blob, `ready` rows
+    // a <blob_id>.bin (blob_id differs from id when identical bytes in the
+    // same room were linked to an existing blob). `deleted` rows stay for
+    // moderation audit until the sweeper drops them. relay = 1: the upload was
+    // made by a relay board `as` a user, so only the board's quota was charged.
+    // img_w / img_h are filled by a later task and stay NULL until then.
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_files (
+          id          TEXT PRIMARY KEY,
+          room_id     TEXT NOT NULL REFERENCES chat_rooms(id),
+          board_id    TEXT NOT NULL,
+          uploader    TEXT NOT NULL COLLATE NOCASE,
+          name        TEXT NOT NULL,
+          orig_name   TEXT NOT NULL,
+          size        INTEGER NOT NULL,
+          received    INTEGER NOT NULL DEFAULT 0,
+          sha256      TEXT,
+          kind        TEXT,
+          status      TEXT NOT NULL,
+          client_id   TEXT NOT NULL DEFAULT '',
+          blob_id     TEXT,
+          relay       INTEGER NOT NULL DEFAULT 0,
+          img_w       INTEGER,
+          img_h       INTEGER,
+          created_at  INTEGER NOT NULL,
+          updated_at  INTEGER NOT NULL,
+          expires_at  INTEGER NOT NULL,
+          deleted_at  INTEGER,
+          deleted_by  TEXT,
+          deleted_why TEXT)`);
+      db.exec('CREATE INDEX IF NOT EXISTS chat_files_room ON chat_files(room_id, status, created_at)');
+      db.exec('CREATE INDEX IF NOT EXISTS chat_files_expiry ON chat_files(status, expires_at)');
+    },
+  },
 ];

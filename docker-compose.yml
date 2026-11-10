@@ -34,6 +34,8 @@ services:
       # volume. It is set ONLY once SMTP is configured on the host: unset,
       # the surface is off and the door repo serves as before; set with no
       # SMTP, the server refuses to start (D7), which is the point.
+      # Shared chat files (docs/CHAT-API.md section 9), on the same volume.
+      CHAT_FILES_DIR: ${CHAT_FILES_DIR:-/data/chat-files}
       ACHIEVEMENTS_DB: ${ACHIEVEMENTS_DB:-}
       ACHIEVEMENTS_SMTP_URL: ${ACHIEVEMENTS_SMTP_URL:-}
       ACHIEVEMENTS_MAIL_FROM: ${ACHIEVEMENTS_MAIL_FROM:-}
