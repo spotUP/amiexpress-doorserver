@@ -2,7 +2,7 @@
 
 The bridge mirrors mapped LiveChat hub rooms to Discord channels and back.
 It runs as its own process (`src/discord-bridge/index.ts`) and talks to the
-hub over HTTP as the relay board `DISCORD`, exactly like a federated board.
+hub over HTTP as the relay board `discord`, exactly like a federated board.
 Discord users appear in the hub as `handle@DISCORD`; hub bans and mutes apply
 to them. Hub to Discord goes through one webhook per channel (the caller's
 name and board on each message); Discord to hub goes through the bot gateway.
@@ -22,8 +22,8 @@ on only when all three GitHub secrets are set:
 | Secret | Value |
 |---|---|
 | `DISCORD_BOT_TOKEN` | Bot token. The bot needs the Message Content intent, and in each mapped channel: View Channel, Send Messages, Read Message History, Manage Webhooks. |
-| `DISCORD_BRIDGE_BOARD_KEY` | BoardKey (`<id>.<secret>`) of the relay board `DISCORD`. The server admin issues it and sets the board's relay flag. |
-| `DISCORD_BRIDGE_ROOMS` | `roomId=channelId,roomId=channelId` |
+| `DISCORD_BRIDGE_BOARD_KEY` | BoardKey (`<id>.<secret>`) of the relay board with id `discord` (exactly; `CHAT_DISCORD_BOARD` in `contract/chat-types.ts`). The server admin creates that board, issues its key and sets its relay flag. |
+| `DISCORD_BRIDGE_ROOMS` | `roomKey=channelId,...`, e.g. `lobby=123456789012345678`. The room key is the hub room key (`lobby` is the landing room); the channel id is the Discord channel snowflake. |
 
 With all three set the workflow writes them and `COMPOSE_PROFILES=discord`
 into the host `.env`. With any one missing the bridge container is stopped
