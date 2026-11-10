@@ -66,6 +66,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
   }
 
   async function onEdit(ev: BridgeEvent, channel: string): Promise<void> {
+    if (boardOf(ev.user) === CHAT_DISCORD_BOARD.toUpperCase()) return; // echo guard: the edit came from Discord
     const link = deps.state.byHub(ev.ref);
     if (!link) return log(`[INFO] edit ${ev.ref}: no Discord twin, skipped`);
     await deps.out.edit(channel, link.discordMessageId, composeContent(ev.text));
@@ -73,6 +74,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
   }
 
   async function onDelete(ev: BridgeEvent, channel: string): Promise<void> {
+    if (boardOf(ev.user) === CHAT_DISCORD_BOARD.toUpperCase()) return; // echo guard: the delete came from Discord
     const link = deps.state.byHub(ev.ref);
     if (!link) return log(`[INFO] delete ${ev.ref}: no Discord twin, skipped`);
     await deps.out.remove(channel, link.discordMessageId);

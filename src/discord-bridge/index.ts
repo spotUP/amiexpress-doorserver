@@ -1,12 +1,13 @@
 /**
  * Entry point of the Discord bridge process (dist/src/discord-bridge/index.js).
- * Phase 3: hub events go to Discord through channel webhooks. Phases 4-5 add
- * the Discord gateway side.
+ * Hub events go to Discord through channel webhooks (outbound); the discord.js
+ * gateway feeds mapped-channel messages to the hub (inbound).
  */
 import { loadBridgeConfig, BridgeConfigError } from './config';
 import { startBridge } from './bridge';
 import { RestDiscordOut } from './discord-out';
 import { createOutbound } from './outbound';
+import { GatewayDiscordIn, createInbound } from './inbound';
 
 async function main(): Promise<void> {
   let config;
@@ -21,13 +22,16 @@ async function main(): Promise<void> {
   }
   const out = RestDiscordOut.fromToken(config.discordToken);
   await out.prepare(config.rooms.values());
-  const bridge = await startBridge(config, (hub, state) => ({
-    onEvent: createOutbound({ rooms: config.rooms, state, out, fetchBoards: () => hub.mirrorBoards() }),
-  }));
+  const gateway = new GatewayDiscordIn(config.discordToken);
+  const bridge = await startBridge(config, (hub, state) => {
+    void gateway.start(createInbound({ rooms: config.rooms, hub, state })).catch((err) => console.error(`[ERROR] discord gateway: ${(err as Error).message}`));
+    return { onEvent: createOutbound({ rooms: config.rooms, state, out, fetchBoards: () => hub.mirrorBoards() }) };
+  });
   console.log(`[OK] discord bridge up, ${config.rooms.size} room(s), hub ${config.hubUrl}`);
   const shutdown = (): void => {
     void bridge.stop().then(() => {
       out.close();
+      void gateway.close();
       process.exit(0);
     });
   };

@@ -58,6 +58,32 @@ export class HubClient {
     for (const room of this.rooms) await this.send('POST', `/rooms/${encodeURIComponent(room)}/join`, {}, signal);
   }
 
+  /** One request that retries once on a 401 (expired session) after opening a new one. */
+  private async call(method: string, path: string, body?: unknown): Promise<Buffer> {
+    if (!this.sid) await this.open();
+    try {
+      return await this.send(method, path, body);
+    } catch (err) {
+      if (!(err instanceof HubError) || err.status !== 401) throw err;
+      await this.open();
+      return this.send(method, path, body);
+    }
+  }
+
+  /** Relay post as `as@DISCORD`; returns the hub message id. */
+  async postAs(room: string, as: string, content: string, clientId: string, replyTo?: string): Promise<string> {
+    const body = { as, content, clientId, ...(replyTo ? { replyTo } : {}) };
+    return (JSON.parse((await this.call('POST', `/rooms/${encodeURIComponent(room)}/messages`, body)).toString('utf8')) as { id: string }).id;
+  }
+
+  async editAs(messageId: string, as: string, content: string): Promise<void> {
+    await this.call('PUT', `/messages/${encodeURIComponent(messageId)}`, { as, content });
+  }
+
+  async deleteAs(messageId: string, as: string): Promise<void> {
+    await this.call('DELETE', `/messages/${encodeURIComponent(messageId)}?as=${encodeURIComponent(as)}`);
+  }
+
   /** Upper-cased ids of the boards whose chat may be mirrored (discord_mirror on), with the list's rev. */
   async mirrorBoards(signal?: AbortSignal): Promise<{ rev: number; boards: Set<string> }> {
     if (!this.sid) await this.open(signal);
