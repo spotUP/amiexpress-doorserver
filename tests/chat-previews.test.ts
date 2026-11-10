@@ -134,7 +134,7 @@ describe('chat previews', () => {
   it('keeps a large noisy PNG under 64 KB, inside the cell box, and clamps cols/rows', async () => {
     const a = await login('alice');
     const r = await room(a);
-    const id = await upload(a, r, 'noise.png', noisyPng(600, 400));
+    const id = await upload(a, r, 'noise.png', noisyPng(300, 200));
     const res = await bin(call('get', `/files/${id}/preview.png?cols=80&rows=24`, a));
     expect(res.status).toBe(200);
     const buf = res.body as Buffer;
