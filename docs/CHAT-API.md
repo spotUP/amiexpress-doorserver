@@ -115,7 +115,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | GET | `/emoji.txt` | EMOJI rows: `name|display|ascii` (image emoji list with empty text fields) |
 | PUT | `/emoji/:name` | `{display, ascii}` or `{dataUrl}`; sysop of the owning board |
 | DELETE | `/emoji/:name` | 204 |
-| POST | `/bbs-events` | `{type, username, nodeId, data}`; board auth, no session; relays one BBS event (login, logout, upload, download, door activity, door event, command) to the posting board's own chat sessions; 204 |
+| POST | `/bbs-events` | `{type, username, nodeId, data}`; board auth, no session; relays one BBS event (login, logout, upload, download, door activity, door event, command, system notice; a `system_notice` carries `data.message` and may have an empty `username`) to the posting board's own chat sessions; 204 |
 
 A path that matches nothing is a JSON 404 from this API, never the web app.
 
@@ -335,7 +335,7 @@ itself hold `!`-escaped sub-fields):
 | `presence` | room id of each room the user is in (empty when in none) | the user | empty | `status!statusText` |
 | `board_joined` | empty | empty | empty | the display name of the board that just opened its first chat session ever |
 | `discord_mirror` | empty | the sysop who switched it | the board id, upper-cased | `1` mirror on, `0` off |
-| `bbs` | the node id | the BBS user | the BBS event type (`user_login`, `user_logout`, `upload`, `download`, `door_activity`, `custom_door_event`, `command`) | the whitelisted `data` keys, urlencoded (`location`, `duration`, `fileName`, `fileSize`, `conferenceName`, `action`, `doorName`, `eventType`, `message`, `isPersonalBest`) |
+| `bbs` | the node id | the BBS user | the BBS event type (`user_login`, `user_logout`, `upload`, `download`, `door_activity`, `custom_door_event`, `command`, `system_notice`) | the whitelisted `data` keys, urlencoded (`location`, `duration`, `fileName`, `fileSize`, `conferenceName`, `action`, `doorName`, `eventType`, `message`, `isPersonalBest`) |
 
 A session sees: events in rooms it has joined, direct messages to or from its
 user, events about its user, `room_created`, `room_deleted` and `topic` of

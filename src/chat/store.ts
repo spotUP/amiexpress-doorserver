@@ -896,7 +896,8 @@ export function relayBbsEvent(db: Database.Database, boardId: string, b: Body): 
   if (!(BBS_EVENT_TYPES as readonly string[]).includes(type)) {
     throw new SurfaceError('bad_request', 400, `type must be one of ${BBS_EVENT_TYPES.join(', ')}`);
   }
-  const username = str(b, 'username', 64);
+  // A system notice (the board's SYSTEM UPDATE countdown) belongs to no user.
+  const username = str(b, 'username', 64, { empty: type === 'system_notice' });
   const node = b.nodeId;
   if (typeof node !== 'number' || !Number.isInteger(node) || node < 0 || node > 999) {
     throw new SurfaceError('bad_request', 400, 'nodeId must be an integer from 0 to 999');

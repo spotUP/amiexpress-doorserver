@@ -82,7 +82,7 @@ export const CHAT_EVENT_TYPES = [
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 
 /** The BBS event types a board may relay through POST /bbs-events: the web backend's bbsEventEmitter set. */
-export const BBS_EVENT_TYPES = ['user_login', 'user_logout', 'upload', 'download', 'door_activity', 'custom_door_event', 'command'] as const;
+export const BBS_EVENT_TYPES = ['user_login', 'user_logout', 'upload', 'download', 'door_activity', 'custom_door_event', 'command', 'system_notice'] as const;
 export type BbsEventType = (typeof BBS_EVENT_TYPES)[number];
 
 /** The `data` keys a relayed BBS event keeps; they travel urlencoded in the event's text field. */
