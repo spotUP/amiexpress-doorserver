@@ -86,8 +86,12 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/files/:id/finish` | `{as?}`: close the upload; reply `{id, sha256, kind, name, size}`. 409 `conflict` unless every byte arrived. `kind` is `lha`, `lzx`, `dms`, `zip`, `program` (Amiga hunk executable), `image`, `text` or `binary`. Emits `file_shared`. Calling it again returns the same reply |
 | DELETE | `/files/:id` | cancel an unfinished upload, or delete a shared file (`?as=` for a relay board). The uploader, a room op or moderator, or a sysop may. 404 `file_gone` when already deleted. Emits `file_deleted` |
 | GET | `/rooms/:id/files.txt` | the room's shared files, newest first, as FILES rows (at most 200). Members only |
-| GET | `/rooms/:id/files` | the same list as JSON `{files: [{id, name, size, uploader, at, label, kind, sha256}]}`. Members only |
+| GET | `/rooms/:id/files` | the same list as JSON `{files: [{id, name, size, uploader, at, label, kind, sha256, imgW, imgH}]}`. Members only |
 | GET | `/files/:id` | the file bytes. Members only (403 `not_member`); 404 `file_gone` for a deleted or expired file. Always `application/octet-stream` with `Content-Disposition: attachment` and an exact `Content-Length`; `Range: bytes=N-` or `N-M` answers 206 with `Content-Range`. The hub has no virus scanner: treat every file as untrusted |
+| GET | `/files/:id/preview.png` | `?cols=C&rows=R`: a picture (`kind` `image`: PNG, JPEG, GIF first frame, IFF ILBM) scaled to fit `C*8 x R*16` pixels (8x16 pixel cells), aspect kept, never enlarged, as an RGB PNG of at most 65536 bytes (scaled down further until it fits). `cols` is clamped to 4..80 (default 32), `rows` to 2..24 (default 10). Headers: `Content-Type: image/png`, exact `Content-Length` (never chunked), `X-Cells: <c>x<r>` = the cells the returned image covers (`ceil(w/8) x ceil(h/16)`). Same access rule as `GET /files/:id`; 415 `not_image` for any other kind. Cached on the hub next to the blob and deleted with it |
+| GET | `/files/:id/preview.rgb` | `?cols=C&rows=R`: the same picture as raw RGB, one area-averaged pixel per cell, `c*r*3` bytes row by row, `Content-Type: application/octet-stream`, exact `Content-Length`, same `X-Cells` (`c` x `r`), same clamps and errors |
+| GET | `/admin/files` | `X-Admin-Token` only; filters `?room=`, `&board=`, `&uploader=` (exact): JSON `{files: [{id, room, board, name, size, uploader, at, kind, imgW, imgH, sha256}]}`, ready files newest first (at most 500) |
+| DELETE | `/admin/files/:id` | `X-Admin-Token` only: delete a file (`why` `sysop`, emits `file_deleted`) |
 | PUT | `/rooms/:id/motd` | `{motd}` (at most 500 characters, empty clears); room owner or moderator |
 | PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
 | DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
@@ -161,7 +165,7 @@ Formats and their fields, in order:
 - PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`
 - IGNORES: `user|at`
 - CANVAS: `y|cells` (`y` is the canvas row 0 to 23, `cells` the row in the canvas wire encoding)
-- FILES: `id|name|size|uploader|at|label`
+- FILES: `id|name|size|uploader|at|label|kind|imgW|imgH` (`kind` is the sniffed type, `imgW`/`imgH` the picture's pixel size, 0 when it is not a picture)
 
 `status` and `statusText` (WHO, MEMBERS, PROFILE) were appended after the
 original fields, so a parser that reads the old positions keeps working.
@@ -263,8 +267,8 @@ zed@FRIEND|1762500100
 
 ```text example FILES
 FILES|1|17|2
-fa1b2c3d4e5f6|demo.lha|48213|alice@BOARD|1760000000|alice
-f0f9e8d7c6b5|notes.txt|912|bob@OTHER|1759990000|bob@OTHER
+fa1b2c3d4e5f6|demo.lha|48213|alice@BOARD|1760000000|alice|lha|0|0
+f0f9e8d7c6b5|shot.png|912|bob@OTHER|1759990000|bob@OTHER|image|320|200
 ```
 
 ```text example CANVAS
@@ -382,7 +386,7 @@ recolour live.
 Errors are JSON `{"error": "<code>", "detail": "<text>", "retryAfter"?: n}`.
 Codes: `bad_request`, `unauthorized`, `session_expired`, `forbidden`,
 `banned`, `muted`, `not_member`, `invite_required`, `not_found`, `too_long`,
-`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op), `not_relay` (the request carried `as` but the board is not a relay board), `too_large` (413; a file or chunk over its limit), `quota` (429 daily upload quota, 507 hub store full), `file_gone` (404; the file was deleted or expired), `files_disabled` (503; the hub has no `CHAT_FILES_DIR`). A 429 also carries a `Retry-After` header.
+`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op), `not_relay` (the request carried `as` but the board is not a relay board), `too_large` (413; a file or chunk over its limit), `quota` (429 daily upload quota, 507 hub store full), `file_gone` (404; the file was deleted or expired), `files_disabled` (503; the hub has no `CHAT_FILES_DIR`), `not_image` (415; a preview was asked for a file that is not a decodable picture). A 429 also carries a `Retry-After` header.
 
 Limits (fixed windows in process): 20 messages per session per 10 seconds,
 300 messages per board per minute, 30 live sessions per board, 6 room

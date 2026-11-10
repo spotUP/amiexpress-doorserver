@@ -16,6 +16,9 @@ import { CHAT_LIMITS } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
 import { charge, refund } from '../achievements/ratelimit';
 import type { Charge } from '../achievements/ratelimit';
+import { decodeImage, MAX_PIXELS } from './image-decode';
+import type { Rgb } from './image-decode';
+import { clamp, COLS_MAX, COLS_MIN, makePng, makeRgb, ROWS_MAX, ROWS_MIN } from './preview';
 import { rebuildBasename, sniffFileKind } from '../submissions';
 import { nowSec } from './config';
 import { emitEvent } from './events';
@@ -65,6 +68,16 @@ function needDir(dir: string | null): string {
 
 const partPath = (dir: string, id: string): string => path.join(dir, `${id}.part`);
 const binPath = (dir: string, blobId: string): string => path.join(dir, `${blobId}.bin`);
+
+/** Remove a blob and every cached preview made from it (<blob>.p<c>x<r>.png / .rgb). The one place blobs are deleted. */
+function removeBlob(dir: string, blobId: string): void {
+  unlinkQuiet(binPath(dir, blobId));
+  try {
+    for (const f of fs.readdirSync(dir)) if (f.startsWith(`${blobId}.p`)) unlinkQuiet(path.join(dir, f));
+  } catch {
+    /* directory gone */
+  }
+}
 
 function unlinkQuiet(p: string): void {
   try {
@@ -269,7 +282,12 @@ export function finishUpload(db: Database.Database, dir: string | null, ctx: Cha
   if (row.received !== row.size) throw new SurfaceError('conflict', 409, `only ${row.received} of ${row.size} bytes received`);
   const part = partPath(d, id);
   const { sha256, head } = hashAndHead(part);
-  const kind = sniffFileKind(head);
+  let kind: string = sniffFileKind(head);
+  let pic: Rgb | null = null;
+  if (kind === 'image') {
+    pic = decodeImage(fs.readFileSync(part));
+    if (!pic || pic.w * pic.h > MAX_PIXELS) kind = 'binary';
+  }
   const same = db
     .prepare("SELECT blob_id FROM chat_files WHERE room_id = ? AND sha256 = ? AND status = 'ready' AND blob_id IS NOT NULL LIMIT 1")
     .get(row.room_id, sha256) as { blob_id: string } | undefined;
@@ -281,8 +299,8 @@ export function finishUpload(db: Database.Database, dir: string | null, ctx: Cha
     fs.renameSync(part, binPath(d, id));
   }
   const now = nowSec();
-  db.prepare("UPDATE chat_files SET status = 'ready', sha256 = ?, kind = ?, blob_id = ?, updated_at = ?, expires_at = ? WHERE id = ?").run(
-    sha256, kind, blobId, now, now + CHAT_LIMITS.fileRetentionDays * DAY, id
+  db.prepare("UPDATE chat_files SET status = 'ready', sha256 = ?, kind = ?, img_w = ?, img_h = ?, blob_id = ?, updated_at = ?, expires_at = ? WHERE id = ?").run(
+    sha256, kind, pic && kind === 'image' ? pic.w : null, pic && kind === 'image' ? pic.h : null, blobId, now, now + CHAT_LIMITS.fileRetentionDays * DAY, id
   );
   emitEvent(db, { type: 'file_shared', roomId: row.room_id, user: row.uploader, ref: id, text: `${row.name}|${row.size}|${kind}` });
   trimRoom(db, d, row.room_id);
@@ -302,13 +320,13 @@ function removeReady(db: Database.Database, dir: string, row: FileRow, by: strin
   db.prepare("UPDATE chat_files SET status = 'deleted', deleted_at = ?, deleted_by = ?, deleted_why = ? WHERE id = ?").run(nowSec(), by, why, row.id);
   const blob = row.blob_id ?? row.id;
   const still = db.prepare("SELECT 1 FROM chat_files WHERE blob_id = ? AND status = 'ready' AND id <> ?").get(blob, row.id);
-  if (!still) unlinkQuiet(binPath(dir, blob));
+  if (!still) removeBlob(dir, blob);
   if (announce) emitEvent(db, { type: 'file_deleted', roomId: row.room_id, user: by, ref: row.id, text: `${row.name}|${why}` });
 }
 
 export function deleteFile(db: Database.Database, dir: string | null, ctx: ChatCtx, id: string): void {
   const d = needDir(dir);
-  requireSession(ctx);
+  if (!ctx.admin) requireSession(ctx);
   const row = getFile(db, id);
   if (row.status === 'deleted') throw new SurfaceError('file_gone', 404, 'that file is gone');
   const own = row.uploader.toLowerCase() === ctx.user.toLowerCase();
@@ -380,4 +398,52 @@ export function sweepFiles(db: Database.Database, dir: string | null): void {
   const old = db.prepare("SELECT * FROM chat_files WHERE status = 'ready' AND expires_at <= ?").all(now) as FileRow[];
   for (const r of old) removeReady(db, dir, r, 'system', 'expired', true);
   db.prepare("DELETE FROM chat_files WHERE status = 'deleted' AND deleted_at < ?").run(now - PURGE_DELETED_AFTER);
+}
+
+// ---- previews ----
+
+export interface Preview {
+  path: string;
+  size: number;
+  cells: string;
+  contentType: string;
+}
+
+const dimParam = (v: unknown, lo: number, hi: number, dflt: number): number => {
+  const n = Number.parseInt(String(v ?? ''), 10);
+  return Number.isFinite(n) ? clamp(n, lo, hi) : dflt;
+};
+
+/** A cached preview of a picture file, made on first request. Same access rule as openDownload. */
+export function openPreview(db: Database.Database, dir: string | null, ctx: ChatCtx, id: string, fmt: 'png' | 'rgb', colsQ: unknown, rowsQ: unknown): Preview {
+  const dl = openDownload(db, dir, ctx, id);
+  const row = getFile(db, id);
+  if (row.kind !== 'image') throw new SurfaceError('not_image', 415, 'that file is not a picture');
+  const cols = dimParam(colsQ, COLS_MIN, COLS_MAX, 32);
+  const rows = dimParam(rowsQ, ROWS_MIN, ROWS_MAX, 10);
+  const stem = path.join(needDir(dir), `${row.blob_id ?? row.id}.p${cols}x${rows}`);
+  const file = `${stem}.${fmt}`;
+  const meta = `${stem}.${fmt}.cells`;
+  const contentType = fmt === 'png' ? 'image/png' : 'application/octet-stream';
+  if (fs.existsSync(file) && fs.existsSync(meta)) {
+    return { path: file, size: fs.statSync(file).size, cells: fs.readFileSync(meta, 'latin1'), contentType };
+  }
+  const pic = decodeImage(fs.readFileSync(dl.path));
+  if (!pic) throw new SurfaceError('not_image', 415, 'that picture cannot be decoded');
+  const out = fmt === 'png' ? makePng(pic, cols, rows) : makeRgb(pic, cols, rows);
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, out.data);
+  fs.renameSync(tmp, file);
+  fs.writeFileSync(meta, out.cells, 'latin1');
+  return { path: file, size: out.data.length, cells: out.cells, contentType };
+}
+
+/** Admin listing across rooms, newest first; filters are exact matches. */
+export function adminListFiles(db: Database.Database, f: { room?: string; board?: string; uploader?: string }): FileRow[] {
+  const where = ["status = 'ready'"];
+  const args: string[] = [];
+  if (f.room) { where.push('room_id = ?'); args.push(f.room); }
+  if (f.board) { where.push('board_id = ? COLLATE NOCASE'); args.push(f.board); }
+  if (f.uploader) { where.push('uploader = ? COLLATE NOCASE'); args.push(f.uploader); }
+  return db.prepare(`SELECT * FROM chat_files WHERE ${where.join(' AND ')} ORDER BY created_at DESC, rowid DESC LIMIT 500`).all(...args) as FileRow[];
 }

@@ -35,8 +35,8 @@ export const CHAT_TEXT_FORMATS = {
   IGNORES: ['user', 'at'],
   /** One canvas row: `y` 0-23, `cells` in the canvas wire encoding (docs/CHAT-API.md). */
   CANVAS: ['y', 'cells'],
-  /** One ready file of a room, newest first; `at` is the epoch second it was shared, `label` the uploader's board label. */
-  FILES: ['id', 'name', 'size', 'uploader', 'at', 'label'],
+  /** One ready file of a room, newest first; `at` is the epoch second it was shared, `label` the uploader's board label, `kind` the sniffed type, `imgW`/`imgH` the pixel size of a picture (0 when not a picture). */
+  FILES: ['id', 'name', 'size', 'uploader', 'at', 'label', 'kind', 'imgW', 'imgH'],
 } as const;
 export type ChatTextFormat = keyof typeof CHAT_TEXT_FORMATS;
 
@@ -114,6 +114,8 @@ export const CHAT_ERROR_CODES = [
   'file_gone',
   /** The hub has no CHAT_FILES_DIR: the file surface answers 503. */
   'files_disabled',
+  /** A preview was asked for a file that is not a decodable picture (415). */
+  'not_image',
 ] as const;
 export type ChatErrorCode = (typeof CHAT_ERROR_CODES)[number];
 
@@ -448,5 +450,9 @@ export const CHAT_ENDPOINTS = [
   'GET /rooms/:id/files.txt',
   'GET /rooms/:id/files',
   'GET /files/:id',
+  'GET /files/:id/preview.png',
+  'GET /files/:id/preview.rgb',
+  'GET /admin/files',
+  'DELETE /admin/files/:id',
 ] as const;
 export type ChatEndpoint = (typeof CHAT_ENDPOINTS)[number];

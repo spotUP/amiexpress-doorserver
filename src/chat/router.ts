@@ -367,13 +367,46 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   });
   router.get('/rooms/:id/files.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => ({ rows: files.listFiles(db, ctx, p(req, 'id'), filesDir !== null), rev: headSeq(db) }));
-    sendText(res, renderText('FILES', out.rev, out.rows.map((r) => [r.id, r.name, r.size, r.uploader, r.created_at, r.label])));
+    sendText(res, renderText('FILES', out.rev, out.rows.map((r) => [r.id, r.name, r.size, r.uploader, r.created_at, r.label, r.kind ?? '', r.img_w ?? 0, r.img_h ?? 0])));
   });
   router.get('/rooms/:id/files', (req: Request, res: Response) => {
     const rows = run(req, false, (db, ctx) => files.listFiles(db, ctx, p(req, 'id'), filesDir !== null));
     res.json({
-      files: rows.map((r) => ({ id: r.id, name: r.name, size: r.size, uploader: r.uploader, at: r.created_at, label: r.label, kind: r.kind, sha256: r.sha256 })),
+      files: rows.map((r) => ({ id: r.id, name: r.name, size: r.size, uploader: r.uploader, at: r.created_at, label: r.label, kind: r.kind, sha256: r.sha256, imgW: r.img_w, imgH: r.img_h })),
     });
+  });
+  for (const fmt of ['png', 'rgb'] as const) {
+    router.get(`/files/:id/preview.${fmt}`, (req: Request, res: Response, next: NextFunction) => {
+      let pv: files.Preview;
+      try {
+        pv = run(req, false, (db, ctx) => files.openPreview(db, filesDir, ctx, p(req, 'id'), fmt, req.query.cols, req.query.rows));
+      } catch (err) {
+        next(err);
+        return;
+      }
+      res.status(200);
+      res.set('Content-Type', pv.contentType);
+      res.set('Content-Length', String(pv.size));
+      res.set('X-Cells', pv.cells);
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Connection', 'close');
+      const stream = fs.createReadStream(pv.path);
+      stream.on('error', () => res.destroy());
+      stream.pipe(res);
+    });
+  }
+  router.get('/admin/files', (req: Request, res: Response) => {
+    if (!isAdmin(req)) throw new SurfaceError('forbidden', 403, 'admin token required');
+    const q = (k: string): string | undefined => (typeof req.query[k] === 'string' && req.query[k] !== '' ? String(req.query[k]) : undefined);
+    const rows = withAchievementsDb(ach, (db) => files.adminListFiles(db, { room: q('room'), board: q('board'), uploader: q('uploader') }), { readonly: true });
+    res.json({
+      files: rows.map((r) => ({ id: r.id, room: r.room_id, board: r.board_id, name: r.name, size: r.size, uploader: r.uploader, at: r.created_at, kind: r.kind, imgW: r.img_w, imgH: r.img_h, sha256: r.sha256 })),
+    });
+  });
+  router.delete('/admin/files/:id', (req: Request, res: Response) => {
+    if (!isAdmin(req)) throw new SurfaceError('forbidden', 403, 'admin token required');
+    run(req, true, (db, ctx) => files.deleteFile(db, filesDir, ctx, p(req, 'id')));
+    res.json({ ok: true });
   });
   router.get('/files/:id', (req: Request, res: Response, next: NextFunction) => {
     let dl: files.Download;

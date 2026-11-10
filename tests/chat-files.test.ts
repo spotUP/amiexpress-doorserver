@@ -192,8 +192,8 @@ describe('chat files', () => {
   });
 
   it('FILES render golden and filename rebuild table', () => {
-    expect(renderText('FILES', 17, [['f1', 'demo.lha', 48213, 'alice@BOARD', 1760000000, 'alice']]).toString('latin1')).toBe(
-      'FILES|1|17|1\r\nf1|demo.lha|48213|alice@BOARD|1760000000|alice\r\n'
+    expect(renderText('FILES', 17, [['f1', 'demo.lha', 48213, 'alice@BOARD', 1760000000, 'alice', 'lha', 0, 0]]).toString('latin1')).toBe(
+      'FILES|1|17|1\r\nf1|demo.lha|48213|alice@BOARD|1760000000|alice|lha|0|0\r\n'
     );
     const table: [string, string][] = [
       ['My Demo.exe', 'My_Demo.exe'],
