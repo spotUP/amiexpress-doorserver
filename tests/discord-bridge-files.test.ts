@@ -73,7 +73,7 @@ describe('Discord attachment copy', () => {
     fs.rmSync(stateDir, { recursive: true, force: true });
   });
 
-  it('REACHABLE: a small attachment lands in chat_files as handle@DISCORD, a 3 MB one is only linked', async () => {
+  it('REACHABLE: a small attachment lands in chat_files as handle@DISCORD without its link in the text, a 3 MB one is only linked', async () => {
     const login = await request(fx.app).post('/chat/v1/sessions').set('Authorization', fx.auth).send({ handle: 'alice', sysop: true });
     const call = (method: 'get' | 'post' | 'put', p: string) => request(fx.app)[method](`/chat/v1${p}`).set('Authorization', fx.auth).set({ 'X-Chat-Session': login.body.sid as string });
     const room = (await call('post', '/rooms').send({ name: 'bridge' })).body.id as string;
@@ -121,9 +121,30 @@ describe('Discord attachment copy', () => {
       const ev = (await call('get', '/events.txt?since=0')).text;
       expect(ev).toContain('file_shared');
       const hist = (await call('get', `/rooms/${room}/history.txt`)).text;
-      expect(hist).toContain(smallUrl);
+      // The copied picture is announced by the hub; its CDN link (hex query) stays
+      // out of the text, where it wrapped into hex scraps on telnet (sysop 2026-11-10).
+      expect(hist).not.toContain(smallUrl);
       expect(hist).toContain(bigUrl);
       expect(hist.indexOf('look')).toBeGreaterThan(-1);
+
+      // A picture with no text posts no message, only the file.
+      const onlyUrl = 'https://cdn.discordapp.com/attachments/1/4/only.png?ex=6af33&hm=c46e7';
+      await sink.create({
+        id: 'd2', channelId: '777', authorName: 'Bob Smith', authorId: '1234567890', authorBot: false, content: '',
+        attachmentUrls: [onlyUrl], attachments: [{ id: 'att3', name: 'only.png', size: small.length, url: onlyUrl }],
+      });
+      expect((db.prepare('SELECT COUNT(*) AS n FROM chat_files').get() as { n: number }).n).toBe(2);
+      expect((await call('get', `/rooms/${room}/history.txt`)).text).not.toContain('only.png');
+
+      // A copy that fails puts the link back into the text: it is the only way to the file.
+      const deadUrl = 'https://cdn.discordapp.com/attachments/1/5/gone.png?ex=1';
+      const ok = global.fetch;
+      global.fetch = ((url: string, init?: RequestInit) => String(url) === deadUrl ? Promise.resolve(new Response('', { status: 404 })) : ok(url, init)) as typeof fetch;
+      await sink.create({
+        id: 'd3', channelId: '777', authorName: 'Bob Smith', authorId: '1234567890', authorBot: false, content: 'gone',
+        attachmentUrls: [deadUrl], attachments: [{ id: 'att4', name: 'gone.png', size: 10, url: deadUrl }],
+      });
+      expect((await call('get', `/rooms/${room}/history.txt`)).text).toContain(`gone ${deadUrl}`);
     } finally {
       global.fetch = real;
       await bridge.stop();

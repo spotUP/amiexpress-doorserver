@@ -91,45 +91,72 @@ export function createInbound(deps: InboundDeps): InboundSink {
     }
   }
 
-  /** Download one attachment and store it in the hub as `handle`. Never throws: the message text is already posted. */
-  async function copyAttachment(room: string, handle: string, a: { id: string; name: string; size: number; url: string }): Promise<void> {
-    if (a.size > CHAT_LIMITS.fileMaxBytes) return;
+  /** Download one attachment and store it in the hub as `handle`. Never throws; false when the hub holds no copy. */
+  async function copyAttachment(room: string, handle: string, a: { id: string; name: string; size: number; url: string }): Promise<boolean> {
     try {
       const res = await fetch(a.url);
-      if (!res.ok) return log(`[ERROR] attachment ${a.id}: download ${res.status}`);
+      if (!res.ok) { log(`[ERROR] attachment ${a.id}: download ${res.status}`); return false; }
       const data = Buffer.from(await res.arrayBuffer());
-      if (data.length === 0 || data.length > CHAT_LIMITS.fileMaxBytes) return;
+      if (data.length === 0 || data.length > CHAT_LIMITS.fileMaxBytes) return false;
       await deps.hub.uploadFileAs(room, handle, a.name, data, a.id.slice(0, 64));
+      return true;
     } catch (err) {
-      if (err instanceof HubError && err.status >= 400 && err.status < 500) return log(`[INFO] hub refused attachment ${a.id}: ${err.message}`);
-      log(`[ERROR] attachment ${a.id}: ${(err as Error).message}`);
+      if (err instanceof HubError && err.status >= 400 && err.status < 500) log(`[INFO] hub refused attachment ${a.id}: ${err.message}`);
+      else log(`[ERROR] attachment ${a.id}: ${(err as Error).message}`);
+      return false;
     }
   }
+
+  /**
+   * Attachments the hub keeps a copy of are announced by the hub (file_shared)
+   * and shown by the doors as pictures or file rows, so their CDN links stay out
+   * of the message text: a wrapped link's hex query (ex=, is=, hm=) showed as
+   * scraps of hex on telnet (sysop 2026-11-10). Only attachments too big to
+   * copy keep their link.
+   */
+  const copyable = (m: InboundMessage) => (m.attachments ?? []).filter((a) => a.size <= CHAT_LIMITS.fileMaxBytes);
+  const linkedUrls = (m: InboundMessage): string[] => {
+    if (!m.attachments) return m.attachmentUrls;
+    const copied = new Set(copyable(m).map((a) => a.url));
+    return m.attachmentUrls.filter((u) => !copied.has(u));
+  };
 
   return {
     async create(m) {
       const room = accepted(m);
       if (!room || deps.state.byDiscord(m.id)) return;
-      const text = discordToHub(m.content, m.attachmentUrls, m.mentions);
-      if (!text) return;
+      const text = discordToHub(m.content, linkedUrls(m), m.mentions);
+      const copies = copyable(m);
+      if (!text && copies.length === 0) return;
       const handle = toHandle(m.authorName, m.authorId);
       let replyTo: string | undefined;
       if (m.referenceId) {
         replyTo = deps.state.byDiscord(m.referenceId)?.hubMessageId;
         if (!replyTo) log(`[INFO] reply ${m.id}: parent ${m.referenceId} has no twin; posting without reply_to`);
       }
-      await guarded(`post ${m.id}`, async () => {
-        const hubId = await deps.hub.postAs(room, handle, text, `discord:${m.id}`.slice(0, 64), replyTo);
-        deps.state.putLink({ hubMessageId: hubId, discordMessageId: m.id, roomId: room, createdAt: now(), authorLabel: handle, content: text });
+      const post = (body: string) => guarded(`post ${m.id}`, async () => {
+        const hubId = await deps.hub.postAs(room, handle, body, `discord:${m.id}`.slice(0, 64), replyTo);
+        deps.state.putLink({ hubMessageId: hubId, discordMessageId: m.id, roomId: room, createdAt: now(), authorLabel: handle, content: body });
       });
+      if (text) await post(text);
       // Discord CDN links expire; keep a copy in the hub file store. After the text so it reads first.
-      for (const a of m.attachments ?? []) await copyAttachment(room, handle, a);
+      const failed: string[] = [];
+      for (const a of copies) if (!(await copyAttachment(room, handle, a))) failed.push(a.url);
+      if (failed.length === 0) return;
+      // No copy: the link is the only way to the attachment, so it goes back into the text.
+      const withLinks = discordToHub(m.content, [...linkedUrls(m), ...failed], m.mentions);
+      const link = deps.state.byDiscord(m.id);
+      if (!link) return post(withLinks);
+      await guarded(`edit ${m.id}`, async () => {
+        await deps.hub.editAs(link.hubMessageId, handle, withLinks);
+        deps.state.setContent(link.hubMessageId, withLinks);
+      });
     },
     async update(m) {
       if (!accepted(m) || !m.contentChanged) return;
       const link = deps.state.byDiscord(m.id);
       if (!link) return log(`[INFO] edit ${m.id}: no hub twin, skipped`);
-      const text = discordToHub(m.content, m.attachmentUrls, m.mentions);
+      const text = discordToHub(m.content, linkedUrls(m), m.mentions);
       if (!text) return;
       await guarded(`edit ${m.id}`, async () => {
         await deps.hub.editAs(link.hubMessageId, toHandle(m.authorName, m.authorId), text);
