@@ -16,9 +16,9 @@ jobs:
       - name: Deploy to Hetzner VPS
         uses: appleboy/ssh-action@v1.0.3
         env:
-          # This repo is PRIVATE, so the host cannot fetch anonymously.
-          # The workflow's own short-lived, read-only token lets it fetch as
-          # somebody. Same pattern as the BBS deploy (deploy-hetzner.yml).
+          # This repo is public since 2026-11-10, so the host could fetch
+          # anonymously. The workflow's own short-lived, read-only token is
+          # still passed so the fetch is not subject to anonymous rate limits. Same pattern as the BBS deploy (deploy-hetzner.yml).
           GH_TOKEN: ${{ github.token }}
           DOORSERVER_JWT_SECRET: ${{ secrets.DOORSERVER_JWT_SECRET }}
           # The three names below were listed in `envs:` and never given a
@@ -42,7 +42,7 @@ jobs:
             echo "== disk before =="
             df -h / | tail -1
             echo "== git fetch + hard reset =="
-            # Fetch as SOMEBODY. This repo is PRIVATE, so an anonymous HTTPS
+            # Fetch as SOMEBODY. While this repo was private, an anonymous HTTPS
             # fetch dies with "could not read Username for 'https://github.com'"
             # and the deploy stops before it starts (observed 2026-09-08, run
             # 34228408047). The token is the workflow's own - short-lived and
