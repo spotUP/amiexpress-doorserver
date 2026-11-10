@@ -379,7 +379,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     router.get(`/files/:id/preview.${fmt}`, (req: Request, res: Response, next: NextFunction) => {
       let pv: files.Preview;
       try {
-        pv = run(req, false, (db, ctx) => files.openPreview(db, filesDir, ctx, p(req, 'id'), fmt, req.query.cols, req.query.rows));
+        pv = run(req, false, (db, ctx) => files.openPreview(db, filesDir, ctx, p(req, 'id'), fmt, req.query.cols, req.query.rows, req.query.q));
       } catch (err) {
         next(err);
         return;

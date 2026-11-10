@@ -152,6 +152,46 @@ describe('chat previews', () => {
     expect(t.height).toBeLessThanOrEqual(32);
   });
 
+  it('q=full: RGB PNG at exactly cells x 8/16 px with no byte cap; q=pal: at most 255 colours, same box, under 128 KB', async () => {
+    const a = await login('alice');
+    const r = await room(a);
+    const id = await upload(a, r, 'noise.png', noisyPng(960, 540));
+    const full = await bin(call('get', `/files/${id}/preview.png?cols=80&rows=64&q=full`, a));
+    expect(full.status).toBe(200);
+    expect(full.headers['x-cells']).toBe('80x23'); // 640x360 fit -> 22.5 rows, nearest 23
+    const f = PNG.sync.read(full.body as Buffer);
+    expect([f.width, f.height]).toEqual([640, 23 * 16]);
+    expect((full.body as Buffer).length).toBeGreaterThan(65536); // noise: no shrink to the 64 KB cap
+    const pal = await bin(call('get', `/files/${id}/preview.png?cols=80&rows=64&q=pal`, a));
+    expect(pal.status).toBe(200);
+    const pb = pal.body as Buffer;
+    expect(pb.length).toBeLessThanOrEqual(128 * 1024);
+    expect(pb[25]).toBe(3); // IHDR colour type: palette
+    const plte = pb.indexOf('PLTE', 0, 'latin1');
+    expect(pb.readUInt32BE(plte - 4) / 3).toBeLessThanOrEqual(255);
+    const pp = PNG.sync.read(pb);
+    const [c, rr] = String(pal.headers['x-cells']).split('x').map(Number);
+    expect([pp.width, pp.height]).toEqual([c * 8, rr * 16]); // noise overflows 128 KB: fewer cells, still 1:1
+    expect(c).toBeLessThan(80);
+    // Unknown q is the original 64 KB fit route.
+    const legacy = await bin(call('get', `/files/${id}/preview.png?cols=80&rows=64&q=nope`, a));
+    expect((legacy.body as Buffer).length).toBeLessThanOrEqual(65536);
+   }, 30000); // a 1.5 MB upload in 32 KB chunks
+
+  it('q=pal keeps a picture of 255 colours or fewer in its exact colours', async () => {
+    const a = await login('alice');
+    const r = await room(a);
+    // 160x32 stripes of 200 distinct colours, already 1:1 at 20x2 cells
+    const colour = (i: number): [number, number, number] => { const k = Math.floor((i % 160) / 0.8) % 200; return [k, 255 - k, (k * 7) % 256]; };
+    const id = await upload(a, r, 'stripes.png', pngOf(160, 32, colour));
+    const pal = await bin(call('get', `/files/${id}/preview.png?cols=20&rows=2&q=pal`, a));
+    expect(pal.headers['x-cells']).toBe('20x2');
+    const pp = PNG.sync.read(pal.body as Buffer);
+    for (let i = 0; i < 160 * 32; i += 1) {
+      expect([pp.data[i * 4], pp.data[i * 4 + 1], pp.data[i * 4 + 2]]).toEqual(colour(i));
+    }
+  });
+
   it('415 not_image for non-pictures and undecodable image magic; 403 for non-members', async () => {
     const a = await login('alice');
     const b = await login('bob');

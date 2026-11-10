@@ -18,7 +18,8 @@ import { charge, refund } from '../achievements/ratelimit';
 import type { Charge } from '../achievements/ratelimit';
 import { decodeImage, MAX_PIXELS } from './image-decode';
 import type { Rgb } from './image-decode';
-import { clamp, COLS_MAX, COLS_MIN, makePng, makeRgb, ROWS_MAX, ROWS_MIN } from './preview';
+import { clamp, COLS_MAX, COLS_MIN, makeCellPng, makePng, makeRgb, ROWS_MAX, ROWS_MIN } from './preview';
+import type { PreviewQuality } from './preview';
 import { rebuildBasename, sniffFileKind } from '../submissions';
 import { nowSec } from './config';
 import { emitEvent } from './events';
@@ -69,7 +70,7 @@ function needDir(dir: string | null): string {
 const partPath = (dir: string, id: string): string => path.join(dir, `${id}.part`);
 const binPath = (dir: string, blobId: string): string => path.join(dir, `${blobId}.bin`);
 
-/** Remove a blob and every cached preview made from it (<blob>.p<c>x<r>.png / .rgb). The one place blobs are deleted. */
+/** Remove a blob and every cached preview made from it (<blob>.p<c>x<r>[.full|.pal].png / .rgb). The one place blobs are deleted. */
 function removeBlob(dir: string, blobId: string): void {
   unlinkQuiet(binPath(dir, blobId));
   try {
@@ -415,13 +416,15 @@ const dimParam = (v: unknown, lo: number, hi: number, dflt: number): number => {
 };
 
 /** A cached preview of a picture file, made on first request. Same access rule as openDownload. */
-export function openPreview(db: Database.Database, dir: string | null, ctx: ChatCtx, id: string, fmt: 'png' | 'rgb', colsQ: unknown, rowsQ: unknown): Preview {
+export function openPreview(db: Database.Database, dir: string | null, ctx: ChatCtx, id: string, fmt: 'png' | 'rgb', colsQ: unknown, rowsQ: unknown, qQ?: unknown): Preview {
   const dl = openDownload(db, dir, ctx, id);
   const row = getFile(db, id);
   if (row.kind !== 'image') throw new SurfaceError('not_image', 415, 'that file is not a picture');
   const cols = dimParam(colsQ, COLS_MIN, COLS_MAX, 32);
   const rows = dimParam(rowsQ, ROWS_MIN, ROWS_MAX, 10);
-  const stem = path.join(needDir(dir), `${row.blob_id ?? row.id}.p${cols}x${rows}`);
+  // q applies to preview.png only; anything but full/pal is the original 64 KB fit.
+  const q: PreviewQuality = fmt === 'png' && (qQ === 'full' || qQ === 'pal') ? qQ : 'fit';
+  const stem = path.join(needDir(dir), `${row.blob_id ?? row.id}.p${cols}x${rows}${q === 'fit' ? '' : `.${q}`}`);
   const file = `${stem}.${fmt}`;
   const meta = `${stem}.${fmt}.cells`;
   const contentType = fmt === 'png' ? 'image/png' : 'application/octet-stream';
@@ -430,7 +433,7 @@ export function openPreview(db: Database.Database, dir: string | null, ctx: Chat
   }
   const pic = decodeImage(fs.readFileSync(dl.path));
   if (!pic) throw new SurfaceError('not_image', 415, 'that picture cannot be decoded');
-  const out = fmt === 'png' ? makePng(pic, cols, rows) : makeRgb(pic, cols, rows);
+  const out = fmt === 'rgb' ? makeRgb(pic, cols, rows) : q === 'fit' ? makePng(pic, cols, rows) : makeCellPng(pic, cols, rows, q);
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, out.data);
   fs.renameSync(tmp, file);
