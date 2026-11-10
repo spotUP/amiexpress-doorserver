@@ -33,6 +33,8 @@ export const CHAT_TEXT_FORMATS = {
   DM: ['threadId', 'peer', 'lastAt', 'unread'],
   PROFILE: ['user', 'nick', 'board', 'status', 'statusText', 'firstSeen', 'lastSeen', 'idleSeconds', 'online', 'sharedRooms'],
   IGNORES: ['user', 'at'],
+  /** One canvas row: `y` 0-23, `cells` in the canvas wire encoding (docs/CHAT-API.md). */
+  CANVAS: ['y', 'cells'],
 } as const;
 export type ChatTextFormat = keyof typeof CHAT_TEXT_FORMATS;
 
@@ -68,6 +70,8 @@ export const CHAT_EVENT_TYPES = [
   'bbs',
   /** A board's sysop switched the Discord mirror; ref = the board id upper-cased, text = '1' on / '0' off. Seen by every session. */
   'discord_mirror',
+  /** One edit of an art room's shared canvas; ref = the new revision, text = the ops (canvas wire encoding). Never relayed to Discord. */
+  'canvas',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 
@@ -135,6 +139,15 @@ export const CHAT_LIMITS = {
   eventsKept: 50000,
   statusTextMax: 120,
   ignoresPerUser: 200,
+  /** Canvas posts per session per window. */
+  canvasPostsPerSession: 40,
+  canvasWindowMs: 10000,
+  /** Longest ops string of one canvas post, in bytes. */
+  canvasOpsMax: 512,
+  /** Most cells (repeats counted) one canvas post may write. */
+  canvasCellsMax: 1920,
+  /** A text reply stops before it passes this many bytes (68K reply buffers are 8192). */
+  replyMaxBytes: 7680,
 } as const;
 
 export interface ChatApiError {
@@ -362,6 +375,8 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/op',
   'POST /rooms/:id/mode',
   'POST /rooms/:id/typing',
+  'GET /rooms/:id/canvas.txt',
+  'POST /rooms/:id/canvas',
   'POST /rooms/:id/deop',
   'PUT /rooms/:id/topic',
   'PUT /rooms/:id/motd',

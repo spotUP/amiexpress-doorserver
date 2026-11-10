@@ -78,6 +78,8 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | PUT | `/rooms/:id/topic` | `{topic}` |
 | POST | `/rooms/:id/mode` | `{modes, params?}` (TS `/mode`): modes like `+i`, `-m`, `+ov`; params is the space-separated `handle@BOARD` list the `o`, `v`, `b` flags take in order. `i` = invite-only (private visibility), `m` = moderated (only staff and voiced users speak, else `moderated`), `o` = op, `v` = voice, `b` = mute until unmuted. Room staff only. Reply `{applied, errors}`: applied modes space-separated, per-flag errors `\|`-separated; flags after a bad one still apply |
 | POST | `/rooms/:id/typing` | `{text}`: the caller's whole input buffer, empty = stopped typing; trimmed to 200 characters, no error. Room members only (no +m check). Emits a `typing` event; senders throttle to one per 400 ms and always send the final empty text |
+| GET | `/rooms/:id/canvas.txt` | `?from=0&count=24&maxBytes=7680`; the shared 80x24 canvas of an **art** room as CANVAS rows, one per canvas row. Members only. Stops before the reply passes `maxBytes` (never above 7680) and reports the rows sent in the header count; ask again from the next row. A room that is not `kind` `art`: 403 `forbidden`. The row is created blank on first use |
+| POST | `/rooms/:id/canvas` | `{base, ops}`: apply `ops` (the canvas wire encoding below) to an art room's canvas; reply `{rev}`. Members only. `base` is the revision the caller last saw: informational, never a reason to refuse. Posts apply in arrival order, last writer wins per cell, `rev` goes up by one per post. An `X` (clear) op needs the room owner or a room op, else 403 `forbidden`. 403 on a room that is not an art room; 413 `too_long` over 512 bytes; 422 `bad_request` for bad grammar (the detail names the byte offset) or more than 1920 cells; 429 `rate_limited` over 40 posts per session per 10 seconds. Emits one `canvas` event |
 | PUT | `/rooms/:id/motd` | `{motd}` (at most 500 characters, empty clears); room owner or moderator |
 | PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
 | DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
@@ -150,6 +152,7 @@ Formats and their fields, in order:
 - DM: `threadId|peer|lastAt|unread`
 - PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`
 - IGNORES: `user|at`
+- CANVAS: `y|cells` (`y` is the canvas row 0 to 23, `cells` the row in the canvas wire encoding)
 
 `status` and `statusText` (WHO, MEMBERS, PROFILE) were appended after the
 original fields, so a parser that reads the old positions keeps working.
@@ -234,6 +237,12 @@ IGNORES|1|413|1
 zed@FRIEND|1762500100
 ```
 
+```text example CANVAS
+CANVAS|1|17|2
+3|^40#*19;^70 *59;
+4| *79;
+```
+
 ```text example DM
 DM|1|413|1
 d1d2d3d4d5d6|zed@FRIEND|1762500100|2
@@ -256,7 +265,7 @@ EVENTS|1|413|0
 `GET /events.txt?since=<seq>&wait=<0..25>` (`wait` defaults to 20; a missing
 `since` means "from now"). The server answers as soon as an event with
 `seq > since` that the session may see exists, otherwise after `wait` seconds
-with an empty reply. At most 200 rows come back; the header's third field is
+with an empty reply. At most 200 rows come back, and the reply stops before it passes `maxBytes` (default and ceiling 7680, so a 68K 8 KB buffer always fits; at least one row is always sent); the header's third field is
 the last sequence number returned (or `since` when none): store it as the
 next `since`. A held poll holds no database handle.
 
@@ -281,6 +290,7 @@ itself hold `!`-escaped sub-fields):
 | `kicked`, `unmuted`, `op`, `deop` | room id | the target | empty | the acting user |
 | `mode` | room id | who set it | empty | the applied modes, e.g. `+i +o alice@BOARD` |
 | `typing` | room id | the typer | empty | the typer's whole input buffer (empty = stopped); receivers expire it after 5 s |
+| `canvas` | room id | the drawer | the new canvas revision | the ops, in the canvas wire encoding; every member of the room gets it (their own echo too); never relayed to Discord |
 | `banned` | room id | the target | empty | `actor!reason` |
 | `muted` | room id | the target | empty | `actor!minutes` |
 | `dm` | `dm:<threadId>` | sender | message id | content |
@@ -295,6 +305,35 @@ A session sees: events in rooms it has joined, direct messages to or from its
 user, events about its user, `room_created`, `room_deleted` and `topic` of
 public rooms, `motd`, `board_joined` and `discord_mirror`, and `bbs` events of its own board only (another board never sees them). `board_joined` is an event only (no room message is stored), is emitted once per board, never on admin mint or reconnect, and is not emitted for boards that had chatted before it was introduced. The pipe inside the `react`, `banned`, `muted` and
 `role` text is shown as `!` because `|` is escaped on the wire.
+
+### Canvas wire encoding
+
+An art room (`kind` `art`) has one shared canvas of 80 columns by 24 rows;
+each cell is a character (ISO-8859-1), a foreground and a background colour
+(0 to 15) and a blink flag. It starts blank (space, 7 on 0) and lives until
+the room is deleted. The encoding is Latin-1 and never contains `|`, `!`, CR
+or LF, so the `.txt` escaper leaves it alone. Reserved bytes, which a cell
+must write as `~hh`: `|` `!` `^` `~` `*` `@`, and every byte below 0x20.
+Every other byte 0x20 to 0xFF is one cell with that character.
+
+| Token | Meaning |
+|---|---|
+| `X` | clear the whole canvas; only as the first byte; room owner or op only |
+| `@x,y:` | start a run at column x, row y (decimal); cells follow left to right; a cell before any run is an error |
+| `^fb` | set the pen: f and b one hex digit each (0 to 15); it persists to the end of the string (a snapshot row starts at 7 on 0) |
+| `^fbB` | the same pen with blink (a capital `B` right after the pair; to write a letter B as the first cell after a pen, write `~42`) |
+| `~hh` | one cell with the byte hh (two hex digits) |
+| `*n;` | the previous cell n more times (n at least 1; the run may not pass column 79) |
+
+A snapshot row is the same grammar with `@0,y:` implied. Example, 20 red `#`
+at row 3 as an ops string: `@0,3:^40#*19;` (13 bytes).
+
+Conflicts: the hub applies posts in arrival order, last writer wins per cell.
+A client applies every `canvas` event in `seq` order, its own echo included,
+so all clients end up in hub order; if an event's `ref` is not the local
+revision plus one, fetch the snapshot again. To open the view: GET the
+snapshot, then apply events whose `ref` is above the snapshot revision.
+Undo is client-side only: it posts the previous cells again.
 
 ## 5. Roles
 
@@ -315,7 +354,8 @@ Codes: `bad_request`, `unauthorized`, `session_expired`, `forbidden`,
 
 Limits (fixed windows in process): 20 messages per session per 10 seconds,
 300 messages per board per minute, 30 live sessions per board, 6 room
-creations per board per hour, 64 held polls per board. Reads other than
+creations per board per hour, 64 held polls per board, 40 canvas posts per
+session per 10 seconds. Reads other than
 `events.txt` are not limited. Environment overrides: `CHAT_POLL_MAX_WAIT`
 (default 25), `CHAT_SESSION_TTL` (default 90).
 
