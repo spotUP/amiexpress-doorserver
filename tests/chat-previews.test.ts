@@ -142,7 +142,10 @@ describe('chat previews', () => {
     const png = PNG.sync.read(buf);
     expect(png.width).toBeLessThanOrEqual(640);
     expect(png.height).toBeLessThanOrEqual(384);
-    expect(res.headers['x-cells']).toBe(`${Math.ceil(png.width / 8)}x${Math.ceil(png.height / 16)}`);
+    // The cells are the display size (the fit, 300x200 px), even when the PNG
+    // was shrunk to stay under the byte cap: the terminal scales it up.
+    expect(res.headers['x-cells']).toBe(`${Math.ceil(300 / 8)}x${Math.ceil(200 / 16)}`);
+    expect(Math.abs(png.width / png.height - 300 / 200)).toBeLessThan(0.05);
     const tiny = await bin(call('get', `/files/${id}/preview.png?cols=1&rows=1`, a));
     const t = PNG.sync.read(tiny.body as Buffer);
     expect(t.width).toBeLessThanOrEqual(32);

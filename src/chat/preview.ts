@@ -13,7 +13,7 @@ export const PREVIEW_MAX_BYTES = 64 * 1024;
 export const COLS_MIN = 4;
 export const COLS_MAX = 80;
 export const ROWS_MIN = 2;
-export const ROWS_MAX = 24;
+export const ROWS_MAX = 64;
 
 export const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -30,8 +30,16 @@ export interface PreviewOut {
   cells: string;
 }
 
+/**
+ * The cells are the display size: the fit before any shrink to the byte cap.
+ * A big picture shrunk to stay under 64 KB still fills the cells it was fitted
+ * to (the terminal scales the PNG up), so a chat log asking for its full width
+ * gets its full width.
+ */
 export function makePng(src: Rgb, cols: number, rows: number): PreviewOut {
-  let { w, h } = fitSize(src.w, src.h, cols, rows);
+  const fit = fitSize(src.w, src.h, cols, rows);
+  const shown = cellsOf(fit.w, fit.h);
+  let { w, h } = fit;
   for (;;) {
     const scaled = w === src.w && h === src.h ? src : resample(src, w, h);
     const png = new PNG({ width: w, height: h });
@@ -43,8 +51,7 @@ export function makePng(src: Rgb, cols: number, rows: number): PreviewOut {
     }
     const data = PNG.sync.write(png, { colorType: 2, inputColorType: 6, inputHasAlpha: true, deflateLevel: 6 });
     if (data.length <= PREVIEW_MAX_BYTES || (w === 1 && h === 1)) {
-      const { c, r } = cellsOf(w, h);
-      return { data, cells: `${c}x${r}` };
+      return { data, cells: `${shown.c}x${shown.r}` };
     }
     // Size grows with area: jump to the estimated fit (with margin) instead of creeping down.
     const k = Math.min(0.95, Math.sqrt(PREVIEW_MAX_BYTES / data.length) * 0.95);
