@@ -9,7 +9,7 @@ import type { Message, PartialMessage } from 'discord.js';
 import { validHandle } from '../chat/sessions';
 import { HubError } from './hub-client';
 import type { HubClient } from './hub-client';
-import { discordToHub } from './text';
+import { discordToHub, type MentionNames } from './text';
 import type { BridgeState } from './state';
 
 export interface InboundMessage {
@@ -25,6 +25,8 @@ export interface InboundMessage {
   attachmentUrls: string[];
   /** Id of the Discord message this one replies to. */
   referenceId?: string | null;
+  /** Names for the user, role and channel ids the content mentions. */
+  mentions?: MentionNames;
 }
 
 export interface InboundUpdate extends InboundMessage {
@@ -90,7 +92,7 @@ export function createInbound(deps: InboundDeps): InboundSink {
     async create(m) {
       const room = accepted(m);
       if (!room || deps.state.byDiscord(m.id)) return;
-      const text = discordToHub(m.content, m.attachmentUrls);
+      const text = discordToHub(m.content, m.attachmentUrls, m.mentions);
       if (!text) return;
       const handle = toHandle(m.authorName, m.authorId);
       let replyTo: string | undefined;
@@ -107,7 +109,7 @@ export function createInbound(deps: InboundDeps): InboundSink {
       if (!accepted(m) || !m.contentChanged) return;
       const link = deps.state.byDiscord(m.id);
       if (!link) return log(`[INFO] edit ${m.id}: no hub twin, skipped`);
-      const text = discordToHub(m.content, m.attachmentUrls);
+      const text = discordToHub(m.content, m.attachmentUrls, m.mentions);
       if (!text) return;
       await guarded(`edit ${m.id}`, async () => {
         await deps.hub.editAs(link.hubMessageId, toHandle(m.authorName, m.authorId), text);
@@ -137,7 +139,19 @@ const toInbound = (m: Message | PartialMessage): InboundMessage => ({
   content: m.content ?? '',
   attachmentUrls: [...(m.attachments?.values() ?? [])].map((a) => a.url),
   referenceId: m.reference?.messageId,
+  mentions: mentionNames(m),
 });
+
+/** Hub names for what the message mentions: users as hub handles, roles and channels by name. */
+function mentionNames(m: Message | PartialMessage): MentionNames {
+  const users: Record<string, string> = {};
+  const roles: Record<string, string> = {};
+  const channels: Record<string, string> = {};
+  for (const u of m.mentions?.users?.values() ?? []) users[u.id] = toHandle(u.username, u.id);
+  for (const r of m.mentions?.roles?.values() ?? []) roles[r.id] = r.name;
+  for (const c of m.mentions?.channels?.values() ?? []) if ('name' in c && typeof c.name === 'string') channels[c.id] = c.name;
+  return { users, roles, channels };
+}
 
 /** The real gateway: Guilds, GuildMessages, MessageContent. */
 export class GatewayDiscordIn implements DiscordIn {

@@ -42,9 +42,51 @@ describe('toHandle', () => {
 
 describe('discordToHub', () => {
   it('appends attachment URLs, replaces non-Latin-1, caps at 500', () => {
-    expect(discordToHub('hi ☺', ['https://cdn/x.png'])).toBe('hi ? https://cdn/x.png');
+    expect(discordToHub('hi \u4e2d', ['https://cdn/x.png'])).toBe('hi ? https://cdn/x.png');
     expect(discordToHub('', ['https://cdn/x.png'])).toBe('https://cdn/x.png');
     expect(discordToHub('a'.repeat(600))).toHaveLength(500);
+  });
+
+  const names = { users: { '111': 'spot', '222': 'user0222' }, roles: { '333': 'Sysops' }, channels: { '444': 'lobby' } };
+  it.each<[string, string, string]>([
+    // emoji
+    ['unicode emoji to door code', 'nice \u{1F44D}', 'nice :thumbsup:'],
+    ['skin tone folds into the base emoji', '\u{1F44D}\u{1F3FD}', ':thumbsup:'],
+    ['emoji with no door alias keeps its shortcode', 'pizza \u{1F355}', 'pizza :pizza:'],
+    ['ZWJ sequence is one shortcode', '\u{1F937}‍♂️ ok', ':shrug: ok'],
+    ['VS16 heart', '❤️', ':heart:'],
+    ['flag', '\u{1F1F8}\u{1F1EA}', ':sweden:'],
+    ['custom emoji', 'gg <:amigaball:123456789012345678>', 'gg :amigaball:'],
+    ['animated custom emoji', '<a:spin:123456789012345678>', ':spin:'],
+    // mentions
+    ['user mention', 'hi <@111>', 'hi @spot'],
+    ['nickname-style mention', 'hi <@!222>', 'hi @user0222'],
+    ['unknown user', 'hi <@999>', 'hi @unknown'],
+    ['role mention', '<@&333> look', '@Sysops look'],
+    ['channel mention', 'see <#444>', 'see #lobby'],
+    ['slash command mention', 'try </who:42>', 'try /who'],
+    ['timestamp', 'at <t:0:R>', 'at 1970-01-01 00:00 UTC'],
+    // markdown
+    ['bold italic underline strike', '**b** *i* __u__ ~~s~~ ***bi*** _j_', 'b i u s bi j'],
+    ['snake_case and 2*3*4 stay', 'my_var_name 2*3*4', 'my_var_name 2*3*4'],
+    ['spoiler', 'it was ||the butler||', 'it was [spoiler: the butler]'],
+    ['heading, subtext, quotes', '# Title\n-# small\n> quoted\n>>> block', 'Title small quoted block'],
+    ['inline code keeps marks', 'run `**x** <@111>` now', 'run **x** <@111> now'],
+    ['code fence drops language', '```js\nconst a_b = 1;\n```', 'const a_b = 1;'],
+    ['masked link', '[docs](https://x.org/a_b_c)', 'docs (https://x.org/a_b_c)'],
+    ['masked link with same label', '[https://x.org](https://x.org)', 'https://x.org'],
+    ['embed-suppressed link', '<https://x.org/__init__>', 'https://x.org/__init__'],
+    ['bare URL keeps underscores', 'see https://x.org/_a_ now', 'see https://x.org/_a_ now'],
+    ['escaped marks', '\\*not bold\\* and \\_x\\_', '*not bold* and _x_'],
+    ['line breaks become spaces', 'one\n\ntwo\r\nthree', 'one two three'],
+    // Latin-1
+    ['Latin-1 letters stay', 'Smörgåsbord été © ½', 'Smörgåsbord été © ½'],
+    ['decomposed accents compose', 'été', 'été'],
+    ['diacritic outside Latin-1 to base letter', 'Dvořák Łódź ő', 'Dvorák ?ódz o'],
+    ['smart punctuation', '“it’s” — wait… • €5', '"it\'s" - wait... * EUR5'],
+    ['zero-width characters dropped', 'a​b', 'ab'],
+  ])('%s', (_label, input, expected) => {
+    expect(discordToHub(input, [], names)).toBe(expected);
   });
 });
 
@@ -117,11 +159,11 @@ describe('Discord -> hub through the bridge', () => {
     }, { log: (l) => logs.push(l), eventAttempts: 2, eventBackoffMs: 5 });
     try {
       // create: sentinel is the history row, authored Bob_Smith@DISCORD.
-      await sink.create(msg({ id: 'd1', content: 'hello ☺', attachmentUrls: ['https://cdn.example/a.png'] }));
+      await sink.create(msg({ id: 'd1', content: '**hello** ☺ <@7>', mentions: { users: { '7': 'amy' } }, attachmentUrls: ['https://cdn.example/a.png'] }));
       let rows = await history();
       expect(rows).toHaveLength(1);
       expect(rows[0][2]).toBe('Bob_Smith@DISCORD');
-      expect(rows[0][7]).toContain('hello ? https://cdn.example/a.png');
+      expect(rows[0][7]).toContain('hello :relaxed: @amy https://cdn.example/a.png');
       const hubId = rows[0][1];
 
       // loop guard: webhook and bot messages post nothing
