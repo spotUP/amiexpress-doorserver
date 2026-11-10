@@ -64,9 +64,9 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/invites` | `{user}`; private rooms |
 | DELETE | `/rooms/:id/invites/:user` | revoke; 204 |
 | GET | `/dm.txt` | DM rows |
-| POST | `/dm/:peer` | `{content, clientId}`; peer is `handle@BOARD`; reply `{id, seq, threadId}` |
-| POST | `/dm-group` | `{participants, content, clientId}`; participants are 2 or more `handle@BOARD` besides the sender (3+ unique members in all); reply `{id, seq, threadId}` |
-| GET | `/dm/:threadId/history.txt` | `?before&limit`; HISTORY rows; marks the peer's messages read |
+| POST | `/dm/:peer` | `{content, clientId, as?}`; peer is `handle@BOARD`; reply `{id, seq, threadId}` |
+| POST | `/dm-group` | `{participants, content, clientId, as?}`; participants are 2 or more `handle@BOARD` besides the sender (3+ unique members in all); reply `{id, seq, threadId}` |
+| GET | `/dm/:threadId/history.txt` | `?before&limit&as`; HISTORY rows; marks the peer's messages read |
 | GET | `/events.txt` | `?since=<seq>&wait=0..25` long poll; EVENTS rows |
 | POST | `/rooms/:id/kick` | `{user}` |
 | POST | `/rooms/:id/ban` | `{user, reason?}` |
@@ -184,6 +184,19 @@ as `as@<relay board>`: that user's room membership comes from the relay
 session, but bans, mutes, `+m` voice, author-only edit and delete, and the
 per-session rate limit apply to the relayed user. `as` can never name another
 board's user. Any other board sending `as` gets 403 `not_relay`.
+
+The same `as` works on `POST /dm/:peer`, `POST /dm-group` (body) and
+`GET /dm/:threadId/history.txt` (`?as=`): the DM is sent from, or the thread
+read as, `as@<relay board>`, with its own per-author rate limit. (Direct
+messages have no bans or ignore filtering on the server; a room ban does not
+stop a DM.) A relay board's `GET /events.txt` also carries every `dm` event
+that has a participant `x@<relay board>`, 1:1 or group, whichever user of the
+board sent or received it. Row (the usual EVENTS columns):
+`seq|dm|<threadId>|<sender full user>|<message id>|<at>|<role color>|<content>||<sender label>`
+for example `42|dm|dm1a2b3c4d5e6f|alice@BBS|dabc123|1700000000||hello||alice`.
+`threadId` starts with `dm` (1:1) or `dg` (group); the row does not name the
+recipient, so ask `GET /dm/<threadId>/history.txt?as=<handle>` for the user it
+concerns. A board that is not a relay still sees only DMs of its own sessions.
 
 Ignore list: the server only stores it, per chat identity, across sessions.
 It filters nothing; the door hides an ignored user's lines itself.

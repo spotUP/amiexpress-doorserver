@@ -241,13 +241,13 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     sendText(res, renderText('DM', out.rev, out.rows.map((r) => [r.threadId, r.peer, r.lastAt, r.unread])));
   });
   router.post('/dm/:peer', (req: Request, res: Response) => {
-    res.status(201).json(run(req, true, (db, ctx) => store.postDm(db, ctx, p(req, 'peer'), body(req))));
+    res.status(201).json(runAs(req, (db, ctx) => store.postDm(db, ctx, p(req, 'peer'), body(req))));
   });
   router.post('/dm-group', (req: Request, res: Response) => {
-    res.status(201).json(run(req, true, (db, ctx) => store.postDmGroup(db, ctx, body(req))));
+    res.status(201).json(runAs(req, (db, ctx) => store.postDmGroup(db, ctx, body(req))));
   });
   router.get('/dm/:threadId/history.txt', (req: Request, res: Response) => {
-    const out = run(req, true, (db, ctx) => ({ rev: headSeq(db), rows: historyRows(db, store.dmHistory(db, ctx, p(req, 'threadId'), req.query), []) }));
+    const out = runAs(req, (db, ctx) => ({ rev: headSeq(db), rows: historyRows(db, store.dmHistory(db, ctx, p(req, 'threadId'), req.query), []) }));
     sendText(res, renderText('HISTORY', out.rev, out.rows));
   });
 

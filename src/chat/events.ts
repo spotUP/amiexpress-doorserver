@@ -59,6 +59,8 @@ export function headSeq(db: Database.Database): number {
  * What a session may see: its joined rooms, its direct messages, events about
  * its user, the lifecycle of public rooms, the message of the day, board_joined,
  * and the `bbs` events of its own board (never another board's, even for the same user name).
+ * A relay board (boards.chat_relay) also gets every `dm` that has a participant `x@<its board>`,
+ * because it speaks for those users (`as`) and no session of its own is that participant.
  */
 export function fetchVisibleEvents(db: Database.Database, sid: string, user: string, since: number, board: string): EventRec[] {
   return db
@@ -74,13 +76,16 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
            OR e.room_id IN (SELECT room_id FROM chat_members WHERE sid = @sid)
            OR (e.dm_a IS NOT NULL AND (e.dm_a = @user OR e.dm_b = @user))
            OR (e.type = 'dm' AND e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE user = @user))
+           OR (e.type = 'dm' AND EXISTS (SELECT 1 FROM boards WHERE id = @board AND chat_relay = 1) AND (
+                 lower(substr(e.dm_a, -length(@suffix))) = @suffix OR lower(substr(e.dm_b, -length(@suffix))) = @suffix
+              OR (e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE lower(substr(user, -length(@suffix))) = @suffix))))
            OR e.user = @user
            OR (e.type IN ('room_created','room_deleted','topic')
                AND e.room_id IN (SELECT id FROM chat_rooms WHERE visibility = 'public'))
         )))
         ORDER BY e.seq LIMIT @limit`
     )
-    .all({ since, sid, user, board, limit: CHAT_LIMITS.eventsPerPoll }) as EventRec[];
+    .all({ since, sid, user, board, suffix: `@${board.toLowerCase()}`, limit: CHAT_LIMITS.eventsPerPoll }) as EventRec[];
 }
 
 /** Keep the newest `keep` events. */

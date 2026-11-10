@@ -234,8 +234,9 @@ export interface EditMessageRequest {
 }
 /**
  * Relay boards only (boards.chat_relay, set by the server admin): post, edit,
- * delete, react, unreact and thread posts may carry `as` (body, or query on
- * DELETE) to act as `as@<own board>`. Any other board gets 403 not_relay.
+ * delete, react, unreact, thread posts, direct messages (POST /dm/:peer,
+ * POST /dm-group) and GET /dm/:threadId/history.txt (query) may carry `as` (body, or query on
+ * DELETE and GET) to act as `as@<own board>`. Any other board gets 403 not_relay.
  */
 export interface RelayActing {
   as?: string;
@@ -261,7 +262,7 @@ export interface ThreadPostRequest {
   clientId: string;
 }
 
-export interface DmPostRequest {
+export interface DmPostRequest extends RelayActing {
   content: string;
   clientId: string;
 }
