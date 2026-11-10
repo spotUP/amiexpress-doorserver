@@ -23,7 +23,7 @@ on only when all three GitHub secrets are set:
 |---|---|
 | `DISCORD_BOT_TOKEN` | Bot token. The bot needs the Message Content intent, and in each mapped channel: View Channel, Send Messages, Read Message History, Manage Webhooks. |
 | `DISCORD_BRIDGE_BOARD_KEY` | BoardKey (`<id>.<secret>`) of the relay board with id `discord` (exactly; `CHAT_DISCORD_BOARD` in `contract/chat-types.ts`). The server admin creates that board, issues its key and sets its relay flag. |
-| `DISCORD_BRIDGE_ROOMS` | `roomKey=channelId,...`, e.g. `lobby=123456789012345678`. The room key is the hub room key (`lobby` is the landing room); the channel id is the Discord channel snowflake. |
+| `DISCORD_BRIDGE_ROOMS` | `roomId=channelId,...`, e.g. `roomd8209269178d=1431571957366788207`. The room id is the hub `chat_rooms.id` (generated, not the room name: the room named `lobby` has its own id per server); the channel id is the Discord channel snowflake. |
 
 With all three set the workflow writes them and `COMPOSE_PROFILES=discord`
 into the host `.env`. With any one missing the bridge container is stopped
