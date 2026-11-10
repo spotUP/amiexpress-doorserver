@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:demopartynet="https://www.demoparty.net/info/ns.html" xmlns:webfeeds="http://webfeeds.org/rss/1.0" xmlns:media="http://search.yahoo.com/mrss/" version="2.0"><channel><title>demoparty.net</title><link>https://www.demoparty.net/</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><description>A feed with upcoming demoparties</description><webfeeds:logo>https://www.demoparty.net/img/marker.svg</webfeeds:logo><webfeeds:accentColor>65ccb8a</webfeeds:accentColor><link xmlns="http://www.w3.org/2005/Atom" rel="hub" href="https://demopartynet.superfeedr.com/"/><link xmlns="http://www.w3.org/2005/Atom" rel="self" href="https://www.demoparty.net/demoparties.xml"/><item><title>Mysdata 2026</title><link>https://www.demoparty.net/mysdata/mysdata-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2630</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;18th - 20th September 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Sweden 🇸🇪&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Karlskrona&lt;br&gt;
+            Karlskrona&lt;/dd&gt;
+                            &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                C64,                             Amiga            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;The 2026 edition of Mysdata is taking place 18-20 September in Karlskrona, Sweden&lt;/p&gt;
+&lt;/p&gt;
+
+    &lt;img src="https://img.demoparty.net/party/none/mysdata/mysdata-2026-logo-850.jpeg" alt="Logo for Mysdata 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/mysdata/mysdata-2026-logo-850.jpeg" type="image/jpeg" length="81140"/><demopartynet:title>Mysdata 2026</demopartynet:title><demopartynet:date>18th - 20th September 2026</demopartynet:date><demopartynet:startDate>Fri, 18 Sep 2026 00:00:00 +0200</demopartynet:startDate><demopartynet:endDate>Sun, 20 Sep 2026 23:59:59 +0200</demopartynet:endDate><demopartynet:country>se</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://mysdata.org/2026/index.html</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/mysdata/mysdata-2026-logo-850.jpeg"></media:thumbnail></item><item><title>Skrolli Party 2026</title><link>https://www.demoparty.net/skrolli/skrolli-party-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2633</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;19th September 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Finland 🇫🇮&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Espoo&lt;br&gt;
+            &lt;/dd&gt;
+                            &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/skrolli/skrolli-party-2026-logo-852.png" alt="Logo for Skrolli Party 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/skrolli/skrolli-party-2026-logo-852.png" type="image/jpeg" length="1821"/><demopartynet:title>Skrolli Party 2026</demopartynet:title><demopartynet:date>19th September 2026</demopartynet:date><demopartynet:startDate>Sat, 19 Sep 2026 00:00:00 +0200</demopartynet:startDate><demopartynet:endDate>Sat, 19 Sep 2026 23:59:59 +0200</demopartynet:endDate><demopartynet:country>fi</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://skrolliparty.fi/2026/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/skrolli/skrolli-party-2026-logo-852.png"></media:thumbnail></item><item><title>Akiba Executable Party 2026</title><link>https://www.demoparty.net/unique-event/akiba-executable-party-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2637</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;27th September 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Party&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Japan 🇯🇵&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;IV AKIHABARA&lt;br&gt;
+            Tokio&lt;/dd&gt;
+                            &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                PC            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;Akiba Executable Party is a screening party for any kind of executable that let you enjoy sound and visuals!!!&lt;/p&gt;
+&lt;p&gt;There will also be a Shader Jam and DJ sets!&lt;/p&gt;
+&lt;/p&gt;
+
+</description><demopartynet:title>Akiba Executable Party 2026</demopartynet:title><demopartynet:date>27th September 2026</demopartynet:date><demopartynet:startDate>Sun, 27 Sep 2026 00:00:00 +0200</demopartynet:startDate><demopartynet:endDate>Sun, 27 Sep 2026 23:59:59 +0200</demopartynet:endDate><demopartynet:country>jp</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://aep.synapserack.com/en/</demopartynet:url></item><item><title>Deadline 2026</title><link>https://www.demoparty.net/deadline-berlin/deadline-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2524</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;2nd - 4th October 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Germany 🇩🇪&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;ORWOhaus e.V.&lt;br&gt;
+            Berlin&lt;/dd&gt;
+                        &lt;dt&gt;Claim&lt;/dt&gt;
+        &lt;dd&gt;&amp;laquo;Apocalypso&amp;raquo;&lt;/dd&gt;
+                &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform,                             PC,                             Amiga,                             Atari,                             C64            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;🌴 Your favorite Deadline will return! 🌴
+Pack your bags — paradise is calling. All details will be announced in due time, but be prepared for:&lt;/p&gt;
+&lt;p&gt;[x] high quality bigscreen and sound-system
+[x] PC and oldschool competitions (as always from the real HW!)
+[x] great musical acts and DJs
+[x] cozy atmosphere, meeting your friends and getting to know new ones!
+[x] retro-gaming tournament
+[x] seminars and workshops (TBA)
+[x] live stream of the whole event
+[x] unique three-dee compo (anaglyph glasses)
+[x] big outdoor area with possibility to camp
+[?] a tropical paradise that is definitely not a banana republic&lt;/p&gt;
+&lt;p&gt;Mark 02.10 – 04.10.2026 in your calendar, book your holidays, flights, trains and trams 🛬🐟 and start planning your release!&lt;/p&gt;
+&lt;p&gt;The brochure looks gorgeous. Nothing can go wrong. This is fine. 🍹🔥
+Looking forward to partying with you! &amp;lt;3&lt;/p&gt;
+&lt;/p&gt;
+
+    &lt;img src="https://img.demoparty.net/party/none/deadline-berlin/deadline-2026-logo-284.png" alt="Logo for Deadline 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/deadline-berlin/deadline-2026-logo-284.png" type="image/jpeg" length="6406"/><demopartynet:title>Deadline 2026</demopartynet:title><demopartynet:date>2nd - 4th October 2026</demopartynet:date><demopartynet:startDate>Fri, 02 Oct 2026 00:00:00 +0200</demopartynet:startDate><demopartynet:endDate>Sun, 04 Oct 2026 23:59:59 +0200</demopartynet:endDate><demopartynet:country>de</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://demoparty.berlin/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/deadline-berlin/deadline-2026-logo-284.png"></media:thumbnail></item><item><title>HackFest 2026</title><link>https://www.demoparty.net/hackfest/hackfest-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2617</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;10th October 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Art-Festival&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;The Netherlands 🇳🇱&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Enschede&lt;br&gt;
+            Enschede&lt;/dd&gt;
+                    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;HackFest aims to make technology and knowledge accessible to everyone, promotes creativity and stimulates both social and economic innovation. On Saturday 10 Oktober 2026, Hackfest gives a platform to a diverse group of creative minds, hackers, inventors, designers, artists, engineers, developers and hobbyists to showcase their projects in an inspiring space.&lt;/p&gt;
+&lt;p&gt;These enthusiastic makers come to Hackfest to present their creations and share their discoveries with the public. The event brings together curious people who enjoy learning and sharing their skills through lectures and workshops and working on their own projects on site. It is a place where people are amazed by installations, original do-it-yourself projects, fascinating discoveries and innovative solutions.&lt;/p&gt;
+&lt;/p&gt;
+
+    &lt;img src="https://img.demoparty.net/party/none/hackfest/hackfest-2026-logo-840.png" alt="Logo for HackFest 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/hackfest/hackfest-2026-logo-840.png" type="image/jpeg" length="144300"/><demopartynet:title>HackFest 2026</demopartynet:title><demopartynet:date>10th October 2026</demopartynet:date><demopartynet:startDate>Sat, 10 Oct 2026 00:00:00 +0200</demopartynet:startDate><demopartynet:endDate>Sat, 10 Oct 2026 23:59:59 +0200</demopartynet:endDate><demopartynet:country>nl</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>http://hackfest.nl</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/hackfest/hackfest-2026-logo-840.png"></media:thumbnail></item><item><title>TRSAC 2026</title><link>https://www.demoparty.net/trsac/trsac-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2610</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;16th - 18th October 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Denmark 🇩🇰&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Firma Sport&lt;br&gt;
+            Århus&lt;/dd&gt;
+                    &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/trsac/trsac-2026-logo-591.jpeg" alt="Logo for TRSAC 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/trsac/trsac-2026-logo-591.jpeg" type="image/jpeg" length="41577"/><demopartynet:title>TRSAC 2026</demopartynet:title><demopartynet:date>16th - 18th October 2026</demopartynet:date><demopartynet:startDate>Fri, 16 Oct 2026 00:00:00 +0200</demopartynet:startDate><demopartynet:endDate>Sun, 18 Oct 2026 23:59:59 +0200</demopartynet:endDate><demopartynet:country>dk</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://trsac.dk</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/trsac/trsac-2026-logo-591.jpeg"></media:thumbnail></item><item><title>NRG 2026</title><link>https://www.demoparty.net/unique-event/nrg-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2619</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;23rd - 25th October 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Poland 🇵🇱&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Międzynarodowe Targi Poznańskie (MTP)&lt;br&gt;
+            Poznan&lt;/dd&gt;
+                            &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;&lt;strong&gt;NRG&lt;/strong&gt; (&lt;em&gt;&lt;strong&gt;eNeRGy&lt;/strong&gt;&lt;/em&gt;) &lt;em&gt;&lt;strong&gt;2026&lt;/strong&gt;&lt;/em&gt; is a Polish digital culture festival built around a full demoparty with compos for contemporary digital creators.&lt;/p&gt;
+&lt;p&gt;The event will take place as an accompanying event to &lt;em&gt;Poznań Game Arena (PGA)&lt;/em&gt;, on the same dates and at the same &lt;a href="https://www.mtp.pl/en/our-venues/mtp-poznan-expo/"&gt;venue&lt;/a&gt;. A supporter ticket for NRG also gives access to PGA, the largest gaming event in Poland and one of the largest of its kind in the world.&lt;/p&gt;
+&lt;p&gt;NRG is aimed both at active demosceners and at new creators who may not yet be part of the scene. Its programme includes stage competitions for programmers, graphic artists and musicians, with entries presented on a big screen and professional sound system, alongside retro hardware and the Polish Quake III Arena Championships.&lt;/p&gt;
+&lt;p&gt;One of NRG’s main goals is to bring fresh blood into the demoscene. Through more open and progressive competition and participation rules, combined with visibility at a major gaming event, NRG goal is to introduce the demoscene to a new generation of creators and encourage them to step onto the scene themselves.&lt;/p&gt;
+&lt;/p&gt;
+
+    &lt;img src="https://img.demoparty.net/party/none/unique-event/nrg-2026-logo-848.png" alt="Logo for NRG 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/unique-event/nrg-2026-logo-848.png" type="image/jpeg" length="353533"/><demopartynet:title>NRG 2026</demopartynet:title><demopartynet:date>23rd - 25th October 2026</demopartynet:date><demopartynet:startDate>Fri, 23 Oct 2026 00:00:00 +0200</demopartynet:startDate><demopartynet:endDate>Sun, 25 Oct 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>pl</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://nrgevent.eu/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/unique-event/nrg-2026-logo-848.png"></media:thumbnail></item><item><title>Benediction Coding Party #6</title><link>https://www.demoparty.net/benediction-coding-party/benediction-coding-party-6?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2626</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;29th October - 1st November 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;France 🇫🇷&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Salle des fêtes&lt;br&gt;
+            Lengronne&lt;/dd&gt;
+                        &lt;dt&gt;Claim&lt;/dt&gt;
+        &lt;dd&gt;&amp;laquo;Amstrad CPC&amp;raquo;&lt;/dd&gt;
+                &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Amstrad CPC            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;Benediction Coding Party is an Amstrad demoparty organized by Eliot / Benediction and takes place from October 30th to November 2nd 2025 in Gavray-sur-Sienne (50450), France. Meet CPC enthusiasts in a convivial atmosphere and share knowledge with them.&lt;/p&gt;
+&lt;/p&gt;
+
+</description><demopartynet:title>Benediction Coding Party #6</demopartynet:title><demopartynet:date>29th October - 1st November 2026</demopartynet:date><demopartynet:startDate>Thu, 29 Oct 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sun, 01 Nov 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>fr</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://bndcodingparty.memoryfull.net/</demopartynet:url></item><item><title>Berlin Demoscene Meeting October 2026</title><link>https://www.demoparty.net/bsm/berlin-demoscene-meeting-october-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2574</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;30th October 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Meeting&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Germany 🇩🇪&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;C-Base&lt;br&gt;
+            Berlin&lt;/dd&gt;
+                    &lt;/dl&gt;
+
+
+</description><demopartynet:title>Berlin Demoscene Meeting October 2026</demopartynet:title><demopartynet:date>30th October 2026</demopartynet:date><demopartynet:startDate>Fri, 30 Oct 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Fri, 30 Oct 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>de</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://www.pouet.net/topic.php?which=12434</demopartynet:url></item><item><title>Zoo 2026</title><link>https://www.demoparty.net/zoo/zoo-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2624</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;30th October - 1st November 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Finland 🇫🇮&lt;/dd&gt;
+                        &lt;dt&gt;Claim&lt;/dt&gt;
+        &lt;dd&gt;&amp;laquo;Hard Day&amp;#039;s Ware&amp;raquo;&lt;/dd&gt;
+        &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/zoo/zoo-2026-logo-592.png" alt="Logo for Zoo 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/zoo/zoo-2026-logo-592.png" type="image/jpeg" length="16010"/><demopartynet:title>Zoo 2026</demopartynet:title><demopartynet:date>30th October - 1st November 2026</demopartynet:date><demopartynet:startDate>Fri, 30 Oct 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sun, 01 Nov 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>fi</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://2026.zooparty.org/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/zoo/zoo-2026-logo-592.png"></media:thumbnail></item><item><title>Flashparty 2026</title><link>https://www.demoparty.net/flashparty/flashparty-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2618</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;31st October 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Argentina 🇦🇷&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Buenos Aires&lt;br&gt;
+            &lt;/dd&gt;
+                    &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/flashparty/flashparty-2026-logo-278.jpeg" alt="Logo for Flashparty 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/flashparty/flashparty-2026-logo-278.jpeg" type="image/jpeg" length="8946"/><demopartynet:title>Flashparty 2026</demopartynet:title><demopartynet:date>31st October 2026</demopartynet:date><demopartynet:startDate>Sat, 31 Oct 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sat, 31 Oct 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>ar</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://flashparty.ar</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/flashparty/flashparty-2026-logo-278.jpeg"></media:thumbnail></item><item><title>Comparade 2026</title><link>https://www.demoparty.net/unique-event/comparade-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2599</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;6th - 8th November 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Germany 🇩🇪&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Munich, Emmering&lt;br&gt;
+            Emmering&lt;/dd&gt;
+                        &lt;dt&gt;Claim&lt;/dt&gt;
+        &lt;dd&gt;&amp;laquo;Always Comparade!&amp;raquo;&lt;/dd&gt;
+                &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform,                             PC,                             Amiga,                             C64            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;Save the date! Comparade 2026 will be back!&lt;/p&gt;
+&lt;p&gt;Features: Free Entry - Chillout Area - Free BBQ - Live Acts - Tag Wall - Fun Compos - Sleeping Area - Breakfast - Compos - Live Stream&lt;/p&gt;
+&lt;p&gt;Compos: Newschool Demo/Intro - Oldskool Demo/Intro - Wild Demo - Graphics - Music - Showdown!&lt;/p&gt;
+&lt;p&gt;Stay tuned for more info.&lt;/p&gt;
+&lt;/p&gt;
+
+    &lt;img src="https://img.demoparty.net/party/none/unique-event/comparade-2026-logo-836.png" alt="Logo for Comparade 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/unique-event/comparade-2026-logo-836.png" type="image/jpeg" length="1167592"/><demopartynet:title>Comparade 2026</demopartynet:title><demopartynet:date>6th - 8th November 2026</demopartynet:date><demopartynet:startDate>Fri, 06 Nov 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sun, 08 Nov 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>de</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>http://www.comparade.de</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/unique-event/comparade-2026-logo-836.png"></media:thumbnail></item><item><title>Demosplash 2026</title><link>https://www.demoparty.net/demosplash/demosplash-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2631</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;21st November 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;United States 🇺🇸&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Jared L Cohon University Center, Carnegie Mellon University&lt;br&gt;
+            Pittsburgh&lt;/dd&gt;
+                            &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/demosplash/demosplash-2026-logo-288.png" alt="Logo for Demosplash 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/demosplash/demosplash-2026-logo-288.png" type="image/jpeg" length="260244"/><demopartynet:title>Demosplash 2026</demopartynet:title><demopartynet:date>21st November 2026</demopartynet:date><demopartynet:startDate>Sat, 21 Nov 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sat, 21 Nov 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>us</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://www.demosplash.org/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/demosplash/demosplash-2026-logo-288.png"></media:thumbnail></item><item><title>Transmission64 2026</title><link>https://www.demoparty.net/transmission64/transmission64-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2580</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;28th November 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Type&lt;/dt&gt;
+        &lt;dd&gt;Online Demoparty&lt;/dd&gt;
+                &lt;dt&gt;Claim&lt;/dt&gt;
+        &lt;dd&gt;&amp;laquo;The C64 Online Demoparty&amp;raquo;&lt;/dd&gt;
+                &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                C64            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;Transmission64 returns in 2026.&lt;/p&gt;
+&lt;/p&gt;
+
+    &lt;img src="https://img.demoparty.net/party/none/transmission64/transmission64-2026-logo-279.gif" alt="Logo for Transmission64 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/transmission64/transmission64-2026-logo-279.gif" type="image/jpeg" length="8013"/><demopartynet:title>Transmission64 2026</demopartynet:title><demopartynet:date>28th November 2026</demopartynet:date><demopartynet:startDate>Sat, 28 Nov 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sat, 28 Nov 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>be</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OnlineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://transmission64.com</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/transmission64/transmission64-2026-logo-279.gif"></media:thumbnail></item><item><title>Inércia 2026</title><link>https://www.demoparty.net/inercia/inercia-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2613</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;4th - 6th December 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Portugal 🇵🇹&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Salão de Festas da Incrivel Almadense&lt;br&gt;
+            Almada&lt;/dd&gt;
+                            &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/inercia/inercia-2026-logo-744.png" alt="Logo for Inércia 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/inercia/inercia-2026-logo-744.png" type="image/jpeg" length="38062"/><demopartynet:title>Inércia 2026</demopartynet:title><demopartynet:date>4th - 6th December 2026</demopartynet:date><demopartynet:startDate>Fri, 04 Dec 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sun, 06 Dec 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>pt</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://2026.inercia.pt</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/inercia/inercia-2026-logo-744.png"></media:thumbnail></item><item><title>Dream210 2026</title><link>https://www.demoparty.net/dream210/dream210-2026?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2628</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;27th - 30th December 2026&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Germany 🇩🇪&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;AKK Karlsruhe&lt;br&gt;
+            Karlsruhe&lt;/dd&gt;
+                        &lt;dt&gt;Claim&lt;/dt&gt;
+        &lt;dd&gt;&amp;laquo;Dreaming Underwater&amp;raquo;&lt;/dd&gt;
+                &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+    &lt;p&gt;&lt;p&gt;Never stop dreaming! After the success of the first edition of our party, Team210 &amp;amp; Friends would once again like to invite you back to lovely Karlsruhe to spend the last days of the year just the way the doctor ordered: Cozy, with friends and demos.&lt;/p&gt;
+&lt;/p&gt;
+
+    &lt;img src="https://img.demoparty.net/party/none/dream210/dream210-2026-logo-847.png" alt="Logo for Dream210 2026" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/dream210/dream210-2026-logo-847.png" type="image/jpeg" length="6541601"/><demopartynet:title>Dream210 2026</demopartynet:title><demopartynet:date>27th - 30th December 2026</demopartynet:date><demopartynet:startDate>Sun, 27 Dec 2026 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Wed, 30 Dec 2026 23:59:59 +0100</demopartynet:endDate><demopartynet:country>de</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://dream210.party/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/dream210/dream210-2026-logo-847.png"></media:thumbnail></item><item><title>Atari Last Party 2027</title><link>https://www.demoparty.net/last-party/atari-last-party-2027?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2598</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;6th - 10th January 2027&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Poland 🇵🇱&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Pensjonat Licheń&lt;br&gt;
+            Licheń Stary&lt;/dd&gt;
+                        &lt;dt&gt;Claim&lt;/dt&gt;
+        &lt;dd&gt;&amp;laquo;Atari XL/XE&amp;raquo;&lt;/dd&gt;
+                &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Atari            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/last-party/atari-last-party-2027-logo-834.png" alt="Logo for Atari Last Party 2027" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/last-party/atari-last-party-2027-logo-834.png" type="image/jpeg" length="62690"/><demopartynet:title>Atari Last Party 2027</demopartynet:title><demopartynet:date>6th - 10th January 2027</demopartynet:date><demopartynet:startDate>Wed, 06 Jan 2027 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sun, 10 Jan 2027 23:59:59 +0100</demopartynet:endDate><demopartynet:country>pl</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://last-party.pl/2027/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/last-party/atari-last-party-2027-logo-834.png"></media:thumbnail></item><item><title>RSync 2027</title><link>https://www.demoparty.net/rsync/rsync-2027?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2569</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;8th - 9th January 2027&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Belgium 🇧🇪&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Het Depot&lt;br&gt;
+            Leuven&lt;/dd&gt;
+                    &lt;/dl&gt;
+
+
+</description><demopartynet:title>RSync 2027</demopartynet:title><demopartynet:date>8th - 9th January 2027</demopartynet:date><demopartynet:startDate>Fri, 08 Jan 2027 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sat, 09 Jan 2027 23:59:59 +0100</demopartynet:endDate><demopartynet:country>be</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://demoparty.be/</demopartynet:url></item><item><title>MountainBytes 2027</title><link>https://www.demoparty.net/mountainbytes/mountainbytes-2027?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2591</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;12th - 14th February 2027&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Switzerland 🇨🇭&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Dreiklang, Steinhausen&lt;br&gt;
+            Steinhausen&lt;/dd&gt;
+                            &lt;dt&gt;Platforms&lt;/dt&gt;
+        &lt;dd&gt;                Multiplatform            &lt;/dd&gt;
+    &lt;/dl&gt;
+
+
+    &lt;img src="https://img.demoparty.net/party/none/mountainbytes/mountainbytes-2027-logo-830.png" alt="Logo for MountainBytes 2027" class="webfeedsFeaturedVisual"&gt;
+</description><enclosure url="https://img.demoparty.net/party/none/mountainbytes/mountainbytes-2027-logo-830.png" type="image/jpeg" length="28498"/><demopartynet:title>MountainBytes 2027</demopartynet:title><demopartynet:date>12th - 14th February 2027</demopartynet:date><demopartynet:startDate>Fri, 12 Feb 2027 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Sun, 14 Feb 2027 23:59:59 +0100</demopartynet:endDate><demopartynet:country>ch</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>MixedEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://mountainbytes.ch/</demopartynet:url><media:thumbnail width="100" height="100" url="https://img.demoparty.net/party/crop-100x100/mountainbytes/mountainbytes-2027-logo-830.png"></media:thumbnail></item><item><title>Lahti Copy-Party 2027</title><link>https://www.demoparty.net/lahti-copy-party/lahti-copy-party-2027?mtm_campaign=event&amp;mtm_source=rss</link><pubDate>Thu, 10 Sep 2026 01:20:28 +0200</pubDate><guid>https://www.demoparty.net/party/2605</guid><description>&lt;dl&gt;
+    &lt;dt&gt;Date&lt;/dt&gt;
+    &lt;dd&gt;26th - 29th March 2027&lt;/dd&gt;
+    &lt;dt&gt;Type&lt;/dt&gt;
+    &lt;dd&gt;Demoparty&lt;/dd&gt;
+            &lt;dt&gt;Country&lt;/dt&gt;
+        &lt;dd&gt;Finland 🇫🇮&lt;/dd&gt;
+                    &lt;dt&gt;Location&lt;/dt&gt;
+            &lt;dd&gt;Lahti&lt;br&gt;
+            &lt;/dd&gt;
+                    &lt;/dl&gt;
+
+
+</description><demopartynet:title>Lahti Copy-Party 2027</demopartynet:title><demopartynet:date>26th - 29th March 2027</demopartynet:date><demopartynet:startDate>Fri, 26 Mar 2027 00:00:00 +0100</demopartynet:startDate><demopartynet:endDate>Mon, 29 Mar 2027 23:59:59 +0200</demopartynet:endDate><demopartynet:country>fi</demopartynet:country><demopartynet:eventStatus>EventScheduled</demopartynet:eventStatus><demopartynet:eventAttendanceMode>OfflineEventAttendanceMode</demopartynet:eventAttendanceMode><demopartynet:url>https://lahticopy.party/</demopartynet:url></item></channel></rss>

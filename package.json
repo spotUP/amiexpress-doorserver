@@ -1,0 +1,44 @@
+{
+  "name": "amiexpress-doorserver",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp src/schema.sql dist/src/schema.sql && mkdir -p dist/src/achievements && cp src/achievements/schema.sql dist/src/achievements/schema.sql && mkdir -p dist/src/releases && cp src/releases/schema.sql dist/src/releases/schema.sql && cp src/lha.js dist/src/lha.js && mkdir -p dist/seeds && (cp seeds/*.json dist/seeds/ 2>/dev/null || true)",
+    "start": "node dist/src/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --config jest.config.ts",
+    "test:ci": "jest --config jest.config.ts --ci",
+    "test:parity": "PARITY_DB=${PARITY_DB:-/tmp/parity-source.db} PARITY_ARCHIVES=${PARITY_ARCHIVES:-../amiexpress_doors/Archives} jest --config jest.config.ts tests/parity.test.ts",
+    "build:web": "npm --prefix web ci && npm --prefix web run build",
+    "build:all": "npm run build:web && npm run build",
+    "dev:web": "npm --prefix web run dev",
+    "capture:achievements-doc": "tsx tests/achievements/capture-doc-examples.ts"
+  },
+  "dependencies": {
+    "@types/busboy": "^1.5.4",
+    "@types/jsonwebtoken": "^9.0.10",
+    "adm-zip": "^0.6.0",
+    "better-sqlite3": "^11.10.0",
+    "busboy": "^1.6.0",
+    "express": "5.1.0",
+    "fast-xml-parser": "^5.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "10.0.0"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^24.10.1",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

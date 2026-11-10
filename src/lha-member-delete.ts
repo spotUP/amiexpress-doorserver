@@ -1,0 +1,195 @@
+/**
+ * Delete members from an LHA/LZH archive IN PLACE, preserving the format.
+ *
+ * Ported from amiexpress-web/web/backend/src/doors/lha-member-delete.ts.
+ * The real `lha` CLI can remove members in place (`lha d <archive> <member>`),
+ * which is all "strip the ads out of the published archive" needs. LZX is
+ * deliberately unsupported: no LZX writer exists.
+ *
+ * Nothing here builds a shell command string. The archive path and every
+ * member name come from the catalog, and real scene filenames contain '$',
+ * '&' and '!' — they are passed as argv entries so the shell never sees them.
+ */
+import { spawnSync, type SpawnSyncReturns } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+
+/** Injectable for tests: runs the archiver and reports how it went. */
+export type ArchiveRunner = (bin: string, args: string[]) => {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+};
+
+const defaultRunner: ArchiveRunner = (bin, args) => {
+  console.log(`[lha-debug] running ${bin} with args ${JSON.stringify(args)}`);
+  const r: SpawnSyncReturns<string> = spawnSync(bin, args, {
+    encoding: 'utf8',
+    timeout: 120_000,
+    env: { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' },
+  });
+  console.log(`[lha-debug] result status: ${r.status}, signal: ${r.signal}, stderr: ${r.stderr?.slice(0, 200)}`);
+  return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+};
+
+/** The archiver to use, or null when none is installed. */
+/**
+ * Pick the right archiver for the given archive. Different formats need
+ * different tools — `lha` only handles LHA/LZH, `7z` handles LHA/LZH/
+ * ZIP/7Z. We default to lha (the corpus is LHA-heavy) and fall back to
+ * 7z for the formats lha doesn't understand. The ARCHIVER_COMMAND env
+ * override forces a specific binary and skips the preference logic.
+ */
+export function findArchiverFor(archivePath: string, existsSync: (p: string) => boolean = fs.existsSync): string | null {
+  const override = process.env.ARCHIVER_COMMAND;
+  if (override && existsSync(override)) return override;
+  const ext = path.extname(archivePath).toLowerCase();
+  const isZipLike = ext === '.zip' || ext === '.7z';
+  const preferred = isZipLike
+    ? ['/usr/bin/7z', '/opt/homebrew/bin/7z']
+    : ['/usr/local/bin/lha', '/usr/bin/lha', '/opt/homebrew/bin/7z', '/usr/bin/7z'];
+  for (const candidate of preferred) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+export function findArchiverBinary(existsSync: (p: string) => boolean = fs.existsSync): string | null {
+  // Legacy entry point used by tests; defaults to LHA-first preference
+  // (the doorserver's primary workload). Tests can pass a custom
+  // existsSync to keep their fake filesystems working.
+  return findArchiverFor('/dummy.lha', existsSync);
+}
+
+export interface MemberDeleteCapability {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Whether members can be removed from this archive in place.
+ */
+export function canDeleteMembers(
+  archivePath: string,
+  binary: string | null = findArchiverFor(archivePath)
+): MemberDeleteCapability {
+  const ext = path.extname(archivePath).toLowerCase();
+  // lha CLI: only supports .lha / .lzh. 7z supports those plus .zip and
+  // .7z. Pick the supported set per binary.
+  const is7z = !!binary && (binary.endsWith('7z') || binary.includes('/7z'));
+  const supported = is7z
+    ? new Set(['.lha', '.lzh', '.zip', '.7z'])
+    : new Set(['.lha', '.lzh']);
+  if (!supported.has(ext)) {
+    return {
+      ok: false,
+      reason: ext === '.lzx'
+        ? 'LZX archives cannot be rewritten here: this server can read LZX but has no LZX writer.'
+        : `Unsupported archive format for in-place editing: ${ext || '(none)'}`,
+    };
+  }
+  if (!binary) {
+    return { ok: false, reason: 'No archiver binary available on this server.' };
+  }
+  return { ok: true };
+}
+
+export interface MemberDeleteResult {
+  ok: boolean;
+  removed: number;
+  reason?: string;
+  /** Requested members refused because their name is a bare wildcard
+   *  character the archiver would match against every member instead of
+   *  just that file - present whenever any were skipped, success or not. */
+  skipped?: string[];
+}
+
+/**
+ * Removes `members` from `archivePath`.
+ */
+export function deleteMembers(
+  archivePath: string,
+  members: string[],
+  opts: { binary?: string | null; runner?: ArchiveRunner } = {}
+): MemberDeleteResult {
+  const binary = opts.binary === undefined ? findArchiverFor(archivePath) : opts.binary;
+  const runner = opts.runner ?? defaultRunner;
+
+  const capability = canDeleteMembers(archivePath, binary);
+  if (!capability.ok) {
+    return { ok: false, removed: 0, reason: capability.reason };
+  }
+  if (members.length === 0) {
+    return { ok: true, removed: 0 };
+  }
+
+  // Both `lha` and `7z` do their OWN glob matching on delete arguments -
+  // spawnSync's argv bypasses the shell, but the archiver itself still
+  // treats a bare '*' or '?' as a wildcard against every member name, not
+  // a literal filename. The ad-classifier's whole "illegal filename chars"
+  // rule (# ? * @ |) exists to catch obfuscated ad files literally named
+  // things like "*" - passing that straight through deleted EVERY member
+  // of the archive instead of just that one file, and since lha deletes an
+  // archive outright once it's empty, this silently destroyed the archive
+  // (reproduced live: `lha dq archive.lha '*'` on a 2-member archive left
+  // "Cannot open archive" - the file was gone). Neither `./name` nor a
+  // backslash/bracket escape gets lha to match it as a literal name either
+  // (tested against the real binary) - there's no safe way to target a
+  // member whose name IS a wildcard character via this CLI, so it's
+  // refused rather than guessed at.
+  const WILDCARD_CHARS = /[*?]/;
+  const wildcardMembers = members.filter((m) => WILDCARD_CHARS.test(m));
+  const literalMembers = members.filter((m) => !WILDCARD_CHARS.test(m));
+  if (literalMembers.length === 0) {
+    return {
+      ok: false,
+      removed: 0,
+      reason: `refusing to delete ${wildcardMembers.map((m) => `"${m}"`).join(', ')}: filename contains a wildcard character (*, ?) the archiver would match against every member instead of this one file`,
+      skipped: wildcardMembers,
+    };
+  }
+
+  // 7z uses "d" to delete, just like lha. Filenames starting with `-` would
+  // be parsed by lha as options (exit 2 + usage message); prefix with `./`
+  // to force positional interpretation.
+  const safeMembers = literalMembers.map((m) => (m.startsWith('-') ? `./${m}` : m));
+  const useLha = binary!.endsWith('lha') || binary!.includes('/lha');
+  // 7z needs a different syntax for zip: `7z d archive.zip member` works
+  // for lha, but for zip 7z needs `-bb` to print byte-level detail and
+  // `-sccUTF-8` for utf-8 output, plus `7z d` exits 1 on warnings
+  // (like "no files matched") so we accept that. Some 7z builds also
+  // want `-y` to auto-confirm the delete.
+  const is7zDelete = !useLha;
+  const args = is7zDelete
+    ? ['d', '-y', '-bb0', '-sccUTF-8', archivePath, ...safeMembers]
+    : ['dq', '--archive-kanji-code=latin1', '--system-kanji-code=utf8', archivePath, ...safeMembers];
+  // First try: explicit latin1/utf8 encoding flags (correct for Amiga archives).
+  // Fallback: 'cap' encoding which doesn't need iconv - works on filenames
+  // whose bytes aren't valid in any standard 8-bit encoding.
+  const fallbackArgs = useLha
+    ? ['dq', '--archive-kanji-code=cap', '--system-kanji-code=utf8', archivePath, ...safeMembers]
+    : args;
+  let result = runner(binary as string, args);
+  if (!is7zDelete && result.status !== 0 && /iconv/.test(result.stderr || '')) {
+    result = runner(binary as string, fallbackArgs);
+  }
+  if (result.status !== 0) {
+    const output = (result.stderr || result.stdout || '').trim().slice(0, 300);
+    return {
+      ok: false,
+      removed: 0,
+      reason: `archiver (${binary}) exited ${result.status ?? 'null'}${output ? ': ' + output : ''}`,
+    };
+  }
+
+  return {
+    ok: true,
+    removed: literalMembers.length,
+    ...(wildcardMembers.length > 0
+      ? {
+          reason: `removed ${literalMembers.length} file(s); refused to delete ${wildcardMembers.map((m) => `"${m}"`).join(', ')} - filename contains a wildcard character (*, ?) the archiver would match against every member instead of this one file`,
+          skipped: wildcardMembers,
+        }
+      : {}),
+  };
+}

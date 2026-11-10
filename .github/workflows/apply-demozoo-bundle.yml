@@ -1,0 +1,131 @@
+name: Apply demozoo sync bundle to live
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag containing the bundle (e.g. demozoo-bundle-20260829-173024)'
+        required: true
+        type: string
+
+concurrency:
+  group: apply-demozoo-bundle
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download bundle from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BUNDLE_DIR="${RUNNER_TEMP}/demozoo-bundle"
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p "$BUNDLE_DIR"
+          gh release download "${{ inputs.release_tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$BUNDLE_DIR" \
+            --pattern 'patch.sql' \
+            --pattern 'submitted-files.tar.gz' \
+            --pattern 'manifest.json'
+          echo "== downloaded files =="
+          ls -la "$BUNDLE_DIR"
+          test -s "$BUNDLE_DIR/patch.sql"
+          test -s "$BUNDLE_DIR/submitted-files.tar.gz"
+          test -s "$BUNDLE_DIR/manifest.json"
+          # Pack into a single tarball for one-shot transfer.
+          cd "$BUNDLE_DIR"
+          tar czf "${RUNNER_TEMP}/demozoo-bundle.tar.gz" \
+            patch.sql submitted-files.tar.gz manifest.json
+          ls -la "${RUNNER_TEMP}/demozoo-bundle.tar.gz"
+
+      - name: rsync tarball to VPS
+        # appleboy/scp-action always creates a folder, even for a
+        # single file. The reliable alternative is rsync over SSH
+        # using the secret key written to a tmpfile. This puts the
+        # tarball at /tmp/demozoo-bundle.tar.gz on the VPS.
+        #
+        # IMPORTANT: rsync creates the destination as a directory if
+        # the path already exists. After a previous failed run, that
+        # path may already be a directory. Pre-cleanup removes it.
+        env:
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          KEY_FILE=~/.ssh/hetzner_apply_key
+          printf '%s\n' "$HETZNER_SSH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          # Pre-cleanup: nuke any leftover from a previous failed run.
+          # (VPS doesn't have its own cleanup of /tmp.)
+          ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "root@${HETZNER_HOST}" \
+            'rm -rf /tmp/demozoo-bundle.tar.gz /tmp/demozoo-bundle /tmp/demozoo-stage'
+          rsync -avz \
+            -e "ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            "${RUNNER_TEMP}/demozoo-bundle.tar.gz" \
+            "root@${HETZNER_HOST}:/tmp/demozoo-bundle.tar.gz"
+          # Verify the file is a file, not a directory.
+          ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "root@${HETZNER_HOST}" \
+            'test -f /tmp/demozoo-bundle.tar.gz' || { echo "rsync created a directory, not a file"; exit 1; }
+          rm -f "$KEY_FILE"
+
+      - name: Apply bundle in doorserver container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            test -f /tmp/demozoo-bundle.tar.gz || { echo "missing tarball"; exit 1; }
+            BUNDLE=/tmp/demozoo-bundle
+            rm -rf "$BUNDLE"
+            mkdir -p "$BUNDLE"
+            tar xzf /tmp/demozoo-bundle.tar.gz -C "$BUNDLE"
+            echo "== bundle on VPS =="
+            ls -la "$BUNDLE/"
+
+            CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])doorserver([-_]|$)' | head -1)
+            if [ -z "$CONTAINER" ]; then
+              echo "ERROR: no doorserver container found"
+              docker ps -a
+              exit 1
+            fi
+            echo "== container: $CONTAINER =="
+
+            # /app is the container cwd. Compiled scripts live at
+            # /app/dist/scripts. Use node + the compiled .js.
+            echo "== before =="
+            docker exec -w /app "$CONTAINER" \
+              node dist/scripts/db-stats.js /data/doors.db
+
+            echo "== copy bundle into container =="
+            docker cp "$BUNDLE" "$CONTAINER:/tmp/demozoo-bundle"
+
+            echo "== apply =="
+            docker exec -w /app "$CONTAINER" \
+              sh -c 'DOORSERVER_DB=/data/doors.db DOOR_ARCHIVES_ROOT=/data/Archives node dist/scripts/demozoo-sync-apply.js /tmp/demozoo-bundle'
+
+            echo "== after =="
+            docker exec -w /app "$CONTAINER" \
+              node dist/scripts/db-stats.js /data/doors.db
+
+            echo "== cleanup =="
+            docker exec "$CONTAINER" rm -rf /tmp/demozoo-bundle
+            rm -rf "$BUNDLE" /tmp/demozoo-bundle.tar.gz
+            echo "== done =="
+
+      - name: Delete draft release (one-shot)
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ inputs.release_tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --yes || echo "release already deleted, ignoring"

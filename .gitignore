@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+.DS_Store
+tests/tmp/
+db-backups/
+bbs_ads/
+data/demozoo-textads-index.jsonl
+data/bbs_ads.db
+
+# Working notes (handoffs, plans, ledgers) stay out of the public repository.
+/thoughts/

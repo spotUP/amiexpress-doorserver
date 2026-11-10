@@ -1,0 +1,936 @@
+{
+  "formatVersion": 1,
+  "achievements": [
+    {
+      "id": "msg.post.1",
+      "name": "First Words",
+      "description": "Post a message",
+      "family": "msg",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.post",
+        "n": 1
+      }
+    },
+    {
+      "id": "msg.post.10",
+      "name": "Regular",
+      "description": "Post ten messages",
+      "family": "msg",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.post",
+        "n": 10
+      }
+    },
+    {
+      "id": "msg.post.100",
+      "name": "Century",
+      "description": "Post a hundred messages",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.post",
+        "n": 100
+      }
+    },
+    {
+      "id": "msg.post.1000",
+      "name": "Chatterbox",
+      "description": "Post a thousand messages",
+      "family": "msg",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.post",
+        "n": 1000
+      }
+    },
+    {
+      "id": "msg.reply.50",
+      "name": "Conversationalist",
+      "description": "Reply to fifty messages",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.reply",
+        "n": 50
+      }
+    },
+    {
+      "id": "msg.thread.10",
+      "name": "Thread Starter",
+      "description": "Start ten threads that drew a reply",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.thread",
+        "n": 10
+      }
+    },
+    {
+      "id": "msg.private.25",
+      "name": "Pen Pal",
+      "description": "Send twenty-five private mails",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.private",
+        "n": 25
+      }
+    },
+    {
+      "id": "msg.conf.distinct.10",
+      "name": "Well Travelled",
+      "description": "Post in ten different conferences",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "msg.post",
+        "dim": "key",
+        "n": 10
+      }
+    },
+    {
+      "id": "msg.long.1",
+      "name": "Essayist",
+      "description": "Post a single message over a hundred lines",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.post",
+        "n": 1,
+        "key": "lines:100+"
+      }
+    },
+    {
+      "id": "msg.fastreply",
+      "name": "Quick Draw",
+      "description": "Reply within sixty seconds of the message you answer",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.reply",
+        "n": 1,
+        "key": "fast"
+      }
+    },
+    {
+      "id": "msg.burst.3",
+      "name": "On A Roll",
+      "description": "Three messages inside five minutes",
+      "family": "msg",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "within",
+        "type": "msg.post",
+        "n": 3,
+        "window_s": 300
+      }
+    },
+    {
+      "id": "msg.comment.10",
+      "name": "Suggestion Box",
+      "description": "Leave ten comments for the sysop",
+      "family": "msg",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "msg.comment",
+        "n": 10
+      }
+    },
+    {
+      "id": "msg.all",
+      "name": "Voice Of The Board",
+      "description": "Every message achievement",
+      "family": "msg",
+      "tier": "platinum",
+      "hidden": false,
+      "rule": {
+        "op": "all",
+        "ids": [
+          "msg.post.1",
+          "msg.post.10",
+          "msg.post.100",
+          "msg.post.1000",
+          "msg.reply.50",
+          "msg.thread.10",
+          "msg.private.25",
+          "msg.conf.distinct.10",
+          "msg.long.1",
+          "msg.fastreply",
+          "msg.burst.3",
+          "msg.comment.10"
+        ]
+      }
+    },
+    {
+      "id": "file.up.1",
+      "name": "Contributor",
+      "description": "Upload a file",
+      "family": "file",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.upload",
+        "n": 1
+      }
+    },
+    {
+      "id": "file.up.10",
+      "name": "Supplier",
+      "description": "Upload ten files",
+      "family": "file",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.upload",
+        "n": 10
+      }
+    },
+    {
+      "id": "file.up.100",
+      "name": "Courier",
+      "description": "Upload a hundred files",
+      "family": "file",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.upload",
+        "n": 100
+      }
+    },
+    {
+      "id": "file.dl.1",
+      "name": "Leecher",
+      "description": "Download a file",
+      "family": "file",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.download",
+        "n": 1
+      }
+    },
+    {
+      "id": "file.dl.100",
+      "name": "Collector",
+      "description": "Download a hundred files",
+      "family": "file",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.download",
+        "n": 100
+      }
+    },
+    {
+      "id": "file.dl.1000",
+      "name": "Archivist",
+      "description": "Download a thousand files",
+      "family": "file",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.download",
+        "n": 1000
+      }
+    },
+    {
+      "id": "file.up.bytes.100mb",
+      "name": "Heavy Lifter",
+      "description": "Upload a hundred megabytes",
+      "family": "file",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "sum",
+        "type": "file.upload",
+        "field": "value",
+        "n": 104857600
+      }
+    },
+    {
+      "id": "file.up.bytes.1gb",
+      "name": "Freight Train",
+      "description": "Upload a gigabyte",
+      "family": "file",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "sum",
+        "type": "file.upload",
+        "field": "value",
+        "n": 1073741824
+      }
+    },
+    {
+      "id": "file.desc.1",
+      "name": "Documentarian",
+      "description": "Write a real description for an upload",
+      "family": "file",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.desc",
+        "n": 1
+      }
+    },
+    {
+      "id": "file.ratio.silver",
+      "name": "Fair Trader",
+      "description": "Reach the silver upload ratio",
+      "family": "file",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.ratio",
+        "n": 1,
+        "key": "silver"
+      }
+    },
+    {
+      "id": "file.ratio.gold",
+      "name": "Patron",
+      "description": "Reach the gold upload ratio",
+      "family": "file",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.ratio",
+        "n": 1,
+        "key": "gold"
+      }
+    },
+    {
+      "id": "file.old.1",
+      "name": "Time Traveller",
+      "description": "Download a file older than twenty-five years",
+      "family": "file",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "file.download",
+        "n": 1,
+        "key": "age:25y+"
+      }
+    },
+    {
+      "id": "file.all",
+      "name": "Keeper Of The Archive",
+      "description": "Every file achievement",
+      "family": "file",
+      "tier": "platinum",
+      "hidden": false,
+      "rule": {
+        "op": "all",
+        "ids": [
+          "file.up.1",
+          "file.up.10",
+          "file.up.100",
+          "file.dl.1",
+          "file.dl.100",
+          "file.dl.1000",
+          "file.up.bytes.100mb",
+          "file.up.bytes.1gb",
+          "file.desc.1",
+          "file.ratio.silver",
+          "file.ratio.gold",
+          "file.old.1"
+        ]
+      }
+    },
+    {
+      "id": "wall.tag.1",
+      "name": "Graffiti",
+      "description": "Tag the wall",
+      "family": "wall",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "wall.tag",
+        "n": 1
+      }
+    },
+    {
+      "id": "wall.tag.10",
+      "name": "Vandal",
+      "description": "Tag the wall ten times",
+      "family": "wall",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "wall.tag",
+        "n": 10
+      }
+    },
+    {
+      "id": "wall.tag.100",
+      "name": "Muralist",
+      "description": "Tag the wall a hundred times",
+      "family": "wall",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "wall.tag",
+        "n": 100
+      }
+    },
+    {
+      "id": "wall.everyconf",
+      "name": "Everywhere",
+      "description": "Tag the wall in every conference on a board",
+      "family": "wall",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "wall.everyconf",
+        "n": 1
+      }
+    },
+    {
+      "id": "bull.read.all",
+      "name": "Well Informed",
+      "description": "Read every bulletin on a board",
+      "family": "bull",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "bull.read.all",
+        "n": 1
+      }
+    },
+    {
+      "id": "wall.all",
+      "name": "Writing On The Wall",
+      "description": "Every wall and bulletin achievement",
+      "family": "wall",
+      "tier": "platinum",
+      "hidden": false,
+      "rule": {
+        "op": "all",
+        "ids": [
+          "wall.tag.1",
+          "wall.tag.10",
+          "wall.tag.100",
+          "wall.everyconf",
+          "bull.read.all"
+        ]
+      }
+    },
+    {
+      "id": "presence.call.1",
+      "name": "Hello",
+      "description": "Call the board",
+      "family": "presence",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "presence.call",
+        "n": 1
+      }
+    },
+    {
+      "id": "presence.call.10",
+      "name": "Visitor",
+      "description": "Call ten times",
+      "family": "presence",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "presence.call",
+        "n": 10
+      }
+    },
+    {
+      "id": "presence.call.100",
+      "name": "Regular Caller",
+      "description": "Call a hundred times",
+      "family": "presence",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "presence.call",
+        "n": 100
+      }
+    },
+    {
+      "id": "presence.call.1000",
+      "name": "Fixture",
+      "description": "Call a thousand times",
+      "family": "presence",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "presence.call",
+        "n": 1000
+      }
+    },
+    {
+      "id": "presence.streak.7",
+      "name": "Week Long",
+      "description": "Call on seven consecutive days",
+      "family": "presence",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "streak",
+        "type": "presence.call",
+        "unit": "day",
+        "n": 7
+      }
+    },
+    {
+      "id": "presence.streak.30",
+      "name": "Month Long",
+      "description": "Call on thirty consecutive days",
+      "family": "presence",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "streak",
+        "type": "presence.call",
+        "unit": "day",
+        "n": 30
+      }
+    },
+    {
+      "id": "presence.minutes.600",
+      "name": "Ten Hours",
+      "description": "Spend ten hours online",
+      "family": "presence",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "presence.minutes",
+        "n": 600
+      }
+    },
+    {
+      "id": "presence.minutes.6000",
+      "name": "Hundred Hours",
+      "description": "Spend a hundred hours online",
+      "family": "presence",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "presence.minutes",
+        "n": 6000
+      }
+    },
+    {
+      "id": "presence.everyhour",
+      "name": "Round The Clock",
+      "description": "Log in during all twenty-four hours of the clock",
+      "family": "presence",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "presence.call",
+        "dim": "key",
+        "n": 24
+      }
+    },
+    {
+      "id": "presence.return30",
+      "name": "Welcome Back",
+      "description": "Call again after thirty days away",
+      "family": "presence",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "presence.call",
+        "n": 1,
+        "key": "return:30"
+      }
+    },
+    {
+      "id": "presence.all",
+      "name": "Part Of The Furniture",
+      "description": "Every presence achievement",
+      "family": "presence",
+      "tier": "platinum",
+      "hidden": false,
+      "rule": {
+        "op": "all",
+        "ids": [
+          "presence.call.1",
+          "presence.call.10",
+          "presence.call.100",
+          "presence.call.1000",
+          "presence.streak.7",
+          "presence.streak.30",
+          "presence.minutes.600",
+          "presence.minutes.6000",
+          "presence.everyhour",
+          "presence.return30"
+        ]
+      }
+    },
+    {
+      "id": "social.chat.1",
+      "name": "Chatty",
+      "description": "Chat for the first time",
+      "family": "social",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "social.chat",
+        "n": 1
+      }
+    },
+    {
+      "id": "social.nodechat.1",
+      "name": "Party Line",
+      "description": "Chat node to node for the first time",
+      "family": "social",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "social.nodechat",
+        "n": 1
+      }
+    },
+    {
+      "id": "social.sysop_paged.1",
+      "name": "Knock Knock",
+      "description": "Page the sysop",
+      "family": "social",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "social.page",
+        "n": 1
+      }
+    },
+    {
+      "id": "social.olm.10",
+      "name": "Messenger",
+      "description": "Send ten online messages",
+      "family": "social",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "social.olm",
+        "n": 10
+      }
+    },
+    {
+      "id": "social.vote.1",
+      "name": "Ballot",
+      "description": "Vote in a poll",
+      "family": "social",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "social.vote",
+        "n": 1
+      }
+    },
+    {
+      "id": "social.greet.1",
+      "name": "Welcome Wagon",
+      "description": "Greet a new user on their first call",
+      "family": "social",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "count",
+        "type": "social.greet",
+        "n": 1
+      }
+    },
+    {
+      "id": "social.all",
+      "name": "Life Of The Party",
+      "description": "Every social achievement",
+      "family": "social",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "all",
+        "ids": [
+          "social.chat.1",
+          "social.nodechat.1",
+          "social.sysop_paged.1",
+          "social.olm.10",
+          "social.vote.1",
+          "social.greet.1"
+        ]
+      }
+    },
+    {
+      "id": "doors.distinct.5",
+      "name": "Explorer",
+      "description": "Play five different doors",
+      "family": "doors",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "door.play",
+        "dim": "key",
+        "n": 5
+      }
+    },
+    {
+      "id": "doors.distinct.10",
+      "name": "Adventurer",
+      "description": "Play ten different doors",
+      "family": "doors",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "door.play",
+        "dim": "key",
+        "n": 10
+      }
+    },
+    {
+      "id": "doors.distinct.25",
+      "name": "Completionist",
+      "description": "Play twenty-five different doors",
+      "family": "doors",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "door.play",
+        "dim": "key",
+        "n": 25
+      }
+    },
+    {
+      "id": "doors.minutes.600",
+      "name": "Door Dweller",
+      "description": "Spend ten hours inside doors",
+      "family": "doors",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "sum",
+        "type": "door.minutes",
+        "field": "value",
+        "n": 600
+      }
+    },
+    {
+      "id": "doors.all",
+      "name": "Master Of Doors",
+      "description": "Every door achievement",
+      "family": "doors",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "all",
+        "ids": [
+          "doors.distinct.5",
+          "doors.distinct.10",
+          "doors.distinct.25",
+          "doors.minutes.600"
+        ]
+      }
+    },
+    {
+      "id": "boards.linked.2",
+      "name": "Two Timer",
+      "description": "Link two boards",
+      "family": "boards",
+      "tier": "bronze",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "meta.link",
+        "dim": "board",
+        "n": 2
+      }
+    },
+    {
+      "id": "boards.linked.5",
+      "name": "Circuit Rider",
+      "description": "Link five boards",
+      "family": "boards",
+      "tier": "silver",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "meta.link",
+        "dim": "board",
+        "n": 5
+      }
+    },
+    {
+      "id": "boards.linked.10",
+      "name": "Scene Veteran",
+      "description": "Link ten boards",
+      "family": "boards",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "meta.link",
+        "dim": "board",
+        "n": 10
+      }
+    },
+    {
+      "id": "boards.same.3",
+      "name": "Three Times Over",
+      "description": "Earn the same achievement on three different boards",
+      "family": "boards",
+      "tier": "gold",
+      "hidden": false,
+      "rule": {
+        "op": "distinct",
+        "type": "meta.unlock",
+        "dim": "board",
+        "group": "key",
+        "n": 3
+      }
+    },
+    {
+      "id": "rare.caller.1000",
+      "name": "Thousandth",
+      "description": "Be a board's thousandth caller account",
+      "family": "rare",
+      "tier": "gold",
+      "hidden": true,
+      "rule": {
+        "op": "count",
+        "type": "presence.call",
+        "n": 1,
+        "key": "caller:1000"
+      }
+    },
+    {
+      "id": "rare.midnight",
+      "name": "Night Owl",
+      "description": "Post a message between midnight and five past",
+      "family": "rare",
+      "tier": "silver",
+      "hidden": true,
+      "rule": {
+        "op": "count",
+        "type": "msg.post",
+        "n": 1,
+        "key": "midnight"
+      }
+    },
+    {
+      "id": "rare.realc64",
+      "name": "Breadbin",
+      "description": "Call from a real Commodore 64",
+      "family": "rare",
+      "tier": "gold",
+      "hidden": true,
+      "rule": {
+        "op": "count",
+        "type": "presence.client",
+        "n": 1,
+        "key": "c64"
+      }
+    },
+    {
+      "id": "rare.realamiga",
+      "name": "Miggy",
+      "description": "Call from a real Amiga",
+      "family": "rare",
+      "tier": "gold",
+      "hidden": true,
+      "rule": {
+        "op": "count",
+        "type": "presence.client",
+        "n": 1,
+        "key": "amiga"
+      }
+    },
+    {
+      "id": "rare.petscii",
+      "name": "Forty Columns",
+      "description": "Complete a session in PETSCII mode",
+      "family": "rare",
+      "tier": "silver",
+      "hidden": true,
+      "rule": {
+        "op": "count",
+        "type": "presence.petscii",
+        "n": 1
+      }
+    },
+    {
+      "id": "rare.newboard.first",
+      "name": "Ground Floor",
+      "description": "The first unlock ever recorded on a board",
+      "family": "rare",
+      "tier": "gold",
+      "hidden": true,
+      "rule": {
+        "op": "count",
+        "type": "meta.board_first",
+        "n": 1
+      }
+    },
+    {
+      "id": "rare.season.winner",
+      "name": "Champion",
+      "description": "Win a season",
+      "family": "rare",
+      "tier": "platinum",
+      "hidden": true,
+      "rule": {
+        "op": "granted"
+      }
+    }
+  ]
+}

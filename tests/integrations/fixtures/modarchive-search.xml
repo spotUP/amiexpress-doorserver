@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DOC-DERIVED fixture (no ModArchive key existed at build time): shape per
+     the xml-tools.php API (request=search -> modarchive/module/id|songtitle|
+     format). RECAPTURE with a real key before trusting a parse failure. -->
+<modarchive>
+  <module>
+    <id>41529</id>
+    <songtitle>intro.mod</songtitle>
+    <format>MOD</format>
+  </module>
+  <module>
+    <id>99999</id>
+    <songtitle>chip tune</songtitle>
+    <format>XM</format>
+  </module>
+</modarchive>

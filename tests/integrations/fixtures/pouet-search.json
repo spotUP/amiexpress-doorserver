@@ -1,0 +1,4613 @@
+{
+    "success": true,
+    "results": {
+        "60678": {
+            "id": "60678",
+            "name": "26 bytes Fuzzy Logic",
+            "type": "32b",
+            "addedUser": {
+                "id": "4177",
+                "nickname": "JAC!",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "micro_atari_logo.gif",
+                "glops": "1602",
+                "registerDate": "2003-03-30 13:23:16",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "688",
+                "thumbdowns": "20",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2012-11-02 12:23:52",
+            "releaseDate": "2012-11-15",
+            "voteup": "7",
+            "votepig": "3",
+            "votedown": "0",
+            "voteavg": "0.7000",
+            "download": "https:\/\/www.wudsn.com\/productions\/c64\/fuzzylogic\/fuzzylogic.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "10335",
+                    "name": "JAC!",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.wudsn.com\/",
+                    "addedUser": "792",
+                    "addedDate": "2008-08-24 23:05:18",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "32b"
+            ],
+            "placings": [],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "12"
+        },
+        "60648": {
+            "id": "60648",
+            "name": "32 bytes fuzzy logic",
+            "type": "32b",
+            "addedUser": {
+                "id": "32621",
+                "nickname": "rudi",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "rule30.gif",
+                "glops": "1452",
+                "registerDate": "2008-05-06 01:05:29",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "500",
+                "thumbdowns": "31",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2012-10-30 14:23:16",
+            "releaseDate": "2012-10-15",
+            "voteup": "9",
+            "votepig": "5",
+            "votedown": "1",
+            "voteavg": "0.5333",
+            "download": "http:\/\/csdb.dk\/release\/download.php?id=140413",
+            "party_compo": "50",
+            "party_place": "20",
+            "party_year": "2012",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "11521",
+                    "name": "Rudi",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "32621",
+                    "addedDate": "2012-01-02 07:25:08",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "4167",
+                    "name": "Darklite",
+                    "acronym": "DKE",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.darklite.org\/",
+                    "addedUser": "1548",
+                    "addedDate": "2005-01-29 06:23:09",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "1967",
+                    "name": "Hoaxers",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "924",
+                    "addedDate": "2002-05-26 05:17:49",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "32b"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "50",
+                        "name": "X",
+                        "web": "http:\/\/www.scs-trc.net\/x2008\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "50",
+                    "ranking": "20",
+                    "year": "2012"
+                }
+            ],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "50",
+                "name": "X",
+                "web": "http:\/\/www.scs-trc.net\/x2008\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "16"
+        },
+        "6441": {
+            "id": "6441",
+            "name": "alcohological",
+            "type": "1k",
+            "addedUser": {
+                "id": "961",
+                "nickname": "dipswitch",
+                "level": "gloperator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "up_icon_16x16.gif",
+                "glops": "10862",
+                "registerDate": "2001-08-02 17:33:56",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "1077",
+                "thumbdowns": "110",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2002-05-26 13:34:53",
+            "releaseDate": "2000-03-15",
+            "voteup": "1",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.5000",
+            "download": "https:\/\/files.zxdemo.org\/files\/Alcohol.zip",
+            "party_compo": "132",
+            "party_place": "6",
+            "party_year": "2000",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1956",
+                    "name": "ZeroTeam",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.zeroteam.sk\/",
+                    "addedUser": "961",
+                    "addedDate": "2002-05-25 01:26:58",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "1k"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "181",
+                        "name": "Forever",
+                        "web": "http:\/\/2013-2015.forever-party.net\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "132",
+                    "ranking": "6",
+                    "year": "2000"
+                }
+            ],
+            "platforms": {
+                "82": {
+                    "name": "ZX Spectrum",
+                    "icon": "k_zx.gif",
+                    "slug": "zxspectrum"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "181",
+                "name": "Forever",
+                "web": "http:\/\/2013-2015.forever-party.net\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "9543": {
+            "id": "9543",
+            "name": "Bio-Logic",
+            "type": "demo",
+            "addedUser": {
+                "id": "775",
+                "nickname": "digitalerr0r",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "ghost_s.gif",
+                "glops": "167",
+                "registerDate": "2001-06-02 16:37:14",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "45",
+                "thumbdowns": "3",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2003-04-25 13:57:36",
+            "releaseDate": "2003-04-15",
+            "voteup": "4",
+            "votepig": "6",
+            "votedown": "3",
+            "voteavg": "0.0769",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2003\/thegathering03\/demo\/tg03_combineddemo_win32_bio-logic_by_dark_codex.zip",
+            "party_compo": "57",
+            "party_place": "17",
+            "party_year": "2003",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1430",
+                    "name": "Dark CodeX Crew",
+                    "acronym": "DCC",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.darkcodex.net",
+                    "addedUser": "123",
+                    "addedDate": "2001-11-08 10:46:36",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "43",
+                        "name": "The Gathering",
+                        "web": "http:\/\/www.gathering.org\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "17",
+                    "year": "2003"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "43",
+                "name": "The Gathering",
+                "web": "http:\/\/www.gathering.org\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "15"
+        },
+        "10278": {
+            "id": "10278",
+            "name": "biologic",
+            "type": "64k",
+            "addedUser": {
+                "id": "961",
+                "nickname": "dipswitch",
+                "level": "gloperator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "up_icon_16x16.gif",
+                "glops": "10862",
+                "registerDate": "2001-08-02 17:33:56",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "1077",
+                "thumbdowns": "110",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2003-07-16 21:46:31",
+            "releaseDate": "2003-07-15",
+            "voteup": "1",
+            "votepig": "3",
+            "votedown": "1",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2003\/symphony03\/amiga\/in64\/vzy-biol.lha",
+            "party_compo": "63",
+            "party_place": "4",
+            "party_year": "2003",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2695",
+                    "name": "Veezya",
+                    "acronym": "VZY",
+                    "disambiguation": "",
+                    "web": "http:\/\/veezya.nakoz.org",
+                    "addedUser": "961",
+                    "addedDate": "2003-04-23 03:29:41",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "64k"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "278",
+                        "name": "Symphony",
+                        "web": "http:\/\/www.amiscena.org\/symphony\/index.php?en",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "63",
+                    "ranking": "4",
+                    "year": "2003"
+                }
+            ],
+            "platforms": {
+                "71": {
+                    "name": "Amiga AGA",
+                    "icon": "k_amiga_aga.gif",
+                    "slug": "amigaaga"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "278",
+                "name": "Symphony",
+                "web": "http:\/\/www.amiscena.org\/symphony\/index.php?en",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "6"
+        },
+        "56593": {
+            "id": "56593",
+            "name": "BOULDER LOGIC",
+            "type": "game",
+            "addedUser": {
+                "id": "908",
+                "nickname": "YERZMYEY\/H-PRG",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "48_.gif",
+                "glops": "1141",
+                "registerDate": "2001-07-12 17:55:03",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "931",
+                "thumbdowns": "40",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2011-01-18 10:10:08",
+            "releaseDate": "2011-01-15",
+            "voteup": "13",
+            "votepig": "5",
+            "votedown": "0",
+            "voteavg": "0.7222",
+            "download": "https:\/\/files.scene.org\/view\/demos\/artists\/bob_smith\/boulderl.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "game"
+            ],
+            "placings": [],
+            "platforms": {
+                "150": {
+                    "name": "ZX-81",
+                    "icon": "k_zx81.gif",
+                    "slug": "zx81"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "25"
+        },
+        "26805": {
+            "id": "26805",
+            "name": "Catalogic",
+            "type": "demo",
+            "addedUser": {
+                "id": "15347",
+                "nickname": "TheBat",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "16px-gif.gif",
+                "glops": "24",
+                "registerDate": "2005-08-08 22:45:54",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "268",
+                "thumbdowns": "130",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2006-10-19 10:12:07",
+            "releaseDate": "2006-10-15",
+            "voteup": "0",
+            "votepig": "7",
+            "votedown": "5",
+            "voteavg": "-0.4167",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2006\/bcnparty06\/demo\/guideline_catalogic.zip",
+            "party_compo": "57",
+            "party_place": "2",
+            "party_year": "2006",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "3618",
+                    "name": "Guideline",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.richtlijn.be",
+                    "addedUser": "9200",
+                    "addedDate": "2004-07-26 03:41:38",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "61",
+                        "name": "bcnparty",
+                        "web": "http:\/\/www.bcnparty.org",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "2",
+                    "year": "2006"
+                }
+            ],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "61",
+                "name": "bcnparty",
+                "web": "http:\/\/www.bcnparty.org",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "13"
+        },
+        "86477": {
+            "id": "86477",
+            "name": "Chronologica 2",
+            "type": "slideshow",
+            "addedUser": {
+                "id": "98192",
+                "nickname": "ROOT808",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "colorcycle.gif",
+                "glops": "1841",
+                "registerDate": "2014-04-22 23:22:40",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2020-07-28 02:36:23",
+            "releaseDate": "1997-10-15",
+            "voteup": "0",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/csdb.dk\/release\/download.php?id=84949",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2230",
+                    "name": "System",
+                    "acronym": "SYS",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "1478",
+                    "addedDate": "2002-09-04 17:54:28",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "slideshow"
+            ],
+            "placings": [],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "1"
+        },
+        "65492": {
+            "id": "65492",
+            "name": "fuzzy logic BBS (1)",
+            "type": "4k,bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2015-04-25 17:46:54",
+            "releaseDate": null,
+            "voteup": "3",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.7500",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/fuzzy_logic_bbs.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "425",
+                    "name": "SMA Posse",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "234",
+                    "addedDate": "2000-12-08 11:54:28",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "4k",
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "4"
+        },
+        "60576": {
+            "id": "60576",
+            "name": "Fuzzy Logic BBS (2)",
+            "type": "8k,bbstro",
+            "addedUser": {
+                "id": "537",
+                "nickname": "phoenix",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "small2.gif",
+                "glops": "9573",
+                "registerDate": "2001-02-26 23:37:07",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "919",
+                "thumbdowns": "30",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2012-10-24 22:02:33",
+            "releaseDate": "1993-10-15",
+            "voteup": "1",
+            "votepig": "2",
+            "votedown": "0",
+            "voteavg": "0.3333",
+            "download": "https:\/\/files.scene.org\/view\/mirrors\/hornet\/demos\/1993\/f\/fuzzy.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "425",
+                    "name": "SMA Posse",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "234",
+                    "addedDate": "2000-12-08 11:54:28",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "8k",
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "3"
+        },
+        "57544": {
+            "id": "57544",
+            "name": "Hymns of Logic",
+            "type": "musicdisk",
+            "addedUser": {
+                "id": "17017",
+                "nickname": "Mystra",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "brs.gif",
+                "glops": "4898",
+                "registerDate": "2005-12-10 09:33:30",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "639",
+                "thumbdowns": "5",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2011-08-20 08:27:34",
+            "releaseDate": "1994-04-15",
+            "voteup": "5",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/mirrors\/the_scene_archives\/The_Scene_Archives_Vol_02\/the_disks_are_in_here\/disks_1251-1300\/1297-hymns_logic_d1.dms",
+            "party_compo": null,
+            "party_place": null,
+            "party_year": null,
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2828",
+                    "name": "Hardcore Design",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "4648",
+                    "addedDate": "2003-07-16 19:57:57",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "musicdisk"
+            ],
+            "placings": [],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "5"
+        },
+        "62454": {
+            "id": "62454",
+            "name": "Illogic",
+            "type": "4k",
+            "addedUser": {
+                "id": "97465",
+                "nickname": "matref",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "bender2.gif",
+                "glops": "9",
+                "registerDate": "2013-10-05 01:03:16",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2014-01-29 16:16:05",
+            "releaseDate": "2014-01-15",
+            "voteup": "4",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.8000",
+            "download": "http:\/\/www.ticalc.org\/pub\/83plus\/asm\/graphics\/illogic.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "4k"
+            ],
+            "placings": [],
+            "platforms": {
+                "159": {
+                    "name": "TI-8x (Z80)",
+                    "icon": "k_tiz80.gif",
+                    "slug": "ti8xz80"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "12"
+        },
+        "7823": {
+            "id": "7823",
+            "name": "Logic",
+            "type": "demo",
+            "addedUser": {
+                "id": "3217",
+                "nickname": "kimi kardashian",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "bits-whale-sea-hsj-20090405.gif",
+                "glops": "5071",
+                "registerDate": "2002-10-04 02:13:02",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2002-10-19 18:39:22",
+            "releaseDate": "1995-08-15",
+            "voteup": "6",
+            "votepig": "11",
+            "votedown": "3",
+            "voteavg": "0.1500",
+            "download": "http:\/\/ftp.amigascne.org\/pub\/amiga\/Groups\/P\/Pygmy_Projects\/PP-Logic.lha",
+            "party_compo": "16",
+            "party_place": "2",
+            "party_year": "1995",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1008",
+                    "name": "Pygmy Projects",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "487",
+                    "addedDate": "2001-07-04 13:57:50",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "7",
+                        "name": "Assembly",
+                        "web": "http:\/\/www.assembly.org",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "16",
+                    "ranking": "2",
+                    "year": "1995"
+                }
+            ],
+            "platforms": {
+                "71": {
+                    "name": "Amiga AGA",
+                    "icon": "k_amiga_aga.gif",
+                    "slug": "amigaaga"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "7",
+                "name": "Assembly",
+                "web": "http:\/\/www.assembly.org",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 1,
+            "commentCount": "23"
+        },
+        "48111": {
+            "id": "48111",
+            "name": "Logic",
+            "type": "demo",
+            "addedUser": {
+                "id": "2229",
+                "nickname": "blkpanther",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "aln_rzr.gif",
+                "glops": "48629",
+                "registerDate": "2002-04-08 01:28:16",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "1061",
+                "thumbdowns": "122",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2008-01-14 19:36:06",
+            "releaseDate": "1991-01-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "http:\/\/csdb.dk\/getinternalfile.php\/17292\/Logic.d64.gz",
+            "party_compo": null,
+            "party_place": null,
+            "party_year": "1991",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "9857",
+                    "name": "The Lost Souls",
+                    "acronym": "TLS",
+                    "disambiguation": "c64",
+                    "web": "",
+                    "addedUser": "177",
+                    "addedDate": "2008-01-14 20:18:09",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": null
+        },
+        "61561": {
+            "id": "61561",
+            "name": "Logic Battle",
+            "type": "cracktro",
+            "addedUser": {
+                "id": "20312",
+                "nickname": "gentleman",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "bf02.gif",
+                "glops": "10249",
+                "registerDate": "2006-08-26 00:53:50",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3",
+                "thumbdowns": "1",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2013-07-12 17:37:56",
+            "releaseDate": "1991-00-15",
+            "voteup": "5",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/mirrors\/amigascne\/Groups\/E\/Endless_Piracy\/EP-CrLogicBattle",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2859",
+                    "name": "Endless Piracy",
+                    "acronym": "EP",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "3030",
+                    "addedDate": "2003-08-01 00:23:46",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "5"
+        },
+        "55499": {
+            "id": "55499",
+            "name": "Logic by computers",
+            "type": "wild",
+            "addedUser": {
+                "id": "556",
+                "nickname": "dominator",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "cube.gif",
+                "glops": "234",
+                "registerDate": "2001-03-09 12:53:21",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "452",
+                "thumbdowns": "71",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2010-08-02 14:07:58",
+            "releaseDate": "2010-08-15",
+            "voteup": "5",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.8333",
+            "download": "http:\/\/www.kosmoplovci.net\/files\/video\/kosmoplovci.logic.by.computers.2010.x264.aac.mkv\/kosmoplovci.logic.by.computers.2010.x264.aac.mkv",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1661",
+                    "name": "kosmoplovci",
+                    "acronym": "kooi",
+                    "disambiguation": "",
+                    "web": "http:\/\/kosmoplovci.net\/",
+                    "addedUser": "556",
+                    "addedDate": "2002-02-09 14:50:26",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "wild"
+            ],
+            "placings": [],
+            "platforms": {
+                "157": {
+                    "name": "Animation\/Video",
+                    "icon": "k_video.gif",
+                    "slug": "animationvideo"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "6"
+        },
+        "9099": {
+            "id": "9099",
+            "name": "Logic Control",
+            "type": "demo",
+            "addedUser": {
+                "id": "619",
+                "nickname": "tomaes",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "tomaes6.gif",
+                "glops": "6064",
+                "registerDate": "2001-04-07 08:30:48",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "162",
+                "thumbdowns": "20",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2003-03-21 16:12:54",
+            "releaseDate": "1997-02-15",
+            "voteup": "4",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/csdb.dk\/release\/download.php?id=11905",
+            "party_compo": "50",
+            "party_place": "2",
+            "party_year": "1997",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "534",
+                    "name": "Fraction",
+                    "acronym": "FTN",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "402",
+                    "addedDate": "2001-02-16 14:06:28",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "163",
+                        "name": "North Party",
+                        "web": "http:\/\/masz.brudne.lapy.pl\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "50",
+                    "ranking": "2",
+                    "year": "1997"
+                }
+            ],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "163",
+                "name": "North Party",
+                "web": "http:\/\/masz.brudne.lapy.pl\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "4"
+        },
+        "85626": {
+            "id": "85626",
+            "name": "logic cracktro",
+            "type": "cracktro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2020-05-21 15:14:46",
+            "releaseDate": "1992-00-15",
+            "voteup": "1",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.5000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/cracktro\/logic_cracktro.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "14893",
+                    "name": "The Entertainment Team",
+                    "acronym": "TET",
+                    "disambiguation": "pc\/warez",
+                    "web": "",
+                    "addedUser": "44120",
+                    "addedDate": "2020-05-21 15:08:23",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "91307": {
+            "id": "91307",
+            "name": "logic OS",
+            "type": "64k",
+            "addedUser": {
+                "id": "59635",
+                "nickname": "djh0ffman",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "logicoma-anim.gif",
+                "glops": "747",
+                "registerDate": "2010-09-06 15:01:30",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "4793",
+                "thumbdowns": "46",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2022-04-17 10:21:18",
+            "releaseDate": "2022-04-15",
+            "voteup": "112",
+            "votepig": "15",
+            "votedown": "0",
+            "voteavg": "0.8819",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2022\/revision22\/amiga-intro\/logicos.zip",
+            "party_compo": "17",
+            "party_place": "1",
+            "party_year": "2022",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "12638",
+                    "name": "Logicoma",
+                    "acronym": "LGC",
+                    "disambiguation": "",
+                    "web": "http:\/\/logicoma.io\/",
+                    "addedUser": "16820",
+                    "addedDate": "2015-07-12 12:10:48",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "64k"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1550",
+                        "name": "Revision",
+                        "web": "http:\/\/www.revision-party.net",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "17",
+                    "ranking": "1",
+                    "year": "2022"
+                }
+            ],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1550",
+                "name": "Revision",
+                "web": "http:\/\/www.revision-party.net",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "132"
+        },
+        "106762": {
+            "id": "106762",
+            "name": "logic sunrise old",
+            "type": "intro",
+            "addedUser": {
+                "id": "110067",
+                "nickname": "RaHoWz",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "bk.gif",
+                "glops": "2",
+                "registerDate": "2026-07-27 22:03:23",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2026-07-31 21:32:08",
+            "releaseDate": "2026-07-15",
+            "voteup": "3",
+            "votepig": "1",
+            "votedown": "1",
+            "voteavg": "0.4000",
+            "download": "https:\/\/uploadnow.io\/f\/T6Np9G6",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "intro"
+            ],
+            "placings": [],
+            "platforms": {
+                "78": {
+                    "name": "Amstrad CPC",
+                    "icon": "k_cpc.gif",
+                    "slug": "amstradcpc"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "5"
+        },
+        "76491": {
+            "id": "76491",
+            "name": "logic system BBS",
+            "type": "32k,bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2018-06-14 06:27:59",
+            "releaseDate": "1994-00-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/logic_system_bbs.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "32k",
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": null
+        },
+        "51630": {
+            "id": "51630",
+            "name": "Logic works final",
+            "type": "cracktro",
+            "addedUser": {
+                "id": "5308",
+                "nickname": "hitchhikr",
+                "level": "gloperator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "hitchhikr.gif",
+                "glops": "14985",
+                "registerDate": "2003-11-05 00:26:49",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "2595",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2008-09-09 01:45:27",
+            "releaseDate": "1987-00-15",
+            "voteup": "2",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/mirrors\/amigascne\/Groups\/T\/The_Kent_Team\/TKT-CrLogicWorksFin.adf",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2635",
+                    "name": "The Kent Team",
+                    "acronym": "TKT",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "3841",
+                    "addedDate": "2003-03-29 12:19:06",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "104383": {
+            "id": "104383",
+            "name": "Logic-2",
+            "type": "16k",
+            "addedUser": {
+                "id": "15685",
+                "nickname": "aGGreSSor",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "wb.gif",
+                "glops": "776",
+                "registerDate": "2005-09-02 14:00:08",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "14",
+                "thumbdowns": "2",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2025-07-03 09:03:21",
+            "releaseDate": "1996-00-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/caglrc.cc\/scalar\/media\/w\/logic2.rom",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "16773",
+                    "name": "First Company",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "15685",
+                    "addedDate": "2025-07-02 20:19:30",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "16k"
+            ],
+            "placings": [],
+            "platforms": {
+                "165": {
+                    "name": "Vector-06c",
+                    "icon": "k_vector06c.gif",
+                    "slug": "vector06c"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": null
+        },
+        "45188": {
+            "id": "45188",
+            "name": "Logical",
+            "type": "demo",
+            "addedUser": {
+                "id": "2229",
+                "nickname": "blkpanther",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "aln_rzr.gif",
+                "glops": "48629",
+                "registerDate": "2002-04-08 01:28:16",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "1061",
+                "thumbdowns": "122",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2008-01-10 21:47:48",
+            "releaseDate": "1989-12-15",
+            "voteup": "1",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "http:\/\/csdb.dk\/getinternalfile.php\/44211\/Logical.rar",
+            "party_compo": "50",
+            "party_place": null,
+            "party_year": "1989",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1581",
+                    "name": "X-Factor",
+                    "acronym": "",
+                    "disambiguation": "c64",
+                    "web": "http:\/\/www.xfactor.dk\/",
+                    "addedUser": "1019",
+                    "addedDate": "2002-01-06 14:44:54",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1063",
+                        "name": "Dominators\/Upfront\/Trilogy Christmas Party",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "50",
+                    "ranking": null,
+                    "year": "1989"
+                }
+            ],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1063",
+                "name": "Dominators\/Upfront\/Trilogy Christmas Party",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "1"
+        },
+        "49781": {
+            "id": "49781",
+            "name": "Logical & Frentic",
+            "type": "cracktro",
+            "addedUser": {
+                "id": "1601",
+                "nickname": "evil",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "dhs3.gif",
+                "glops": "3845",
+                "registerDate": "2001-12-20 04:16:21",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3368",
+                "thumbdowns": "22",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2008-02-25 18:40:30",
+            "releaseDate": null,
+            "voteup": "0",
+            "votepig": "1",
+            "votedown": "1",
+            "voteavg": "-0.5000",
+            "download": "http:\/\/files.dhs.nu\/files_demo\/16bitcrw.zip",
+            "party_compo": null,
+            "party_place": null,
+            "party_year": null,
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "10050",
+                    "name": "16-bit Crew",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "1601",
+                    "addedDate": "2008-02-25 18:39:34",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "70": {
+                    "name": "Atari ST",
+                    "icon": "k_atari_st.gif",
+                    "slug": "atarist"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "57376": {
+            "id": "57376",
+            "name": "Logical Data Disk",
+            "type": "cracktro",
+            "addedUser": {
+                "id": "20312",
+                "nickname": "gentleman",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "bf02.gif",
+                "glops": "10249",
+                "registerDate": "2006-08-26 00:53:50",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3",
+                "thumbdowns": "1",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2011-07-25 23:58:26",
+            "releaseDate": "1992-00-15",
+            "voteup": "2",
+            "votepig": "2",
+            "votedown": "0",
+            "voteavg": "0.5000",
+            "download": "http:\/\/ftp.amigascne.org\/pub\/amiga\/Groups\/B\/Bronx\/BRONX-CrLogicalDataDisk",
+            "party_compo": null,
+            "party_place": null,
+            "party_year": null,
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1102",
+                    "name": "Bronx",
+                    "acronym": "BNX",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.bronxwhq.org\/",
+                    "addedUser": "487",
+                    "addedDate": "2001-07-09 17:34:58",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "4"
+        },
+        "10792": {
+            "id": "10792",
+            "name": "Logical Final",
+            "type": "cracktro",
+            "addedUser": {
+                "id": "3841",
+                "nickname": "Helioth",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "l_amiga1.gif",
+                "glops": "1214",
+                "registerDate": "2003-01-11 08:27:59",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "4",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2003-08-30 14:25:08",
+            "releaseDate": "1991-07-15",
+            "voteup": "14",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/mirrors\/amigascne\/Groups\/T\/TRSI\/TRSI-CrLogicalFinal",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "280",
+                    "name": "Tristar & Red Sector Inc.",
+                    "acronym": "TRSI",
+                    "disambiguation": "",
+                    "web": "https:\/\/trsi.org",
+                    "addedUser": "11",
+                    "addedDate": "2000-10-08 04:51:10",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "16"
+        },
+        "10871": {
+            "id": "10871",
+            "name": "Logical Stones",
+            "type": "game",
+            "addedUser": {
+                "id": "5149",
+                "nickname": "Eddy",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "divermonostep.gif",
+                "glops": "5",
+                "registerDate": "2003-10-06 12:58:32",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2003-10-24 14:58:35",
+            "releaseDate": "2003-10-15",
+            "voteup": "5",
+            "votepig": "2",
+            "votedown": "0",
+            "voteavg": "0.7143",
+            "download": "http:\/\/www.face5.hu\/download\/Logical_Stones.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "3046",
+                    "name": "Face5",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.face5.hu",
+                    "addedUser": "5149",
+                    "addedDate": "2003-10-06 13:05:49",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "game"
+            ],
+            "placings": [],
+            "platforms": {
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "13"
+        },
+        "8256": {
+            "id": "8256",
+            "name": "Logical Thoughts",
+            "type": "demo",
+            "addedUser": {
+                "id": "1761",
+                "nickname": "FooLman",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "smalluf.gif",
+                "glops": "614",
+                "registerDate": "2002-01-15 13:36:30",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "5",
+                "thumbdowns": "8",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2002-12-09 11:03:58",
+            "releaseDate": "1994-01-15",
+            "voteup": "3",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.7500",
+            "download": "https:\/\/files.scene.org\/view\/parties\/1993\/theparty93\/demo\/tdslogic.zip",
+            "party_compo": "95",
+            "party_place": "19",
+            "party_year": "1993",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2436",
+                    "name": "TDS Inc.",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "1761",
+                    "addedDate": "2002-12-09 11:00:22",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "45",
+                        "name": "The Party",
+                        "web": "http:\/\/www.theparty.dk\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "95",
+                    "ranking": "19",
+                    "year": "1993"
+                }
+            ],
+            "platforms": {
+                "69": {
+                    "name": "MS-Dos\/gus",
+                    "icon": "k_gus.gif",
+                    "slug": "msdosgus"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "45",
+                "name": "The Party",
+                "web": "http:\/\/www.theparty.dk\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "4"
+        },
+        "80841": {
+            "id": "80841",
+            "name": "Logical Wasteland BBS",
+            "type": "8k,bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2019-03-31 14:30:13",
+            "releaseDate": "1995-00-15",
+            "voteup": "2",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.6667",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/logical_wasteland_bbs.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "8k",
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "3"
+        },
+        "36638": {
+            "id": "36638",
+            "name": "Logicality",
+            "type": "dentro",
+            "addedUser": {
+                "id": "2229",
+                "nickname": "blkpanther",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "aln_rzr.gif",
+                "glops": "48629",
+                "registerDate": "2002-04-08 01:28:16",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "1061",
+                "thumbdowns": "122",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2008-01-04 21:50:17",
+            "releaseDate": "1995-11-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "http:\/\/csdb.dk\/getinternalfile.php\/27240\/logicality.t64",
+            "party_compo": null,
+            "party_place": null,
+            "party_year": null,
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "8359",
+                    "name": "Xlcus Software and Design",
+                    "acronym": "XLCUS",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.studiox64.com\/",
+                    "addedUser": "2229",
+                    "addedDate": "2008-01-04 21:50:01",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "dentro"
+            ],
+            "placings": [],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": null
+        },
+        "65523": {
+            "id": "65523",
+            "name": "maniax dream \/ fuzzy logic bbs (1)",
+            "type": "4k,bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2015-05-01 19:23:52",
+            "releaseDate": "1994-00-15",
+            "voteup": "2",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.6667",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/maniax_dream_fuzzy_logic_bbs.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "4k",
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "3"
+        },
+        "79134": {
+            "id": "79134",
+            "name": "maniax dream \/ fuzzy logic BBS (2)",
+            "type": "256b,bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2018-11-23 21:34:26",
+            "releaseDate": "1994-00-15",
+            "voteup": "1",
+            "votepig": "0",
+            "votedown": "2",
+            "voteavg": "-0.3333",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/maniax_dream_fuzzy_logic_bbs2.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "256b",
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "3"
+        },
+        "33085": {
+            "id": "33085",
+            "name": "Positive Logic",
+            "type": "demo",
+            "addedUser": {
+                "id": "15359",
+                "nickname": "Bobic",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "4s_2.gif",
+                "glops": "9049",
+                "registerDate": "2005-08-10 02:17:55",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "188",
+                "thumbdowns": "14",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2007-11-03 17:36:54",
+            "releaseDate": "1993-07-15",
+            "voteup": "7",
+            "votepig": "2",
+            "votedown": "0",
+            "voteavg": "0.7778",
+            "download": "http:\/\/ftp.amigascne.org\/pub\/amiga\/Groups\/0-9\/5thGeneration\/FG-POSIT.DMS",
+            "party_compo": "16",
+            "party_place": "2",
+            "party_year": "1993",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1117",
+                    "name": "Fifth Generation",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "900",
+                    "addedDate": "2001-07-11 05:38:17",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1129",
+                        "name": "Southern Party",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "16",
+                    "ranking": "2",
+                    "year": "1993"
+                }
+            ],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1129",
+                "name": "Southern Party",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "9"
+        },
+        "53570": {
+            "id": "53570",
+            "name": "Restricted logic",
+            "type": "4k",
+            "addedUser": {
+                "id": "35954",
+                "nickname": "xtrium",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "x2.gif",
+                "glops": "194",
+                "registerDate": "2008-08-18 10:31:20",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "983",
+                "thumbdowns": "71",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2009-08-01 22:52:41",
+            "releaseDate": "2009-08-15",
+            "voteup": "33",
+            "votepig": "12",
+            "votedown": "1",
+            "voteavg": "0.6957",
+            "download": "https:\/\/files.scene.org\/view\/parties\/2009\/evoke09\/in4k\/evk0998brestricted_logic.zip",
+            "party_compo": "106",
+            "party_place": "6",
+            "party_year": "2009",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "10288",
+                    "name": "Trolls In The Shadows",
+                    "acronym": "TITS",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "35628",
+                    "addedDate": "2008-08-12 00:51:38",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "4k"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "18",
+                        "name": "Evoke",
+                        "web": "http:\/\/www.evoke.eu",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "106",
+                    "ranking": "6",
+                    "year": "2009"
+                }
+            ],
+            "platforms": {
+                "66": {
+                    "name": "Linux",
+                    "icon": "k_linux.gif",
+                    "slug": "linux"
+                },
+                "68": {
+                    "name": "Windows",
+                    "icon": "k_win.gif",
+                    "slug": "windows"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "18",
+                "name": "Evoke",
+                "web": "http:\/\/www.evoke.eu",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "47"
+        },
+        "89624": {
+            "id": "89624",
+            "name": "Scorn Technologic Intro",
+            "type": "cracktro",
+            "addedUser": {
+                "id": "98192",
+                "nickname": "ROOT808",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "colorcycle.gif",
+                "glops": "1841",
+                "registerDate": "2014-04-22 23:22:40",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2021-08-16 21:03:53",
+            "releaseDate": "1997-01-15",
+            "voteup": "1",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/csdb.dk\/release\/download.php?id=131625",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "6332",
+                    "name": "Scorn",
+                    "acronym": "SLT",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "1548",
+                    "addedDate": "2006-05-24 00:04:02",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "cracktro"
+            ],
+            "placings": [],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "1"
+        },
+        "93111": {
+            "id": "93111",
+            "name": "Self running demo with some logic circuitry",
+            "type": "demo",
+            "addedUser": {
+                "id": "4624",
+                "nickname": "---",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "bla.gif",
+                "glops": "934",
+                "registerDate": "2003-07-11 10:41:52",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "0",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2022-12-23 22:19:58",
+            "releaseDate": "2022-12-15",
+            "voteup": "10",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/absencehq.de\/atari\/SELFRUN.ZIP",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "3417",
+                    "name": "Excellence In Art",
+                    "acronym": "XIA",
+                    "disambiguation": "",
+                    "web": "http:\/\/brainfish.net\/atari",
+                    "addedUser": "7032",
+                    "addedDate": "2004-03-24 11:56:04",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "15648",
+                    "name": "The Innovator",
+                    "acronym": "tIn",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "4624",
+                    "addedDate": "2022-12-23 22:17:53",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "11698",
+                    "name": "GGN",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "1156",
+                    "addedDate": "2012-07-11 08:22:20",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [],
+            "platforms": {
+                "70": {
+                    "name": "Atari ST",
+                    "icon": "k_atari_st.gif",
+                    "slug": "atarist"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "10"
+        },
+        "85015": {
+            "id": "85015",
+            "name": "Silicon Logic Demo",
+            "type": "demo",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2020-03-15 06:34:27",
+            "releaseDate": "1993-08-15",
+            "voteup": "0",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/silicon_logic_demo.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "14826",
+                    "name": "Silicon Logic",
+                    "acronym": "SL",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "44120",
+                    "addedDate": "2020-03-15 06:32:57",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "1"
+        },
+        "58907": {
+            "id": "58907",
+            "name": "State Logic",
+            "type": "demo",
+            "addedUser": {
+                "id": "537",
+                "nickname": "phoenix",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "small2.gif",
+                "glops": "9573",
+                "registerDate": "2001-02-26 23:37:07",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "919",
+                "thumbdowns": "30",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2012-03-20 19:07:59",
+            "releaseDate": "1998-10-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/1999\/gravity99\/demo\/alba.rar",
+            "party_compo": "57",
+            "party_place": "6",
+            "party_year": "1999",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2024",
+                    "name": "Alba",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "924",
+                    "addedDate": "2002-06-08 03:38:35",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "22",
+                        "name": "Gravity",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "6",
+                    "year": "1999"
+                }
+            ],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "22",
+                "name": "Gravity",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": null
+        },
+        "42367": {
+            "id": "42367",
+            "name": "Tautologic",
+            "type": "demo",
+            "addedUser": {
+                "id": "2229",
+                "nickname": "blkpanther",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "aln_rzr.gif",
+                "glops": "48629",
+                "registerDate": "2002-04-08 01:28:16",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "1061",
+                "thumbdowns": "122",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2008-01-07 19:02:09",
+            "releaseDate": "1997-00-15",
+            "voteup": "2",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "http:\/\/csdb.dk\/getinternalfile.php\/37426\/Tautologic.zip",
+            "party_compo": "50",
+            "party_place": "1",
+            "party_year": "1997",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1944",
+                    "name": "Tempest",
+                    "acronym": "TMP",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "619",
+                    "addedDate": "2002-05-24 14:07:39",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                },
+                {
+                    "id": "2122",
+                    "name": "Victory",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "25881",
+                    "addedDate": "2002-07-26 22:24:30",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "111",
+                        "name": "YALP",
+                        "web": "http:\/\/www.indus3.org\/scene\/yalp99.html",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "50",
+                    "ranking": "1",
+                    "year": "1997"
+                }
+            ],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "111",
+                "name": "YALP",
+                "web": "http:\/\/www.indus3.org\/scene\/yalp99.html",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "2955": {
+            "id": "2955",
+            "name": "Technological Death",
+            "type": "demo",
+            "addedUser": {
+                "id": "402",
+                "nickname": "Optimus",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "monk.gif",
+                "glops": "13772",
+                "registerDate": "2000-12-14 14:58:36",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "2105",
+                "thumbdowns": "115",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2001-06-27 22:40:49",
+            "releaseDate": "1993-05-15",
+            "voteup": "141",
+            "votepig": "9",
+            "votedown": "2",
+            "voteavg": "0.9145",
+            "download": "http:\/\/ftp.amigascne.org\/pub\/amiga\/Groups\/M\/Mad-Elks\/MadElks-TechnologicalDeath.dms",
+            "party_compo": "16",
+            "party_place": "1",
+            "party_year": "1993",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "970",
+                    "name": "Mad Elks",
+                    "acronym": "MDE",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "402",
+                    "addedDate": "2001-06-27 22:09:44",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "519",
+                        "name": "Mountain Congress",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "16",
+                    "ranking": "1",
+                    "year": "1993"
+                }
+            ],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "519",
+                "name": "Mountain Congress",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 2,
+            "commentCount": "156"
+        },
+        "15890": {
+            "id": "15890",
+            "name": "Technological Dreams",
+            "type": "demo",
+            "addedUser": {
+                "id": "637",
+                "nickname": "lai",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "gameboy.gif",
+                "glops": "487",
+                "registerDate": "2001-04-16 05:27:00",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "183",
+                "thumbdowns": "2",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2005-02-13 05:22:28",
+            "releaseDate": "1997-08-15",
+            "voteup": "14",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.9333",
+            "download": "https:\/\/files.scene.org\/view\/parties\/1997\/bk-mania97\/demo\/technological_dreams.img",
+            "party_compo": "39",
+            "party_place": "1",
+            "party_year": "1997",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "4213",
+                    "name": "Mega Best Software",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "637",
+                    "addedDate": "2005-02-13 05:09:38",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1101",
+                        "name": "BK-Mania",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "39",
+                    "ranking": "1",
+                    "year": "1997"
+                }
+            ],
+            "platforms": {
+                "119": {
+                    "name": "BK-0010\/11M",
+                    "icon": "k_bk.gif",
+                    "slug": "bk001011m"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1101",
+                "name": "BK-Mania",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "15"
+        },
+        "51393": {
+            "id": "51393",
+            "name": "technological impression",
+            "type": "demo",
+            "addedUser": {
+                "id": "177",
+                "nickname": "psenough",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "ps.gif",
+                "glops": "10434",
+                "registerDate": "2000-09-09 22:44:56",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "2775",
+                "thumbdowns": "567",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2008-08-24 11:42:04",
+            "releaseDate": "1997-12-15",
+            "voteup": "1",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.5000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/1997\/astrosyn97\/demo\/nfn_ti.zip",
+            "party_compo": "95",
+            "party_place": "1",
+            "party_year": "1997",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "2018",
+                    "name": "Norferin",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "924",
+                    "addedDate": "2002-06-06 23:20:50",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "174",
+                        "name": "Astrosyn",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "95",
+                    "ranking": "1",
+                    "year": "1997"
+                }
+            ],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "174",
+                "name": "Astrosyn",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "86491": {
+            "id": "86491",
+            "name": "Technological Meltdown BBS",
+            "type": "bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2020-07-28 16:16:56",
+            "releaseDate": "1994-07-15",
+            "voteup": "0",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/technological_meltdown_bbs.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "14267",
+                    "name": "Poison",
+                    "acronym": "",
+                    "disambiguation": "artgroup",
+                    "web": "",
+                    "addedUser": "44120",
+                    "addedDate": "2019-03-13 07:19:54",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "1"
+        },
+        "75964": {
+            "id": "75964",
+            "name": "Technological Overdrive",
+            "type": "dentro",
+            "addedUser": {
+                "id": "537",
+                "nickname": "phoenix",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "small2.gif",
+                "glops": "9573",
+                "registerDate": "2001-02-26 23:37:07",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "919",
+                "thumbdowns": "30",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2018-05-01 14:55:22",
+            "releaseDate": "1994-07-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/mirrors\/scenesp.org\/compilations\/blastersound_bbs\/demos\/MB-TECHO.ZIP",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "10047",
+                    "name": "Mystic Bytes",
+                    "acronym": "MB",
+                    "disambiguation": "pc",
+                    "web": "",
+                    "addedUser": "961",
+                    "addedDate": "2008-02-24 19:17:15",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "dentro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": null
+        },
+        "32948": {
+            "id": "32948",
+            "name": "Technological Snow",
+            "type": "demo",
+            "addedUser": {
+                "id": "6946",
+                "nickname": "comankh",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "5grama.gif",
+                "glops": "2930",
+                "registerDate": "2004-06-07 10:34:16",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "269",
+                "thumbdowns": "14",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2007-10-29 03:59:12",
+            "releaseDate": "1993-12-15",
+            "voteup": "1",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.5000",
+            "download": "http:\/\/csdb.dk\/getinternalfile.php\/70826\/Technological_Snow.zip",
+            "party_compo": "50",
+            "party_place": "2",
+            "party_year": "1993",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "548",
+                    "name": "Agony Design",
+                    "acronym": "AGY",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "537",
+                    "addedDate": "2001-02-28 04:12:31",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "2028",
+                        "name": "Elysium + Antia Party December",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "50",
+                    "ranking": "2",
+                    "year": "1993"
+                }
+            ],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "2028",
+                "name": "Elysium + Antia Party December",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "66026": {
+            "id": "66026",
+            "name": "Technological Terror",
+            "type": "demo",
+            "addedUser": {
+                "id": "1926",
+                "nickname": "ham",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "amiga.gif",
+                "glops": "6702",
+                "registerDate": "2002-02-20 20:17:35",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "1351",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2015-07-31 12:25:37",
+            "releaseDate": "2015-07-15",
+            "voteup": "4",
+            "votepig": "2",
+            "votedown": "0",
+            "voteavg": "0.6667",
+            "download": "https:\/\/ftp.untergrund.net\/users\/ham\/raspberrypi\/demos\/TechnologicalTerror.tar.gz",
+            "party_compo": "57",
+            "party_place": "2",
+            "party_year": "2015",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "1705",
+                    "name": "Software Failure",
+                    "acronym": "SFL",
+                    "disambiguation": "",
+                    "web": "http:\/\/sfl.untergrund.net",
+                    "addedUser": "1926",
+                    "addedDate": "2002-02-20 20:25:55",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "17",
+                        "name": "Euskal",
+                        "web": "http:\/\/www.euskal.org\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "57",
+                    "ranking": "2",
+                    "year": "2015"
+                }
+            ],
+            "platforms": {
+                "154": {
+                    "name": "Raspberry Pi",
+                    "icon": "k_raspi.gif",
+                    "slug": "raspberrypi"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "17",
+                "name": "Euskal",
+                "web": "http:\/\/www.euskal.org\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "6"
+        },
+        "9061": {
+            "id": "9061",
+            "name": "Technological Threat",
+            "type": "demo",
+            "addedUser": {
+                "id": "3841",
+                "nickname": "Helioth",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "l_amiga1.gif",
+                "glops": "1214",
+                "registerDate": "2003-01-11 08:27:59",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "4",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2003-03-20 08:32:14",
+            "releaseDate": "1990-06-15",
+            "voteup": "3",
+            "votepig": "6",
+            "votedown": "0",
+            "voteavg": "0.3333",
+            "download": "http:\/\/ftp.amigascne.org\/pub\/amiga\/Groups\/B\/Brainstorm\/BRS-TechnologicalThreat",
+            "party_compo": "16",
+            "party_place": "3",
+            "party_year": "1990",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "909",
+                    "name": "Brainstorm",
+                    "acronym": "BRS",
+                    "disambiguation": "",
+                    "web": "http:\/\/brainstorm.untergrund.net\/",
+                    "addedUser": "39",
+                    "addedDate": "2001-06-05 22:58:16",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "512",
+                        "name": "Alcatraz Pentcost",
+                        "web": "",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "16",
+                    "ranking": "3",
+                    "year": "1990"
+                }
+            ],
+            "platforms": {
+                "73": {
+                    "name": "Amiga OCS\/ECS",
+                    "icon": "k_amiga.gif",
+                    "slug": "amigaocsecs"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "512",
+                "name": "Alcatraz Pentcost",
+                "web": "",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "9"
+        },
+        "86494": {
+            "id": "86494",
+            "name": "The Inner Logic BBS (1)",
+            "type": "bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2020-07-28 16:35:13",
+            "releaseDate": "1995-02-15",
+            "voteup": "0",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/the_inner_logic_bbs1.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "1"
+        },
+        "86495": {
+            "id": "86495",
+            "name": "The Inner Logic BBS (2)",
+            "type": "bbstro",
+            "addedUser": {
+                "id": "44120",
+                "nickname": "sensenstahl",
+                "level": "moderator",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "mslug2.gif",
+                "glops": "51612",
+                "registerDate": "2010-02-15 10:44:33",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "3342",
+                "thumbdowns": "36",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2020-07-28 16:36:41",
+            "releaseDate": "1995-01-15",
+            "voteup": "1",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/compilations\/lost_found_and_more\/bbs\/the_inner_logic_bbs2.zip",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [],
+            "types": [
+                "bbstro"
+            ],
+            "placings": [],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "1"
+        },
+        "33061": {
+            "id": "33061",
+            "name": "Tongueman's Logic FINAL",
+            "type": "game",
+            "addedUser": {
+                "id": "11703",
+                "nickname": "ccovell",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "tongueman.gif",
+                "glops": "58",
+                "registerDate": "2005-01-05 16:53:58",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "70",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2007-10-31 15:27:38",
+            "releaseDate": "2007-10-15",
+            "voteup": "9",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/artists\/chris_covell\/tonguemans_logic_final.zip",
+            "party_compo": null,
+            "party_place": null,
+            "party_year": null,
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "3767",
+                    "name": "Chris Covell",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.chrismcovell.com",
+                    "addedUser": "9874",
+                    "addedDate": "2004-09-19 18:52:07",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "game"
+            ],
+            "placings": [],
+            "platforms": {
+                "100": {
+                    "name": "NEC TurboGrafx\/PC Engine",
+                    "icon": "k_pce.gif",
+                    "slug": "necturbografxpcengine"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "10"
+        },
+        "24925": {
+            "id": "24925",
+            "name": "Tongueman's Logic game demo",
+            "type": "game",
+            "addedUser": {
+                "id": "11703",
+                "nickname": "ccovell",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "tongueman.gif",
+                "glops": "58",
+                "registerDate": "2005-01-05 16:53:58",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "70",
+                "thumbdowns": "0",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2006-05-30 05:27:20",
+            "releaseDate": "2006-05-15",
+            "voteup": "2",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "1.0000",
+            "download": "https:\/\/files.scene.org\/view\/demos\/artists\/chris_covell\/tonguemans_logic_demo.zip",
+            "party_compo": null,
+            "party_place": null,
+            "party_year": null,
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "3767",
+                    "name": "Chris Covell",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/www.chrismcovell.com",
+                    "addedUser": "9874",
+                    "addedDate": "2004-09-19 18:52:07",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "game"
+            ],
+            "placings": [],
+            "platforms": {
+                "100": {
+                    "name": "NEC TurboGrafx\/PC Engine",
+                    "icon": "k_pce.gif",
+                    "slug": "necturbografxpcengine"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "3"
+        },
+        "83375": {
+            "id": "83375",
+            "name": "Trans Logic 2",
+            "type": "16k,game",
+            "addedUser": {
+                "id": "52191",
+                "nickname": "skoro",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "commodore.gif",
+                "glops": "84",
+                "registerDate": "2010-01-28 08:08:47",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "228",
+                "thumbdowns": "1",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2019-10-16 17:18:06",
+            "releaseDate": "2008-00-15",
+            "voteup": "1",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.5000",
+            "download": "http:\/\/plus4world.powweb.com\/dl\/games\/t\/trans_logic_2.prg",
+            "party_compo": null,
+            "party_place": "0",
+            "party_year": "0",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "3155",
+                    "name": "assassins",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "http:\/\/plus4world.powweb.com\/groups\/ASN",
+                    "addedUser": "5237",
+                    "addedDate": "2004-01-08 10:26:16",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "16k",
+                "game"
+            ],
+            "placings": [],
+            "platforms": {
+                "104": {
+                    "name": "C16\/116\/plus4",
+                    "icon": "k_c16.gif",
+                    "slug": "c16116plus4"
+                }
+            },
+            "awards": [],
+            "party": null,
+            "cdc": 0,
+            "commentCount": "2"
+        },
+        "68262": {
+            "id": "68262",
+            "name": "Unlogical",
+            "type": "demo",
+            "addedUser": {
+                "id": "537",
+                "nickname": "phoenix",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "small2.gif",
+                "glops": "9573",
+                "registerDate": "2001-02-26 23:37:07",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "919",
+                "thumbdowns": "30",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2016-10-06 12:14:00",
+            "releaseDate": "1995-05-15",
+            "voteup": "0",
+            "votepig": "0",
+            "votedown": "0",
+            "voteavg": "0.0000",
+            "download": "https:\/\/files.scene.org\/view\/parties\/1995\/demobit95\/demo\/unlogic.zip",
+            "party_compo": "95",
+            "party_place": "3",
+            "party_year": "1995",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "12889",
+                    "name": "Eastwood",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "537",
+                    "addedDate": "2016-10-06 12:12:44",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "65",
+                        "name": "Demobit",
+                        "web": "https:\/\/www.demobit.party\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "95",
+                    "ranking": "3",
+                    "year": "1995"
+                }
+            ],
+            "platforms": {
+                "67": {
+                    "name": "MS-Dos",
+                    "icon": "k_msdos.gif",
+                    "slug": "msdos"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "65",
+                "name": "Demobit",
+                "web": "https:\/\/www.demobit.party\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": null
+        },
+        "61511": {
+            "id": "61511",
+            "name": "Vectrologic",
+            "type": "demo",
+            "addedUser": {
+                "id": "3427",
+                "nickname": "mermaid",
+                "level": "user",
+                "permissionSubmitItems": "1",
+                "permissionOpenBBS": "1",
+                "permissionPostBBS": "1",
+                "permissionPostOneliner": "1",
+                "avatar": "rez64.gif",
+                "glops": "820",
+                "registerDate": "2002-11-07 15:27:27",
+                "udlogin": null,
+                "sceneIDLastRefresh": null,
+                "sceneIDData": null,
+                "thumbups": "2130",
+                "thumbdowns": "23",
+                "ojuice": null,
+                "slengpung": null,
+                "csdb": null,
+                "zxdemo": null,
+                "demozoo": null,
+                "lastip": null,
+                "lasthost": null,
+                "stats": []
+            },
+            "addedDate": "2013-07-01 11:53:03",
+            "releaseDate": "2013-06-15",
+            "voteup": "12",
+            "votepig": "1",
+            "votedown": "0",
+            "voteavg": "0.9231",
+            "download": "http:\/\/csdb.dk\/getinternalfile.php\/118344\/vectrologic_atl-party_version.d64",
+            "party_compo": "92",
+            "party_place": "2",
+            "party_year": "2013",
+            "sceneorg": null,
+            "demozoo": null,
+            "csdb": null,
+            "zxdemo": null,
+            "invitation": null,
+            "invitationyear": null,
+            "boardID": null,
+            "rank": null,
+            "groups": [
+                {
+                    "id": "7164",
+                    "name": "Atlantic",
+                    "acronym": "",
+                    "disambiguation": "",
+                    "web": "",
+                    "addedUser": "5372",
+                    "addedDate": "2007-01-18 18:54:47",
+                    "csdb": null,
+                    "zxdemo": null,
+                    "demozoo": null
+                }
+            ],
+            "types": [
+                "demo"
+            ],
+            "placings": [
+                {
+                    "party": {
+                        "id": "1562",
+                        "name": "Edison",
+                        "web": "https:\/\/edisonparty.com\/",
+                        "addedDate": null,
+                        "addedUser": null
+                    },
+                    "compo": "92",
+                    "ranking": "2",
+                    "year": "2013"
+                }
+            ],
+            "platforms": {
+                "76": {
+                    "name": "Commodore 64",
+                    "icon": "k_commodore.gif",
+                    "slug": "commodore64"
+                }
+            },
+            "awards": [],
+            "party": {
+                "id": "1562",
+                "name": "Edison",
+                "web": "https:\/\/edisonparty.com\/",
+                "addedDate": null,
+                "addedUser": null
+            },
+            "cdc": 0,
+            "commentCount": "13"
+        }
+    }
+}

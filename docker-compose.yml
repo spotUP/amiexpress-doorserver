@@ -1,0 +1,65 @@
+services:
+  doorserver:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    restart: unless-stopped
+    # Bound to loopback only - Caddy fronts this on the VPS and reverse
+    # proxies to it. Publishing on 0.0.0.0 would expose it on every
+    # interface, bypassing Caddy; harmless for anonymous reads today, wrong
+    # the moment phase 3 adds /admin/*.
+    ports:
+      - "127.0.0.1:3010:3010"
+    volumes:
+      - doorserver-data:/data
+    networks:
+      - default
+      - doorserver-net
+    environment:
+      DOORSERVER_DB: /data/doors.db
+      DOOR_ARCHIVES_ROOT: /data/Archives
+      PORT: "3010"
+      DOORSERVER_ADMIN_KEYS: ${DOORSERVER_ADMIN_KEYS:-}
+      # The signing key is passed by the deploy workflow via
+      # `export DOORSERVER_JWT_SECRET; docker compose up` - the workflow
+      # writes the value from a GitHub Actions secret into its own
+      # shell env, then exports it before compose runs. compose then
+      # substitutes ${DOORSERVER_JWT_SECRET} in this block.
+      DOORSERVER_JWT_SECRET: ${DOORSERVER_JWT_SECRET:-}
+      # The achievements surface (docs/ACHIEVEMENTS-API.md). ACHIEVEMENTS_DB
+      # sits on the SAME volume next to doors.db - no new container, no new
+      # volume. It is set ONLY once SMTP is configured on the host: unset,
+      # the surface is off and the door repo serves as before; set with no
+      # SMTP, the server refuses to start (D7), which is the point.
+      ACHIEVEMENTS_DB: ${ACHIEVEMENTS_DB:-}
+      ACHIEVEMENTS_SMTP_URL: ${ACHIEVEMENTS_SMTP_URL:-}
+      ACHIEVEMENTS_MAIL_FROM: ${ACHIEVEMENTS_MAIL_FROM:-}
+      ACHIEVEMENTS_BASE_URL: ${ACHIEVEMENTS_BASE_URL:-https://doors.uprough.net}
+      # The releases surface (docs/RELEASES-API.md). Same volume, own file,
+      # own surface: empty when never imported (the server creates it, the
+      # importer fills it offline via scripts/import-bbs-filelist.ts), and
+      # everything else serves as before either way.
+      RELEASES_DB: ${RELEASES_DB:-/data/releases.db}
+      # Uploads wait in /data/quarantine (beside the database, never inside
+      # the archive root); the server creates it at startup.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3010/api/door-repo/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  # Shared with the amiexpress-web (bbs) stack so the bbs container can
+  # reach this container by service DNS as "doorserver". Created once on
+  # the host via `docker network create doorserver-net` - not managed by
+  # this compose file (external: true), since it's shared across two
+  # independent compose projects. The loopback-only host port publish
+  # above is unaffected - this only adds a second, container-to-container
+  # path in.
+  doorserver-net:
+    external: true
+
+volumes:
+  doorserver-data:
+    name: doorserver-data

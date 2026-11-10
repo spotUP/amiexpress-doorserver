@@ -1,0 +1,34 @@
+{
+  "populationUnlocks": [
+    "boards.linked.2",
+    "rare.newboard.first"
+  ],
+  "unlocks": [
+    "0/uprough:msg.conf.distinct.10",
+    "0/uprough:msg.post.1",
+    "0/uprough:msg.post.10",
+    "0/uprough:presence.call.1",
+    "0/uprough:msg.post.1",
+    "1/uprough:file.up.1",
+    "2/uprough:file.dl.1",
+    "2/uprough:file.dl.100",
+    "2/uprough:file.up.bytes.100mb",
+    "2/uprough:presence.call.1",
+    "3/uprough:social.chat.1",
+    "3/uprough:wall.tag.1",
+    "4/uprough:msg.post.100",
+    "4/uprough:social.vote.1",
+    "4/uprough:file.up.1",
+    "5/uprough:msg.burst.3",
+    "6/uprough:presence.streak.7",
+    "6/other:rare.realc64",
+    "6/third:boards.same.3"
+  ],
+  "accepted": 127,
+  "duplicates": 1,
+  "rejected": {
+    "unverified_player": 1,
+    "not_linked": 1
+  },
+  "clamped": 2
+}

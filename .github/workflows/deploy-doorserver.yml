@@ -1,0 +1,163 @@
+name: Deploy door server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-doorserver
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Hetzner VPS
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          # This repo is PRIVATE, so the host cannot fetch anonymously.
+          # The workflow's own short-lived, read-only token lets it fetch as
+          # somebody. Same pattern as the BBS deploy (deploy-hetzner.yml).
+          GH_TOKEN: ${{ github.token }}
+          DOORSERVER_JWT_SECRET: ${{ secrets.DOORSERVER_JWT_SECRET }}
+          # The three names below were listed in `envs:` and never given a
+          # value here, so ssh-action forwarded them EMPTY on every run, the
+          # script's "all three or none" gate saw no SMTP URL, and every deploy
+          # switched the achievements surface off. It only ever ran because
+          # someone wrote /app/doorserver/.env by hand - which the next deploy
+          # then overwrote (2026-09-07: mail died the moment a deploy ran).
+          ACHIEVEMENTS_DB: ${{ secrets.ACHIEVEMENTS_DB }}
+          ACHIEVEMENTS_SMTP_URL: ${{ secrets.ACHIEVEMENTS_SMTP_URL }}
+          ACHIEVEMENTS_MAIL_FROM: ${{ secrets.ACHIEVEMENTS_MAIL_FROM }}
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: root
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          command_timeout: 30m
+          envs: DOORSERVER_JWT_SECRET,ACHIEVEMENTS_DB,ACHIEVEMENTS_SMTP_URL,ACHIEVEMENTS_MAIL_FROM,GH_TOKEN
+          script: |
+            set -euo pipefail
+            cd /app/doorserver
+            echo "== disk before =="
+            df -h / | tail -1
+            echo "== git fetch + hard reset =="
+            # Fetch as SOMEBODY. This repo is PRIVATE, so an anonymous HTTPS
+            # fetch dies with "could not read Username for 'https://github.com'"
+            # and the deploy stops before it starts (observed 2026-09-08, run
+            # 34228408047). The token is the workflow's own - short-lived and
+            # scoped to this repo - written to a 600 file rather than a command
+            # line so it never appears in `ps` on the host. Anonymous stays as
+            # the fallback, so a run with no token behaves exactly as before.
+            # The token is an HTTPS credential, so it is used against the HTTPS
+            # URL, never through `origin`: the host clone's origin is SSH, and
+            # the host's SSH key is a deploy key for amiexpress-web only, so
+            # every fetch through origin got "Repository not found" and no
+            # deploy landed from 2026-09-09 to 2026-11-07.
+            # No --prune on the HTTPS fetch: pruning against a bare URL with an
+            # explicit refspec deletes refs/remotes/origin/main and then fails
+            # to write it back ("cannot lock ref"), so attempt 1 always failed
+            # and fell through to the SSH origin (run 42491114919).
+            CRED_FILE=""
+            if [ -n "${GH_TOKEN:-}" ]; then
+              CRED_FILE=$(mktemp)
+              chmod 600 "$CRED_FILE"
+              printf 'https://x-access-token:%s@github.com\n' "$GH_TOKEN" > "$CRED_FILE"
+            fi
+            FETCH_OK=0
+            for attempt in 1 2 3 4 5; do
+              if [ -n "$CRED_FILE" ] \
+                && GIT_TERMINAL_PROMPT=0 git -c "credential.helper=store --file=$CRED_FILE" \
+                     fetch https://github.com/spotUP/amiexpress-doorserver.git \
+                     +main:refs/remotes/origin/main; then
+                FETCH_OK=1
+                break
+              fi
+              if GIT_TERMINAL_PROMPT=0 git fetch --prune origin main; then
+                FETCH_OK=1
+                break
+              fi
+              echo "fetch attempt $attempt failed; retrying in $((attempt * 5))s" >&2
+              sleep $((attempt * 5))
+            done
+            if [ -n "$CRED_FILE" ]; then rm -f "$CRED_FILE"; fi
+            if [ "$FETCH_OK" != "1" ]; then
+              echo "git fetch failed after 5 attempts" >&2
+              exit 1
+            fi
+            git reset --hard origin/main
+            echo "== ensure .env is in place =="
+            # The .env file is gitignored (correctly - it holds a signing
+            # secret). The deploy workflow writes it from a GitHub Actions
+            # secret on every run, so a container restart never has to guess
+            # what's in the file. If the secret isn't set, the script
+            # writes a placeholder and the admin API will return 503 - the
+            # public site keeps working.
+            #
+            if [ -n "${DOORSERVER_JWT_SECRET:-}" ]; then
+              printf 'DOORSERVER_JWT_SECRET=%s\n' "${DOORSERVER_JWT_SECRET}" > .env
+              chmod 600 .env
+              echo "[OK] .env written from secret (length ${#DOORSERVER_JWT_SECRET})"
+            elif [ ! -f .env ]; then
+              printf 'DOORSERVER_JWT_SECRET=\n' > .env
+              echo "[WARN] DOORSERVER_JWT_SECRET not set in workflow; admin API will be disabled"
+            fi
+            # The achievements surface, from three more repository secrets.
+            # All three or none: ACHIEVEMENTS_DB set without SMTP is a
+            # startup failure by design (docs/ACHIEVEMENTS-API.md), so the
+            # workflow only writes ACHIEVEMENTS_DB when the SMTP URL is
+            # present too. Unset, the surface stays off and the door repo
+            # serves exactly as before.
+            if [ -n "${ACHIEVEMENTS_SMTP_URL:-}" ] && [ -n "${ACHIEVEMENTS_MAIL_FROM:-}" ]; then
+              # Exported, not only written: ssh-action forwards every name in
+              # `envs` whether or not the secret exists, so an absent
+              # ACHIEVEMENTS_DB secret arrives here SET BUT EMPTY. docker
+              # compose gives a shell variable priority over .env, so that
+              # empty string overrode the path this file had just written and
+              # the server started with "ACHIEVEMENTS_DB is not set" - with a
+              # correct .env on disk (2026-09-07). The shell and the file must
+              # agree, so the default is applied to both.
+              export ACHIEVEMENTS_DB="${ACHIEVEMENTS_DB:-/data/achievements.db}"
+              printf 'ACHIEVEMENTS_DB=%s\n' "${ACHIEVEMENTS_DB}" >> .env
+              printf 'ACHIEVEMENTS_SMTP_URL=%s\n' "${ACHIEVEMENTS_SMTP_URL}" >> .env
+              printf 'ACHIEVEMENTS_MAIL_FROM=%s\n' "${ACHIEVEMENTS_MAIL_FROM}" >> .env
+              echo "[OK] achievements surface configured (db ${ACHIEVEMENTS_DB:-/data/achievements.db})"
+            else
+              echo "[INFO] achievements surface off: ACHIEVEMENTS_SMTP_URL / ACHIEVEMENTS_MAIL_FROM not set"
+            fi
+            echo "== prune builder cache + dangling/unused images (host runs at 91% disk, 3.6 GB free) =="
+            # The board's own deploy runs on this host and prunes too; Docker
+            # refuses a second prune with "a prune operation is already
+            # running", which failed the whole deploy after the code was
+            # already checked out (run 42491114919). Pruning is housekeeping:
+            # retry while the other one finishes, then go on without it.
+            prune_or_skip() {
+              for i in 1 2 3 4 5 6; do
+                if docker "$@" prune -f; then return 0; fi
+                echo "docker $1 prune busy; retry $i in 10s" >&2
+                sleep 10
+              done
+              echo "[WARN] docker $1 prune skipped: another prune kept running" >&2
+            }
+            prune_or_skip builder
+            # Dangling layers only: -a would remove all unused images, dangerous on unattended live host
+            prune_or_skip image
+            echo "== build + up =="
+            GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
+            echo "== health =="
+            sleep 10
+            curl -fsS http://localhost:3010/api/door-repo/health
+            echo "== achievements: plain HTTP must reach the surface =="
+            # The host's Caddyfile serves EVERY path of doors.uprough.net over
+            # plain HTTP by design (Amiga stacks cannot do TLS; the block is
+            # commented so on the host), so no per-path exemption exists to
+            # take or to over-widen. What is checked: the surface answers as
+            # itself over http - 200 with its own header when configured, and
+            # its own JSON 404 (never index.html) when the surface is off.
+            # The Caddyfile is not in this repo, so this is REPORTED, never
+            # assumed - see docs/superpowers/plans/2026-09-03-achievements-server.md, AC-21.
+            curl -s -o /dev/null -w 'catalog.txt over http: %{http_code}  contract header: %{header_json}\n' http://doors.uprough.net/achievements/v1/catalog.txt | cut -c1-200 || true
+            echo "achievements health:   $(curl -s http://localhost:3010/achievements/v1/health | head -c 300)"
+            echo "door-repo health:      $(curl -s http://localhost:3010/api/door-repo/health | head -c 300)"
+            echo "== disk after =="
+            df -h / | tail -1

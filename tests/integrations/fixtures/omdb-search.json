@@ -1,0 +1,1 @@
+{"_note": "DOC-DERIVED fixture (no OMDb key at build time): shape per omdbapi.com (?s= -> Response/Search[]). RECAPTURE with a real key before trusting a parse failure.", "Response": "True", "Search": [{"Title": "Tron", "Year": "1982", "imdbID": "tt0084827", "Type": "movie"}, {"Title": "Tron: Legacy", "Year": "2010", "imdbID": "tt1104001", "Type": "movie"}], "totalResults": "2"}

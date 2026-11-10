@@ -1,0 +1,114 @@
+/**
+ * The migration runner: it must be safe to start the server twice.
+ */
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { openDb, applySchema } from '../src/db';
+import { runMigrations, hasColumn, MIGRATIONS, type Migration } from '../src/migrations';
+import type { ServerConfig } from '../src/config';
+
+let dir: string;
+let cfg: ServerConfig;
+
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'doorsrv-mig-'));
+  const dbPath = path.join(dir, 'doors.db');
+  fs.writeFileSync(dbPath, '');
+  cfg = { dbPath, archivesRoot: dir, port: 3010, adminKeys: [], jwtSecret: null, learnKey: null, achievements: null, releases: null };
+  const db = openDb(cfg);
+  applySchema(db);
+  db.prepare(
+    `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+     VALUES ('id1', 'ACC-V103.LHA', 'AmiExpress/ACC-V103.LHA', 'Account Editor', 'XIM', 1700000000)`
+  ).run();
+  db.close();
+});
+
+afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+describe('runMigrations', () => {
+  it('adds requires_bbs to a catalog that predates it', () => {
+    const db = openDb(cfg);
+    expect(hasColumn(db, 'door_catalog', 'requires_bbs')).toBe(false);
+    const ran = runMigrations(db);
+    expect(ran).toEqual(MIGRATIONS.map((m) => `${m.version}:${m.name}`));
+    expect(hasColumn(db, 'door_catalog', 'requires_bbs')).toBe(true);
+    db.close();
+  });
+
+  it('is a no-op the second time, and leaves the rows alone', () => {
+    const db = openDb(cfg);
+    runMigrations(db);
+    db.prepare("UPDATE door_catalog SET requires_bbs = '/X 3.38+' WHERE id = 'id1'").run();
+    expect(runMigrations(db)).toEqual([]);
+    const row = db.prepare('SELECT name, requires_bbs FROM door_catalog WHERE id = ?').get('id1') as {
+      name: string;
+      requires_bbs: string;
+    };
+    expect(row).toEqual({ name: 'Account Editor', requires_bbs: '/X 3.38+' });
+    db.close();
+  });
+
+  it('records what it applied', () => {
+    const db = openDb(cfg);
+    runMigrations(db);
+    const rows = db.prepare('SELECT version, name FROM schema_migrations ORDER BY version').all();
+    expect(rows).toEqual(MIGRATIONS.map((m) => ({ version: m.version, name: m.name })));
+    db.close();
+  });
+
+  it('creates the admin tables', () => {
+    const db = openDb(cfg);
+    runMigrations(db);
+    const tables = (
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(tables).toEqual(
+      expect.arrayContaining(['door_catalog_overrides', 'admin_users', 'door_submissions', 'admin_audit'])
+    );
+    db.close();
+  });
+
+  it('rolls a failing step back rather than half-applying it', () => {
+    const bad: Migration[] = [
+      {
+        version: 99,
+        name: 'breaks halfway',
+        up: (db) => {
+          db.exec('CREATE TABLE half_applied (x TEXT)');
+          throw new Error('boom');
+        },
+      },
+    ];
+    const db = openDb(cfg);
+    expect(() => runMigrations(db, bad)).toThrow('boom');
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'half_applied'")
+      .all();
+    expect(tables).toEqual([]);
+    expect(db.prepare('SELECT version FROM schema_migrations').all()).toEqual([]);
+    db.close();
+  });
+
+  it('creates batch_jobs and batch_job_items', () => {
+    const db = openDb(cfg);
+    runMigrations(db);
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('batch_jobs','batch_job_items')")
+      .all() as { name: string }[];
+    expect(tables.map((t) => t.name).sort()).toEqual(['batch_job_items', 'batch_jobs']);
+    db.prepare(
+      `INSERT INTO batch_jobs (id, kind, status, total, completed, failed_count, created_by, created_at, updated_at)
+       VALUES ('job1', 'reextract', 'running', 3, 0, 0, NULL, 1, 1)`
+    ).run();
+    db.prepare(
+      `INSERT INTO batch_job_items (job_id, archive_name, status) VALUES ('job1', 'FOO.LHA', 'pending')`
+    ).run();
+    const item = db.prepare('SELECT * FROM batch_job_items WHERE job_id = ?').get('job1');
+    expect(item).toMatchObject({ job_id: 'job1', archive_name: 'FOO.LHA', status: 'pending' });
+    db.close();
+  });
+});

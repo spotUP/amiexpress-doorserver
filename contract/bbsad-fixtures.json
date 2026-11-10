@@ -1,0 +1,60 @@
+{
+  "contractVersion": "1",
+  "cases": [
+    {
+      "name": "phone, group and node count on one line",
+      "adId": 2439,
+      "filename": "713-460-8217.xyz",
+      "input": "--->  Martyriun BBS 713-460-8217 - ANTHROX WHQ - 3 NODES - ELITE <---",
+      "expected": {
+        "phones": ["713-460-8217"],
+        "nodes": 3,
+        "handles": [],
+        "groups": ["anthrox whq"]
+      }
+    },
+    {
+      "name": "two-word group, bang group, international phone; placeholder is not a phone",
+      "adId": 5703,
+      "filename": "NewAdVenTUreS!",
+      "input": "__________________________/ sTAff! \\______________ \\      CoCaIne! hQ\n         Muad'Dib - Lightning - Eurobyte            __      MySTiC Dutch hQ\n NoDe1: +31-(0)-204-930-420   `:::    ELITE WAREZ, MODULES,     \\/\n NoDe2: +31-(0)-RiNG-DOWN!      :::     REQUESTS, X-RATED!        /\\",
+      "expected": {
+        "phones": ["+31-(0)-204-930-420"],
+        "nodes": null,
+        "handles": [],
+        "groups": ["cocaine hq", "mystic dutch hq"]
+      }
+    },
+    {
+      "name": "handles trapped in box art",
+      "adId": 11371,
+      "filename": "eLECTRONIC.cONFUSION",
+      "input": "         [╖wEBSTER/pSn╖] [╖mR.hYDE/hY^kGD╖]                          :\n            [╖ZiNKO/PB╖zARCH&XMAN/pSn╖╢RíNτE ╪F THíEVES/pSg╖]        .",
+      "expected": {
+        "phones": [],
+        "nodes": null,
+        "handles": ["wEBSTER/pSn", "mR.hYDE/hY", "ZiNKO/PB", "XMAN/pSn", "THíEVES/pSg"],
+        "groups": []
+      }
+    },
+    {
+      "name": "blanked phone is not a phone; node count reads",
+      "adId": 4181,
+      "filename": "tHEYARd.bbS",
+      "input": "   | | located in +49 /______/ running on 8 nodes with analoge/isdn/telnet\n : | || | ╖consoles/amiga/graffiti/ascii/hiphopmp3/pc/classicgames/linux/drugs.\n : | || | : ahs whq ╖ arcade whq ╖ bgirl whq ╖ srz whq ╖ lp! ghq ╖        _ / |",
+      "expected": {
+        "phones": [],
+        "nodes": 8,
+        "handles": [],
+        "groups": ["ahs whq", "arcade whq", "bgirl whq", "srz whq", "lp ghq"]
+      }
+    },
+    {
+      "name": "pure art carries no facts",
+      "adId": 0,
+      "filename": "(art only)",
+      "input": "   ._. ___)    \\_ \\/ / (______   _( _/______ /_ .: :.: ╖╖╖ :..:   :.: ╖╖╖ :.",
+      "expected": { "phones": [], "nodes": null, "handles": [], "groups": [] }
+    }
+  ]
+}
