@@ -367,6 +367,7 @@ export const CHAT_ENDPOINTS = [
   'POST /dm/:peer',
   'POST /dm-group',
   'GET /dm/:threadId/history.txt',
+  'GET /dm/:threadId/participants.txt',
   'GET /events.txt',
   'POST /rooms/:id/kick',
   'POST /rooms/:id/ban',

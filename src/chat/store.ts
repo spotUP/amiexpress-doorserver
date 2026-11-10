@@ -590,6 +590,31 @@ export function dmHistory(db: Database.Database, ctx: ChatCtx, threadId: string,
   return rows.reverse().map((m) => ({ seq: m.seq, id: m.id, user: m.sender, at: m.created_at, replyTo: '', threadId, text: m.content }));
 }
 
+/**
+ * The full users (user@board) taking part in a DM thread, sorted. A relay board
+ * (boards.chat_relay) may read it when the thread holds one of its users; any
+ * other session only when its own user is a participant. Else 403, like the
+ * group history of a foreign thread.
+ */
+export function dmParticipants(db: Database.Database, ctx: ChatCtx, threadId: string): string[] {
+  let users: string[];
+  if (threadId.startsWith('dg')) {
+    users = (db.prepare('SELECT user FROM chat_dm_members WHERE thread_id = ?').all(threadId) as { user: string }[]).map((r) => r.user);
+  } else {
+    const set = new Set<string>();
+    for (const r of db.prepare('SELECT DISTINCT dm_a, dm_b FROM chat_dm_messages WHERE thread_id = ?').all(threadId) as { dm_a: string; dm_b: string }[]) {
+      if (r.dm_a) set.add(r.dm_a);
+      if (r.dm_b) set.add(r.dm_b);
+    }
+    users = [...set];
+  }
+  const relay = (db.prepare('SELECT chat_relay FROM boards WHERE id = ?').get(ctx.boardId) as { chat_relay: number } | undefined)?.chat_relay === 1;
+  const suffix = `@${ctx.boardId.toLowerCase()}`;
+  const allowed = relay ? users.some((u) => u.toLowerCase().endsWith(suffix)) : users.includes(ctx.user);
+  if (!allowed) throw new SurfaceError('forbidden', 403, 'not a participant of this thread');
+  return users.sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase()));
+}
+
 function dmGroupHistory(db: Database.Database, ctx: ChatCtx, threadId: string, before: number, limit: number): HistoryRec[] {
   const member = db.prepare('SELECT 1 FROM chat_dm_members WHERE thread_id = ? AND user = ?').get(threadId, ctx.user);
   if (!member) throw new SurfaceError('forbidden', 403, 'not a member of this group');

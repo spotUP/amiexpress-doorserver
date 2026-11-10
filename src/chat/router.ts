@@ -251,6 +251,11 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     sendText(res, renderText('HISTORY', out.rev, out.rows));
   });
 
+  router.get('/dm/:threadId/participants.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), users: store.dmParticipants(db, ctx, p(req, 'threadId')) }));
+    sendText(res, renderText('PARTICIPANTS', out.rev, out.users.map((u) => [u])));
+  });
+
   // ---- events: the long poll ----
   router.get('/events.txt', async (req: Request, res: Response, next: NextFunction) => {
     try {

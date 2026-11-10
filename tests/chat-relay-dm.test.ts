@@ -118,4 +118,35 @@ describe('relay boards: as on direct messages', () => {
     const carolRows = (await events(carol, since)).filter((r) => r[1] === 'dm');
     expect(carolRows.map((r) => r[7])).toEqual(['private']);
   });
+
+  it('GET /dm/:threadId/participants.txt: relay board reads threads holding its user, participants read their own, others are refused', async () => {
+    const bridge = await login(discordAuth, 'bridge');
+    const alice = await login(fx.auth, 'alice');
+    const bob = await login(fx.auth, 'bob');
+    const carol = await login(fx.auth, 'carol');
+    const users = (text: string): string[] => rowsOf(text).map((r) => r[0]);
+
+    // the hub must have seen the DISCORD users before they can be addressed
+    for (const as of ['zed', 'yan']) expect((await call(bridge, 'post', `/dm/${carol.user}`).send({ content: 'seen', clientId: cid(), as })).status).toBe(201);
+    const one = await call(alice, 'post', '/dm/zed@DISCORD').send({ content: 'hi zed', clientId: cid() });
+    const grp = await call(alice, 'post', '/dm-group').send({ participants: ['yan@DISCORD', bob.user], content: 'grp', clientId: cid() });
+    const none = await call(bob, 'post', `/dm/${carol.user}`).send({ content: 'private', clientId: cid() });
+    expect([one.status, grp.status, none.status]).toEqual([201, 201, 201]);
+    const path = (t: { body: { threadId: string } }) => `/dm/${t.body.threadId}/participants.txt`;
+
+    const r1 = await call(bridge, 'get', path(one));
+    expect(r1.status).toBe(200);
+    expect(r1.text.split('\r\n')[0]).toMatch(/^PARTICIPANTS\|1\|\d+\|2$/);
+    expect(users(r1.text)).toEqual([alice.user, 'zed@DISCORD']);
+    expect(users((await call(bridge, 'get', path(grp))).text)).toEqual([alice.user, bob.user, 'yan@DISCORD'].sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase())));
+
+    expect((await call(bridge, 'get', path(none))).status).toBe(403);
+    expect((await call(bridge, 'get', '/dm/dmnosuchthread/participants.txt')).status).toBe(403);
+
+    expect(users((await call(alice, 'get', path(one))).text)).toEqual([alice.user, 'zed@DISCORD']);
+    expect(users((await call(bob, 'get', path(grp))).text)).toContain(bob.user);
+    expect((await call(carol, 'get', path(one))).status).toBe(403);
+    expect((await call(carol, 'get', path(grp))).status).toBe(403);
+    expect((await call(alice, 'get', path(none))).status).toBe(403);
+  });
 });

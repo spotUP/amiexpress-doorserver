@@ -67,6 +67,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/dm/:peer` | `{content, clientId, as?}`; peer is `handle@BOARD`; reply `{id, seq, threadId}` |
 | POST | `/dm-group` | `{participants, content, clientId, as?}`; participants are 2 or more `handle@BOARD` besides the sender (3+ unique members in all); reply `{id, seq, threadId}` |
 | GET | `/dm/:threadId/history.txt` | `?before&limit&as`; HISTORY rows; marks the peer's messages read |
+| GET | `/dm/:threadId/participants.txt` | PARTICIPANTS rows, one `handle@BOARD` per line, sorted; a relay board may read a thread holding one of its users, any other session only a thread it is in; else 403 `forbidden` |
 | GET | `/events.txt` | `?since=<seq>&wait=0..25` long poll; EVENTS rows |
 | POST | `/rooms/:id/kick` | `{user}` |
 | POST | `/rooms/:id/ban` | `{user, reason?}` |
@@ -195,8 +196,10 @@ board sent or received it. Row (the usual EVENTS columns):
 `seq|dm|<threadId>|<sender full user>|<message id>|<at>|<role color>|<content>||<sender label>`
 for example `42|dm|dm1a2b3c4d5e6f|alice@BBS|dabc123|1700000000||hello||alice`.
 `threadId` starts with `dm` (1:1) or `dg` (group); the row does not name the
-recipient, so ask `GET /dm/<threadId>/history.txt?as=<handle>` for the user it
-concerns. A board that is not a relay still sees only DMs of its own sessions.
+recipient: `GET /dm/<threadId>/participants.txt` lists the thread's users
+(`PARTICIPANTS|1|<rev>|2` then `alice@BBS`, `zed@DISCORD`, one per row) so the
+bridge can pick its own; the relay board may read it only for a thread with
+one of its users, else 403 `forbidden`. A board that is not a relay still sees only DMs of its own sessions.
 
 Ignore list: the server only stores it, per chat identity, across sessions.
 It filters nothing; the door hides an ignored user's lines itself.
