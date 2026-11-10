@@ -24,6 +24,10 @@ export interface MirrorOrigin {
   source: string;
   /** The script a reader runs to regenerate it. */
   generator: string;
+  /** Repo that owns `source`; defaults to amiexpress-doorserver. */
+  repo?: string;
+  /** Keep the source's leading doc comment under the header (default: strip it). */
+  keepLeadingComment?: boolean;
 }
 
 const MANIFEST_ORIGIN: MirrorOrigin = {
@@ -36,11 +40,11 @@ export function renderMirror(sourceText: string, origin: MirrorOrigin = MANIFEST
     '/**',
     ' * GENERATED FILE -- DO NOT EDIT BY HAND.',
     ' *',
-    ` * Mirror of amiexpress-doorserver ${origin.source}.`,
+    ` * Mirror of ${origin.repo ?? 'amiexpress-doorserver'} ${origin.source}.`,
     ` * Regenerate with: npx tsx ${origin.generator}`,
     ' */',
     '',
-    sourceText.replace(/^\/\*\*[\s\S]*?\*\/\n/, ''),
+    origin.keepLeadingComment ? sourceText : sourceText.replace(/^\/\*\*[\s\S]*?\*\/\n/, ''),
   ].join('\n');
 }
 

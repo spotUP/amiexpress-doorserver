@@ -32,7 +32,7 @@ describe('chat canvas store', () => {
       await call('post', `/rooms/${id}/canvas`, sid).send({ ops: '@5,5:^34b' });
       const row = db.prepare('SELECT rev, cells FROM chat_canvas WHERE room_id = ?').get(id) as { rev: number; cells: Buffer };
       expect(row.rev).toBe(2);
-      expect(readCell(row.cells, 5, 5)).toEqual({ ch: 0x62, fg: 3, bg: 4, blink: false });
+      expect(readCell(row.cells, 5, 5)).toEqual({ char: String.fromCharCode(0x62), fg: 3, bg: 4, blink: false });
     } finally { db.close(); }
   });
 
