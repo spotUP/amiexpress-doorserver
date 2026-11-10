@@ -4,6 +4,7 @@ import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { heldPollCount } from '../src/chat/events';
+import { _resetRateLimitsForTests } from '../src/achievements/ratelimit';
 
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });
@@ -50,4 +51,16 @@ describe('chat long poll', () => {
     const row = r.text.split(/\r?\n/).find((l) => l.includes('|message|'));
     expect(row?.split('|').slice(7)).toEqual(['answer', parent, 'alice']);
   });
+  it('never sends more than maxBytes of events, however many canvas events wait', async () => {
+    const a = await login('alice');
+    const id = (await call('post', '/rooms', a).send({ name: 'bulk', kind: 'art' })).body.id as string;
+    await call('post', `/rooms/${id}/join`, a);
+    for (let i = 0; i < 200; i++) {
+      if (i % 30 === 0) _resetRateLimitsForTests();
+      await call('post', `/rooms/${id}/canvas`, a).send({ ops: Array.from({ length: 6 }, (_, y) => `@0,${y}:${'x'.repeat(70)}`).join('') });
+    }
+    const r = await call('get', '/events.txt?since=0&wait=0&maxBytes=7680', a);
+    expect(Buffer.byteLength(r.text)).toBeLessThanOrEqual(7680);
+    expect(r.text).toContain('|canvas|');
+  }, 60000);
 });

@@ -9,7 +9,7 @@
  *   ops, visibility, deletes or clears the room.
  */
 import type Database from 'better-sqlite3';
-import type { ChatRolePerms } from '../../contract/chat-types';
+import type { ChatRoomKind, ChatRolePerms } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
 import { permsOf } from './roles';
 import { splitUser } from './sessions';
@@ -24,11 +24,12 @@ export interface RoomRec {
   motd: string;
   visibility: 'public' | 'private';
   moderated: number;
+  kind: ChatRoomKind;
 }
 
 export function getRoom(db: Database.Database, id: string): RoomRec {
   const r = db
-    .prepare('SELECT id, name, owner_board, owner_user, topic, motd, visibility, moderated FROM chat_rooms WHERE id = ? AND deleted_at IS NULL')
+    .prepare('SELECT id, name, owner_board, owner_user, topic, motd, visibility, moderated, kind FROM chat_rooms WHERE id = ? AND deleted_at IS NULL')
     .get(id) as RoomRec | undefined;
   if (!r) throw new SurfaceError('not_found', 404, 'no such room');
   return r;
@@ -76,4 +77,9 @@ export function requireMod(
 
 export function requireSysop(ctx: ChatCtx): void {
   if (!ctx.admin && !ctx.sysop) throw new SurfaceError('forbidden', 403, 'sysop only');
+}
+
+/** Clearing the shared canvas (an `X` op): the room owner and the room's ops only (D3). */
+export function requireCanvasClear(db: Database.Database, room: RoomRec, ctx: ChatCtx): void {
+  if (!isRoomStaff(db, room, ctx)) throw new SurfaceError('forbidden', 403, 'only the room owner or an op may clear the canvas');
 }

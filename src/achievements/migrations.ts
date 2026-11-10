@@ -310,4 +310,18 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('ALTER TABLE boards ADD COLUMN discord_mirror INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 12,
+    name: 'chat: chat_canvas holds the shared 80x24 cell canvas of an art room',
+    // /draw is art rooms only. One row per room, created lazily on the first
+    // read or post; cells = 80*24*3 bytes (char, fg<<4|bg, flags with bit 0 =
+    // blink). It lives until the room row is deleted (ON DELETE CASCADE).
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_canvas (
+          room_id TEXT PRIMARY KEY REFERENCES chat_rooms(id) ON DELETE CASCADE,
+          rev INTEGER NOT NULL DEFAULT 0,
+          cells BLOB NOT NULL,
+          updated_at INTEGER NOT NULL)`);
+    },
+  },
 ];

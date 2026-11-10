@@ -5,7 +5,7 @@
  * including the last, Latin-1.
  */
 import type { Response } from 'express';
-import { CHAT_DISCORD_BOARD, CHAT_DISCORD_MARKER, CHAT_TEXT_VERSION } from '../../contract/chat-types';
+import { CHAT_DISCORD_BOARD, CHAT_LIMITS, CHAT_DISCORD_MARKER, CHAT_TEXT_VERSION } from '../../contract/chat-types';
 import { esc, oneLine, toLatin1Safe } from '../text-format';
 
 export function f(v: string | number | null | undefined): string {
@@ -16,6 +16,29 @@ export function renderText(name: string, revision: number | string, rows: (strin
   const lines = [`${name}|${CHAT_TEXT_VERSION}|${revision}|${rows.length}`];
   for (const r of rows) lines.push(r.map((x) => f(x)).join('|'));
   return Buffer.from(lines.map((l) => l + '\r\n').join(''), 'latin1');
+}
+
+/** The byte size of one rendered row line including CRLF (rows are Latin-1, one byte per character). */
+function rowBytes(r: (string | number)[]): number {
+  return r.map((x) => f(x)).join('|').length + 2;
+}
+
+/** `?maxBytes=` clamped to 64..replyMaxBytes; missing or junk means replyMaxBytes. */
+export function clampMaxBytes(q: unknown): number {
+  const n = Math.floor(Number(q));
+  return Number.isFinite(n) && n > 0 ? Math.max(64, Math.min(n, CHAT_LIMITS.replyMaxBytes)) : CHAT_LIMITS.replyMaxBytes;
+}
+
+/** The leading rows whose reply (header included) stays within maxBytes; always at least one row so a poll makes progress. */
+export function fitRows<T extends (string | number)[]>(rows: T[], maxBytes: number): T[] {
+  let used = 40; // header line
+  const out: T[] = [];
+  for (const r of rows) {
+    used += rowBytes(r);
+    if (used > maxBytes && out.length > 0) break;
+    out.push(r);
+  }
+  return out;
 }
 
 /** Send a text body with an exact Content-Length and no keep-alive, never chunked. */

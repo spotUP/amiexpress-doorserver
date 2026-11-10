@@ -20,7 +20,7 @@ import type Database from 'better-sqlite3';
 import { loadChatConfig } from './config';
 import { fetchVisibleEvents, headSeq, heldPollCount, waitForEvents } from './events';
 import type { EventRec } from './events';
-import { displayLabels, markOrigin, renderText, sendText } from './render';
+import { clampMaxBytes, displayLabels, fitRows, markOrigin, renderText, sendText } from './render';
 import * as roles from './roles';
 import { actingCtx, createSession, expireSession, resolveSession, startSweeper } from './sessions';
 import type { ChatCtx } from './sessions';
@@ -277,8 +277,10 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
         const text = (e: EventRec): string => (e.type === 'message' || e.type === 'edit' ? markOrigin(e.user, e.text) : e.text);
         return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), text(e), e.reply_to, e.user ? labels.get(e.user) ?? e.user : '']);
       });
-      const last = events.length > 0 ? events[events.length - 1].seq : since;
-      sendText(res, renderText('EVENTS', last, out));
+      // A 68K reply buffer is 8 KB: stop before the reply passes maxBytes and let the client poll on from the last seq.
+      const fitted = fitRows(out, clampMaxBytes(req.query.maxBytes));
+      const last = fitted.length > 0 ? events[fitted.length - 1].seq : since;
+      sendText(res, renderText('EVENTS', last, fitted));
     } catch (err) {
       next(err);
     }
@@ -305,6 +307,13 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.post('/rooms/:id/typing', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.setTyping(db, ctx, p(req, 'id'), body(req)));
     res.json({ ok: true });
+  });
+  router.get('/rooms/:id/canvas.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db, ctx) => store.getCanvas(db, ctx, p(req, 'id'), req.query));
+    sendText(res, renderText('CANVAS', out.rev, out.rows));
+  });
+  router.post('/rooms/:id/canvas', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => store.applyCanvasOps(db, ctx, p(req, 'id'), body(req))));
   });
   router.put('/rooms/:id/motd', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.setRoomMotd(db, ctx, p(req, 'id'), body(req)));

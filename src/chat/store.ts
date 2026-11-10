@@ -14,7 +14,8 @@ import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
 import { nowSec } from './config';
 import { emitEvent, headSeq } from './events';
-import { getRoom, isMember, isOp, isOwnerLevel, isRoomStaff, requireMod, requireOwner, requireSysop } from './permissions';
+import { getRoom, isMember, isOp, isOwnerLevel, isRoomStaff, requireCanvasClear, requireMod, requireOwner, requireSysop } from './permissions';
+import { applyParsed, blankCanvas, CANVAS_ROWS, CanvasGrammarError, encodeRow, parseOps } from './canvas-codec';
 import type { RoomRec } from './permissions';
 import { permsOf } from './roles';
 import { newId, splitUser, validHandle } from './sessions';
@@ -754,6 +755,8 @@ export function deleteRoom(db: Database.Database, ctx: ChatCtx, id: string): voi
   emitEvent(db, { type: 'room_deleted', roomId: id, user: ctx.user || 'admin', text: room.name });
   db.prepare('UPDATE chat_rooms SET deleted_at = ?, name_key = ? WHERE id = ?').run(nowSec(), `${room.name.toLowerCase()}~deleted~${id}`, id);
   db.prepare('DELETE FROM chat_members WHERE room_id = ?').run(id);
+  // The room row is only soft-deleted, so the cascade never fires: the canvas goes with the room here.
+  db.prepare('DELETE FROM chat_canvas WHERE room_id = ?').run(id);
 }
 
 export function clearRoom(db: Database.Database, ctx: ChatCtx, id: string): void {
@@ -925,4 +928,61 @@ export function memberUsers(db: Database.Database, roomIds: Iterable<string>): s
 /** The boards whose callers the bridge may copy to Discord, upper-cased as in user ids. */
 export function discordMirrorBoards(db: Database.Database): string[] {
   return (db.prepare('SELECT id FROM boards WHERE discord_mirror = 1 ORDER BY id').all() as { id: string }[]).map((r) => r.id.toUpperCase());
+}
+
+// ---- shared canvas (/draw): art rooms only ----
+
+function canvasRoom(db: Database.Database, ctx: ChatCtx, id: string): RoomRec {
+  const room = getRoom(db, id);
+  requireMemberOf(db, room.id, ctx);
+  if (room.kind !== 'art') throw new SurfaceError('forbidden', 403, 'only an art room has a canvas');
+  return room;
+}
+
+/** The room's canvas row, created blank on first touch. */
+function canvasRow(db: Database.Database, roomId: string): { rev: number; cells: Buffer } {
+  db.prepare('INSERT OR IGNORE INTO chat_canvas (room_id, rev, cells, updated_at) VALUES (?, 0, ?, ?)').run(roomId, blankCanvas(), nowSec());
+  return db.prepare('SELECT rev, cells FROM chat_canvas WHERE room_id = ?').get(roomId) as { rev: number; cells: Buffer };
+}
+
+/** GET canvas.txt: rows `from`..`from+count-1`, stopping early before the reply passes `maxBytes`. */
+export function getCanvas(db: Database.Database, ctx: ChatCtx, id: string, q: Record<string, unknown>): { rev: number; rows: [number, string][] } {
+  const room = canvasRoom(db, ctx, id);
+  const num = (v: unknown, d: number): number => (v === undefined ? d : Math.max(0, Math.floor(Number(v)) || 0));
+  const from = Math.min(num(q.from, 0), CANVAS_ROWS);
+  const count = Math.min(num(q.count, CANVAS_ROWS), CANVAS_ROWS - from);
+  const maxBytes = Math.max(64, Math.min(num(q.maxBytes, CHAT_LIMITS.replyMaxBytes), CHAT_LIMITS.replyMaxBytes));
+  const { rev, cells } = canvasRow(db, room.id);
+  const rows: [number, string][] = [];
+  let used = 32; // header line
+  for (let y = from; y < from + count; y++) {
+    const enc = encodeRow(cells, y);
+    used += String(y).length + 1 + enc.length + 2;
+    if (used > maxBytes && rows.length > 0) break;
+    rows.push([y, enc]);
+  }
+  return { rev, rows };
+}
+
+/** POST canvas {base, ops}: apply in arrival order (last writer wins per cell), rev + 1, emit one `canvas` event. */
+export function applyCanvasOps(db: Database.Database, ctx: ChatCtx, id: string, b: Body): { rev: number } {
+  const room = canvasRoom(db, ctx, id);
+  charge([{ key: `chat:canvas:${ctx.sid ?? ctx.user}`, limit: { max: CHAT_LIMITS.canvasPostsPerSession, windowSeconds: CHAT_LIMITS.canvasWindowMs / 1000 } }]);
+  const ops = b.ops;
+  if (typeof ops !== 'string' || ops.length === 0) throw new SurfaceError('bad_request', 422, 'ops must be a non-empty string');
+  if (ops.length > CHAT_LIMITS.canvasOpsMax) throw new SurfaceError('too_long', 413, `ops is longer than ${CHAT_LIMITS.canvasOpsMax} bytes`);
+  let parsed;
+  try {
+    parsed = parseOps(ops, CHAT_LIMITS.canvasCellsMax);
+  } catch (err) {
+    if (err instanceof CanvasGrammarError) throw new SurfaceError('bad_request', 422, `bad ops at byte ${err.offset}: ${err.message}`);
+    throw err;
+  }
+  if (parsed.clear) requireCanvasClear(db, room, ctx);
+  const row = canvasRow(db, room.id);
+  applyParsed(row.cells, parsed);
+  const rev = row.rev + 1;
+  db.prepare('UPDATE chat_canvas SET rev = ?, cells = ?, updated_at = ? WHERE room_id = ?').run(rev, row.cells, nowSec(), room.id);
+  emitEvent(db, { type: 'canvas', roomId: room.id, user: ctx.user, ref: String(rev), text: ops });
+  return { rev };
 }
