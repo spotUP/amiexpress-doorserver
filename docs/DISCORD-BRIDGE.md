@@ -10,6 +10,18 @@ name and board on each message); Discord to hub goes through the bot gateway.
 Per-board mirroring is opt-in: a sysop turns it on for their board with
 `/discord on` (off by default). Boards that are off never reach Discord.
 
+## Mentions
+
+Hub to Discord: `@name` in a caller's line pings the server member it names.
+The bridge matches the name case-insensitively against usernames first, then
+display names and nicknames (spaces written as `_`, e.g. `@Bob_Smith`). No
+match, or more than one member with that name: the text stays plain and nobody
+is pinged. `@name@DISCORD` also resolves; `@name@<any other board>` is a BBS
+caller and is left alone. `@everyone`, `@here` and roles never ping.
+
+Discord to hub: `<@id>` mentions arrive as `@<username>`, the handle the hub
+shows for that Discord user.
+
 ## Deployment
 
 `docker-compose.yml` has a `discord-bridge` service under the compose profile
@@ -21,7 +33,7 @@ on only when all three GitHub secrets are set:
 
 | Secret | Value |
 |---|---|
-| `DISCORD_BOT_TOKEN` | Bot token. The bot needs the Message Content intent, and in each mapped channel: View Channel, Send Messages, Read Message History, Manage Webhooks. |
+| `DISCORD_BOT_TOKEN` | Bot token. The bot needs the Message Content and Server Members intents (both privileged, switched on in the developer portal under Bot), and in each mapped channel: View Channel, Send Messages, Read Message History, Manage Webhooks. |
 | `DISCORD_BRIDGE_BOARD_KEY` | BoardKey (`<id>.<secret>`) of the relay board with id `discord` (exactly; `CHAT_DISCORD_BOARD` in `contract/chat-types.ts`). The server admin creates that board, issues its key and sets its relay flag. |
 | `DISCORD_BRIDGE_ROOMS` | `roomId=channelId,...`, e.g. `roomd8209269178d=1431571957366788207`. The room id is the hub `chat_rooms.id` (generated, not the room name: the room named `lobby` has its own id per server); the channel id is the Discord channel snowflake. |
 

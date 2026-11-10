@@ -33,7 +33,13 @@ async function main(): Promise<void> {
         console.error(`[ERROR] discord gateway: ${(err as Error).message}`);
         process.exit(1);
       });
-      return { onEvent: createOutbound({ rooms: config.rooms, state, out, fetchBoards: () => hub.mirrorBoards() }) };
+      return { onEvent: createOutbound({
+          rooms: config.rooms,
+          state,
+          out,
+          fetchBoards: () => hub.mirrorBoards(),
+          resolveMention: (channel, name) => gateway.memberId(channel, name),
+        }) };
     },
     {
       onPolled: (seq) => {

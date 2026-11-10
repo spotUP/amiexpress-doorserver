@@ -5,8 +5,8 @@
  * send message_reference).
  */
 import { CHAT_DISCORD_BOARD } from '../../contract/chat-types';
-import { composeContent, webhookName } from './text';
-import type { ReplyQuote } from './text';
+import { composeMessage, webhookName } from './text';
+import type { MentionResolver, ReplyQuote } from './text';
 import type { DiscordOut } from './discord-out';
 import type { BridgeState } from './state';
 import type { BridgeEvent } from './wire';
@@ -25,6 +25,8 @@ export interface OutboundDeps {
   out: DiscordOut;
   /** GET /discord/boards.txt */
   fetchBoards: () => Promise<MirrorBoards>;
+  /** Discord channel id + hub `@name` -> Discord user id (gateway member cache). Absent: no pings. */
+  resolveMention?: (channelId: string, name: string) => string | undefined;
   log?: (line: string) => void;
   now?: () => number;
 }
@@ -46,6 +48,11 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     return cache.boards.has(board);
   }
 
+  function resolverFor(channel: string): MentionResolver | undefined {
+    const r = deps.resolveMention;
+    return r ? (name) => r(channel, name) : undefined;
+  }
+
   async function onMessage(ev: BridgeEvent, channel: string): Promise<void> {
     const board = boardOf(ev.user);
     if (board === CHAT_DISCORD_BOARD.toUpperCase()) return; // loop guard
@@ -61,7 +68,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
         log(`[INFO] reply ${ev.ref}: parent ${ev.replyTo} has no twin; posting without a quote`);
       }
     }
-    const id = await deps.out.post(channel, { username: webhookName(label), content: composeContent(ev.text, quote) });
+    const id = await deps.out.post(channel, { username: webhookName(label), ...composeMessage(ev.text, quote, resolverFor(channel)) });
     deps.state.putLink({ hubMessageId: ev.ref, discordMessageId: id, roomId: ev.room, createdAt: now(), authorLabel: label, content: ev.text });
   }
 
@@ -69,7 +76,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     if (boardOf(ev.user) === CHAT_DISCORD_BOARD.toUpperCase()) return; // echo guard: the edit came from Discord
     const link = deps.state.byHub(ev.ref);
     if (!link) return log(`[INFO] edit ${ev.ref}: no Discord twin, skipped`);
-    await deps.out.edit(channel, link.discordMessageId, composeContent(ev.text));
+    await deps.out.edit(channel, link.discordMessageId, composeMessage(ev.text, undefined, resolverFor(channel)));
     deps.state.setContent(ev.ref, ev.text);
   }
 

@@ -54,9 +54,83 @@ export function quoteLine(q: ReplyQuote): string {
 
 /** Final webhook content: optional quote line, then the escaped text, capped at Discord's limit. */
 export function composeContent(text: string, quote?: ReplyQuote): string {
-  const body = escapeDiscord(text);
+  return composeMessage(text, quote).content;
+}
+
+/** Discord's cap on allowed_mentions.users. */
+export const MENTION_USERS_MAX = 100;
+
+/** Webhook content plus the user ids it may ping (allowed_mentions.users). */
+export interface ComposedMessage {
+  content: string;
+  users: string[];
+}
+
+/** Hub "@name" -> Discord user id, or undefined when the name is unknown or ambiguous. */
+export type MentionResolver = (name: string) => string | undefined;
+
+/**
+ * `@name` in hub text, optionally suffixed `@discord` (the hub form of a
+ * Discord user, `handle@DISCORD`). A name followed by any other `@board`
+ * is a BBS caller and is never resolved against Discord.
+ */
+const HUB_MENTION = /(^|[^\w@.])@([\w.]*\w)(@[a-z0-9][a-z0-9-]*)?/gi;
+const MARK_OPEN = '\uE000';
+const MARK_CLOSE = '\uE001';
+
+/**
+ * Like composeContent, and turns each `@name` the resolver knows into a real
+ * `<@id>` mention. Resolved names become private-use markers before escaping,
+ * so the escape rules see the same text as before; the markers become `<@id>`
+ * afterwards. Unresolved names stay literal text.
+ */
+export function composeMessage(text: string, quote?: ReplyQuote, resolve?: MentionResolver): ComposedMessage {
+  const ids: string[] = [];
+  let marked = text.replace(/[\uE000\uE001]/g, '');
+  if (resolve) {
+    marked = marked.replace(HUB_MENTION, (all, lead: string, name: string, board?: string) => {
+      if (board && board.slice(1).toUpperCase() !== 'DISCORD') return all;
+      const id = resolve(name);
+      if (!id) return all;
+      ids.push(id);
+      return `${lead}${MARK_OPEN}${ids.length - 1}${MARK_CLOSE}`;
+    });
+  }
+  const body = escapeDiscord(marked).replace(/\uE000(\d+)\uE001/g, (_m, n: string) => `<@${ids[Number(n)]}>`);
   const full = quote ? `${quoteLine(quote)}\n${body}` : body;
-  return full.length > DISCORD_MESSAGE_LIMIT ? `${full.slice(0, DISCORD_MESSAGE_LIMIT - 3)}...` : full;
+  const content = full.length > DISCORD_MESSAGE_LIMIT ? `${full.slice(0, DISCORD_MESSAGE_LIMIT - 3)}...` : full;
+  const users = [...new Set(ids)].filter((id) => content.includes(`<@${id}>`)).slice(0, MENTION_USERS_MAX);
+  return { content, users };
+}
+
+/** Names one Discord guild member answers to. */
+export interface MemberNames {
+  id: string;
+  username: string;
+  globalName?: string | null;
+  nickname?: string | null;
+}
+
+/** Comparable form of a name: whitespace -> `_` (as inbound toHandle does), lower-case. */
+export function mentionKey(name: string): string {
+  return name.trim().replace(/\s+/g, '_').toLowerCase();
+}
+
+/**
+ * The member a hub `@name` means: a unique username match first, else a
+ * unique display name or nickname match. None or several: undefined, so the
+ * name stays plain text and nobody is pinged by mistake.
+ */
+export function pickMember(members: Iterable<MemberNames>, name: string): string | undefined {
+  const key = mentionKey(name);
+  const byUsername = new Set<string>();
+  const byDisplay = new Set<string>();
+  for (const m of members) {
+    if (mentionKey(m.username) === key) byUsername.add(m.id);
+    else if ([m.globalName, m.nickname].some((n) => n && mentionKey(n) === key)) byDisplay.add(m.id);
+  }
+  if (byUsername.size) return byUsername.size === 1 ? [...byUsername][0] : undefined;
+  return byDisplay.size === 1 ? [...byDisplay][0] : undefined;
 }
 
 /** Hub-side limit for Discord -> hub text (CHAT_LIMITS.contentMax). */

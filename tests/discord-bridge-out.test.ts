@@ -18,7 +18,7 @@ import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { startBridge } from '../src/discord-bridge/bridge';
 import { RestDiscordOut, WEBHOOK_NAME } from '../src/discord-bridge/discord-out';
 import { boardOf, createOutbound } from '../src/discord-bridge/outbound';
-import { composeContent, escapeDiscord, quoteLine, webhookName } from '../src/discord-bridge/text';
+import { composeContent, composeMessage, escapeDiscord, pickMember, quoteLine, webhookName } from '../src/discord-bridge/text';
 import type { BridgeConfig } from '../src/discord-bridge/config';
 import type { BridgeEvent } from '../src/discord-bridge/wire';
 
@@ -136,8 +136,16 @@ describe('hub -> Discord through the bridge', () => {
     await out.prepare(['777']);
     const config = configFor(room);
     const logs: string[] = [];
+    const members = [{ id: '4242', username: 'bob.smith', globalName: 'Bob Smith', nickname: null }];
     const bridge = await startBridge(config, (hub, state) => ({
-      onEvent: createOutbound({ rooms: config.rooms, state, out, fetchBoards: () => hub.mirrorBoards(), log: (l) => logs.push(l) }),
+      onEvent: createOutbound({
+        rooms: config.rooms,
+        state,
+        out,
+        fetchBoards: () => hub.mirrorBoards(),
+        resolveMention: (channel, name) => (channel === '777' ? pickMember(members, name) : undefined),
+        log: (l) => logs.push(l),
+      }),
     }), { log: (l) => logs.push(l) });
     try {
       // The webhook was created by the bridge, named for it.
@@ -169,8 +177,17 @@ describe('hub -> Discord through the bridge', () => {
       await until(() => discord.calls.some((c) => c.method === 'DELETE'));
       expect(discord.calls.find((c) => c.method === 'DELETE')?.url).toContain('/webhooks/wh1/tok/messages/m1');
 
-      // Bob's message never produced a call; nothing beyond the two posts.
-      expect(discord.webhookPosts()).toHaveLength(2);
+      // A hub @name of a server member becomes a real ping, for that user only.
+      await say(alice, 'hey @bob_smith and @carol@UPROUGH');
+      await until(() => discord.webhookPosts().length === 3);
+      expect(discord.webhookPosts()[2].body).toEqual({
+        username: 'alice',
+        content: 'hey <@4242> and @carol@UPROUGH',
+        allowed_mentions: { parse: [], users: ['4242'] },
+      });
+
+      // Bob's message never produced a call; nothing beyond the three posts.
+      expect(discord.webhookPosts()).toHaveLength(3);
       expect(discord.calls.some((c) => JSON.stringify(c.body).includes('hidden'))).toBe(false);
     } finally {
       await bridge.stop();
@@ -289,6 +306,35 @@ describe('text.ts', () => {
   it('quoteLine flattens, truncates to 80 characters and adds the jump link', () => {
     expect(quoteLine({ label: 'bob', text: 'a\nb  c' })).toBe('> bob: a b c');
     expect(quoteLine({ label: 'bob', text: 'y'.repeat(100), link: 'https://l' })).toBe(`> bob: ${'y'.repeat(80)}... ([jump](https://l))`);
+  });
+
+  it('composeMessage pings resolved names only, keeps escaping and skips BBS callers', () => {
+    const ids: Record<string, string> = { bob: '1', 'a_b': '2' };
+    const resolve = (n: string): string | undefined => ids[n.toLowerCase()];
+    expect(composeMessage('hi @Bob, @bob and @nobody', undefined, resolve)).toEqual({ content: 'hi <@1>, <@1> and @nobody', users: ['1'] });
+    expect(composeMessage('*@a_b* @bob@discord @bob@UPROUGH x@bob', undefined, resolve)).toEqual({
+      content: '\\*<@2>\\* <@1> @bob@UPROUGH x@bob',
+      users: ['2', '1'],
+    });
+    // Marker characters typed by a caller cannot forge a mention.
+    expect(composeMessage('\uE0000\uE001 @bob', undefined, resolve)).toEqual({ content: '0 <@1>', users: ['1'] });
+    expect(composeMessage('@bob @everyone', undefined, undefined)).toEqual({ content: '@bob @\u200Beveryone', users: [] });
+    // A mention cut off by the 2000 cap is not allowed to ping.
+    expect(composeMessage(`${'x'.repeat(1996)} @bob`, undefined, resolve).users).toEqual([]);
+  });
+
+  it('pickMember prefers a unique username, then a unique display name or nickname', () => {
+    const m = [
+      { id: '1', username: 'neo', globalName: 'The One', nickname: null },
+      { id: '2', username: 'trinity', globalName: 'Neo', nickname: null },
+      { id: '3', username: 'morpheus', globalName: 'Cap', nickname: 'Big Boss' },
+      { id: '4', username: 'tank', globalName: 'cap', nickname: null },
+    ];
+    expect(pickMember(m, 'NEO')).toBe('1');
+    expect(pickMember(m, 'the_one')).toBe('1');
+    expect(pickMember(m, 'big_boss')).toBe('3');
+    expect(pickMember(m, 'cap')).toBeUndefined();
+    expect(pickMember(m, 'nobody')).toBeUndefined();
   });
 
   it('composeContent caps at 2000 characters', () => {

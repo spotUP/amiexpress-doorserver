@@ -9,7 +9,7 @@ import type { Message, PartialMessage } from 'discord.js';
 import { validHandle } from '../chat/sessions';
 import { HubError } from './hub-client';
 import type { HubClient } from './hub-client';
-import { discordToHub, type MentionNames } from './text';
+import { discordToHub, pickMember, type MentionNames } from './text';
 import type { BridgeState } from './state';
 
 export interface InboundMessage {
@@ -153,10 +153,14 @@ function mentionNames(m: Message | PartialMessage): MentionNames {
   return { users, roles, channels };
 }
 
-/** The real gateway: Guilds, GuildMessages, MessageContent. */
+/**
+ * The real gateway: Guilds, GuildMessages, MessageContent, GuildMembers.
+ * GuildMembers (privileged: "Server Members Intent" in the developer portal)
+ * keeps the member cache whole, so hub `@name` can ping any server member.
+ */
 export class GatewayDiscordIn implements DiscordIn {
   private readonly client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers],
     partials: [Partials.Message, Partials.Channel],
   });
 
@@ -170,7 +174,27 @@ export class GatewayDiscordIn implements DiscordIn {
       void sink.update({ ...toInbound(newM), contentChanged: changed }).catch(swallow('update'));
     });
     this.client.on('messageDelete', (m) => void sink.remove({ id: m.id, channelId: m.channelId }).catch(swallow('delete')));
+    // Load every member once; the GuildMembers intent keeps the cache current after that.
+    this.client.on('clientReady', (c) => {
+      for (const g of c.guilds.cache.values()) {
+        g.members.fetch().then(
+          (all) => this.log(`[OK] guild ${g.id}: ${all.size} member(s) cached for mentions`),
+          swallow(`members of guild ${g.id}`),
+        );
+      }
+    });
     await this.client.login(this.token);
+  }
+
+  /** The member of the channel's guild a hub `@name` means (text.ts pickMember); undefined when unknown or ambiguous. */
+  memberId(channelId: string, name: string): string | undefined {
+    const ch = this.client.channels.cache.get(channelId);
+    const guild = ch && 'guild' in ch ? ch.guild : undefined;
+    if (!guild) return undefined;
+    return pickMember(
+      [...guild.members.cache.values()].map((m) => ({ id: m.id, username: m.user.username, globalName: m.user.globalName, nickname: m.nickname })),
+      name,
+    );
   }
 
   /** True once the gateway session is up (discord.js resumes on its own after drops). */

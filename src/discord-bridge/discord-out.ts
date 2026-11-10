@@ -8,9 +8,14 @@ import { REST, Routes } from 'discord.js';
 
 export const WEBHOOK_NAME = 'LiveChat bridge';
 
-export interface WebhookPost {
-  username: string;
+/** Message text plus the Discord user ids it may ping (none when empty). */
+export interface WebhookBody {
   content: string;
+  users?: readonly string[];
+}
+
+export interface WebhookPost extends WebhookBody {
+  username: string;
 }
 
 export interface DiscordOut {
@@ -18,7 +23,7 @@ export interface DiscordOut {
   prepare(channelIds: Iterable<string>): Promise<void>;
   /** Execute the channel webhook; returns the Discord message id. */
   post(channelId: string, post: WebhookPost): Promise<string>;
-  edit(channelId: string, messageId: string, content: string): Promise<void>;
+  edit(channelId: string, messageId: string, body: WebhookBody): Promise<void>;
   remove(channelId: string, messageId: string): Promise<void>;
   /** https://discord.com/channels/<guild>/<channel>/<message>, once the channel is prepared. */
   jumpLink(channelId: string, messageId: string): string | undefined;
@@ -36,7 +41,10 @@ interface Target {
   guildId: string | undefined;
 }
 
-const NO_MENTIONS = { parse: [] as string[] };
+/** Never @everyone, @here or roles; users only when the bridge resolved them. */
+function allowedMentions(users: readonly string[] | undefined): { parse: string[]; users?: string[] } {
+  return users && users.length ? { parse: [], users: [...users] } : { parse: [] };
+}
 
 export class RestDiscordOut implements DiscordOut {
   private readonly targets = new Map<string, Target>();
@@ -73,14 +81,17 @@ export class RestDiscordOut implements DiscordOut {
     const sent = (await this.rest.post(Routes.webhook(t.id, t.token), {
       auth: false,
       query: new URLSearchParams({ wait: 'true' }),
-      body: { username: post.username, content: post.content, allowed_mentions: NO_MENTIONS },
+      body: { username: post.username, content: post.content, allowed_mentions: allowedMentions(post.users) },
     })) as { id: string };
     return sent.id;
   }
 
-  async edit(channelId: string, messageId: string, content: string): Promise<void> {
+  async edit(channelId: string, messageId: string, body: WebhookBody): Promise<void> {
     const t = this.target(channelId);
-    await this.rest.patch(Routes.webhookMessage(t.id, t.token, messageId), { auth: false, body: { content, allowed_mentions: NO_MENTIONS } });
+    await this.rest.patch(Routes.webhookMessage(t.id, t.token, messageId), {
+      auth: false,
+      body: { content: body.content, allowed_mentions: allowedMentions(body.users) },
+    });
   }
 
   async remove(channelId: string, messageId: string): Promise<void> {
