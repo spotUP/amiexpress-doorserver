@@ -53,21 +53,23 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     return r ? (name) => r(channel, name) : undefined;
   }
 
+  function quoteOf(ev: BridgeEvent, channel: string): ReplyQuote | undefined {
+    if (!ev.replyTo) return undefined;
+    const parent = deps.state.byHub(ev.replyTo);
+    if (parent && parent.content !== undefined) {
+      return { label: parent.authorLabel || '?', text: parent.content, link: deps.out.jumpLink(channel, parent.discordMessageId) };
+    }
+    log(`[INFO] reply ${ev.ref}: parent ${ev.replyTo} has no twin; posting without a quote`);
+    return undefined;
+  }
+
   async function onMessage(ev: BridgeEvent, channel: string): Promise<void> {
     const board = boardOf(ev.user);
     if (board === CHAT_DISCORD_BOARD.toUpperCase()) return; // loop guard
     if (deps.state.byHub(ev.ref)) return; // replayed after a restart: already posted
     if (!(await mirrored(board))) return;
     const label = ev.label || ev.user;
-    let quote: ReplyQuote | undefined;
-    if (ev.replyTo) {
-      const parent = deps.state.byHub(ev.replyTo);
-      if (parent && parent.content !== undefined) {
-        quote = { label: parent.authorLabel || '?', text: parent.content, link: deps.out.jumpLink(channel, parent.discordMessageId) };
-      } else {
-        log(`[INFO] reply ${ev.ref}: parent ${ev.replyTo} has no twin; posting without a quote`);
-      }
-    }
+    const quote = quoteOf(ev, channel);
     const id = await deps.out.post(channel, { username: webhookName(label), ...composeMessage(ev.text, quote, resolverFor(channel)) });
     deps.state.putLink({ hubMessageId: ev.ref, discordMessageId: id, roomId: ev.room, createdAt: now(), authorLabel: label, content: ev.text });
   }
@@ -76,7 +78,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     if (boardOf(ev.user) === CHAT_DISCORD_BOARD.toUpperCase()) return; // echo guard: the edit came from Discord
     const link = deps.state.byHub(ev.ref);
     if (!link) return log(`[INFO] edit ${ev.ref}: no Discord twin, skipped`);
-    await deps.out.edit(channel, link.discordMessageId, composeMessage(ev.text, undefined, resolverFor(channel)));
+    await deps.out.edit(channel, link.discordMessageId, composeMessage(ev.text, quoteOf(ev, channel), resolverFor(channel)));
     deps.state.setContent(ev.ref, ev.text);
   }
 

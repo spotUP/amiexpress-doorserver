@@ -21,7 +21,7 @@ export interface EventRec {
   ref: string;
   at: number;
   text: string;
-  /** The message a `message` event answers, '' otherwise. */
+  /** The message a `message` or `edit` event answers, '' otherwise. */
   reply_to: string;
 }
 
@@ -68,7 +68,7 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
       `SELECT e.seq, e.type, e.room_id, e.label, e.user, e.ref, e.at, e.text,
               COALESCE(m.reply_to, '') AS reply_to
          FROM chat_events e
-         LEFT JOIN chat_messages m ON e.type = 'message' AND m.id = e.ref
+         LEFT JOIN chat_messages m ON e.type IN ('message','edit') AND m.id = e.ref
         WHERE e.seq > @since AND (
               (e.type = 'bbs' AND e.board_id = @board)
            OR (e.type <> 'bbs' AND (

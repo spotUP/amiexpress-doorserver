@@ -342,3 +342,34 @@ describe('text.ts', () => {
     expect(composeContent('t', { label: 'a', text: 'p' })).toBe('> a: p\nt');
   });
 });
+
+describe('createOutbound edit of a reply (H5)', () => {
+  it('quotes the parent on edit exactly as on create', async () => {
+    const { BridgeState } = await import('../src/discord-bridge/state');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bridge-ob-'));
+    const state = new BridgeState(path.join(dir, 's.db'));
+    const bodies: string[] = [];
+    const handler = createOutbound({
+      rooms: new Map([['r', 'c']]),
+      state,
+      out: {
+        prepare: async () => undefined,
+        post: async (_c, p) => { bodies.push(String(p.content)); return `d${bodies.length}`; },
+        edit: async (_c, _m, b) => { bodies.push(String(b.content)); },
+        remove: async () => undefined,
+        jumpLink: () => 'http://jump',
+      },
+      fetchBoards: async () => ({ rev: 1, boards: new Set(['B']) }),
+      log: () => undefined,
+      now: () => 0,
+    });
+    const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'message', room: 'r', user: 'a@B', ref: 'h1', at: '', roleColor: '', text: 'hi', replyTo: '', label: 'a', ...over });
+    await handler(ev({ ref: 'h1', text: 'parent text' }));
+    await handler(ev({ ref: 'h2', text: 'answer', replyTo: 'h1' }));
+    await handler(ev({ type: 'edit', ref: 'h2', text: 'answer edited', replyTo: 'h1' }));
+    expect(bodies[2]).toBe(bodies[1].replace('answer', 'answer edited'));
+    expect(bodies[2]).toContain('> a: parent text');
+    state.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
