@@ -86,8 +86,12 @@ export function createBoard(
     throw new SurfaceError('board_exists', 409, `board "${id}" already exists`);
   }
   const secret = newSecret();
+  // discord_mirror starts on (owner ruling 2026-11-11): a new board's chat
+  // reaches the shared Discord channel until its sysop types /discord off.
+  // The column DEFAULT stays 0 from migration 11; SQLite cannot change it
+  // without rebuilding the table, so the insert names the value.
   db.prepare(
-    'INSERT INTO boards (id, name, contact, key_hash, created_at) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO boards (id, name, contact, key_hash, created_at, discord_mirror) VALUES (?, ?, ?, ?, ?, 1)'
   ).run(id, name, contact, hashPassword(secret), nowSeconds());
   return { id, key: `${id}.${secret}` };
 }

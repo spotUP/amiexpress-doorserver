@@ -5,7 +5,7 @@
  */
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
-import { BBS_EVENT_DATA_KEYS, BBS_EVENT_TYPES, CHAT_DEFAULT_ROOM_KEY, CHAT_LIMITS, CHAT_ROOM_KINDS } from '../../contract/chat-types';
+import { BBS_EVENT_DATA_KEYS, BBS_EVENT_TYPES, CHAT_DEFAULT_ROOM_KEY, CHAT_DISCORD_BOARD, CHAT_LIMITS, CHAT_ROOM_KINDS } from '../../contract/chat-types';
 import type {
   ChatRoomKind, ChatVisibility, CreateRoomReply, DmPostReply, EditMessageReply, EmojiRow, JoinReply, PinRow,
   PostMessageReply, ReactReply, RoomRow, SearchHit,
@@ -956,7 +956,7 @@ export function memberUsers(db: Database.Database, roomIds: Iterable<string>): s
 
 /** The boards whose callers the bridge may copy to Discord, upper-cased as in user ids. */
 export function discordMirrorBoards(db: Database.Database): string[] {
-  return (db.prepare('SELECT id FROM boards WHERE discord_mirror = 1 ORDER BY id').all() as { id: string }[]).map((r) => r.id.toUpperCase());
+  return (db.prepare('SELECT id FROM boards WHERE discord_mirror = 1 AND chat_relay = 0 AND id <> ? ORDER BY id').all(CHAT_DISCORD_BOARD) as { id: string }[]).map((r) => r.id.toUpperCase());
 }
 
 // ---- shared canvas (/draw): art rooms only ----

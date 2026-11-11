@@ -121,10 +121,11 @@ describe('hub -> Discord through the bridge', () => {
 
   it('mirrors opted-in boards only: webhook payload, edit, delete and reply reach the twin', async () => {
     const alice = await login(fx.auth, 'alice', true); // UPROUGH sysop
-    const bob = await login(`Board ${otherKey}`, 'bob'); // OTHER: mirror stays off
+    const bob = await login(`Board ${otherKey}`, 'bob', true); // OTHER sysop: mirror turned off below
     const room = (await call(alice, 'post', '/rooms').send({ name: 'bridge' })).body.id as string;
     for (const s of [alice, bob]) expect((await call(s, 'post', `/rooms/${room}/join`)).status).toBe(200);
     expect((await call(alice, 'put', '/discord').send({ on: true })).status).toBe(200);
+    expect((await call(bob, 'put', '/discord').send({ on: false })).status).toBe(200); // new boards start mirrored
     const say = async (s: S, content: string, replyTo?: string): Promise<string> => {
       const r = await call(s, 'post', `/rooms/${room}/messages`).send({ content, clientId: `c${++n}`, ...(replyTo ? { replyTo } : {}) });
       expect(r.status).toBe(201);

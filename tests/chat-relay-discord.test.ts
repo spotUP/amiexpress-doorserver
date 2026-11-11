@@ -139,9 +139,14 @@ describe('discord mirror (/discord on|off)', () => {
     const sysop = await login(fx.auth, 'sys', true);
     const caller = await login(fx.auth, 'alice');
 
-    expect((await call(caller, 'get', '/discord')).body.on).toBe(false);
-    const refused = await call(caller, 'put', '/discord').send({ on: true });
+    // A new board starts mirrored; the relay board itself is never listed.
+    expect((await call(caller, 'get', '/discord')).body.on).toBe(true);
+    const bridge0 = await login(discordAuth, 'bridge');
+    expect(rowsOf((await call(bridge0, 'get', '/discord/boards.txt')).text)).toEqual([['UPROUGH']]);
+    const refused = await call(caller, 'put', '/discord').send({ on: false });
     expect(refused.status).toBe(403);
+    expect((await call(sysop, 'put', '/discord').send({ on: false })).body.on).toBe(false);
+    expect((await call(caller, 'get', '/discord')).body.on).toBe(false);
     expect((await call(sysop, 'put', '/discord').send({ on: 'yes' })).status).toBe(400);
 
     const on = await call(sysop, 'put', '/discord').send({ on: true });
@@ -155,14 +160,14 @@ describe('discord mirror (/discord on|off)', () => {
     expect(rowsOf(boards.text)).toEqual([['UPROUGH']]);
 
     const events = rowsOf((await call(bridge, 'get', '/events.txt?since=0&wait=0')).text).filter((r) => r[1] === 'discord_mirror');
-    expect(events).toHaveLength(1);
-    expect(events[0][4]).toBe('UPROUGH');
-    expect(events[0][7]).toBe('1');
+    expect(events).toHaveLength(2);
+    expect(events[1][4]).toBe('UPROUGH');
+    expect(events.map((r) => r[7])).toEqual(['0', '1']);
 
     await call(sysop, 'put', '/discord').send({ on: true }); // no change: no second event
     await call(sysop, 'put', '/discord').send({ on: false });
     const after = rowsOf((await call(bridge, 'get', '/events.txt?since=0&wait=0')).text).filter((r) => r[1] === 'discord_mirror');
-    expect(after.map((r) => r[7])).toEqual(['1', '0']);
+    expect(after.map((r) => r[7])).toEqual(['0', '1', '0']);
     expect(rowsOf((await call(bridge, 'get', '/discord/boards.txt')).text)).toEqual([]);
   });
 });
