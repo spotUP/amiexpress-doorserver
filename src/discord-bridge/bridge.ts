@@ -4,6 +4,7 @@
  */
 import { HubClient } from './hub-client';
 import { BridgeState } from './state';
+import { channelsOf } from './config';
 import type { BridgeConfig } from './config';
 import type { BridgeEvent } from './wire';
 
@@ -54,6 +55,9 @@ export async function startBridge(config: BridgeConfig, handlersOrFactory: Bridg
   const minBackoff = opts.minBackoffMs ?? 500;
   const maxBackoff = opts.maxBackoffMs ?? 30000;
   const state = new BridgeState(config.dbPath);
+  // Rows from before multi-guild belong to the channel the room had then: its first.
+  const claimed = state.claimLegacyLinks((room) => channelsOf(config.rooms, room)[0]);
+  if (claimed > 0) log(`[INFO] ${claimed} message link(s) from before multi-guild assigned to their room's first channel`);
   const hub = new HubClient(config.hubUrl, config.boardKey, config.handle, config.rooms.keys());
   const abort = new AbortController();
   const handlers = typeof handlersOrFactory === 'function' ? handlersOrFactory(hub, state) : handlersOrFactory;

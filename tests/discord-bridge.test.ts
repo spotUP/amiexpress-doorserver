@@ -154,7 +154,7 @@ describe('bridge config', () => {
   it('parses a full environment', () => {
     const c = loadBridgeConfig(ok);
     expect(c.hubUrl).toBe('http://hub:3010');
-    expect([...c.rooms]).toEqual([['r1', 'c1'], ['r2', 'c2']]);
+    expect([...c.rooms]).toEqual([['r1', ['c1']], ['r2', ['c2']]]);
     expect(c.discordToken).toBe('tok');
   });
   it.each(Object.keys(ok))('fails fast naming %s when missing', (name) => {

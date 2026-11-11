@@ -12,6 +12,9 @@ import { HubError } from './hub-client';
 import type { HubClient } from './hub-client';
 import { discordToHub, pickMember, type MentionNames } from './text';
 import type { BridgeState } from './state';
+import { roomOfChannel } from './config';
+import type { RoomChannels } from './config';
+import type { Fanout } from './outbound';
 
 export interface InboundMessage {
   id: string;
@@ -30,6 +33,8 @@ export interface InboundMessage {
   referenceId?: string | null;
   /** Names for the user, role and channel ids the content mentions. */
   mentions?: MentionNames;
+  /** Name of the guild the message was posted in (labels the copies in other guilds). */
+  guildName?: string;
 }
 
 export interface InboundUpdate extends InboundMessage {
@@ -62,8 +67,13 @@ export function toHandle(username: string, authorId: string): string {
 }
 
 export interface InboundDeps {
-  rooms: ReadonlyMap<string, string>;
+  rooms: RoomChannels;
   hub: Pick<HubClient, 'postAs' | 'editAs' | 'deleteAs' | 'uploadFileAs'>;
+  /**
+   * Multi-guild: copies a message posted in one linked channel to the room's
+   * other linked channels (outbound.ts createFanout). Absent: hub only.
+   */
+  fanout?: Fanout;
   state: BridgeState;
   log?: (line: string) => void;
   now?: () => number;
@@ -72,7 +82,18 @@ export interface InboundDeps {
 export function createInbound(deps: InboundDeps): InboundSink {
   const log = deps.log ?? ((l: string) => console.log(l));
   const now = deps.now ?? Date.now;
-  const roomOf = new Map([...deps.rooms].map(([room, channel]) => [channel, room]));
+  const roomOf = roomOfChannel(deps.rooms);
+
+  /** The hub id of the message `m` replies to, when its parent has a twin. */
+  const parentOf = (m: InboundMessage): string | undefined => (m.referenceId ? deps.state.byDiscord(m.referenceId)?.hubMessageId : undefined);
+
+  /**
+   * Text for the copies in other guilds: every attachment stays a link (the
+   * hub file copy is not visible in Discord), and the copy is labelled with
+   * the author's guild so readers can tell the servers apart.
+   */
+  const copyText = (m: InboundMessage): string => discordToHub(m.content, m.attachmentUrls, m.mentions);
+  const copyLabel = (m: InboundMessage, handle: string): string => (m.guildName ? `${handle} (${m.guildName})` : handle);
 
   /** Mapped channel, not a webhook post (the bridge's own), not a bot. */
   const accepted = (m: InboundMessage): string | null => {
@@ -136,9 +157,16 @@ export function createInbound(deps: InboundDeps): InboundSink {
       }
       const post = (body: string) => guarded(`post ${m.id}`, async () => {
         const hubId = await deps.hub.postAs(room, handle, body, `discord:${m.id}`.slice(0, 64), replyTo);
-        deps.state.putLink({ hubMessageId: hubId, discordMessageId: m.id, roomId: room, createdAt: now(), authorLabel: handle, content: body });
+        deps.state.putLink({ hubMessageId: hubId, discordMessageId: m.id, roomId: room, channelId: m.channelId, source: true, createdAt: now(), authorLabel: handle, content: body });
       });
       if (text) await post(text);
+      // Multi-guild: the room's other linked channels get a webhook copy, never this channel.
+      const own = deps.state.byDiscord(m.id);
+      const fanout = deps.fanout;
+      if (fanout && own) {
+        await guarded(`copy ${m.id} to other guilds`, () =>
+          fanout.post({ hubMessageId: own.hubMessageId, room, label: copyLabel(m, handle), text: copyText(m), replyTo }, m.channelId));
+      }
       // Discord CDN links expire; keep a copy in the hub file store. After the text so it reads first.
       const failed: string[] = [];
       for (const a of copies) if (!(await copyAttachment(room, handle, a))) failed.push(a.url);
@@ -162,14 +190,26 @@ export function createInbound(deps: InboundDeps): InboundSink {
         await deps.hub.editAs(link.hubMessageId, toHandle(m.authorName, m.authorId), text);
         deps.state.setContent(link.hubMessageId, text);
       });
+      const fanout = deps.fanout;
+      if (fanout && link.source) {
+        await guarded(`copy edit ${m.id} to other guilds`, () => fanout.edit(link.hubMessageId, copyText(m), parentOf(m), m.channelId));
+      }
     },
     async remove(m) {
       if (!roomOf.has(m.channelId)) return;
       const link = deps.state.byDiscord(m.id);
       if (!link) return log(`[INFO] delete ${m.id}: no hub twin, skipped`);
+      if (deps.fanout && !link.source) {
+        // A server's moderator removed the bridge's copy in their own guild: that guild only.
+        log(`[INFO] delete ${m.id}: bridge copy of ${link.hubMessageId} removed in channel ${m.channelId}; hub and other guilds keep it`);
+        deps.state.removeByDiscord(m.id);
+        return;
+      }
       const as = link.authorLabel ?? '';
+      const fanout = deps.fanout;
       await guarded(`delete ${m.id}`, async () => {
         await deps.hub.deleteAs(link.hubMessageId, as);
+        if (fanout) await fanout.remove(link.hubMessageId, m.channelId);
         deps.state.removeByHub(link.hubMessageId);
       });
     },
@@ -188,6 +228,7 @@ const toInbound = (m: Message | PartialMessage): InboundMessage => ({
   attachments: [...(m.attachments?.values() ?? [])].map((a) => ({ id: a.id, name: a.name ?? 'file', size: a.size, url: a.url })),
   referenceId: m.reference?.messageId,
   mentions: mentionNames(m),
+  guildName: m.guild?.name,
 });
 
 /** Hub names for what the message mentions: users as hub handles, roles and channels by name. */

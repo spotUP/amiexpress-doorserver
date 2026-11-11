@@ -3,10 +3,10 @@
  * Hub events go to Discord through channel webhooks (outbound); the discord.js
  * gateway feeds mapped-channel messages to the hub (inbound).
  */
-import { loadBridgeConfig, BridgeConfigError } from './config';
+import { loadBridgeConfig, BridgeConfigError, allChannels } from './config';
 import { startBridge } from './bridge';
 import { RestDiscordOut } from './discord-out';
-import { createOutbound } from './outbound';
+import { createFanout, createOutbound } from './outbound';
 import { GatewayDiscordIn, createInbound } from './inbound';
 import { writeHealth } from './health';
 
@@ -22,14 +22,17 @@ async function main(): Promise<void> {
     throw err;
   }
   const out = RestDiscordOut.fromToken(config.discordToken);
-  await out.prepare(config.rooms.values());
+  await out.prepare(allChannels(config.rooms));
   const gateway = new GatewayDiscordIn(config.discordToken);
   const bridge = await startBridge(
     config,
     (hub, state) => {
+      const resolveMention = (channel: string, name: string) => gateway.memberId(channel, name);
+      // One fan-out for both directions: a Discord message is copied to the room's other guilds.
+      const fanout = createFanout({ rooms: config.rooms, state, out, resolveMention });
       // A failed login (bad token, missing intent) ends the process so the
       // restart policy retries it; discord.js resumes dropped sessions itself.
-      gateway.start(createInbound({ rooms: config.rooms, hub, state })).catch((err) => {
+      gateway.start(createInbound({ rooms: config.rooms, hub, state, fanout })).catch((err) => {
         console.error(`[ERROR] discord gateway: ${(err as Error).message}`);
         process.exit(1);
       });
@@ -38,7 +41,7 @@ async function main(): Promise<void> {
           state,
           out,
           fetchBoards: () => hub.mirrorBoards(),
-          resolveMention: (channel, name) => gateway.memberId(channel, name),
+          resolveMention,
         }) };
     },
     {
@@ -51,7 +54,7 @@ async function main(): Promise<void> {
       },
     },
   );
-  console.log(`[OK] discord bridge up, ${config.rooms.size} room(s), hub ${config.hubUrl}`);
+  console.log(`[OK] discord bridge up, ${config.rooms.size} room(s) in ${allChannels(config.rooms).length} channel(s), hub ${config.hubUrl}`);
   const shutdown = (): void => {
     void bridge.stop().then(() => {
       out.close();
