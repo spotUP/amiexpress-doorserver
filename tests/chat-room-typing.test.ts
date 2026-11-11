@@ -19,7 +19,7 @@ async function login(handle: string, sysop: boolean): Promise<{ sid: string; use
 const call = (method: 'get' | 'post', path: string, sid: string) => request(fx.app)[method](`/chat/v1${path}`).set('Authorization', fx.auth).set('X-Chat-Session', sid);
 
 describe('room typing', () => {
-  it('emits typing events for members, clears on "", refuses non-members, trims to 200', async () => {
+  it('emits typing events for members, keeps the latest, clears on "", refuses non-members, trims to 200', async () => {
     const owner = await login('sys', true);
     const id = (await call('post', '/rooms', owner.sid).send({ name: 'typing' })).body.id as string;
     await call('post', `/rooms/${id}/join`, owner.sid);
@@ -34,7 +34,9 @@ describe('room typing', () => {
 
     const ev = await call('get', '/events.txt?since=0&wait=0', owner.sid);
     const rows = ev.text.split('\r\n').map((l) => l.split('|')).filter((c) => c[1] === 'typing');
-    expect(rows.map((c) => c[7])).toEqual(['hello wor', '', 'x'.repeat(200)]);
+    // Typing is a state: only the latest buffer per user and room stays in the log.
+    expect(rows.map((c) => c[7])).toEqual(['x'.repeat(200)]);
     expect(rows[0].join('|')).toContain(bob.user);
   });
+
 });

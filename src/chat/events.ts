@@ -40,6 +40,9 @@ export interface NewEvent {
 }
 
 export function emitEvent(db: Database.Database, e: NewEvent): number {
+  // A typing event is a state ("this user's buffer is now X"), not history: keep only the
+  // latest per user and room, so typing noise never fills the replay window (eventsPerPoll).
+  if (e.type === 'typing') db.prepare("DELETE FROM chat_events WHERE type = 'typing' AND user = ? AND room_id IS ?").run(e.user, e.roomId ?? null);
   const res = db
     .prepare(
       `INSERT INTO chat_events (type, room_id, label, user, ref, at, text, dm_a, dm_b, board_id)
