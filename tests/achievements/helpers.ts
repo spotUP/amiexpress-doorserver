@@ -27,6 +27,7 @@ import { createApp } from '../../src/app';
 import { createBoard, _clearBoardKeyCacheForTests } from '../../src/achievements/boards';
 import { _resetRateLimitsForTests } from '../../src/achievements/ratelimit';
 import { initAchievementsDb, openAchievementsDb } from '../../src/achievements/db';
+import { _stopChatSweepersForTests } from '../../src/chat/sessions';
 import { loadSeed } from '../../src/achievements/catalog';
 import type { ServerConfig } from '../../src/config';
 import type { AchievementsConfig } from '../../src/achievements/config';
@@ -174,7 +175,10 @@ export function makeAchievementsFixture(opts: FixtureOptions = {}): Achievements
       return res.body.token as string;
     },
     openAchievements: () => new Database(achievementsDbPath),
-    cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
+    cleanup: () => {
+      _stopChatSweepersForTests(); // the sweeper belongs to this fixture's database
+      fs.rmSync(dir, { recursive: true, force: true });
+    },
   };
 }
 
