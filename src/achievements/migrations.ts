@@ -304,7 +304,7 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
     // which is how the Discord bridge speaks for many Discord users through
     // one session. discord_mirror is each board's own opt-in (sysop command
     // /discord on|off): off means the bridge never copies that board's
-    // callers to Discord. Both default off.
+    // callers to Discord. Both default off; createBoard sets discord_mirror = 1 since 2026-11-11.
     up: (db) => {
       db.exec('ALTER TABLE boards ADD COLUMN chat_relay INTEGER NOT NULL DEFAULT 0');
       db.exec('ALTER TABLE boards ADD COLUMN discord_mirror INTEGER NOT NULL DEFAULT 0');
