@@ -31,10 +31,28 @@ export function escapeDiscord(text: string): string {
  * limits them to 80 characters. A zero-width space after the first letter
  * keeps the name readable and accepted.
  */
+function escapeName(label: string): string {
+  return label.replace(/(d)(iscord)|(c)(lyde)/gi, (_m, a?: string, b?: string, c?: string, d?: string) => `${a ?? c}${ZWSP}${b ?? d}`).trim();
+}
+
 export function webhookName(label: string): string {
-  const cleaned = label.replace(/(d)(iscord)|(c)(lyde)/gi, (_m, a?: string, b?: string, c?: string, d?: string) => `${a ?? c}${ZWSP}${b ?? d}`);
-  const name = cleaned.trim().slice(0, DISCORD_NAME_LIMIT);
+  const name = escapeName(label).slice(0, DISCORD_NAME_LIMIT);
   return name || 'unknown';
+}
+
+/** Longest guild name shown in a copy's webhook name; the handle keeps the rest of the 80 characters. */
+export const GUILD_SUFFIX_MAX = 40;
+
+/**
+ * `handle (Guild name)` within the webhook name limit: the handle is cut first so the
+ * guild suffix survives; a guild name over GUILD_SUFFIX_MAX is cut too.
+ */
+export function guildLabel(handle: string, guildName: string): string {
+  const guild = escapeName(guildName).slice(0, GUILD_SUFFIX_MAX).trim();
+  if (!guild) return webhookName(handle);
+  const suffix = ` (${guild})`;
+  const head = escapeName(handle).slice(0, DISCORD_NAME_LIMIT - suffix.length).trimEnd();
+  return `${head || 'unknown'}${suffix}`;
 }
 
 export interface ReplyQuote {

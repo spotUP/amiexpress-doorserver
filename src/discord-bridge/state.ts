@@ -130,6 +130,11 @@ export class BridgeState {
     this.db.prepare('UPDATE message_map SET content = ? WHERE hub_message_id = ?').run(content, hubMessageId);
   }
 
+  /** Store the text of the webhook copies only; the source row keeps what the hub holds. */
+  setCopyContent(hubMessageId: string, content: string): void {
+    this.db.prepare('UPDATE message_map SET content = ? WHERE hub_message_id = ? AND source = 0').run(content, hubMessageId);
+  }
+
   /** Drop every twin of the hub message. */
   removeByHub(hubMessageId: string): void {
     this.db.prepare('DELETE FROM message_map WHERE hub_message_id = ?').run(hubMessageId);

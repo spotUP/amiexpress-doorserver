@@ -134,7 +134,8 @@ describe('Discord attachment copy', () => {
         attachmentUrls: [onlyUrl], attachments: [{ id: 'att3', name: 'only.png', size: small.length, url: onlyUrl }],
       });
       expect((db.prepare('SELECT COUNT(*) AS n FROM chat_files').get() as { n: number }).n).toBe(2);
-      expect((await call('get', `/rooms/${room}/history.txt`)).text).not.toContain('only.png');
+      // Attachment-only: the link is posted as the message text (the hub also keeps the file), so other servers see it.
+      expect((await call('get', `/rooms/${room}/history.txt`)).text).toContain('only.png');
 
       // A copy that fails puts the link back into the text: it is the only way to the file.
       const deadUrl = 'https://cdn.discordapp.com/attachments/1/5/gone.png?ex=1';

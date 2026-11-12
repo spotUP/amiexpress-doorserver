@@ -10,7 +10,7 @@ import { validHandle } from '../chat/sessions';
 import { CHAT_LIMITS } from '../../contract/chat-types';
 import { HubError } from './hub-client';
 import type { HubClient } from './hub-client';
-import { discordToHub, pickMember, type MentionNames } from './text';
+import { discordToHub, guildLabel, pickMember, type MentionNames } from './text';
 import type { BridgeState } from './state';
 import { roomOfChannel } from './config';
 import type { RoomChannels } from './config';
@@ -93,7 +93,7 @@ export function createInbound(deps: InboundDeps): InboundSink {
    * the author's guild so readers can tell the servers apart.
    */
   const copyText = (m: InboundMessage): string => discordToHub(m.content, m.attachmentUrls, m.mentions);
-  const copyLabel = (m: InboundMessage, handle: string): string => (m.guildName ? `${handle} (${m.guildName})` : handle);
+  const copyLabel = (m: InboundMessage, handle: string): string => (m.guildName ? guildLabel(handle, m.guildName) : handle);
 
   /** Mapped channel, not a webhook post (the bridge's own), not a bot. */
   const accepted = (m: InboundMessage): string | null => {
@@ -146,8 +146,11 @@ export function createInbound(deps: InboundDeps): InboundSink {
     async create(m) {
       const room = accepted(m);
       if (!room || deps.state.byDiscord(m.id)) return;
-      const text = discordToHub(m.content, linkedUrls(m), m.mentions);
+      const own = discordToHub(m.content, linkedUrls(m), m.mentions);
       const copies = copyable(m);
+      // Attachment-only: the links are the message, so the hub and the other servers see it.
+      const linkOnly = !own && copies.length > 0;
+      const text = linkOnly ? copyText(m) : own;
       if (!text && copies.length === 0) return;
       const handle = toHandle(m.authorName, m.authorId);
       let replyTo: string | undefined;
@@ -161,16 +164,16 @@ export function createInbound(deps: InboundDeps): InboundSink {
       });
       if (text) await post(text);
       // Multi-guild: the room's other linked channels get a webhook copy, never this channel.
-      const own = deps.state.byDiscord(m.id);
+      const posted = deps.state.byDiscord(m.id);
       const fanout = deps.fanout;
-      if (fanout && own) {
+      if (fanout && posted) {
         await guarded(`copy ${m.id} to other guilds`, () =>
-          fanout.post({ hubMessageId: own.hubMessageId, room, label: copyLabel(m, handle), text: copyText(m), replyTo }, m.channelId));
+          fanout.post({ hubMessageId: posted.hubMessageId, room, label: copyLabel(m, handle), text: copyText(m), replyTo }, m.channelId));
       }
       // Discord CDN links expire; keep a copy in the hub file store. After the text so it reads first.
       const failed: string[] = [];
       for (const a of copies) if (!(await copyAttachment(room, handle, a))) failed.push(a.url);
-      if (failed.length === 0) return;
+      if (failed.length === 0 || linkOnly) return; // link-only text already holds every URL
       // No copy: the link is the only way to the attachment, so it goes back into the text.
       const withLinks = discordToHub(m.content, [...linkedUrls(m), ...failed], m.mentions);
       const link = deps.state.byDiscord(m.id);

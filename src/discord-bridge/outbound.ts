@@ -91,31 +91,83 @@ export function createFanout(deps: FanoutDeps): Fanout {
 
   return {
     async post(m, skipChannel) {
+      const failed = new Failures();
       for (const channel of channelsOf(deps.rooms, m.room)) {
         if (channel === skipChannel) continue; // never echo to the channel it came from
         if (deps.state.byHubIn(m.hubMessageId, channel)) continue; // replayed or retried: already posted here
-        const id = await deps.out.post(channel, { username: webhookName(m.label), ...composeMessage(m.text, quoteOf(m.replyTo, channel, m.hubMessageId), resolverFor(channel)) });
-        deps.state.putLink({ hubMessageId: m.hubMessageId, discordMessageId: id, roomId: m.room, channelId: channel, createdAt: now(), authorLabel: m.label, content: m.text });
+        try {
+          const id = await deps.out.post(channel, { username: webhookName(m.label), ...composeMessage(m.text, quoteOf(m.replyTo, channel, m.hubMessageId), resolverFor(channel)) });
+          deps.state.putLink({ hubMessageId: m.hubMessageId, discordMessageId: id, roomId: m.room, channelId: channel, createdAt: now(), authorLabel: m.label, content: m.text });
+        } catch (err) {
+          failed.add(`post ${m.hubMessageId}`, channel, err); // the other servers still get their copy; a retry only redoes this channel
+        }
       }
+      failed.throwIfAny();
     },
     async edit(hubMessageId, text, replyTo, skipChannel) {
       const links = deps.state.linksOf(hubMessageId).filter((l) => !l.source && l.channelId !== skipChannel);
       if (links.length === 0) log(`[INFO] edit ${hubMessageId}: no Discord twin, skipped`);
+      const failed = new Failures();
       for (const l of links) {
         const channel = l.channelId ?? '';
-        await deps.out.edit(channel, l.discordMessageId, composeMessage(text, quoteOf(replyTo, channel, hubMessageId), resolverFor(channel)));
+        if (!channel) {
+          log(`[INFO] edit ${hubMessageId}: twin ${l.discordMessageId} has no channel (legacy row), skipped`);
+          continue;
+        }
+        try {
+          await deps.out.edit(channel, l.discordMessageId, composeMessage(text, quoteOf(replyTo, channel, hubMessageId), resolverFor(channel)));
+        } catch (err) {
+          if (isGone(err)) {
+            log(`[INFO] edit ${hubMessageId}: twin ${l.discordMessageId} in ${channel} is gone, row dropped`);
+            deps.state.removeByDiscord(l.discordMessageId);
+          } else failed.add(`edit ${hubMessageId}`, channel, err);
+        }
       }
-      deps.state.setContent(hubMessageId, text);
+      deps.state.setCopyContent(hubMessageId, text);
+      failed.throwIfAny();
     },
     async remove(hubMessageId, skipChannel) {
       const links = deps.state.linksOf(hubMessageId).filter((l) => !l.source && l.channelId !== skipChannel);
       if (links.length === 0) log(`[INFO] delete ${hubMessageId}: no Discord twin, skipped`);
+      const failed = new Failures();
       for (const l of links) {
-        await deps.out.remove(l.channelId ?? '', l.discordMessageId);
+        const channel = l.channelId ?? '';
+        if (!channel) {
+          log(`[INFO] delete ${hubMessageId}: twin ${l.discordMessageId} has no channel (legacy row), skipped`);
+          continue;
+        }
+        try {
+          await deps.out.remove(channel, l.discordMessageId);
+        } catch (err) {
+          if (!isGone(err)) {
+            failed.add(`delete ${hubMessageId}`, channel, err);
+            continue;
+          }
+          log(`[INFO] delete ${hubMessageId}: twin ${l.discordMessageId} in ${channel} was already gone`);
+        }
         deps.state.removeByDiscord(l.discordMessageId);
       }
+      failed.throwIfAny();
     },
   };
+}
+
+/** Discord answered 404 (10008 Unknown Message, 10003 Unknown Channel, 10015 Unknown Webhook): the twin no longer exists. */
+export function isGone(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { status?: unknown; code?: unknown };
+  return e.status === 404 || e.code === 10008 || e.code === 10003 || e.code === 10015;
+}
+
+/** Collects per-channel errors so one bad channel does not stop the others; throws once at the end. */
+class Failures {
+  private readonly lines: string[] = [];
+  add(what: string, channel: string, err: unknown): void {
+    this.lines.push(`${what} in ${channel}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  throwIfAny(): void {
+    if (this.lines.length > 0) throw new Error(this.lines.join('; '));
+  }
 }
 
 export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise<void> {
@@ -148,8 +200,16 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     if (ev.type !== 'message' && ev.type !== 'edit' && ev.type !== 'delete') return;
     if (channelsOf(deps.rooms, ev.room).length === 0) return;
     if (ev.type === 'message') return onMessage(ev);
-    if (fromDiscord(ev)) return; // echo guard: the edit/delete came from Discord, inbound.ts fanned it out
-    if (ev.type === 'edit') return fanout.edit(ev.ref, ev.text, ev.replyTo);
-    return fanout.remove(ev.ref);
+    // The actor's board says nothing about the author's: a BBS sysop can edit or delete a Discord-origin
+    // message. Webhook copies follow; the original in its own server is the author's and stays (the bot cannot edit it).
+    const source = deps.state.linksOf(ev.ref).find((l) => l.source);
+    if (ev.type === 'edit') {
+      // Echo of inbound.ts's own edit: the hub text equals what the source row holds, copies already follow.
+      if (fromDiscord(ev) && (!source || source.content === ev.text)) return;
+      return fanout.edit(ev.ref, ev.text, ev.replyTo);
+    }
+    if (fromDiscord(ev) && !source) return; // nothing of ours left to delete
+    await fanout.remove(ev.ref);
+    deps.state.removeByHub(ev.ref); // the hub message is gone; so are the source row and any legacy rows
   };
 }

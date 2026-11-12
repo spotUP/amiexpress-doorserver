@@ -89,10 +89,20 @@ What flows where:
   copy.
 - A server moderator who deletes a bridge copy removes it in that server
   only; the hub and the other servers keep the message.
+- A BBS sysop who edits or deletes a Discord-origin message in the hub changes
+  or removes every webhook copy. The original in its own server stays: the
+  bot cannot edit or delete another user's message.
+- One unreachable channel does not stop the others: each channel is tried,
+  a Discord 404 on an edit or delete counts as already gone (the map row is
+  dropped), and any other error is raised once at the end for the channels
+  that failed only. A retry does not post again where a copy exists.
+- A copy's webhook name is `handle (Server name)` within Discord's 80
+  characters: the handle is cut first, the server name only if it alone is
+  over 40.
 - Attachments are copied as links. Discord CDN links expire, so an old copy
   may lose its picture; the hub keeps its own file copy as before. A message
-  with attachments and no text reaches the hub as a file only and is not
-  copied to the other servers.
+  with attachments and no text is posted to the hub and to the other servers
+  as the attachment links (the hub also keeps its file copy).
 - Deleting a pre-upgrade Discord message in Discord no longer deletes its hub
   copy (the old map did not record which rows were Discord originals).
 
