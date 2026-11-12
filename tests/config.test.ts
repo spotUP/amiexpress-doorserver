@@ -76,4 +76,20 @@ describe('loadConfig', () => {
     });
     expect(cfg.adminKeys).toEqual([]);
   });
+
+  describe('chatOnly (CHAT_ONLY)', () => {
+    const base = () => ({
+      DOORSERVER_DB: path.join(tmp, 'doors.db'),
+      DOOR_ARCHIVES_ROOT: path.join(tmp, 'Archives'),
+    });
+    it('is false when unset', () => {
+      expect(loadConfig(base()).chatOnly).toBe(false);
+    });
+    it('is true only for 1', () => {
+      expect(loadConfig({ ...base(), CHAT_ONLY: '1' }).chatOnly).toBe(true);
+      expect(loadConfig({ ...base(), CHAT_ONLY: ' 1 ' }).chatOnly).toBe(true);
+      expect(loadConfig({ ...base(), CHAT_ONLY: '0' }).chatOnly).toBe(false);
+      expect(loadConfig({ ...base(), CHAT_ONLY: '' }).chatOnly).toBe(false);
+    });
+  });
 });

@@ -49,6 +49,12 @@ export interface ServerConfig {
    * /chat/v1 file routes answer 503 files_disabled.
    */
   chatFilesDir?: string | null;
+  /**
+   * CHAT_ONLY=1: run as a chat-only sidecar. The empty-catalog refusal at
+   * startup is skipped; everything else (migrations, achievements, chat) runs.
+   * Unset or any other value: false, the normal door server.
+   */
+  chatOnly?: boolean;
 }
 
 const DEFAULT_PORT = 3010;
@@ -116,5 +122,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     achievements: loadAchievementsConfig(env),
     releases: loadReleasesConfig(env),
     chatFilesDir: loadChatFilesDir(env),
+    chatOnly: env.CHAT_ONLY?.trim() === '1',
   };
 }

@@ -100,14 +100,18 @@ function main(): void {
     console.log('[INFO] releases surface disabled: RELEASES_DB is not set');
   }
 
-  let doors: number;
-  try {
-    doors = assertCatalogUsable(cfg);
-  } catch (err) {
-    for (const line of (err as Error).message.split('\n')) {
-      console.error(`[ERROR] ${line}`);
+  let doors = 0;
+  if (cfg.chatOnly) {
+    console.log('[INFO] chat-only mode: catalog check skipped');
+  } else {
+    try {
+      doors = assertCatalogUsable(cfg);
+    } catch (err) {
+      for (const line of (err as Error).message.split('\n')) {
+        console.error(`[ERROR] ${line}`);
+      }
+      process.exit(1);
     }
-    process.exit(1);
   }
 
   // Uploads land on the data volume, which is empty on a fresh host.
