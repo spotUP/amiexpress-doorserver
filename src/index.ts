@@ -3,7 +3,7 @@ import { loadConfig, ConfigError } from './config';
 import type { ServerConfig } from './config';
 import { getDoorCount, getCatalogRevision } from './catalog';
 import { openDb } from './db';
-import { runMigrations } from './migrations';
+import { prepareCatalogDb } from './migrations';
 import { bootstrapAdmins } from './auth';
 import { initAchievementsDb } from './achievements/db';
 import { initReleasesDb } from './releases/db';
@@ -52,7 +52,7 @@ function main(): void {
   try {
     const db = openDb(cfg);
     try {
-      for (const step of runMigrations(db)) console.log(`[INFO] migration ${step}`);
+      for (const step of prepareCatalogDb(db)) console.log(`[INFO] migration ${step}`);
       // DOORSERVER_ADMIN_KEYS becomes accounts: the label is the username,
       // the key is the password. An existing account is never touched.
       for (const username of bootstrapAdmins(db, cfg)) console.log(`[INFO] admin account created: ${username}`);

@@ -11,6 +11,7 @@
  * throws stops startup rather than serving a half-migrated catalog.
  */
 import type Database from 'better-sqlite3';
+import { applySchema } from './db';
 
 export interface Migration {
   version: number;
@@ -404,4 +405,20 @@ export function runMigrations(db: Database.Database, migrations: Migration[] = M
     ran.push(`${m.version}:${m.name}`);
   }
   return ran;
+}
+
+/**
+ * Bring a catalog database to the current schema, whatever state it is in:
+ * schema.sql first (it creates the tables the migrations ALTER), then every
+ * migration not yet applied. This is what server boot runs.
+ *
+ * The catalog volume this server first ran on was seeded by hand, so boot
+ * never had to create the tables, and a fresh volume (the board-local chat
+ * sidecar, CHAT_ONLY=1) failed every start with "no such table:
+ * door_catalog". Every statement in schema.sql is IF NOT EXISTS and every
+ * ALTER here is guarded by hasColumn, so a seeded catalog is left as it is.
+ */
+export function prepareCatalogDb(db: Database.Database): string[] {
+  applySchema(db);
+  return runMigrations(db);
 }

@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { openDb, applySchema } from '../src/db';
-import { runMigrations, hasColumn, MIGRATIONS, type Migration } from '../src/migrations';
+import { runMigrations, prepareCatalogDb, hasColumn, MIGRATIONS, type Migration } from '../src/migrations';
 import type { ServerConfig } from '../src/config';
 
 let dir: string;
@@ -109,6 +109,31 @@ describe('runMigrations', () => {
     ).run();
     const item = db.prepare('SELECT * FROM batch_job_items WHERE job_id = ?').get('job1');
     expect(item).toMatchObject({ job_id: 'job1', archive_name: 'FOO.LHA', status: 'pending' });
+    db.close();
+  });
+});
+
+describe('prepareCatalogDb', () => {
+  // The board-local chat sidecar starts on an EMPTY doors.db. Boot used to
+  // run only the migrations, and migration 1 ALTERs door_catalog, so every
+  // start died with "no such table: door_catalog".
+  it('brings an empty database file to the full schema', () => {
+    const dbPath = path.join(dir, 'fresh.db');
+    fs.writeFileSync(dbPath, '');
+    const db = openDb({ ...cfg, dbPath });
+    const ran = prepareCatalogDb(db);
+    expect(ran).toHaveLength(MIGRATIONS.length);
+    expect(hasColumn(db, 'door_catalog', 'requires_bbs')).toBe(true);
+    expect(hasColumn(db, 'door_catalog', 'classified_fp')).toBe(true);
+    db.close();
+  });
+
+  it('leaves a seeded catalog and its rows alone', () => {
+    const db = openDb(cfg);
+    prepareCatalogDb(db);
+    expect(prepareCatalogDb(db)).toEqual([]);
+    const row = db.prepare('SELECT name FROM door_catalog WHERE id = ?').get('id1');
+    expect(row).toEqual({ name: 'Account Editor' });
     db.close();
   });
 });
