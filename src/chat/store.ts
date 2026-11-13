@@ -1032,6 +1032,88 @@ export function discordMirrorBoards(db: Database.Database): string[] {
   return (db.prepare('SELECT id FROM boards WHERE discord_mirror = 1 AND chat_relay = 0 AND id <> ? ORDER BY id').all(CHAT_DISCORD_BOARD) as { id: string }[]).map((r) => r.id.toUpperCase());
 }
 
+// ---- Discord join: a board sysop links a Discord channel to the shared room ----
+
+export type DiscordJoinRow = { id: number; channelId: string; status: 'linked' | 'failed'; error: string };
+
+const SNOWFLAKE = /^\d{15,22}$/;
+
+/** The Discord bridge's own board (relay), the only one that may publish the application id or report link errors. */
+function requireDiscordBoard(ctx: ChatCtx): void {
+  requireSession(ctx);
+  if (ctx.boardId.toLowerCase() !== CHAT_DISCORD_BOARD.toLowerCase()) throw new SurfaceError('forbidden', 403, 'the Discord bridge only');
+}
+
+/** The invite URL for the bridge's bot; 404 bridge_not_ready until the bridge has published its application id. */
+export function discordInvite(db: Database.Database, ctx: ChatCtx): { url: string; applicationId: string } {
+  requireSession(ctx);
+  const r = db.prepare('SELECT application_id FROM discord_app WHERE id = 1').get() as { application_id: string } | undefined;
+  if (!r) throw new SurfaceError('not_found', 404, 'bridge_not_ready');
+  // permissions: View Channel, Send Messages, Manage Webhooks, Read Message History, Attach Files
+  return { applicationId: r.application_id, url: `https://discord.com/oauth2/authorize?client_id=${r.application_id}&scope=bot&permissions=629145600` };
+}
+
+/** `/discord join`: link `channelId` to the shared LiveChat room at once (no approval). 409 when already linked. */
+export function requestDiscordJoin(db: Database.Database, ctx: ChatCtx, b: Body): { id: number; status: 'linked' } {
+  requireSession(ctx);
+  if (!ctx.sysop) throw new SurfaceError('forbidden', 403, 'sysop only');
+  const channelId = typeof b.channelId === 'string' ? b.channelId.trim() : '';
+  if (!SNOWFLAKE.test(channelId)) throw new SurfaceError('bad_request', 400, 'channelId must be a Discord channel id (15 to 22 digits)');
+  const room = db.prepare('SELECT id FROM chat_rooms WHERE name_key = ?').get(CHAT_DEFAULT_ROOM_KEY) as { id: string } | undefined;
+  if (!room) throw new SurfaceError('not_found', 404, 'no shared room');
+  if (db.prepare("SELECT 1 FROM discord_links WHERE channel_id = ? AND status = 'linked'").get(channelId)) {
+    throw new SurfaceError('conflict', 409, 'channel already linked');
+  }
+  const live = (db.prepare("SELECT COUNT(*) AS n FROM discord_links WHERE board_id = ? AND status = 'linked'").get(ctx.boardId) as { n: number }).n;
+  if (live >= 5) throw new SurfaceError('conflict', 409, 'this board already has 5 linked channels');
+  // A failed row for the same channel is replaced by the new request.
+  db.prepare("DELETE FROM discord_links WHERE channel_id = ? AND status = 'failed'").run(channelId);
+  const id = Number(
+    db.prepare("INSERT INTO discord_links (room, channel_id, board_id, status, requested_by, requested_at) VALUES (?, ?, ?, 'linked', ?, ?)")
+      .run(room.id, channelId, ctx.boardId, ctx.user, nowSec()).lastInsertRowid,
+  );
+  emitEvent(db, { type: 'discord_link', user: ctx.user, ref: String(id), text: 'linked' });
+  return { id, status: 'linked' };
+}
+
+/** This board's requests, newest first. */
+export function listOwnDiscordJoins(db: Database.Database, ctx: ChatCtx): DiscordJoinRow[] {
+  requireSession(ctx);
+  if (!ctx.sysop) throw new SurfaceError('forbidden', 403, 'sysop only');
+  const rows = db.prepare('SELECT id, channel_id, status, error FROM discord_links WHERE board_id = ? ORDER BY id DESC').all(ctx.boardId) as { id: number; channel_id: string; status: 'linked' | 'failed'; error: string | null }[];
+  return rows.map((r) => ({ id: r.id, channelId: r.channel_id, status: r.status, error: r.error ?? '' }));
+}
+
+/** The bridge publishes its Discord application id at login (idempotent). */
+export function setDiscordApp(db: Database.Database, ctx: ChatCtx, b: Body): void {
+  requireDiscordBoard(ctx);
+  const id = typeof b.applicationId === 'string' ? b.applicationId.trim() : '';
+  if (!SNOWFLAKE.test(id)) throw new SurfaceError('bad_request', 400, 'applicationId must be digits');
+  db.prepare('INSERT INTO discord_app (id, application_id, at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET application_id = excluded.application_id, at = excluded.at').run(id, nowSec());
+}
+
+/** The bridge could not use a link: status failed plus the reason shown by `/discord status`. */
+export function reportDiscordLinkError(db: Database.Database, ctx: ChatCtx, id: number, b: Body): void {
+  requireDiscordBoard(ctx);
+  const error = typeof b.error === 'string' ? b.error.slice(0, 200) : '';
+  const res = db.prepare("UPDATE discord_links SET status = 'failed', error = ? WHERE id = ?").run(error, id);
+  if (res.changes === 0) throw new SurfaceError('not_found', 404, 'no such link');
+  emitEvent(db, { type: 'discord_link', user: ctx.user, ref: String(id), text: 'failed' });
+}
+
+/** Rows for links.txt: the links the bridge must run. */
+export function linkedDiscordLinks(db: Database.Database): (string | number)[][] {
+  const rows = db.prepare("SELECT id, room, channel_id, board_id FROM discord_links WHERE status = 'linked' ORDER BY id").all() as { id: number; room: string; channel_id: string; board_id: string }[];
+  return rows.map((r) => [r.id, r.room, r.channel_id, r.board_id]);
+}
+
+/** Admin unlink (`DELETE /admin/discord/links/:id`); false when there was no such link. */
+export function deleteDiscordLink(db: Database.Database, id: number): boolean {
+  const res = db.prepare('DELETE FROM discord_links WHERE id = ?').run(id);
+  if (res.changes > 0) emitEvent(db, { type: 'discord_link', user: '', ref: String(id), text: 'removed' });
+  return res.changes > 0;
+}
+
 // ---- shared canvas (/draw): art rooms only ----
 
 function canvasRoom(db: Database.Database, ctx: ChatCtx, id: string): RoomRec {

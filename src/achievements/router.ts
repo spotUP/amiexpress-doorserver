@@ -36,6 +36,7 @@ import {
 import type { IssuedCode } from './players';
 import { linkBoard, rotateLinkCode, unlinkBoard } from './links';
 import { storeEvents } from './events';
+import { deleteDiscordLink } from '../chat/store';
 import { evaluate } from './engine';
 import { registerDoorCatalog } from './doors';
 import { patchProfile, readProfile } from './profile';
@@ -176,6 +177,17 @@ export function createAchievementsRouter(
       });
     });
   }
+
+  // Unlink a Discord channel (no admin page; documented in DISCORD-BRIDGE.md).
+  admin.delete('/discord/links/:id', (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const gone = Number.isInteger(id) && withAchievementsDb(ach, (db) => db.transaction(() => deleteDiscordLink(db, id))());
+    if (!gone) {
+      res.status(404).json({ error: 'not_found', detail: 'no such link' });
+      return;
+    }
+    res.json({ ok: true });
+  });
 
   // Relay boards (the Discord bridge) speak `as` many of their own users
   // through one chat session. Only the server admin may grant that.

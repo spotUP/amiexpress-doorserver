@@ -410,4 +410,25 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
           updated_at INTEGER NOT NULL)`);
     },
   },
+  {
+    version: 17,
+    name: 'chat: discord_links (a sysop-requested Discord channel linked to the shared room) and discord_app',
+    // No approval step: a request is `linked` at once; the bridge writes
+    // `failed` plus `error` when it cannot see the channel or create a webhook.
+    // One live (linked) row per channel; a failed channel may be requested again.
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS discord_links (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          room         TEXT NOT NULL,
+          channel_id   TEXT NOT NULL,
+          board_id     TEXT NOT NULL,
+          status       TEXT NOT NULL CHECK (status IN ('linked','failed')),
+          requested_by TEXT NOT NULL,
+          requested_at INTEGER NOT NULL,
+          error        TEXT)`);
+      db.exec("CREATE UNIQUE INDEX IF NOT EXISTS discord_links_live ON discord_links(channel_id) WHERE status = 'linked'");
+      db.exec('CREATE INDEX IF NOT EXISTS discord_links_board ON discord_links(board_id)');
+      db.exec('CREATE TABLE IF NOT EXISTS discord_app (id INTEGER PRIMARY KEY CHECK (id = 1), application_id TEXT NOT NULL, at INTEGER NOT NULL)');
+    },
+  },
 ];

@@ -470,6 +470,28 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     sendText(res, renderText('DISCORD', out.rev, out.rows));
   });
 
+  router.get('/discord/invite', (req: Request, res: Response) => {
+    res.json(run(req, false, (db, ctx) => store.discordInvite(db, ctx)));
+  });
+  router.post('/discord/join', (req: Request, res: Response) => {
+    res.status(201).json(run(req, true, (db, ctx) => store.requestDiscordJoin(db, ctx, body(req))));
+  });
+  router.get('/discord/join', (req: Request, res: Response) => {
+    res.json(run(req, false, (db, ctx) => store.listOwnDiscordJoins(db, ctx)));
+  });
+  router.put('/discord/app', (req: Request, res: Response) => {
+    run(req, true, (db, ctx) => store.setDiscordApp(db, ctx, body(req)));
+    res.json({ ok: true });
+  });
+  router.post('/discord/links/:id/error', (req: Request, res: Response) => {
+    run(req, true, (db, ctx) => store.reportDiscordLinkError(db, ctx, Number(req.params.id), body(req)));
+    res.json({ ok: true });
+  });
+  router.get('/discord/links.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db) => ({ rev: headSeq(db), rows: store.linkedDiscordLinks(db) }));
+    sendText(res, renderText('DISCORD_LINKS', out.rev, out.rows));
+  });
+
   // ---- roles: the sysop of a board manages that board's roles; an admin names ?board= ----
   const roleBoard = (req: Request, ctx: ChatCtx): string => {
     requireSysop(ctx);
