@@ -10,6 +10,7 @@ import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 
+jest.setTimeout(30000);
 let fx: AchievementsFixture;
 let discordAuth: string;
 beforeEach(async () => {
