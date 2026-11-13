@@ -102,6 +102,11 @@ export class HubClient {
     return JSON.parse(out.toString('utf8')) as { id: string; sha256: string; kind: string };
   }
 
+  /** The bytes of a shared file (GET /files/:id; the bridge session has joined the room). */
+  async downloadFile(fileId: string): Promise<Buffer> {
+    return this.call('GET', `/files/${encodeURIComponent(fileId)}`);
+  }
+
   async deleteFileAs(fileId: string, as: string): Promise<void> {
     await this.call('DELETE', `/files/${encodeURIComponent(fileId)}?as=${encodeURIComponent(as)}`);
   }

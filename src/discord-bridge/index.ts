@@ -41,6 +41,7 @@ async function main(): Promise<void> {
           state,
           out,
           fetchBoards: () => hub.mirrorBoards(),
+          fetchFile: (id) => hub.downloadFile(id),
           resolveMention,
         }) };
     },

@@ -14,8 +14,15 @@ export interface WebhookBody {
   users?: readonly string[];
 }
 
+/** A file uploaded with the message (multipart), shown inline by Discord when it is a picture. */
+export interface WebhookAttachment {
+  name: string;
+  data: Buffer;
+}
+
 export interface WebhookPost extends WebhookBody {
   username: string;
+  attachment?: WebhookAttachment;
 }
 
 export interface DiscordOut {
@@ -82,6 +89,7 @@ export class RestDiscordOut implements DiscordOut {
       auth: false,
       query: new URLSearchParams({ wait: 'true' }),
       body: { username: post.username, content: post.content, allowed_mentions: allowedMentions(post.users) },
+      ...(post.attachment ? { files: [{ name: post.attachment.name, data: post.attachment.data }] } : {}),
     })) as { id: string };
     return sent.id;
   }

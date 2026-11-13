@@ -14,7 +14,7 @@ import { channelsOf } from './config';
 import type { RoomChannels } from './config';
 import { composeMessage, webhookName } from './text';
 import type { MentionResolver, ReplyQuote } from './text';
-import type { DiscordOut } from './discord-out';
+import type { DiscordOut, WebhookAttachment } from './discord-out';
 import type { BridgeState } from './state';
 import type { BridgeEvent } from './wire';
 
@@ -39,7 +39,12 @@ export interface FanoutDeps {
 export interface OutboundDeps extends FanoutDeps {
   /** GET /discord/boards.txt */
   fetchBoards: () => Promise<MirrorBoards>;
+  /** Bytes of a hub file, to upload a shared picture to Discord. Absent: pictures go as a text line. */
+  fetchFile?: (fileId: string) => Promise<Buffer>;
 }
+
+/** Discord's webhook upload limit is 25 MB on current servers; stay under the 10 MB older servers allow. */
+export const PICTURE_UPLOAD_MAX = 8 * 1024 * 1024;
 
 /** One hub message as the fan-out posts it. */
 export interface FanoutMessage {
@@ -51,6 +56,8 @@ export interface FanoutMessage {
   text: string;
   /** Hub id of the parent message, '' or undefined when not a reply. */
   replyTo?: string;
+  /** Uploaded with the post (a shared picture). */
+  attachment?: WebhookAttachment;
 }
 
 export interface Fanout {
@@ -96,7 +103,7 @@ export function createFanout(deps: FanoutDeps): Fanout {
         if (channel === skipChannel) continue; // never echo to the channel it came from
         if (deps.state.byHubIn(m.hubMessageId, channel)) continue; // replayed or retried: already posted here
         try {
-          const id = await deps.out.post(channel, { username: webhookName(m.label), ...composeMessage(m.text, quoteOf(m.replyTo, channel, m.hubMessageId), resolverFor(channel)) });
+          const id = await deps.out.post(channel, { username: webhookName(m.label), ...composeMessage(m.text, quoteOf(m.replyTo, channel, m.hubMessageId), resolverFor(channel)), ...(m.attachment ? { attachment: m.attachment } : {}) });
           deps.state.putLink({ hubMessageId: m.hubMessageId, discordMessageId: id, roomId: m.room, channelId: channel, createdAt: now(), authorLabel: m.label, content: m.text });
         } catch (err) {
           failed.add(`post ${m.hubMessageId}`, channel, err); // the other servers still get their copy; a retry only redoes this channel
@@ -192,9 +199,50 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     await fanout.post({ hubMessageId: ev.ref, room: ev.room, label: ev.label || ev.user, text: ev.text, replyTo: ev.replyTo });
   }
 
+  /** file_shared text is `name|size|kind`; the name may hold `|` only in its tail, so split from the right. */
+  function parseShared(text: string): { name: string; size: number; kind: string } {
+    const parts = text.split('|');
+    const kind = parts.pop() ?? '';
+    const size = Number(parts.pop());
+    return { name: parts.join('|'), size: Number.isFinite(size) ? size : 0, kind };
+  }
+
+  function sizeLabel(n: number): string {
+    return n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} bytes`;
+  }
+
+  /** A shared picture goes up as an attachment; any other file (or a picture too big / unreadable) as a text line with no link, the hub download needs a session. */
+  async function onFileShared(ev: BridgeEvent): Promise<void> {
+    if (fromDiscord(ev)) return; // an attachment copied in from Discord already sits in its own channel
+    if (channelsOf(deps.rooms, ev.room).every((c) => deps.state.byHubIn(ev.ref, c))) return;
+    if (!(await mirrored(boardOf(ev.user)))) return;
+    const { name, size, kind } = parseShared(ev.text);
+    const base = { hubMessageId: ev.ref, room: ev.room, label: ev.label || ev.user };
+    if (kind === 'image' && deps.fetchFile && size <= PICTURE_UPLOAD_MAX) {
+      let data: Buffer | undefined;
+      try {
+        data = await deps.fetchFile(ev.ref);
+      } catch (err) {
+        (deps.log ?? console.log)(`[INFO] file ${ev.ref}: could not read the picture (${(err as Error).message}); posting a text line`);
+      }
+      if (data) return fanout.post({ ...base, text: name, attachment: { name: name || 'picture', data } });
+    }
+    await fanout.post({ ...base, text: `shared file ${name} (${sizeLabel(size)})` });
+  }
+
   return async (ev) => {
     if (ev.type === 'discord_mirror') {
       cache = null;
+      return;
+    }
+    if (ev.type === 'file_shared') {
+      if (channelsOf(deps.rooms, ev.room).length === 0) return;
+      return onFileShared(ev);
+    }
+    if (ev.type === 'file_deleted') {
+      if (channelsOf(deps.rooms, ev.room).length === 0) return;
+      await fanout.remove(ev.ref);
+      deps.state.removeByHub(ev.ref);
       return;
     }
     if (ev.type !== 'message' && ev.type !== 'edit' && ev.type !== 'delete') return;
