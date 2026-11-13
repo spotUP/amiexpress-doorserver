@@ -30,6 +30,8 @@ export const CHAT_TEXT_FORMATS = {
   WHO: ['user', 'room', 'sysop', 'roleColor', 'idleSeconds', 'status', 'statusText', 'label'],
   /** The boards whose callers the Discord bridge may copy (discord_mirror on), upper-cased. */
   DISCORD: ['board'],
+  /** The Discord channel links the bridge must run: link id, hub room, channel id, requesting board. */
+  DISCORD_LINKS: ['id', 'room', 'channelId', 'board'],
   DM: ['threadId', 'peer', 'lastAt', 'unread'],
   PROFILE: ['user', 'nick', 'board', 'status', 'statusText', 'firstSeen', 'lastSeen', 'idleSeconds', 'online', 'sharedRooms'],
   IGNORES: ['user', 'at'],
@@ -76,6 +78,8 @@ export const CHAT_EVENT_TYPES = [
   'bbs',
   /** A board's sysop switched the Discord mirror; ref = the board id upper-cased, text = '1' on / '0' off. Seen by every session. */
   'discord_mirror',
+  /** A Discord channel link was requested (linked) or failed; ref = the link id, text = `linked` or `failed`. Seen by every session so the bridge refreshes at once. */
+  'discord_link',
   /** One edit of an art room's shared canvas; ref = the new revision, text = the ops (canvas wire encoding). Never relayed to Discord. */
   'canvas',
   /** A file finished uploading to a room; ref = the file id, text = `name|size|kind`. */
