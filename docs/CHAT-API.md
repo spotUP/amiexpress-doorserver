@@ -42,10 +42,12 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | GET | `/rooms.txt` | `?mine=1` optional; ROOMS rows |
 | GET | `/rooms` | the same as a JSON array |
 | POST | `/rooms` | `{name, topic?, visibility?, kind?}`; kind is `text` (default), `voice` or `art`; reply `{id, name, visibility, kind}` |
-| POST | `/rooms/:id/join` | reply `{id, name, topic, motd, members, ops, since}` |
-| POST | `/rooms/:id/leave` | 204 |
+| POST | `/rooms/:id/join` | reply `{id, name, topic, motd, members, ops, since, lastRead}`; membership is persistent (survives session expiry), `lastRead` is the caller's read marker |
+| POST | `/rooms/:id/leave` | 204; also ends the persistent membership (a kick, ban or room delete does too; session expiry does not) |
+| GET | `/memberships.txt` | the caller's persistent rooms, MEMBERSHIPS rows; `unread` counts top-level messages after `lastRead` |
+| PUT | `/rooms/:id/read` | `{seq}`; the marker only moves forward; reply `{lastRead}`; 403 `not_member` without a membership |
 | GET | `/rooms/:id/members.txt` | MEMBERS rows; status fields appended |
-| GET | `/rooms/:id/history.txt` | `?before=<seq>&limit=1..50` (default 20); HISTORY rows, oldest first |
+| GET | `/rooms/:id/history.txt` | `?before=<seq>&limit=1..50` (default 20), or `?after=<seq>&limit=1..500` for a catch-up read of newer rows; HISTORY rows, oldest first |
 | POST | `/rooms/:id/messages` | `{content, clientId, replyTo?, threadId?, as?}`; reply `{id, seq, at}`. `as` (relay boards only, see below) |
 | PUT | `/messages/:id` | `{content}`, author only; reply `{id, seq}` |
 | DELETE | `/messages/:id` | author, room op, owning-board sysop, role with perms, admin; 204 |
@@ -164,6 +166,7 @@ Formats and their fields, in order:
 - DM: `threadId|peer|lastAt|unread`
 - PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`
 - IGNORES: `user|at`
+- MEMBERSHIPS: `roomId|name|lastRead|unread`
 - CANVAS: `y|cells` (`y` is the canvas row 0 to 23, `cells` the row in the canvas wire encoding)
 - FILES: `id|name|size|uploader|at|label|kind|imgW|imgH` (`kind` is the sniffed type, `imgW`/`imgH` the picture's pixel size, 0 when it is not a picture)
 
@@ -258,6 +261,11 @@ spot@UPROUGH|lobby|1|11|4|away|at lunch|spot
 ```text example PROFILE
 PROFILE|1|413|1
 spot@UPROUGH|spot|UPROUGH|away|at lunch|1762400000|1762500100|42|1|room1a2b3c4d5e6f
+```
+
+```text example MEMBERSHIPS
+MEMBERSHIPS|1|413|1
+room1a2b3c4d5e6f|lobby|405|3
 ```
 
 ```text example IGNORES

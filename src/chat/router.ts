@@ -142,6 +142,13 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     run(req, true, (db, ctx) => store.leaveRoom(db, ctx, p(req, 'id')));
     res.json({ ok: true });
   });
+  router.get('/memberships.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), rows: store.listMemberships(db, ctx) }));
+    sendText(res, renderText('MEMBERSHIPS', out.rev, out.rows.map((r) => [r.roomId, r.name, r.lastRead, r.unread])));
+  });
+  router.put('/rooms/:id/read', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => store.markRead(db, ctx, p(req, 'id'), body(req))));
+  });
   router.get('/rooms/:id/members.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => {
       const cache = new Map<string, string>();

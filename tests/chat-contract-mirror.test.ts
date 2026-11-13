@@ -41,7 +41,7 @@ describe('the chat contract', () => {
 
   it('documents exactly the endpoints the contract names', () => {
     expect([...documentedEndpoints()].sort()).toEqual([...CHAT_ENDPOINTS].sort());
-    expect(CHAT_ENDPOINTS).toHaveLength(80);
+    expect(CHAT_ENDPOINTS).toHaveLength(82);
   });
 
   it('documents every error code and every event type', () => {

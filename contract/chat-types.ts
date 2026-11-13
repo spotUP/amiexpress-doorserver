@@ -33,6 +33,8 @@ export const CHAT_TEXT_FORMATS = {
   DM: ['threadId', 'peer', 'lastAt', 'unread'],
   PROFILE: ['user', 'nick', 'board', 'status', 'statusText', 'firstSeen', 'lastSeen', 'idleSeconds', 'online', 'sharedRooms'],
   IGNORES: ['user', 'at'],
+  /** The caller's persistent rooms; `lastRead` is a message seq, `unread` the top-level messages after it. */
+  MEMBERSHIPS: ['roomId', 'name', 'lastRead', 'unread'],
   /** One canvas row: `y` 0-23, `cells` in the canvas wire encoding (docs/CHAT-API.md). */
   CANVAS: ['y', 'cells'],
   /** One ready file of a room, newest first; `at` is the epoch second it was shared, `label` the uploader's board label, `kind` the sniffed type, `imgW`/`imgH` the pixel size of a picture (0 when not a picture). */
@@ -248,6 +250,8 @@ export interface JoinReply {
   members: number;
   ops: string[];
   since: number;
+  /** The caller's read marker in this room (a message seq); a first join starts at the room's newest message. */
+  lastRead: number;
 }
 
 export interface PostMessageRequest {
@@ -384,6 +388,8 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/leave',
   'GET /rooms/:id/members.txt',
   'GET /rooms/:id/history.txt',
+  'GET /memberships.txt',
+  'PUT /rooms/:id/read',
   'POST /rooms/:id/messages',
   'PUT /messages/:id',
   'DELETE /messages/:id',

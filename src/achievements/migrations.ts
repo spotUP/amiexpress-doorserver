@@ -361,4 +361,30 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS chat_files_expiry ON chat_files(status, expires_at)');
     },
   },
+  {
+    version: 14,
+    name: 'chat: chat_memberships keeps a user in a room across sessions, with a last-read marker',
+    // chat_members is per session and goes when the session expires;
+    // chat_memberships is per (user, room) and goes only on an explicit leave,
+    // a kick or ban, or when the room is deleted. last_read_seq is a chat_messages.seq.
+    // Existing members are backfilled with the room's current head so nobody
+    // starts with a pile of unread. chat_presence.auto = 1 marks the `away`
+    // the hub set itself when a user's last session expired.
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_memberships (
+          user TEXT NOT NULL COLLATE NOCASE,
+          room_id TEXT NOT NULL,
+          last_read_seq INTEGER NOT NULL DEFAULT 0,
+          joined_at INTEGER NOT NULL,
+          PRIMARY KEY (user, room_id))`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_memberships_room ON chat_memberships(room_id)');
+      db.exec(`INSERT OR IGNORE INTO chat_memberships (user, room_id, last_read_seq, joined_at)
+          SELECT m.user, m.room_id,
+                 COALESCE((SELECT MAX(seq) FROM chat_messages c WHERE c.room_id = m.room_id AND c.thread_id IS NULL), 0),
+                 MIN(m.joined_at)
+            FROM chat_members m GROUP BY m.user, m.room_id`);
+      const cols = db.prepare('PRAGMA table_info(chat_presence)').all() as { name: string }[];
+      if (!cols.some((c) => c.name === 'auto')) db.exec('ALTER TABLE chat_presence ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];

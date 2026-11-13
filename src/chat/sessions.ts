@@ -93,6 +93,8 @@ export function createSession(
     `INSERT INTO chat_sessions (sid, board_id, handle, user, sysop, client, created_at, last_seen)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(sid, boardId, handle, user, body.sysop === true ? 1 : 0, client, now, now);
+  // The hub's own `away` (last session expired) ends with the first new session.
+  db.prepare('DELETE FROM chat_presence WHERE user = ? AND auto = 1').run(user);
   // The board's first chat session ever: the conditional UPDATE is the atomic
   // claim, so only the call that changes the row announces the board.
   const first = db.prepare('UPDATE boards SET chat_first_seen_at = ? WHERE id = ? AND chat_first_seen_at IS NULL').run(now, boardId);
@@ -111,7 +113,18 @@ export function expireSession(db: Database.Database, sid: string): void {
   db.prepare('DELETE FROM chat_members WHERE sid = ?').run(sid);
   db.prepare('DELETE FROM chat_sessions WHERE sid = ?').run(sid);
   if (!db.prepare('SELECT 1 FROM chat_sessions WHERE user = ?').get(s.user)) {
-    db.prepare('DELETE FROM chat_presence WHERE user = ?').run(s.user);
+    // A user who stays a member of some room is shown away, not gone. A status the user set
+    // (busy, dnd, their own away text) survives; only the hub's own away is written here.
+    const kept = db.prepare('SELECT 1 FROM chat_memberships WHERE user = ?').get(s.user);
+    if (kept) {
+      db.prepare(
+        `INSERT INTO chat_presence (user, status, text, updated_at, auto) VALUES (?, 'away', '', ?, 1)
+         ON CONFLICT(user) DO UPDATE SET status = 'away', text = '', updated_at = excluded.updated_at, auto = 1
+         WHERE chat_presence.auto = 1`
+      ).run(s.user, nowSec());
+    } else {
+      db.prepare('DELETE FROM chat_presence WHERE user = ?').run(s.user);
+    }
   }
   for (const r of rooms) {
     const other = db.prepare('SELECT 1 FROM chat_members WHERE room_id = ? AND user = ?').get(r.room_id, s.user);

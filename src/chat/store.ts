@@ -114,14 +114,47 @@ export function joinRoom(db: Database.Database, ctx: ChatCtx, id: string): JoinR
   const first = !isMember(db, id, ctx.user);
   db.prepare('INSERT OR IGNORE INTO chat_members (room_id, sid, user, joined_at) VALUES (?, ?, ?, ?)').run(id, ctx.sid, ctx.user, nowSec());
   if (first) emitEvent(db, { type: 'joined', roomId: id, user: ctx.user });
+  db.prepare('INSERT OR IGNORE INTO chat_memberships (user, room_id, last_read_seq, joined_at) VALUES (?, ?, ?, ?)').run(ctx.user, id, roomHeadSeq(db, id), nowSec());
+  const lastRead = (db.prepare('SELECT last_read_seq AS n FROM chat_memberships WHERE user = ? AND room_id = ?').get(ctx.user, id) as { n: number }).n;
   const ops = (db.prepare('SELECT user FROM chat_room_ops WHERE room_id = ? ORDER BY user').all(id) as { user: string }[]).map((r) => r.user);
-  return { id, name: room.name, topic: room.topic, motd: room.motd, members: countMembers(db, id), ops, since: headSeq(db) };
+  return { id, name: room.name, topic: room.topic, motd: room.motd, members: countMembers(db, id), ops, since: headSeq(db), lastRead };
+}
+
+/** The newest top-level message seq of a room; 0 for an empty room. */
+function roomHeadSeq(db: Database.Database, roomId: string): number {
+  return (db.prepare('SELECT COALESCE(MAX(seq), 0) AS n FROM chat_messages WHERE room_id = ? AND thread_id IS NULL AND deleted_at IS NULL').get(roomId) as { n: number }).n;
+}
+
+/** The caller's rooms with the marker and the count of top-level messages after it. */
+export function listMemberships(db: Database.Database, ctx: ChatCtx): { roomId: string; name: string; lastRead: number; unread: number }[] {
+  requireSession(ctx);
+  const rows = db
+    .prepare(
+      `SELECT r.id AS roomId, r.name AS name, m.last_read_seq AS lastRead,
+              (SELECT COUNT(*) FROM chat_messages c WHERE c.room_id = r.id AND c.thread_id IS NULL AND c.deleted_at IS NULL AND c.seq > m.last_read_seq) AS unread
+         FROM chat_memberships m JOIN chat_rooms r ON r.id = m.room_id AND r.deleted_at IS NULL
+        WHERE m.user = ? ORDER BY r.name`
+    )
+    .all(ctx.user) as { roomId: string; name: string; lastRead: number; unread: number }[];
+  return rows;
+}
+
+/** Move the caller's read marker forward; it never moves back. Returns the stored marker. */
+export function markRead(db: Database.Database, ctx: ChatCtx, id: string, b: Body): { lastRead: number } {
+  requireSession(ctx);
+  getRoom(db, id);
+  const seq = Number(b.seq);
+  if (!Number.isInteger(seq) || seq < 0) throw new SurfaceError('bad_request', 400, 'seq must be a non-negative integer');
+  const r = db.prepare('UPDATE chat_memberships SET last_read_seq = MAX(last_read_seq, ?) WHERE user = ? AND room_id = ?').run(seq, ctx.user, id);
+  if (r.changes === 0) throw new SurfaceError('not_member', 403, 'join the room first');
+  return { lastRead: (db.prepare('SELECT last_read_seq AS n FROM chat_memberships WHERE user = ? AND room_id = ?').get(ctx.user, id) as { n: number }).n };
 }
 
 export function leaveRoom(db: Database.Database, ctx: ChatCtx, id: string): void {
   requireSession(ctx);
   getRoom(db, id);
   db.prepare('DELETE FROM chat_members WHERE room_id = ? AND sid = ?').run(id, ctx.sid);
+  db.prepare('DELETE FROM chat_memberships WHERE user = ? AND room_id = ?').run(ctx.user, id);
   if (!isMember(db, id, ctx.user)) emitEvent(db, { type: 'left', roomId: id, user: ctx.user });
 }
 
@@ -134,12 +167,18 @@ export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { 
         WHERE m.room_id = ? GROUP BY m.user ORDER BY m.user`
     )
     .all(id) as { user: string; sysop: number }[];
+  // Members whose session is not in the room (expired, or a fresh one that has not joined yet).
+  const inRoom = new Set(rows.map((r) => r.user.toLowerCase()));
+  const hasSession = (u: string): boolean => db.prepare('SELECT 1 FROM chat_sessions WHERE user = ?').get(u) !== undefined;
+  const extra = (db.prepare('SELECT user FROM chat_memberships WHERE room_id = ? ORDER BY user').all(id) as { user: string }[])
+    .filter((r) => !inRoom.has(r.user.toLowerCase()))
+    .map((r) => ({ user: r.user, sysop: 0 }));
   const pres = presenceMap(db);
-  return rows.map((r) => ({
+  return [...rows, ...extra].sort((a, b) => a.user.localeCompare(b.user)).map((r) => ({
     user: r.user,
     sysop: r.sysop === 1,
     op: isOp(db, id, r.user) || room.owner_user.toLowerCase() === r.user.toLowerCase(),
-    ...presenceFrom(pres, r.user),
+    ...(pres.get(r.user.toLowerCase()) ?? { status: inRoom.has(r.user.toLowerCase()) || hasSession(r.user) ? 'online' : 'away', statusText: '' }),
   }));
 }
 
@@ -195,8 +234,8 @@ export function setPresence(db: Database.Database, ctx: ChatCtx, b: Body): Prese
   const text = b.text === undefined ? '' : str(b, 'text', CHAT_LIMITS.statusTextMax, { empty: true });
   if (status === 'online' && text === '') return clearPresence(db, ctx);
   db.prepare(
-    `INSERT INTO chat_presence (user, status, text, updated_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(user) DO UPDATE SET status = excluded.status, text = excluded.text, updated_at = excluded.updated_at`
+    `INSERT INTO chat_presence (user, status, text, updated_at, auto) VALUES (?, ?, ?, ?, 0)
+     ON CONFLICT(user) DO UPDATE SET status = excluded.status, text = excluded.text, updated_at = excluded.updated_at, auto = 0`
   ).run(ctx.user, status, text, nowSec());
   const out = { status, statusText: text };
   emitPresence(db, ctx.user, out);
@@ -396,9 +435,20 @@ function pageArgs(q: { before?: unknown; limit?: unknown }): { before: number; l
   };
 }
 
-export function roomHistory(db: Database.Database, ctx: ChatCtx, id: string, q: { before?: unknown; limit?: unknown }): HistoryRec[] {
+export const HISTORY_AFTER_MAX = 500;
+
+export function roomHistory(db: Database.Database, ctx: ChatCtx, id: string, q: { before?: unknown; limit?: unknown; after?: unknown }): HistoryRec[] {
   const room = getRoom(db, id);
   if (room.visibility === 'private' && !ctx.admin) requireMemberOf(db, id, ctx);
+  const after = Number(q.after);
+  if (q.after !== undefined && Number.isInteger(after) && after >= 0) {
+    // Catch-up read: everything newer than the marker, oldest first.
+    const n = Number(q.limit);
+    const lim = Number.isInteger(n) && n >= 1 ? Math.min(n, HISTORY_AFTER_MAX) : CHAT_LIMITS.historyDefault;
+    return (db
+      .prepare('SELECT * FROM chat_messages WHERE room_id = ? AND thread_id IS NULL AND deleted_at IS NULL AND seq > ? ORDER BY seq ASC LIMIT ?')
+      .all(id, after, lim) as MsgRow[]).map(toHistory);
+  }
   const { before, limit } = pageArgs(q);
   const rows = db
     .prepare('SELECT * FROM chat_messages WHERE room_id = ? AND thread_id IS NULL AND deleted_at IS NULL AND seq < ? ORDER BY seq DESC LIMIT ?')
@@ -637,6 +687,7 @@ export function invite(db: Database.Database, ctx: ChatCtx, id: string, b: Body,
 }
 
 function evict(db: Database.Database, roomId: string, user: string): void {
+  db.prepare('DELETE FROM chat_memberships WHERE room_id = ? AND user = ?').run(roomId, user);
   if (db.prepare('DELETE FROM chat_members WHERE room_id = ? AND user = ?').run(roomId, user).changes > 0) {
     emitEvent(db, { type: 'left', roomId, user });
   }
@@ -781,6 +832,7 @@ export function deleteRoom(db: Database.Database, ctx: ChatCtx, id: string, file
   emitEvent(db, { type: 'room_deleted', roomId: id, user: ctx.user || 'admin', text: room.name });
   db.prepare('UPDATE chat_rooms SET deleted_at = ?, name_key = ? WHERE id = ?').run(nowSec(), `${room.name.toLowerCase()}~deleted~${id}`, id);
   db.prepare('DELETE FROM chat_members WHERE room_id = ?').run(id);
+  db.prepare('DELETE FROM chat_memberships WHERE room_id = ?').run(id);
   // The room row is only soft-deleted, so the cascade never fires: the canvas goes with the room here.
   db.prepare('DELETE FROM chat_canvas WHERE room_id = ?').run(id);
   removeRoomFiles(db, filesDir, id, ctx.user || 'admin', false);
