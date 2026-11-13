@@ -103,6 +103,12 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | GET | `/discord` | JSON `{on}`: whether the caller's board is mirrored to Discord |
 | PUT | `/discord` | `{on: true\|false}` (door `/discord on\|off`); sysop session of the board only, else `forbidden`; reply `{on}`; emits `discord_mirror` when the value changes. Default off: a board that never opted in is never copied to Discord |
 | GET | `/discord/boards.txt` | DISCORD rows: the board ids (upper-cased) whose callers the Discord bridge may copy |
+| GET | `/discord/invite` | JSON `{url, applicationId}`: the bot invite link; `not_found` until the bridge has published its application id |
+| POST | `/discord/join` | `{channelId}`; sysop session only, else `forbidden`. Links that Discord channel to the shared LiveChat room at once; 201 `{id, status}`; `conflict` (409) when the channel is already linked or the board has 5 linked channels; emits `discord_link` |
+| GET | `/discord/join` | sysop session only; JSON array `{id, channelId, status, error}` of this board's requests, newest first; `status` is `linked` or `failed` |
+| PUT | `/discord/app` | `{applicationId}`; the Discord bridge board only, else `forbidden`; reply `{ok}` |
+| POST | `/discord/links/:id/error` | `{error}`; the Discord bridge board only; marks the request `failed`; reply `{ok}` |
+| GET | `/discord/links.txt` | DISCORD_LINKS rows: the linked channels the Discord bridge mirrors |
 | GET | `/roles` | sysop session or admin; JSON array of roles |
 | POST | `/roles` | `{name, colorHex, colorAnsi, position?, perms?}` |
 | PUT | `/roles/:id` | the same body, replaces |
@@ -163,6 +169,7 @@ Formats and their fields, in order:
 - EMOJI: `name|display|ascii`
 - WHO: `user|room|sysop|roleColor|idleSeconds|status|statusText|label`
 - DISCORD: `board`
+- DISCORD_LINKS: `id|room|channelId|board`
 - DM: `threadId|peer|lastAt|unread`
 - PROFILE: `user|nick|board|status|statusText|firstSeen|lastSeen|idleSeconds|online|sharedRooms`
 - IGNORES: `user|at`
@@ -296,6 +303,11 @@ AEW
 UPROUGH
 ```
 
+```text example DISCORD_LINKS
+DISCORD_LINKS|1|413|1
+1|roomd8209269178d|1431571957366788207|AEW
+```
+
 An empty poll answers a header with count 0 and no rows:
 
 ```text example EVENTS
@@ -343,6 +355,7 @@ itself hold `!`-escaped sub-fields):
 | `presence` | room id of each room the user is in (empty when in none) | the user | empty | `status!statusText` |
 | `board_joined` | empty | empty | empty | the display name of the board that just opened its first chat session ever |
 | `discord_mirror` | empty | the sysop who switched it | the board id, upper-cased | `1` mirror on, `0` off |
+| `discord_link` | empty | the sysop who requested it (empty on admin delete) | the link id | `linked`, `failed` or `removed` |
 | `bbs` | the node id | the BBS user | the BBS event type (`user_login`, `user_logout`, `upload`, `download`, `door_activity`, `custom_door_event`, `command`, `system_notice`) | the whitelisted `data` keys, urlencoded (`location`, `duration`, `fileName`, `fileSize`, `conferenceName`, `action`, `doorName`, `eventType`, `message`, `isPersonalBest`) |
 
 A session sees: events in rooms it has joined, direct messages to or from its
