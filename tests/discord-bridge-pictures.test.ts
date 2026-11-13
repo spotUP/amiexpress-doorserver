@@ -9,7 +9,8 @@ import * as path from 'path';
 import { BridgeState } from '../src/discord-bridge/state';
 import { createOutbound, PICTURE_UPLOAD_MAX } from '../src/discord-bridge/outbound';
 import type { DiscordOut, WebhookPost } from '../src/discord-bridge/discord-out';
-import type { BridgeEvent } from '../src/discord-bridge/wire';
+import { parseEvents, decodeBody, type BridgeEvent } from '../src/discord-bridge/wire';
+import { renderText } from '../src/chat/render';
 
 const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({
   seq: 1, type: 'file_shared', room: 'r', user: 'Bob@B', ref: 'f1', at: '', roleColor: '', text: 'cat.png|2048|image', replyTo: '', label: 'Bob', ...over,
@@ -39,6 +40,19 @@ function setup(opts: { fetchFile?: (id: string) => Promise<Buffer>; boards?: str
 }
 
 describe('hub pictures to Discord', () => {
+  it('reads name, size and kind from the real EVENTS wire, where the hub escapes | to !', async () => {
+    // Regression: the hub stores `name|size|kind`, renderText escapes each | in a cell to !, so the
+    // bridge saw no `|` and posted "shared file  (0 bytes)" instead of the picture.
+    const body = decodeBody(renderText('EVENTS', 1, [[7, 'file_shared', 'r', 'Bob@B', 'f9', '', '', 'shot-1.png|74446|image', '', 'Bob']]));
+    const [wire] = parseEvents(body).events;
+    expect(wire.text).toBe('shot-1.png!74446!image');
+    const bytes = Buffer.from('PNGDATA');
+    const t = setup({ fetchFile: async () => bytes });
+    await t.handler(wire);
+    expect(t.posts[0].post.attachment).toEqual({ name: 'shot-1.png', data: bytes });
+    t.done();
+  });
+
   it('uploads a picture as an attachment to every linked channel, once per replay', async () => {
     const bytes = Buffer.from('PNGDATA');
     const t = setup({ fetchFile: async () => bytes });

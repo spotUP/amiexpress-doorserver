@@ -199,9 +199,13 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     await fanout.post({ hubMessageId: ev.ref, room: ev.room, label: ev.label || ev.user, text: ev.text, replyTo: ev.replyTo });
   }
 
-  /** file_shared text is `name|size|kind`; the name may hold `|` only in its tail, so split from the right. */
+  /**
+   * file_shared text is `name|size|kind` in the hub, but the EVENTS text wire escapes every `|` in a cell to `!`
+   * (src/text-format.ts esc), so the bridge reads `name!size!kind`. Accept both, like the C door (livechat.c shared_add).
+   * The name may itself hold `!` or `|`, so take size and kind from the right.
+   */
   function parseShared(text: string): { name: string; size: number; kind: string } {
-    const parts = text.split('|');
+    const parts = text.split(/[|!]/);
     const kind = parts.pop() ?? '';
     const size = Number(parts.pop());
     return { name: parts.join('|'), size: Number.isFinite(size) ? size : 0, kind };
