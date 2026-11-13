@@ -1050,7 +1050,7 @@ export function discordInvite(db: Database.Database, ctx: ChatCtx): { url: strin
   const r = db.prepare('SELECT application_id FROM discord_app WHERE id = 1').get() as { application_id: string } | undefined;
   if (!r) throw new SurfaceError('not_found', 404, 'bridge_not_ready');
   // permissions: View Channel, Send Messages, Manage Webhooks, Read Message History, Attach Files
-  return { applicationId: r.application_id, url: `https://discord.com/oauth2/authorize?client_id=${r.application_id}&scope=bot&permissions=629145600` };
+  return { applicationId: r.application_id, url: `https://discord.com/oauth2/authorize?client_id=${r.application_id}&scope=bot&permissions=536972288` };
 }
 
 /** `/discord join`: link `channelId` to the shared LiveChat room at once (no approval). 409 when already linked. */
