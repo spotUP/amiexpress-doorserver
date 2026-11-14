@@ -141,6 +141,7 @@ describe('hub screen commands', () => {
     type('/events doors'); expect(last()).toBe('Door activity events: OFF');
     type('/events off'); expect(last()).toBe('All BBS events disabled');
     type('/events nope'); expect(last()).toBe('Valid types: logins, files, doors, messages, announcements, on, off');
+    for (const w of ['files', 'file', 'share']) { type('/' + w); expect(last()).toBe('File sharing is not on Amiga yet.'); }
     type('/sounds'); expect(last()).toBe('Error: Usage: /sounds on|off');
     type('/sounds off'); expect(last()).toBe('Sounds disabled');
     type('/settings'); expect(last()).toBe('  BBS events: see /events');
