@@ -100,6 +100,16 @@ describe('partyline ui: wire bytes vs the C ui_cells_present', () => {
     });
   }
 
+  it('a new message rewraps only that line (per-line wrap cache)', () => {
+    const b = new Bench(80, 25, false);
+    for (let i = 0; i < 40; i++) b.say();
+    draw(b.c, b.m, b.d);
+    const before = b.d.lineWraps;
+    b.say();
+    draw(b.c, b.m, b.d);
+    expect(b.d.lineWraps - before).toBe(1);
+  });
+
   it('30 sessions in one process: memory and per-frame time', () => {
     const gc = (global as { gc?: () => void }).gc;
     gc?.();
