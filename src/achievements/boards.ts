@@ -44,11 +44,21 @@ export interface BoardRow {
   chat_relay: number;
   /** 1 = the board's sysop opted its callers into the Discord mirror. */
   discord_mirror: number;
+  /** PLP/1 login key, plpKeyOf(secret); null until the board's next verified request. */
+  plp_key: string | null;
 }
 
 /** The board a request proved it is, attached by requireBoard. */
 export interface BoardRequest extends Request {
   board?: { id: string; name: string; suspended: boolean };
+}
+
+/**
+ * The PLP/1 login key (migration 15): derived from the secret so the board can
+ * compute it and the hub can store it without storing the secret itself.
+ */
+export function plpKeyOf(secret: string): string {
+  return crypto.createHmac('sha256', secret).update('PLP/1 board key').digest('hex');
 }
 
 function newSecret(): string {
@@ -91,8 +101,8 @@ export function createBoard(
   // The column DEFAULT stays 0 from migration 11; SQLite cannot change it
   // without rebuilding the table, so the insert names the value.
   db.prepare(
-    'INSERT INTO boards (id, name, contact, key_hash, created_at, discord_mirror) VALUES (?, ?, ?, ?, ?, 1)'
-  ).run(id, name, contact, hashPassword(secret), nowSeconds());
+    'INSERT INTO boards (id, name, contact, key_hash, created_at, discord_mirror, plp_key) VALUES (?, ?, ?, ?, ?, 1, ?)'
+  ).run(id, name, contact, hashPassword(secret), nowSeconds(), plpKeyOf(secret));
   return { id, key: `${id}.${secret}` };
 }
 
@@ -184,7 +194,7 @@ export function registerBoard(
 /** A fresh secret for an existing board. The old key stops on the next request. */
 export function rotateBoardKey(db: Database.Database, id: string): { id: string; key: string } {
   const secret = newSecret();
-  const res = db.prepare('UPDATE boards SET key_hash = ? WHERE id = ?').run(hashPassword(secret), id);
+  const res = db.prepare('UPDATE boards SET key_hash = ?, plp_key = ? WHERE id = ?').run(hashPassword(secret), plpKeyOf(secret), id);
   if (res.changes === 0) {
     throw new SurfaceError('bad_request', 400, `board "${id}" does not exist`);
   }
@@ -209,7 +219,7 @@ export function setBoardRelay(db: Database.Database, id: string, relay: boolean)
 
 export function getBoard(db: Database.Database, id: string): BoardRow | null {
   const row = db
-    .prepare('SELECT id, name, contact, key_hash, created_at, suspended_at, chat_relay, discord_mirror FROM boards WHERE id = ?')
+    .prepare('SELECT id, name, contact, key_hash, created_at, suspended_at, chat_relay, discord_mirror, plp_key FROM boards WHERE id = ?')
     .get(id) as BoardRow | undefined;
   return row ?? null;
 }
@@ -217,7 +227,7 @@ export function getBoard(db: Database.Database, id: string): BoardRow | null {
 export function listBoards(db: Database.Database): BoardRow[] {
   return db
     .prepare(
-      'SELECT id, name, contact, key_hash, created_at, suspended_at, chat_relay, discord_mirror FROM boards ORDER BY id'
+      'SELECT id, name, contact, key_hash, created_at, suspended_at, chat_relay, discord_mirror, plp_key FROM boards ORDER BY id'
     )
     .all() as BoardRow[];
 }
@@ -339,6 +349,11 @@ export function requireBoard(ach: AchievementsConfig) {
         verifiedKeys.delete(presented.fingerprint);
         res.status(401).json({ error: 'unauthenticated' });
         return;
+      }
+      // Boards minted before migration 15 get their PLP/1 key on their first verified request.
+      const plpKey = plpKeyOf(presented.secret);
+      if (row.plp_key !== plpKey) {
+        withAchievementsDb(ach, (db) => db.prepare('UPDATE boards SET plp_key = ? WHERE id = ? AND key_hash = ?').run(plpKey, row.id, row.key_hash));
       }
       verifiedKeys.set(presented.fingerprint, {
         boardId: row.id,

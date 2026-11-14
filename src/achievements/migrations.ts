@@ -387,4 +387,16 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       if (!cols.some((c) => c.name === 'auto')) db.exec('ALTER TABLE chat_presence ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 15,
+    name: 'partyline: boards.plp_key holds the PLP/1 login key derived from the board secret',
+    // The scrypt hash cannot drive a challenge-response, so PLP/1 (docs/PARTYLINE-PROTOCOL.md)
+    // keys its HMAC with HMAC-SHA256(secret, "PLP/1 board key"): a leaked row lets someone
+    // log in to Partyline as that board, never call /chat/v1 or /achievements/v1 with it.
+    // NULL until the board's next verified request or key mint (src/achievements/boards.ts).
+    up: (db) => {
+      const cols = db.prepare('PRAGMA table_info(boards)').all() as { name: string }[];
+      if (!cols.some((c) => c.name === 'plp_key')) db.exec('ALTER TABLE boards ADD COLUMN plp_key TEXT');
+    },
+  },
 ];
