@@ -79,6 +79,9 @@ export class HubScreen implements PartylineScreen {
     }
   }
 
+  /** The last message number handed to a pane line (C msg_number); line_by_number looks it up. */
+  msgNumber = 0;
+
   systemLine(text: string): void { this.note(SYSTEM, text); }
   note(kind: number, text: string): void {
     this.model.addLine(newLine(kind, '', '', text));
@@ -100,6 +103,7 @@ export class HubScreen implements PartylineScreen {
     this.model.paneLabel = r.topic ? `${r.name.slice(0, 40)} - ${r.topic.slice(0, 50)}` : r.name;
     this.model.lines = [];
     this.model.linesChanged();
+    this.msgNumber = 0;
     this.cursor = Math.max(this.cursor, r.since);
     this.systemLine(`Joined #${r.name.slice(0, 40)} (${r.members} users)`);
     this.note(ACTIVITY_LINE, `Joined #${r.name.slice(0, 40)}`);
@@ -107,9 +111,9 @@ export class HubScreen implements PartylineScreen {
   }
 
   /** livechat.c send_room_line: the line goes to the store; the event brings it back on screen. */
-  sendRoomLine(text: string): void {
+  sendRoomLine(text: string, replyTo?: string): void {
     if (!this.roomId) { this.systemLine('Join a channel first: /join room'); return; }
-    this.tryRun(true, (db, ctx) => postMessage(db, ctx, this.roomId, { content: text, clientId: newId('pl') }));
+    this.tryRun(true, (db, ctx) => postMessage(db, ctx, this.roomId, { content: text, clientId: newId('pl'), ...(replyTo ? { replyTo } : {}) }));
   }
 
   /** take_events: the events this session may see since the cursor. */
@@ -135,6 +139,7 @@ export class HubScreen implements PartylineScreen {
     if (e.type === 'message' && inRoom) {
       const l = newLine(LIVE, stamp(e.at), e.user, e.text);
       l.id = e.ref;
+      l.number = ++this.msgNumber; // livechat.c msg_number: the number a user types in /reply, /react ...
       m.addLine(l);
     } else if ((e.type === 'joined' || e.type === 'left') && inRoom) {
       const joined = e.type === 'joined';
