@@ -149,6 +149,20 @@ describe('hub screen commands', () => {
     expect(last()).toBe('Shared rooms: #lab');
   });
 
+  it('emoji search, emojis categories, customemoji add list remove', () => {
+    type('/emoji lol'); expect(screen.model.lines.some((l) => l.text === 'Emojis matching "lol":')).toBe(true);
+    expect(last()).toBe('  XD  :joy: (laugh, lol)');
+    type('/emoji zzzz'); expect(last()).toBe('No emojis found for "zzzz"');
+    type('/emojis nope'); expect(last()).toBe('Unknown category "nope". Use /emojis to see all categories.');
+    type('/emojis special'); expect(last()).toBe('  [=>]  :door: (game, app)');
+    type('/customemoji'); expect(last()).toBe('No custom emoji yet.');
+    type('/customemoji add :smile: a b'); expect(last()).toBe(':smile: is a built-in emoji.');
+    type('/customemoji add Boing BOING (o)'); type('/customemoji list'); expect(last()).toBe('  boing  web BOING  telnet (o)');
+    type('/emojis special'); expect(last()).toBe('  (o)  :boing: (custom)');
+    type('/customemoji remove :boing:'); type('/customemoji list'); expect(last()).toBe('No custom emoji yet.');
+    type('/customemoji add x'); expect(last()).toBe('Usage: /customemoji add <name> <display> <ascii>');
+  });
+
   it('slash menu Tab fills the command; /quit and Ctrl-Q quit', () => {
     screen.input(Buffer.from('/nic\t'));
     expect(screen.model.input).toBe('/nick ');
