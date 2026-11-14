@@ -266,6 +266,8 @@ function drawSettings(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
 
 export const PICK_CATS = ['Emotions', 'Actions', 'Symbols', 'Special'];
 const PICK_H = 14;
+/** The C lc_hit numbers of the picker rects. */
+export const HIT_FMT = 13, HIT_FMT_CAT = 14, HIT_FMT_ITEM = 15, HIT_FMT_CLOSE = 16;
 export const pickRows = (): number => PICK_H - 4;
 export const pickList = (o: OverlayState): { code: string; face: string }[] => o.pickItems.filter((e) => e.cat === o.pickCat);
 
@@ -310,6 +312,10 @@ function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
     const e = items[k];
     c.text(top + 2 + i, ix + 2, iw - 3 <= 16 ? e.face : e.face.padEnd(16) + e.code, iw - 3);
   }
+  d.hits.add(HIT_FMT, top, left, H, w);
+  d.hits.add(HIT_FMT_CAT, top + 2, left + 2, PICK_CATS.length, catw - 2);
+  d.hits.add(HIT_FMT_ITEM, top + 2, ix + 1, Math.min(rows, items.length - o.pickTop), iw - 2);
+  d.hits.add(HIT_FMT_CLOSE, top + 1, left + w - 5, 1, 3);
   c.pen(p.alert, DEFAULT, 0);
   c.text(top + 1, left + w - 5, '[X]', 3);
   c.pen(p.ink, DEFAULT, 0);

@@ -170,6 +170,29 @@ describe('hub screen commands', () => {
     type('/emoji '); expect(o.fmt).toBe(true);
   });
 
+  it('emoji picker mouse: category click, item click selects then inserts, [X] closes, wheel scrolls, outside click closes', () => {
+    const o = screen.over;
+    const click = (id: number, dr = 0, x = 0): void => {
+      const r = screen.drawState.hits.r.find((h) => h.id === id)!;
+      screen.input(Buffer.from(`\x1b[<${x};${r.left + 1};${r.top + dr + 1}M\x1b[<${x};${r.left + 1};${r.top + dr + 1}m`, 'latin1'));
+      screen.render(true);
+    };
+    screen.model.input = ''; screen.model.inputCur = 0;
+    screen.key(5); screen.render(true);
+    click(14, 2); expect(o.pickCat).toBe(2); expect(o.pickPane).toBe(0);
+    click(14, 2); expect(o.pickPane).toBe(1); // a second click on the category enters it
+    click(14, 0); expect(o.pickCat).toBe(0);
+    click(15, 1); expect(o.pickItem).toBe(1); expect(o.fmt).toBe(true); // first click selects
+    click(15, 1); expect(o.fmt).toBe(false); // a click on the selected row inserts and closes
+    expect(screen.model.input).toMatch(/^:\w+: $/);
+    screen.key(5); screen.render(true); click(16); expect(o.fmt).toBe(false); expect(screen.model.input).toMatch(/^:\w+: $/);
+    screen.key(5); screen.render(true);
+    const at = screen.model.scroll;
+    screen.input(Buffer.from('\x1b[<64;5;5M', 'latin1')); expect(screen.model.scroll).toBe(at + 3);
+    screen.input(Buffer.from('\x1b[<65;5;5M', 'latin1')); expect(screen.model.scroll).toBe(at);
+    screen.input(Buffer.from('\x1b[<0;1;1M', 'latin1')); expect(o.fmt).toBe(false); // left press outside
+  });
+
   it('emoji search, emojis categories, customemoji add list remove', () => {
     type('/emoji lol'); expect(screen.model.lines.some((l) => l.text === 'Emojis matching "lol":')).toBe(true);
     expect(last()).toBe('  XD  :joy: (laugh, lol)');
