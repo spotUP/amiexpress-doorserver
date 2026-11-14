@@ -39,6 +39,8 @@ export interface ScreenInfo {
   hello: PlpHello;
   /** Call when the model changed; the session coalesces and flushes. */
   markDirty: () => void;
+  /** /quit: end the connection the way a BYE does (no resume). */
+  quit?: () => void;
 }
 export type ScreenFactory = (info: ScreenInfo) => PartylineScreen;
 
@@ -211,7 +213,7 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty() });
+    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit') });
     this.markDirty(true);
   }
 
