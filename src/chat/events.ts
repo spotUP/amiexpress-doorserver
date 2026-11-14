@@ -108,6 +108,14 @@ interface Waiter {
 
 const waiters = new Map<string, Waiter>();
 let wakePending = false;
+/** In-process readers (Partyline screens): told after each commit, like a held poll, and fetch themselves. */
+const listeners = new Set<() => void>();
+
+/** Call fn after every committed batch of events; returns the unsubscribe. */
+export function onEvents(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
+}
 
 export function heldPollCount(): number {
   return waiters.size;
@@ -124,6 +132,7 @@ function scheduleWake(): void {
   setImmediate(() => {
     wakePending = false;
     wakeAll();
+    for (const fn of [...listeners]) fn();
   });
 }
 
