@@ -85,6 +85,21 @@ describe('hub screen commands', () => {
     type('/unignore carol'); expect(last()).toBe('You are not ignoring carol.');
   });
 
+  it('moderation, invite, mode, motd, whois, msg, create, delete', () => {
+    type('/kick'); expect(last()).toBe('Error: Usage: /kick @user [reason]');
+    type('/create #lounge'); expect(screen.model.room).toBe('lounge');
+    type('/motd'); expect(last()).toBe('No MOTD set. Use /motd <text> to set, /motd --clear to clear.');
+    type('/motd hello all'); type('/motd'); expect(last()).toBe('[MOTD] hello all');
+    type('/mode x'); expect(last()).toBe('Error: Mode string must start with + or -');
+    const n = screen.model.lines.length; type('/mode +m'); expect(screen.model.lines.length).toBe(n);
+    type('/invite'); expect(last()).toBe('Error: Usage: /invite @user [#room]');
+    type('/whois'); expect(last()).toBe('Error: Usage: /whois @user');
+    type('/whois @nobody'); expect(last()).toBe('User nobody is not online.');
+    type('/msg hi'); expect(last()).toBe('Usage: /msg @user [@user2 ...] message');
+    type('/delete #lounge'); expect(last()).toBe('Deleted #lounge');
+    expect(screen.model.room).toBe('');
+  });
+
   it('slash menu Tab fills the command; /quit and Ctrl-Q quit', () => {
     screen.input(Buffer.from('/nic\t'));
     expect(screen.model.input).toBe('/nick ');
