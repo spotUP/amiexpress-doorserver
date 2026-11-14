@@ -22,7 +22,7 @@ import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState } from './draw';
 import { ACTIVITY_LINE, FOCUS_INPUT, HISTORY, LIVE, Model, newLine, SYSTEM, TEXT_MAX } from './model';
-import { MODAL_NONE, MODAL_QUIT, OverlayState, pickList, pickMove } from './overlays';
+import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, OverlayState, PICK_CATS, pickList, pickMove } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
 
@@ -189,6 +189,10 @@ export class HubScreen implements PartylineScreen {
     for (const b of bytes) {
       if (this.esc !== '') {
         this.esc += String.fromCharCode(b);
+        if (this.esc.startsWith('\x1b[<')) { // SGR mouse report ESC [ < button ; col ; row M|m
+          if (b === 0x4d || b === 0x6d) { const e = this.esc; this.esc = ''; this.mouse(e, b === 0x4d); } else if (this.esc.length > 24) this.esc = '';
+          continue;
+        }
         const k = KEY_SEQ[this.esc];
         if (k !== undefined) { this.esc = ''; this.key(k); } else if (this.esc.length >= 4 || (this.esc.length >= 2 && this.esc[1] !== '[' && this.esc[1] !== 'O')) {
           // shortcut: an unknown sequence is dropped whole; a lone Esc is seen only when the next byte is not '['.
@@ -260,13 +264,40 @@ export class HubScreen implements PartylineScreen {
     else if (k === K_ESC) o.fmt = false;
     else if (k === K_ENTER) {
       if (o.pickPane === 0) { o.pickPane = 1; return; }
-      o.fmt = false;
-      const e = pickList(o)[o.pickItem];
-      if (!e) return;
-      if (m.input.length + e.code.length + 1 >= TEXT_MAX) { this.systemLine('The emoji does not fit the input'); return; }
-      m.input = `${m.input}${e.code} `;
-      m.inputCur = m.input.length;
+      this.pickApply();
     }
+  }
+
+  /** emoji_apply: close the picker and append the selected code and a space to the input. */
+  private pickApply(): void {
+    const m = this.model, o = this.over;
+    o.fmt = false;
+    const e = pickList(o)[o.pickItem];
+    if (!e) return;
+    if (m.input.length + e.code.length + 1 >= TEXT_MAX) { this.systemLine('The emoji does not fit the input'); return; }
+    m.input = `${m.input}${e.code} `;
+    m.inputCur = m.input.length;
+  }
+
+  /** The mouse (livechat.c): a wheel step moves the chat three lines; with the picker on top a left press selects, a press on the
+   *  selected row or category enters it, [X] closes, and a left press outside closes. Releases and motion carry nothing. */
+  private mouse(seq: string, press: boolean): void {
+    const f = /^\x1b\[<(\d+);(\d+);(\d+)$/.exec(seq.slice(0, -1));
+    if (!f) return;
+    const b = Number(f[1]), m = this.model, o = this.over;
+    if (b >= 64) { if (b < 66) m.scroll = Math.max(0, m.scroll + (b === 64 ? 3 : -3)); return; }
+    if (!press || b >= 32 || !o.fmt) return;
+    const h = this.drawState.hits.at(Number(f[3]) - 1, Number(f[2]) - 1), button = b & 3;
+    if (h.id === HIT_FMT_CLOSE) { o.fmt = false; return; }
+    if (h.id === HIT_FMT_CAT && h.dr < PICK_CATS.length) {
+      if (h.dr === o.pickCat) { o.pickPane = 1; return; }
+      o.pickPane = 0; pickMove(o, h.dr - o.pickCat);
+    } else if (h.id === HIT_FMT_ITEM) {
+      const item = h.dr + o.pickTop;
+      if (item >= pickList(o).length) return;
+      if (o.pickPane === 1 && item === o.pickItem) { this.pickApply(); return; }
+      o.pickPane = 1; pickMove(o, item - o.pickItem);
+    } else if (h.id !== HIT_FMT && button === 0) o.fmt = false;
   }
 
   /** slash_key: true when the "/" menu used the key. */
