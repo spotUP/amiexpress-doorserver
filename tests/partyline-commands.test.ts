@@ -12,6 +12,8 @@ import { createRoom, joinRoom, postMessage } from '../src/chat/store';
 import { canonical } from '../src/partyline/commands';
 import { cellFg, cellBg, cellFlags, BG_DEFAULT } from '../src/partyline/ui/cells';
 import { chatScreen } from '../src/partyline/ui/screen';
+import { MENU_COL } from '../src/partyline/ui/draw';
+import { FOCUS_INPUT, FOCUS_MENU, LIVE, SIDE_HEAD, SIDE_ROOM, SIDE_USER, newLine, newSide } from '../src/partyline/ui/model';
 import type { HubScreen } from '../src/partyline/ui/screen';
 import type { ScreenInfo } from '../src/partyline/session';
 
@@ -213,10 +215,66 @@ describe('hub screen commands', () => {
     expect(screen.model.input).toMatch(/^:\w+: $/);
     screen.key(5); screen.render(true); click(16); expect(o.fmt).toBe(false); expect(screen.model.input).toMatch(/^:\w+: $/);
     screen.key(5); screen.render(true);
+    for (let i = 0; i < 80; i++) screen.model.addLine(newLine(LIVE, '', 'bob', `line ${i}`)); // the wheel clamps to the scrollbar span
+    screen.render(true);
     const at = screen.model.scroll;
-    screen.input(Buffer.from('\x1b[<64;5;5M', 'latin1')); expect(screen.model.scroll).toBe(at + 3);
-    screen.input(Buffer.from('\x1b[<65;5;5M', 'latin1')); expect(screen.model.scroll).toBe(at);
+    screen.input(Buffer.from('\x1b[<64;40;5M', 'latin1')); expect(screen.model.scroll).toBe(at + 3);
+    screen.input(Buffer.from('\x1b[<65;40;5M', 'latin1')); expect(screen.model.scroll).toBe(at);
     screen.input(Buffer.from('\x1b[<0;1;1M', 'latin1')); expect(o.fmt).toBe(false); // left press outside
+  });
+
+  describe('mouse (livechat.c handle_mouse)', () => {
+    const sgr = (b: number, x: number, y: number, end = 'M'): void => { screen.input(Buffer.from(`\x1b[<${b};${x + 1};${y + 1}${end}`, 'latin1')); screen.render(true); };
+    const press = (x: number, y: number): void => sgr(0, x, y);
+    const fill = (): void => { for (let i = 0; i < 80; i++) screen.model.addLine(newLine(LIVE, '', 'bob', `line ${i}`)); screen.render(true); };
+    const bar = (): { top: number; left: number; rows: number } => screen.drawState.hits.r.find((h) => h.id === 12)!;
+
+    it('menu bar: a label press opens that menu on its first item; a press elsewhere closes it', () => {
+      screen.render(true);
+      press(MENU_COL[2], 0);
+      expect(screen.model.menu).toBe(2); expect(screen.model.menuSel).toBe(0); expect(screen.model.focus).toBe(FOCUS_MENU);
+      screen.render(true); press(MENU_COL[1], 0); expect(screen.model.menu).toBe(1);
+      press(40, 10); expect(screen.model.menu).toBe(-1); expect(screen.model.focus).toBe(FOCUS_INPUT);
+    });
+
+    it('dropdown: an item press closes the menu and runs it (Toggle Sidebar, Keyboard Shortcuts)', () => {
+      screen.render(true);
+      press(MENU_COL[2], 0); screen.render(true);
+      const dd = screen.drawState.hits.r.find((h) => h.id === 2)!;
+      press(dd.left, dd.top + 2);
+      expect(screen.model.menu).toBe(-1); expect(screen.model.sidebarHidden).toBe(true);
+      press(0, 24); expect(screen.model.sidebarHidden).toBe(false); // the status line shows the sidebar again
+      press(MENU_COL[3], 0); screen.render(true);
+      const d2 = screen.drawState.hits.r.find((h) => h.id === 2)!;
+      press(d2.left, d2.top + 1);
+      expect(screen.over.help).toBe(true);
+    });
+
+    it('sidebar: a press selects an entry, a heading is ignored, the wheel steps the selection by two', () => {
+      const m = screen.model;
+      m.side = [newSide(SIDE_HEAD, false, 'CHANNELS'), newSide(SIDE_ROOM, true, 'a'), newSide(SIDE_ROOM, false, 'b'), newSide(SIDE_USER, false, 'c'), newSide(SIDE_ROOM, false, 'd')];
+      m.sideSel = 1; screen.render(true);
+      const sb = screen.drawState.hits.r.find((h) => h.id === 3)!;
+      press(sb.left, sb.top + 2); expect(m.sideSel).toBe(2);
+      press(sb.left, sb.top); expect(m.sideSel).toBe(2);
+      sgr(65, sb.left, sb.top, 'M'); expect(m.sideSel).toBe(4);
+      sgr(64, sb.left, sb.top, 'M'); expect(m.sideSel).toBe(2);
+      const at = m.scroll; fill();
+      sgr(64, sb.left, sb.top, 'M'); expect(m.scroll).toBe(at); // over the sidebar the wheel does not scroll the chat
+    });
+
+    it('scrollbar: a press jumps the thumb, a held drag follows the pointer, a release ends it, the wheel clamps', () => {
+      fill();
+      const b = bar(), d = screen.drawState, m = screen.model;
+      press(b.left, b.top); expect(m.scroll).toBe(d.barSpan);
+      press(b.left, b.top + b.rows - 1); expect(m.scroll).toBe(0);
+      press(b.left, b.top); sgr(32, b.left, b.top + b.rows - 1); expect(m.scroll).toBe(0); // motion with the button held drags
+      sgr(32, b.left, b.top); expect(m.scroll).toBe(d.barSpan);
+      sgr(0, b.left, b.top + b.rows - 1, 'm'); sgr(32, b.left, b.top); expect(m.scroll).toBe(d.barSpan);
+      sgr(35, b.left, b.top + b.rows - 1); expect(m.scroll).toBe(d.barSpan); // plain motion carries nothing
+      sgr(64, 40, 5); expect(m.scroll).toBe(d.barSpan); // clamped at the top
+      sgr(65, 40, 5); expect(m.scroll).toBe(d.barSpan - 3);
+    });
   });
 
   it('emoji search, emojis categories, customemoji add list remove', () => {

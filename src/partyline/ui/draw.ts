@@ -20,7 +20,7 @@ export const MENU_ITEMS: ReadonlyArray<readonly string[]> = [
   ['Settings (Ctrl+S)', 'Theme', 'Toggle Sidebar', 'Clear Chat'],
   ['About', 'Keyboard Shortcuts', 'Quit (Ctrl+Q)'],
 ];
-const MENU_LABELS = ['Chat v4.0.0', 'Tools', 'View', 'Help'];
+export const MENU_LABELS = ['Chat v4.0.0', 'Tools', 'View', 'Help'];
 
 export class DrawState {
   hits = new Hits();
@@ -30,6 +30,13 @@ export class DrawState {
   chatRowLine = new Int16Array(CHAT_ROWS_MAX).fill(-1);
   barBody = 0; barRows = 0; barThumb = 0; barSpan = 0;
   rewraps = 0;
+  /** lc_scroll_at: the scroll (rows from the bottom) that puts the thumb under a pointer row; -1 with no scrollbar. */
+  scrollAt(row: number): number {
+    if (this.barRows <= 0) return -1;
+    const track = this.barRows - this.barThumb;
+    const pos = Math.max(0, Math.min(track, row - this.barBody - Math.trunc(this.barThumb / 2)));
+    return track > 0 ? this.barSpan - Math.trunc((pos * this.barSpan + track - 1) / track) : 0;
+  }
   /** Lines actually rewrapped (the per-line cache misses). */
   lineWraps = 0;
   private perLine = new WeakMap<Line, { t: string; n: number }>();
