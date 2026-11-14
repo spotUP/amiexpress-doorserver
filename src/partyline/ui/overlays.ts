@@ -316,7 +316,7 @@ function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
   d.hits.add(HIT_FMT_CAT, top + 2, left + 2, PICK_CATS.length, catw - 2);
   d.hits.add(HIT_FMT_ITEM, top + 2, ix + 1, Math.min(rows, items.length - o.pickTop), iw - 2);
   d.hits.add(HIT_FMT_CLOSE, top + 1, left + w - 5, 1, 3);
-  c.pen(p.alert, DEFAULT, 0);
+  c.pen(p.alert, 0, 0); // the close button is red on black, as in draw_fmt
   c.text(top + 1, left + w - 5, '[X]', 3);
   c.pen(p.ink, DEFAULT, 0);
 }

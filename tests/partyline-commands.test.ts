@@ -9,6 +9,7 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, joinRoom, postMessage } from '../src/chat/store';
 import { canonical } from '../src/partyline/commands';
+import { cellFg, cellBg, cellFlags, BG_DEFAULT } from '../src/partyline/ui/cells';
 import { chatScreen } from '../src/partyline/ui/screen';
 import type { HubScreen } from '../src/partyline/ui/screen';
 import type { ScreenInfo } from '../src/partyline/session';
@@ -175,6 +176,23 @@ describe('hub screen commands', () => {
     (screen.info.hello as { mouse: boolean }).mouse = true;
     expect(screen.render(true).toString('latin1')).toContain('\x1b[?1000h\x1b[?1006h');
     expect(screen.render(false).toString('latin1')).not.toContain('\x1b[?1006h');
+  });
+
+  it('emoji picker colours follow draw_fmt: selected category ground on ok, selected item ground on accent, [X] red on black', () => {
+    const pal = screen.model.pal;
+    screen.model.input = ''; screen.model.inputCur = 0;
+    screen.key(5); screen.render(true);
+    const cell = (id: number): number => {
+      const r = screen.drawState.hits.r.find((h) => h.id === id)!;
+      return screen.cells.back[r.top * screen.cells.cols + r.left];
+    };
+    const cat = cell(14), item = cell(15), close = cell(16);
+    expect([cellFg(cat), cellBg(cat)]).toEqual([pal.barInk, pal.ok]);
+    expect([cellFg(item), cellBg(item)]).toEqual([pal.barInk, pal.accent]);
+    expect(cellFg(close)).toBe(pal.alert);
+    expect(cellBg(close)).toBe(0);
+    expect(cellFlags(close) & BG_DEFAULT).toBe(0);
+    screen.key(1007);
   });
 
   it('emoji picker mouse: category click, item click selects then inserts, [X] closes, wheel scrolls, outside click closes', () => {
