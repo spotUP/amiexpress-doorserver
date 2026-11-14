@@ -44,6 +44,7 @@ describe('hub screen commands', () => {
   const type = (line: string): string[] => {
     const before = screen.model.lines.length;
     screen.input(Buffer.from(`${line}\r`, 'latin1'));
+    screen.take(); // the store event reaches the pane through the emitter, which a test does not wait for
     return screen.model.lines.slice(Math.max(0, before - 1)).map((l) => l.text);
   };
   const last = (): string => screen.model.lines[screen.model.lines.length - 1]?.text ?? '';
@@ -98,6 +99,28 @@ describe('hub screen commands', () => {
     type('/msg hi'); expect(last()).toBe('Usage: /msg @user [@user2 ...] message');
     type('/delete #lounge'); expect(last()).toBe('Deleted #lounge');
     expect(screen.model.room).toBe('');
+  });
+
+  it('message commands map the line number to the stored message', () => {
+    screen.run(true, (db, ctx) => createRoom(db, ctx, { name: 'general' }));
+    type('/join #general');
+    type('/reply hi'); expect(last()).toBe('No message to reply to: name one with its id.');
+    type('/react 9 +1'); expect(last()).toBe('No such message number.');
+    type('first line');
+    const lines = (): string[] => screen.model.lines.filter((l) => l.number > 0).map((l) => `${l.number}:${l.text}`);
+    expect(lines()).toEqual(['1:first line']);
+    type('/edit 1 changed'); expect(lines()).toEqual(['1:changed']);
+    type('/edit better'); expect(lines()).toEqual(['1:better']);
+    type('/reply 1 answer'); expect(lines()).toEqual(['1:better', '2:answer']);
+    type('/love 1'); type('/react 1 fire'); type('/reactions 1'); expect(last()).toMatch(/^Reactions on 1: (\[heart 1\] \[fire 1\]|\[fire 1\] \[heart 1\])$/);
+    type('/unreact fire 1'); type('/reactions 1'); expect(last()).toBe('Reactions on 1: [heart 1]');
+    type('/thread 1'); expect(last()).toMatch(/: better$/); // threadHistory leads with the parent message
+    type('/pin 1'); expect(last()).toBe('Pin requested.');
+    type('/pinned'); expect(last()).toMatch(/^1\. bob.*: better/);
+    type('/search better'); expect(last()).toBe('Found 1 results for "better"');
+    type('/unpin 1'); type('/pinned'); expect(last()).toBe('No pinned messages in this room.');
+    type('/deletemsg 1'); expect(lines()).toEqual(['2:answer']);
+    type('/deletemsg'); expect(lines()).toEqual([]);
   });
 
   it('slash menu Tab fills the command; /quit and Ctrl-Q quit', () => {

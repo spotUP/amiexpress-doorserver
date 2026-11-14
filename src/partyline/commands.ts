@@ -8,9 +8,10 @@
  * table lists as aliases (users, channels, +1, -1, heart, fire): C_ALIAS and
  * C_DROP keep run_command's behaviour on both sides.
  */
-import { addIgnore, clearPresence, createRoom, deleteRoom, invite, leaveRoom, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
+import { addIgnore, clearPresence, createRoom, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
 import { CMD_HELP } from './ui/slash';
+import { stamp } from './ui/screen';
 import type { HubScreen } from './ui/screen';
 
 const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg' };
@@ -218,6 +219,131 @@ function deleteChannelTyped(s: HubScreen, rest: string): void {
   }
 }
 
+// ---- message commands: the number on a pane line maps to the stored message id (C line_by_number) ----
+const digits = (a: string): boolean => /^\d+$/.test(a);
+const lineByNumber = (s: HubScreen, n: number) => (n > 0 ? s.model.lines.find((l) => l.number === n) : undefined);
+/** Pane nicks are store users (handle@BOARD), which is ctx.user, not the screen's handle. */
+const ownLast = (s: HubScreen) => {
+  const me = s.tryRun(false, (_db, ctx) => ctx.user);
+  return [...s.model.lines].reverse().find((l) => l.number > 0 && l.id !== '' && l.nick === me);
+};
+const roomLast = (s: HubScreen) => [...s.model.lines].reverse().find((l) => l.number > 0 && l.id !== '');
+
+/** typed_message: a message number to its line, or the "No such message number." line. */
+function typedMessage(s: HubScreen, a: string) {
+  const l = lineByNumber(s, parseInt(a, 10));
+  if (!l || l.id === '') s.systemLine('No such message number.');
+  return l && l.id !== '' ? l : undefined;
+}
+
+/** edit_typed: /edit [msg-id] new text; an id counts only with two or more words. */
+function editTyped(s: HubScreen, rest: string): void {
+  if (rest === '') { usage(s, '/edit [msg-id] new text'); return; }
+  const a = firstWord(rest);
+  let text = rest, l;
+  if (digits(a) && afterWord(rest) !== '') { l = typedMessage(s, a); if (!l) return; text = afterWord(rest); }
+  else if (!(l = ownLast(s))) { s.systemLine('No message to edit: name one with its id, or send a line first.'); return; }
+  const id = l.id;
+  s.tryRun(true, (db, ctx) => editMessage(db, ctx, id, { content: text }));
+}
+
+/** reply_typed: /reply [msg-id] text (alias r), /thread msg-id text (alias t); both send a reply line. */
+function replyTyped(s: HubScreen, rest: string, thread: boolean): void {
+  const a = firstWord(rest), text0 = afterWord(rest);
+  if (thread && digits(a) && text0 === '') { // an id alone opens the thread view
+    const l = typedMessage(s, a);
+    if (!l) return;
+    const rows = s.tryRun(false, (db, ctx) => threadHistory(db, ctx, l.id));
+    if (!rows) return;
+    s.systemLine(rows.length === 0 ? 'No replies in this thread.' : `Thread (${rows.length}):`);
+    for (const r of rows) s.systemLine(`${r.user.slice(0, 24)}: ${r.text.slice(0, 190)}`);
+    return;
+  }
+  if (thread && (a === '' || text0 === '')) { usage(s, '/thread <msg-id> message'); return; }
+  if (rest === '') { usage(s, '/reply [msg-id] message'); return; }
+  let text = rest, l;
+  if (digits(a) && text0 !== '') { l = typedMessage(s, a); if (!l) return; text = text0; }
+  else if (thread) { usage(s, '/thread <msg-id> message'); return; }
+  else if (!(l = roomLast(s))) { s.systemLine('No message to reply to: name one with its id.'); return; }
+  if (!s.roomId) { s.systemLine('Join a room first.'); return; }
+  s.sendRoomLine(text, l.id);
+}
+
+/** delete_typed: /deletemsg [msg-id]. */
+function deleteMsgTyped(s: HubScreen, rest: string): void {
+  const a = firstWord(rest);
+  if (a !== '' && !digits(a)) { usage(s, '/deletemsg [msg-id]'); return; }
+  const l = a !== '' ? typedMessage(s, a) : ownLast(s);
+  if (!l) { if (a === '') s.systemLine('No message to delete: name one with its id, or send a line first.'); return; }
+  const id = l.id;
+  s.tryRun(true, (db, ctx) => { deleteMessage(db, ctx, id); return true; });
+}
+
+/** react (/react n emoji), love, thumbsup, unreact [emoji] n: react_typed and the run_command react branch. */
+function reactTyped(s: HubScreen, cmd: string, rest: string): void {
+  const a = firstWord(rest);
+  if (cmd === 'react') {
+    const l = typedMessage(s, a);
+    if (!l) return;
+    const emoji = afterWord(rest);
+    if (emoji === '') { s.systemLine('Usage: /react n emoji'); return; }
+    s.tryRun(true, (db, ctx) => react(db, ctx, l.id, { emoji }));
+    return;
+  }
+  if (cmd === 'unreact') {
+    const b = firstWord(afterWord(rest));
+    if (b === '') { usage(s, '/unreact [emoji] <msg-id>'); return; }
+    const l = typedMessage(s, b);
+    if (l) s.tryRun(true, (db, ctx) => unreact(db, ctx, l.id, a !== '' ? a : '+1'));
+    return;
+  }
+  if (a === '') { usage(s, cmd === 'love' ? '/love <msg-id>' : '/thumbsup <msg-id>'); return; }
+  const l = typedMessage(s, a);
+  if (l) s.tryRun(true, (db, ctx) => react(db, ctx, l.id, { emoji: cmd === 'love' ? 'heart' : '+1' }));
+}
+
+/** reactions_typed: `Reactions on N: [emoji n] ...` or `No reactions on N`. */
+function reactionsTyped(s: HubScreen, rest: string): void {
+  const a = firstWord(rest);
+  if (a === '') { usage(s, '/reactions <msg-id>'); return; }
+  const l = typedMessage(s, a);
+  if (!l) return;
+  const rows = s.tryRun(false, (db, ctx) => reactionRows(db, ctx, l.id));
+  if (!rows) return;
+  const shown = rows.filter((r) => r.count > 0).map((r) => ` [${r.emoji.slice(0, 12)} ${r.count}]`).join('');
+  s.systemLine(shown === '' ? `No reactions on ${a.slice(0, 12)}` : `Reactions on ${a.slice(0, 12)}:${shown}`);
+}
+
+/** pin_typed: a message number, else the raw id. The store checks the level. */
+function pinTyped(s: HubScreen, on: boolean, rest: string): void {
+  const a = firstWord(rest);
+  if (a === '' || afterWord(rest) !== '') { usage(s, on ? '/pin <msg-id>' : '/unpin <msg-id>'); return; }
+  if (!s.roomId) { s.systemLine('Join a room first.'); return; }
+  const id = (digits(a) ? lineByNumber(s, parseInt(a, 10))?.id : '') || a, room = s.roomId;
+  if (s.tryRun(true, (db, ctx) => { pin(db, ctx, room, { messageId: id }, on, id); return true; })) s.systemLine(on ? 'Pin requested.' : 'Unpin requested.');
+}
+
+/** pinned_typed: up to 8 pins, as lines instead of C's view window. */
+function pinnedTyped(s: HubScreen): void {
+  if (!s.roomId) { s.systemLine('Join a room first.'); return; }
+  const room = s.roomId;
+  const rows = s.tryRun(false, (db, ctx) => listPins(db, ctx, room));
+  if (!rows) return;
+  if (rows.length === 0) { s.systemLine('No pinned messages in this room.'); return; }
+  s.systemLine(`Pinned Messages (${rows.length}):`);
+  rows.slice(0, 8).forEach((r, i) => s.systemLine(`${i + 1}. ${r.user.slice(0, 24)}: ${r.content.slice(0, 60)} (pinned by ${r.pinnedBy.slice(0, 20)})`));
+}
+
+/** search_run with the query typed after /search (no modal): room-scoped, 2 characters minimum. */
+function searchTyped(s: HubScreen, rest: string): void {
+  if (rest.length < 2) { s.systemLine('Search query must be at least 2 characters'); return; }
+  const room = s.roomId;
+  const rows = s.tryRun(false, (db, ctx) => search(db, ctx, { q: rest, room, limit: 20 }));
+  if (!rows) return;
+  rows.forEach((r, i) => s.systemLine(`${i + 1}. ${r.user.slice(0, 20)} @ ${stamp(r.at)}: ${r.content.slice(0, 60)}`));
+  s.systemLine(`Found ${rows.length} results for "${rest.slice(0, 100)}"`);
+}
+
 /** run_command: true means quit. */
 export function runCommand(s: HubScreen, line: string): boolean {
   const word = firstWord(line.slice(1)).toLowerCase();
@@ -282,6 +408,16 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'mode': modeTyped(s, rest); return false;
     case 'create': if (rest === '') usage(s, '/create #name [--type text|voice|art]'); else createTyped(s, rest, word === 'np'); return false;
     case 'delete': deleteChannelTyped(s, rest); return false;
+    case 'edit': editTyped(s, rest); return false;
+    case 'reply': replyTyped(s, rest, false); return false;
+    case 'thread': replyTyped(s, rest, true); return false;
+    case 'deletemsg': deleteMsgTyped(s, rest); return false;
+    case 'react': case 'unreact': case 'love': case 'thumbsup': reactTyped(s, cmd, rest); return false;
+    case 'reactions': reactionsTyped(s, rest); return false;
+    case 'pin': pinTyped(s, true, rest); return false;
+    case 'unpin': pinTyped(s, false, rest); return false;
+    case 'pinned': pinnedTyped(s); return false;
+    case 'search': searchTyped(s, rest); return false;
     case null:
       s.systemLine('Unknown command. Type /help for help.');
       return false;
