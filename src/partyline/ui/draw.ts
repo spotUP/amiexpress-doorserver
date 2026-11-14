@@ -7,7 +7,7 @@
 import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, wrap } from './cells';
 import { cover, drawOverlays, OverlayState, Rect } from './overlays';
 import { drawSlash } from './slash';
-import { Model, Side, lineMarked, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
+import { Model, Line, Side, lineMarked, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
 
 export const HIT_NONE = 0, HIT_MENU = 1, HIT_DROPDOWN = 2, HIT_SIDEBAR = 3, HIT_CHAT = 4, HIT_INPUT = 5,
   HIT_STATUS = 6, HIT_POPUP = 7, HIT_SCROLLBAR = 12; // the C lc_hit numbers
@@ -30,12 +30,24 @@ export class DrawState {
   chatRowLine = new Int16Array(CHAT_ROWS_MAX).fill(-1);
   barBody = 0; barRows = 0; barThumb = 0; barSpan = 0;
   rewraps = 0;
+  /** Lines actually rewrapped (the per-line cache misses). */
+  lineWraps = 0;
+  private perLine = new WeakMap<Line, { t: string; n: number }>();
   private lineRows: number[] = [];
   private cacheGen = -1; private cacheN = -1; private cacheWidth = 0; private cacheStamps = false;
   /** draw_chat's wrap cache: pass 1 only when a line, the width or the stamps changed. */
   rows(m: Model, width: number, stamps: boolean): number[] {
     if (this.cacheGen !== m.linesGen || this.cacheN !== m.lines.length || this.cacheWidth !== width || this.cacheStamps !== stamps) {
-      this.lineRows = m.lines.map((l) => wrap(lineMarked(m, l, stamps, width), width, WRAP_MAX).length);
+      if (this.cacheWidth !== width) this.perLine = new WeakMap();
+      // Per-line cache: rewrap only lines whose marked text changed (a new message, an edit, a reaction).
+      this.lineRows = m.lines.map((l) => {
+        const t = lineMarked(m, l, stamps, width), hit = this.perLine.get(l);
+        if (hit && hit.t === t) return hit.n;
+        const n = wrap(t, width, WRAP_MAX).length;
+        this.perLine.set(l, { t, n });
+        this.lineWraps++;
+        return n;
+      });
       this.cacheGen = m.linesGen; this.cacheN = m.lines.length; this.cacheWidth = width; this.cacheStamps = stamps;
       this.rewraps++;
     }
