@@ -22,16 +22,16 @@ import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState } from './draw';
 import { ACTIVITY_LINE, FOCUS_INPUT, HISTORY, LIVE, Model, newLine, SYSTEM, TEXT_MAX } from './model';
-import { MODAL_NONE, MODAL_QUIT, OverlayState } from './overlays';
+import { MODAL_NONE, MODAL_QUIT, OverlayState, pickList, pickMove } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
-import { loadCustomEmoji, runCommand } from '../commands';
+import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
 
 /** ui_key.h codes. */
 export const K_UP = 1000, K_DOWN = 1001, K_PGUP = 1002, K_PGDN = 1003, K_HOME = 1004, K_END = 1005, K_ENTER = 1006, K_ESC = 1007,
-  K_LEFT = 1008, K_RIGHT = 1009, K_F1 = 1011;
+  K_LEFT = 1008, K_RIGHT = 1009, K_BACKTAB = 1010, K_F1 = 1011, K_F4 = 1014;
 const KEY_SEQ: Record<string, number> = {
   '\x1b[A': K_UP, '\x1b[B': K_DOWN, '\x1b[C': K_RIGHT, '\x1b[D': K_LEFT, '\x1b[H': K_HOME, '\x1b[F': K_END,
-  '\x1b[5~': K_PGUP, '\x1b[6~': K_PGDN, '\x1bOP': K_F1, '\x1b[1~': K_HOME, '\x1b[4~': K_END,
+  '\x1b[5~': K_PGUP, '\x1b[6~': K_PGDN, '\x1bOP': K_F1, '\x1bOS': K_F4, '\x1b[14~': K_F4, '\x1b[Z': K_BACKTAB, '\x1b[1~': K_HOME, '\x1b[4~': K_END,
 };
 
 export type ChatRun = <T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T) => T;
@@ -49,6 +49,8 @@ export class HubScreen implements PartylineScreen {
   readonly over = new OverlayState();
   /** The room the caller is in (livechat.c room_id); '' before the first join. */
   roomId = '';
+  /** Custom emoji with a picture and no ascii face: the picker lists them by :name:, a message cannot expand them. */
+  imageEmoji: string[] = [];
   private cursor = 0;
   private readonly off: () => void;
 
@@ -214,6 +216,7 @@ export class HubScreen implements PartylineScreen {
       return;
     }
     if (k === 17) { o.modal = MODAL_QUIT; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
+    if (o.fmt) { this.pickKey(k); return; }
     if (o.help) {
       if (k === K_ESC || k === 0x71) o.help = false;
       else if (k === K_DOWN) o.helpTop++;
@@ -221,6 +224,7 @@ export class HubScreen implements PartylineScreen {
       return;
     }
     if (m.focus === FOCUS_INPUT && this.slashKey(k)) return;
+    if (k === K_F4 || k === 5) { this.openPicker(); return; }
     if (k === K_F1) { o.help = true; o.helpTop = 0; return; }
     if (k === K_PGUP) { m.scroll += 10; return; }
     if (k === K_PGDN) { m.scroll = Math.max(0, m.scroll - 10); return; }
@@ -238,6 +242,30 @@ export class HubScreen implements PartylineScreen {
       m.input = m.input.slice(0, m.inputCur) + String.fromCharCode(k) + m.input.slice(m.inputCur);
       m.inputCur++;
       o.slashOff = false;
+    }
+  }
+
+  /** emoji_show: the picker over the chat, on the first category. */
+  openPicker(): void {
+    const o = this.over;
+    o.fmt = true; o.pickItems = allEmoji(this); o.pickCat = o.pickItem = o.pickTop = o.pickPane = 0;
+  }
+
+  /** fmt_key: the picker owns every key while it is shown; Enter on an item inserts its code and a space (emoji_apply). */
+  private pickKey(k: number): void {
+    const m = this.model, o = this.over;
+    if (k === K_UP || k === 0x6b) pickMove(o, -1);
+    else if (k === K_DOWN || k === 0x6a) pickMove(o, 1);
+    else if (k === 9 || k === K_BACKTAB) o.pickPane ^= 1;
+    else if (k === K_ESC) o.fmt = false;
+    else if (k === K_ENTER) {
+      if (o.pickPane === 0) { o.pickPane = 1; return; }
+      o.fmt = false;
+      const e = pickList(o)[o.pickItem];
+      if (!e) return;
+      if (m.input.length + e.code.length + 1 >= TEXT_MAX) { this.systemLine('The emoji does not fit the input'); return; }
+      m.input = `${m.input}${e.code} `;
+      m.inputCur = m.input.length;
     }
   }
 

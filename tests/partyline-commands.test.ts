@@ -149,6 +149,25 @@ describe('hub screen commands', () => {
     expect(last()).toBe('Shared rooms: #lab');
   });
 
+  it('emoji picker: F4 and Ctrl+E open it, keys move, Enter inserts the code, Escape closes', () => {
+    const o = screen.over;
+    screen.input(Buffer.from('hi ')); screen.input(Buffer.from('\x1bOS', 'latin1'));
+    expect(o.fmt).toBe(true);
+    screen.render(true); // draws without throwing
+    screen.input(Buffer.from([0x0d])); // category pane Enter moves to the items
+    screen.input(Buffer.from('\x1b[B', 'latin1')); screen.input(Buffer.from('j'));
+    expect(o.pickItem).toBe(2);
+    screen.input(Buffer.from([0x0d]));
+    expect(o.fmt).toBe(false);
+    expect(screen.model.input).toBe('hi :joy: ');
+    expect(screen.model.inputCur).toBe(screen.model.input.length);
+    screen.key(5); expect(o.fmt).toBe(true);
+    screen.key(1001); expect(o.pickCat).toBe(1); // the picker opens on the categories
+    screen.key(1007); expect(o.fmt).toBe(false);
+    expect(screen.model.input).toBe('hi :joy: ');
+    type('/emoji'); expect(o.fmt).toBe(true);
+  });
+
   it('emoji search, emojis categories, customemoji add list remove', () => {
     type('/emoji lol'); expect(screen.model.lines.some((l) => l.text === 'Emojis matching "lol":')).toBe(true);
     expect(last()).toBe('  XD  :joy: (laugh, lol)');

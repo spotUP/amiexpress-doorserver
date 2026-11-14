@@ -55,6 +55,9 @@ export class OverlayState {
   slashSel = 0; slashTop = 0; slashOff = false;
   /** The format/emoji picker is shown (lc_model fmt). */
   fmt = false;
+  /** The emoji picker (lc_model fmt_*): its entries, category, selected item, first visible item, and which pane has the keys. */
+  pickItems: { code: string; face: string; cat: number }[] = [];
+  pickCat = 0; pickItem = 0; pickTop = 0; pickPane = 0;
   /** The last frame's settings interior row -> SET_* (-1 a gap); lc_hit reads it. */
   setItemAt = new Int8Array(64).fill(-1);
 }
@@ -261,6 +264,57 @@ function drawSettings(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
   c.pen(p.ink, DEFAULT, 0);
 }
 
+export const PICK_CATS = ['Emotions', 'Actions', 'Symbols', 'Special'];
+const PICK_H = 14;
+export const pickRows = (): number => PICK_H - 4;
+export const pickList = (o: OverlayState): { code: string; face: string }[] => o.pickItems.filter((e) => e.cat === o.pickCat);
+
+/** lc_fmt_move: Up/Down walk the focused pane; a new category starts at the top. */
+export function pickMove(o: OverlayState, delta: number): void {
+  if (o.pickPane === 0) {
+    const k = Math.max(0, Math.min(PICK_CATS.length - 1, o.pickCat + delta));
+    if (k !== o.pickCat) { o.pickCat = k; o.pickItem = o.pickTop = 0; }
+    return;
+  }
+  const k = Math.max(0, Math.min(pickList(o).length - 1, o.pickItem + delta));
+  o.pickItem = k;
+  if (k < o.pickTop) o.pickTop = k;
+  if (k >= o.pickTop + pickRows()) o.pickTop = k - pickRows() + 1;
+}
+
+/** draw_fmt for the emoji picker: bottom right above the input, categories left, items right (face in a 16 column, then the code). */
+function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
+  const p = m.pal, W = c.cols, H = PICK_H, rows = pickRows();
+  const w = Math.min(52, Math.max(20, W - 2)), y = c.rows - 7;
+  let top = y - H - 1;
+  if (top < 0) top = y + 1;
+  const left = Math.max(0, W - w), catw = Math.max(8, Math.min(14, w - 24)), ix = left + 1 + catw, iw = w - 2 - catw;
+  const items = pickList(o);
+  c.pen(p.ink, DEFAULT, 0);
+  c.fill(top + 1, left + 1, H - 2, w - 2, 0x20);
+  c.box(top, left, H, w, p.accent, ' Emoji Picker [Tab | Enter] ', p.ink);
+  cover(d, top, left, H, w);
+  c.box(top + 1, left + 1, H - 4, catw, p.ok, ' Category ', p.ink);
+  PICK_CATS.forEach((n, i) => {
+    const sel = i === o.pickCat;
+    c.pen(sel ? p.barInk : p.ink, sel ? p.ok : DEFAULT, 0);
+    c.fill(top + 2 + i, left + 2, 1, catw - 2, 0x20);
+    c.text(top + 2 + i, left + 3, n, catw - 3);
+  });
+  c.pen(p.ink, DEFAULT, 0);
+  c.box(top + 1, ix, H - 2, iw, p.accent, ` ${PICK_CATS[o.pickCat]} `, p.ink);
+  for (let i = 0; i < rows && o.pickTop + i < items.length; i++) {
+    const k = o.pickTop + i;
+    c.pen(k === o.pickItem ? p.barInk : p.ink, k === o.pickItem ? p.accent : DEFAULT, 0);
+    c.fill(top + 2 + i, ix + 1, 1, iw - 2, 0x20);
+    const e = items[k];
+    c.text(top + 2 + i, ix + 2, iw - 3 <= 16 ? e.face : e.face.padEnd(16) + e.code, iw - 3);
+  }
+  c.pen(p.alert, DEFAULT, 0);
+  c.text(top + 1, left + w - 5, '[X]', 3);
+  c.pen(p.ink, DEFAULT, 0);
+}
+
 /** The overlays lc_draw paints last, in the C order (help, view, search, settings, modal). */
 export function drawOverlays(c: Cells, m: Model, d: DrawState, o: OverlayState, caret: { cr: number; cc: number }): void {
   if (o.help) drawText(c, m, d, 'Help', HELP_TEXT, o.helpTop, false);
@@ -268,4 +322,5 @@ export function drawOverlays(c: Cells, m: Model, d: DrawState, o: OverlayState, 
   if (o.search) drawSearch(c, m, d, o, caret);
   if (o.settings) drawSettings(c, m, d, o);
   if (o.modal !== MODAL_NONE) drawModal(c, m, d, o, caret);
+  if (o.fmt) drawPicker(c, m, d, o);
 }
