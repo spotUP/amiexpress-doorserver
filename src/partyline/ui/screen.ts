@@ -20,8 +20,8 @@ import type { ChatCtx } from '../../chat/sessions';
 import { joinRoom, listMemberships, listRooms, postMessage, roomHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
-import { draw, DrawState } from './draw';
-import { ACTIVITY_LINE, FOCUS_INPUT, HISTORY, LIVE, Model, newLine, SYSTEM, TEXT_MAX } from './model';
+import { draw, DrawState, HIT_DROPDOWN, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
+import { ACTIVITY_LINE, FOCUS_INPUT, FOCUS_MENU, HISTORY, LIVE, Model, newLine, SIDE_HEAD, SIDE_BLANK, SYSTEM, TEXT_MAX } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, OverlayState, PICK_CATS, pickList, pickMove } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
@@ -294,10 +294,24 @@ export class HubScreen implements PartylineScreen {
   private mouse(seq: string, press: boolean): void {
     const f = /^\x1b\[<(\d+);(\d+);(\d+)$/.exec(seq.slice(0, -1));
     if (!f) return;
-    const b = Number(f[1]), m = this.model, o = this.over;
-    if (b >= 64) { if (b < 66) m.scroll = Math.max(0, m.scroll + (b === 64 ? 3 : -3)); return; }
-    if (!press || b >= 32 || !o.fmt) return;
-    const h = this.drawState.hits.at(Number(f[3]) - 1, Number(f[2]) - 1), button = b & 3;
+    const b = Number(f[1]), m = this.model, o = this.over, d = this.drawState;
+    const row = Number(f[3]) - 1, col = Number(f[2]) - 1;
+    if (b >= 64) {
+      if (b >= 66) return;
+      const up = b === 64;
+      if (d.hits.at(row, col).id === HIT_SIDEBAR) this.sideMove(up ? -2 : 2);
+      else m.scroll = Math.max(0, Math.min(d.barRows > 0 ? d.barSpan : 0, m.scroll + (up ? 3 : -3)));
+      return;
+    }
+    if (this.barDrag) { // the thumb follows the pointer until the button comes up
+      if (!press) this.barDrag = false;
+      else if (b >= 32) { if ((b & 3) !== 3) { const sc = d.scrollAt(row); if (sc >= 0) m.scroll = sc; } else this.barDrag = false; }
+      if (!(press && b < 32)) return;
+      this.barDrag = false;
+    }
+    if (!press || b >= 32) return;
+    if (!o.fmt) { this.mousePress(row, col, b & 3); return; }
+    const h = d.hits.at(row, col), button = b & 3;
     if (h.id === HIT_FMT_CLOSE) { o.fmt = false; return; }
     if (h.id === HIT_FMT_CAT && h.dr < PICK_CATS.length) {
       if (h.dr === o.pickCat) { o.pickPane = 1; return; }
@@ -308,6 +322,45 @@ export class HubScreen implements PartylineScreen {
       if (o.pickPane === 1 && item === o.pickItem) { this.pickApply(); return; }
       o.pickPane = 1; pickMove(o, item - o.pickItem);
     } else if (h.id !== HIT_FMT && button === 0) o.fmt = false;
+  }
+
+  private barDrag = false;
+
+  /** side_move: step the sidebar selection over rows that are not headings or blanks. */
+  private sideMove(step: number): void {
+    const m = this.model, ok = (i: number): boolean => i >= 0 && i < m.side.length && m.side[i].kind !== SIDE_HEAD && m.side[i].kind !== SIDE_BLANK;
+    let i = m.sideSel + step;
+    while (i >= 0 && i < m.side.length && !ok(i)) i += step;
+    if (ok(i)) m.sideSel = i;
+  }
+
+  /** handle_mouse for a press with no picker on top: menu bar, dropdown, status line, input, scrollbar, sidebar. Chat and
+   *  channel/user context menus, the format picker and room switching are not on Partyline (see partyline-mouse2.md). */
+  private mousePress(row: number, col: number, button: number): void {
+    const m = this.model, o = this.over, h = this.drawState.hits.at(row, col);
+    if (o.modal !== MODAL_NONE || o.help) return;
+    if (h.id === HIT_MENU) {
+      const k = MENU_COL.findIndex((c, i) => col >= c && col < c + MENU_LABELS[i].length);
+      if (k >= 0) { m.menu = k; m.menuSel = 0; m.focus = FOCUS_MENU; return; }
+    }
+    if (h.id === HIT_DROPDOWN && m.menu >= 0 && h.dr < MENU_ITEMS[m.menu].length) {
+      const it = MENU_ITEMS[m.menu][h.dr];
+      m.menu = -1; m.focus = FOCUS_INPUT;
+      if (it.startsWith('Help') || it === 'Keyboard Shortcuts') { o.help = true; o.helpTop = 0; } else if (it.startsWith('Channel List') || it === 'Toggle Sidebar') m.sidebarHidden = !m.sidebarHidden;
+      else if (it.startsWith('Emoji')) this.openPicker();
+      else if (it.startsWith('Quit')) this.key(17);
+      return;
+    }
+    if (m.focus === FOCUS_MENU) { m.menu = -1; m.focus = FOCUS_INPUT; }
+    if (h.id === HIT_STATUS) m.sidebarHidden = false;
+    else if (h.id === HIT_INPUT) m.focus = FOCUS_INPUT;
+    else if (h.id === HIT_SCROLLBAR) {
+      const sc = this.drawState.scrollAt(row);
+      if (sc >= 0) m.scroll = sc;
+      this.barDrag = button === 0;
+    } else if (h.id === HIT_SIDEBAR && h.dr < m.side.length && m.side[h.dr].kind !== SIDE_HEAD && m.side[h.dr].kind !== SIDE_BLANK) {
+      m.sideSel = h.dr;
+    }
   }
 
   /** slash_key: true when the "/" menu used the key. */
