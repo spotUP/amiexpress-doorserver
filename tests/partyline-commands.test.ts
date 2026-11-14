@@ -131,6 +131,24 @@ describe('hub screen commands', () => {
     type('/edit 1 fixed'); expect(screen.model.lines.find((l) => l.number === 1)?.text).toBe('fixed');
   });
 
+  it('create takes topic words and --motd; events, sounds, settings, clear-room, whois', () => {
+    type('/create #lab fun times --motd "be kind" --private');
+    expect(screen.model.room).toBe('lab');
+    expect(screen.model.paneLabel).toBe('lab - fun times');
+    type('/motd'); expect(last()).toBe('[MOTD] be kind');
+    type('/create #x --type foo'); expect(last()).toBe('Error: Channel type must be text, voice or art.');
+    type('/events'); expect(screen.model.lines.some((l) => l.text.includes('Door Activity:') && l.text.endsWith('ON'))).toBe(true);
+    type('/events doors'); expect(last()).toBe('Door activity events: OFF');
+    type('/events off'); expect(last()).toBe('All BBS events disabled');
+    type('/events nope'); expect(last()).toBe('Valid types: logins, files, doors, messages, announcements, on, off');
+    type('/sounds'); expect(last()).toBe('Error: Usage: /sounds on|off');
+    type('/sounds off'); expect(last()).toBe('Sounds disabled');
+    type('/settings'); expect(last()).toBe('  BBS events: see /events');
+    type('first'); type('/clear-room'); expect(last()).toBe('Clear history requested for lab');
+    type(`/whois @${screen.run(false, (_db, ctx) => ctx.user)}`); expect(screen.model.lines.some((l) => /^Board .*last seen \d\d:\d\d, idle \d+s$/.test(l.text))).toBe(true);
+    expect(last()).toBe('Shared rooms: #lab');
+  });
+
   it('slash menu Tab fills the command; /quit and Ctrl-Q quit', () => {
     screen.input(Buffer.from('/nic\t'));
     expect(screen.model.input).toBe('/nick ');

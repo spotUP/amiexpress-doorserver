@@ -8,13 +8,13 @@
  * table lists as aliases (users, channels, +1, -1, heart, fire): C_ALIAS and
  * C_DROP keep run_command's behaviour on both sides.
  */
-import { addIgnore, clearPresence, createRoom, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
+import { addIgnore, clearPresence, clearRoom, createRoom, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
 import { CMD_HELP } from './ui/slash';
 import { stamp } from './ui/screen';
 import type { HubScreen } from './ui/screen';
 
-const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg' };
+const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg', 'clear-room': 'clear-room', clearroom: 'clear-room' };
 const C_DROP = new Set(['users', 'channels', '+1', '-1', 'heart', 'fire']);
 /** run_command: these answer with a fixed line on Amiga, so they do on Partyline. */
 const NOT_ON_AMIGA: Record<string, string> = {
@@ -151,7 +151,10 @@ function whoisTyped(s: HubScreen, rest: string): void {
   if (p === undefined) return;
   if (p === null) { s.systemLine(`User ${shown.slice(0, 30)} is not online.`); return; }
   s.systemLine(`${p.nick.slice(0, 30)} - ${p.status.slice(0, 20)}${p.statusText !== '' ? ': ' : ''}${p.statusText.slice(0, 60)}`);
-  s.systemLine(`Board ${p.board.slice(0, 20)}, ${p.online ? 'online' : 'offline'}, idle ${p.idle}s`);
+  s.systemLine(`Board ${p.board.slice(0, 20)}, ${p.online ? 'online' : 'offline'}, last seen ${stamp(p.lastSeen)}, idle ${p.idle === '' ? 0 : p.idle}s`);
+  // room_names_of: the profile carries room ids; the name comes from the room row.
+  const names = p.sharedRooms === '' ? [] : s.tryRun(false, (db) => p.sharedRooms.split(',').map((id) => (db.prepare('SELECT name FROM chat_rooms WHERE id = ?').get(id) as { name: string } | undefined)?.name ?? id)) ?? [];
+  if (names.length > 0) s.systemLine(`Shared rooms: ${names.map((n) => `#${n}`).join(', ').slice(0, 100)}`);
 }
 
 /** msg_typed: every leading @word is a target; one is a DM, two or more a group DM. */
@@ -194,16 +197,31 @@ function modeTyped(s: HubScreen, rest: string): void {
   if (r && r.errors !== '') for (const e of r.errors.split('\n')) s.systemLine(`Error: ${e.slice(0, 120)}`);
 }
 
-/** create_typed: /create #name [--type text|voice|art] [--private|--invite-only]. */
+const CREATE_USAGE = '/create #name [topic] [--type text|voice|art] [--private] [--invite-only] [--motd "text"]';
+
+/** create_flags: the first word is the name, other plain words the topic, --motd takes the words up to the next flag. */
 function createTyped(s: HubScreen, rest: string, priv: boolean): void {
-  const m = /--type +(\S+)/.exec(rest);
-  const kind = m ? m[1] : 'text';
-  if (!['text', 'voice', 'art'].includes(kind)) { usage(s, '/create #name [--type text|voice|art]'); return; }
-  const isPriv = priv || /--(private|invite-only)\b/.test(rest);
-  const name = rest.replace(/--\S+( +(text|voice|art))?/g, '').trim().replace(/^#/, '');
-  if (name === '') { usage(s, '/create #name [--type text|voice|art]'); return; }
-  const r = s.tryRun(true, (db, ctx) => createRoom(db, ctx, { name, kind, visibility: isPriv ? 'private' : 'public' }));
-  if (r) s.joinRoom(r.id);
+  const words = rest.split(/ +/).filter((w) => w !== '');
+  const name = words[0].replace(/^#/, '');
+  let kind = 'text', motd = '', isPriv = priv;
+  const topic: string[] = [];
+  for (let i = 1; i < words.length; i++) {
+    const w = words[i];
+    if (w === '--private' || w === '--invite-only') isPriv = true;
+    else if (w === '--type') {
+      kind = (words[++i] ?? '').toLowerCase();
+      if (!['text', 'voice', 'art'].includes(kind)) { s.systemLine('Error: Channel type must be text, voice or art.'); return; }
+    } else if (w === '--motd') {
+      const m: string[] = [];
+      while (i + 1 < words.length && !words[i + 1].startsWith('--')) m.push(words[++i]);
+      motd = m.join(' ').replace(/^["']|["']$/g, '');
+    } else topic.push(w);
+  }
+  if (name === '') { usage(s, CREATE_USAGE); return; }
+  const r = s.tryRun(true, (db, ctx) => createRoom(db, ctx, { name, kind, visibility: isPriv ? 'private' : 'public', ...(topic.length > 0 ? { topic: topic.join(' ').slice(0, 120) } : {}) }));
+  if (!r) return;
+  if (motd !== '') s.tryRun(true, (db, ctx) => setRoomMotd(db, ctx, r.id, { motd }));
+  s.joinRoom(r.id);
 }
 
 /** delete_channel_typed. */
@@ -344,6 +362,62 @@ function searchTyped(s: HubScreen, rest: string): void {
   s.systemLine(`Found ${rows.length} results for "${rest.slice(0, 100)}"`);
 }
 
+const onOff = (v: boolean): string => (v ? 'ON' : 'OFF');
+const EVENT_KEYS: [string, string[], string, string][] = [
+  ['logins', ['login'], 'Login/logout events', 'User Logins/Logouts:    '],
+  ['files', ['file'], 'File upload/download events', 'File Uploads/Downloads: '],
+  ['doors', ['door'], 'Door activity events', 'Door Activity:          '],
+  ['messages', ['message'], 'New message events', 'New Messages:           '],
+  ['announcements', ['announcement', 'system'], 'System announcements', 'System Announcements:   '],
+];
+
+/** events_typed: the preferences live on the screen for the session (the hub stores no prefs). */
+function eventsTyped(s: HubScreen, rest: string): void {
+  const sub = firstWord(rest).toLowerCase(), ev = s.prefs.events;
+  if (sub === '') {
+    s.systemLine('BBS Event Display Settings:');
+    for (const [k, , , label] of EVENT_KEYS) s.systemLine(`  ${label} ${onOff(ev[k])}`);
+    s.systemLine('Use /events <type> to toggle: logins, files, doors, messages, announcements; /events on|off sets all.');
+    return;
+  }
+  if (['on', 'enable', 'off', 'disable'].includes(sub)) {
+    const on = sub[1] === 'n';
+    for (const [k] of EVENT_KEYS) ev[k] = on;
+    s.systemLine(on ? 'All BBS events enabled' : 'All BBS events disabled');
+    return;
+  }
+  const row = EVENT_KEYS.find(([k, alt]) => k === sub || alt.includes(sub));
+  if (!row) { s.systemLine(`Unknown event type: ${sub.slice(0, 30)}`); s.systemLine('Valid types: logins, files, doors, messages, announcements, on, off'); return; }
+  ev[row[0]] = !ev[row[0]];
+  s.systemLine(`${row[2]}: ${onOff(ev[row[0]])}`);
+}
+
+/** sounds_typed: /sounds on|off. */
+function soundsTyped(s: HubScreen, rest: string): void {
+  const w = firstWord(rest).toLowerCase();
+  if (w !== 'on' && w !== 'off') { s.systemLine('Error: Usage: /sounds on|off'); return; }
+  s.prefs.sounds = w === 'on';
+  s.systemLine(s.prefs.sounds ? 'Sounds enabled' : 'Sounds disabled');
+}
+
+/** settings_open without the overlay: the current values as system lines. */
+function settingsTyped(s: HubScreen): void {
+  s.systemLine('Settings:');
+  s.systemLine(`  Timestamps: ${onOff(s.model.timestamps)}  (/timestamps)`);
+  s.systemLine(`  Compact mode: ${onOff(s.model.compact)}  (/compact)`);
+  s.systemLine(`  Sounds: ${onOff(s.prefs.sounds)}  (/sounds on|off)`);
+  s.systemLine('  BBS events: see /events');
+}
+
+/** The sidebar "Clear History" action, sysop only; the store checks the owner level. */
+function clearRoomTyped(s: HubScreen, rest: string): void {
+  const a = firstWord(rest).replace(/^#/, '');
+  const hit = a === '' ? undefined : (s.tryRun(false, (db, ctx) => listRooms(db, ctx)) ?? []).find((r) => r.name.toLowerCase() === a.toLowerCase() || r.id === a);
+  const id = a === '' ? s.roomId : hit?.id;
+  if (!id) { s.systemLine(a === '' ? 'Join a room first.' : `Channel ${a.slice(0, 40)} not found`); return; }
+  if (s.tryRun(true, (db, ctx) => { clearRoom(db, ctx, id); return true; })) s.systemLine(`Clear history requested for ${(hit?.name ?? s.model.room).slice(0, 36)}`);
+}
+
 /** run_command: true means quit. */
 export function runCommand(s: HubScreen, line: string): boolean {
   const word = firstWord(line.slice(1)).toLowerCase();
@@ -406,7 +480,7 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'msg': msgTyped(s, rest); return false;
     case 'motd': motdTyped(s, rest); return false;
     case 'mode': modeTyped(s, rest); return false;
-    case 'create': if (rest === '') usage(s, '/create #name [--type text|voice|art]'); else createTyped(s, rest, word === 'np'); return false;
+    case 'create': if (rest === '') usage(s, CREATE_USAGE); else createTyped(s, rest, word === 'np'); return false;
     case 'delete': deleteChannelTyped(s, rest); return false;
     case 'edit': editTyped(s, rest); return false;
     case 'reply': replyTyped(s, rest, false); return false;
@@ -418,6 +492,10 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'unpin': pinTyped(s, false, rest); return false;
     case 'pinned': pinnedTyped(s); return false;
     case 'search': searchTyped(s, rest); return false;
+    case 'events': eventsTyped(s, rest); return false;
+    case 'sounds': soundsTyped(s, rest); return false;
+    case 'settings': settingsTyped(s); return false;
+    case 'clear-room': clearRoomTyped(s, rest); return false;
     case null:
       s.systemLine('Unknown command. Type /help for help.');
       return false;

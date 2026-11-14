@@ -81,6 +81,8 @@ export class HubScreen implements PartylineScreen {
 
   /** The last message number handed to a pane line (C msg_number); line_by_number looks it up. */
   msgNumber = 0;
+  /** /events and /sounds, kept for the session (livechat.c ev_* and snd_on; the hub stores no prefs). */
+  readonly prefs = { sounds: true, events: { logins: true, files: true, doors: true, messages: true, announcements: true } as Record<string, boolean> };
 
   systemLine(text: string): void { this.note(SYSTEM, text); }
   note(kind: number, text: string): void {
