@@ -165,7 +165,8 @@ describe('hub screen commands', () => {
     screen.key(1001); expect(o.pickCat).toBe(1); // the picker opens on the categories
     screen.key(1007); expect(o.fmt).toBe(false);
     expect(screen.model.input).toBe('hi :joy: ');
-    type('/emoji'); expect(o.fmt).toBe(true);
+    screen.model.input = ''; screen.model.inputCur = 0;
+    type('/emoji '); expect(o.fmt).toBe(true);
   });
 
   it('emoji search, emojis categories, customemoji add list remove', () => {
