@@ -9,6 +9,7 @@ import { initAchievementsDb } from './achievements/db';
 import { initReleasesDb } from './releases/db';
 import { smtpMailer, startMailDrain, MAIL_DRAIN_INTERVAL_MS } from './achievements/mail';
 import { ensureQuarantine } from './submissions';
+import { createPartylineServer, loadPartylineConfig } from './partyline/server';
 
 /**
  * Refuse to serve a catalog that cannot be read, or that reads clean but
@@ -131,6 +132,22 @@ function main(): void {
   if (cfg.achievements) {
     startMailDrain(cfg.achievements, smtpMailer(cfg.achievements));
     console.log(`[INFO] mail drain every ${MAIL_DRAIN_INTERVAL_MS / 1000}s`);
+  }
+
+  // Partyline (PLP/1) is off unless PARTYLINE_ENABLED=1; it lives on the chat store, so it needs achievements.
+  const plp = loadPartylineConfig();
+  if (plp.enabled && !cfg.achievements) {
+    console.error('[ERROR] PARTYLINE_ENABLED=1 needs ACHIEVEMENTS_DB; partyline not started');
+  } else if (plp.enabled && cfg.achievements) {
+    const partyline = createPartylineServer(plp, cfg.achievements);
+    partyline.listen().catch((err: Error) => console.error(`[ERROR] partyline listen on ${plp.port} failed: ${err.message}`));
+    // Drain on SIGTERM so callers see a status line and resume onto the new process.
+    process.once('SIGTERM', () => {
+      console.log('[INFO] SIGTERM: draining partyline');
+      const exit = setTimeout(() => process.exit(0), 2000);
+      exit.unref();
+      void partyline.drain().then(() => process.exit(0));
+    });
   }
 }
 
