@@ -7,6 +7,7 @@ import type { AchievementsFixture } from './achievements/helpers';
 import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
+import { emitEvent } from '../src/chat/events';
 import { createRoom, joinRoom, postMessage } from '../src/chat/store';
 import { canonical } from '../src/partyline/commands';
 import { cellFg, cellBg, cellFlags, BG_DEFAULT } from '../src/partyline/ui/cells';
@@ -238,5 +239,33 @@ describe('hub screen commands', () => {
     screen.input(Buffer.from('\x08'.repeat(6)));
     type('/quit'); expect(quits).toBe(1);
     screen.input(Buffer.from([17])); screen.input(Buffer.from('y')); expect(quits).toBe(2);
+  });
+  it('draw and art: usage, not an art channel, joining an art channel', () => {
+    screen.run(true, (db, ctx) => { createRoom(db, ctx, { name: 'general' }); createRoom(db, ctx, { name: 'paint', kind: 'art' }); });
+    type('/join #general');
+    type('/draw'); expect(last()).toBe('Usage: /draw <art channel>  (art channels are marked [A] in the sidebar)');
+    type('/draw #general'); expect(last()).toBe('That is not an Art channel.');
+    type('/art #paint'); expect(screen.model.room).toBe('paint');
+    type('/draw'); expect(last()).toBe('The drawing canvas is not on Partyline yet.');
+  });
+
+  it('view and picture: numbers, the picture announcement, non-pictures, files off', () => {
+    screen.run(true, (db, ctx) => createRoom(db, ctx, { name: 'general' }));
+    type('/join #general');
+    type('/view 1'); expect(last()).toBe('No files shared yet this session');
+    const share = (ref: string, text: string): void => {
+      screen.run(true, (db, ctx) => emitEvent(db, { type: 'file_shared', roomId: screen.roomId, user: 'amy', ref, text }));
+      screen.take();
+    };
+    share('f1', 'pic.png|10|image');
+    expect(last()).toBe('amy shared a picture: pic.png (/view)  #1 [PICTURE] pic.png');
+    share('f2', 'notes.txt|5|text');
+    type('/picture 3'); expect(last()).toBe('No file 3 (1-2)');
+    type('/view 2'); expect(last()).toBe('That file is not a picture');
+    type('/view 1'); expect(last()).toBe('File sharing is off on this hub');
+  });
+
+  it('upload is not on Partyline yet', () => {
+    type('/upload'); expect(last()).toBe('/upload is not on Partyline yet.');
   });
 });

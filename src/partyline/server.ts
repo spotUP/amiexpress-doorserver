@@ -50,6 +50,8 @@ export interface PartylineServer {
 }
 
 export interface PartylineOptions {
+  /** The hub's chat file directory (cfg.chatFilesDir); null or absent: file sharing is off. */
+  filesDir?: string | null;
   screen?: ScreenFactory;
   chat?: ChatConfig;
   log?: (line: string) => void;
@@ -70,7 +72,7 @@ export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsCon
 
   const attach = (sock: Duplex, isTls: boolean): void => {
     const s = new PartylineSession(sock, {
-      ach, chat, screen: opts.screen ?? chatScreen(ach, chat), tls: isTls,
+      ach, chat, screen: opts.screen ?? chatScreen(ach, chat, opts.filesDir ?? null), tls: isTls,
       isDraining: () => draining,
       onClose: (gone) => sessions.delete(gone),
       log,

@@ -10,6 +10,8 @@
  */
 import { addIgnore, clearPresence, clearRoom, createRoom, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
+import { openPreview } from '../chat/files';
+import fs from 'fs';
 import { CMD_HELP } from './ui/slash';
 import { EMOJI, emojiBuiltin } from './ui/model';
 import { stamp } from './ui/screen';
@@ -22,6 +24,36 @@ const NOT_ON_AMIGA: Record<string, string> = {
   voice: 'Voice is not on Amiga yet.', deafen: 'Voice is not on Amiga yet.', undeafen: 'Voice is not on Amiga yet.', mic: 'Voice is not on Amiga yet.',
   files: 'File sharing is not on Amiga yet.',
 };
+
+const RAMP = ' .:-=+*#%@';
+
+/** livechat.c draw_typed and view_typed. The canvas and kitty pictures need the full-screen client; /upload needs a transfer (ZModem or browser): not here. */
+function drawViewTyped(s: HubScreen, cmd: string, rest: string): void {
+  if (cmd === 'draw') {
+    const kindOf = (id: string): string => s.tryRun(false, (db, ctx) => listRooms(db, ctx).find((r) => r.id === id || r.name.toLowerCase() === id.replace(/^#/, '').toLowerCase())?.kind ?? '') ?? '';
+    if (rest === '') { s.systemLine(kindOf(s.roomId) === 'art' ? 'The drawing canvas is not on Partyline yet.' : 'Usage: /draw <art channel>  (art channels are marked [A] in the sidebar)'); return; }
+    if (kindOf(rest) !== 'art') { s.systemLine('That is not an Art channel.'); return; }
+    joinTyped(s, rest);
+    return;
+  }
+  const n = Number.parseInt(rest, 10) || 0, files = s.shared;
+  if (n < 1 || n > files.length) { s.systemLine(files.length > 0 ? `No file ${n} (1-${files.length})` : 'No files shared yet this session'); return; }
+  const f = files[n - 1];
+  if (f.kind !== 'image') { s.systemLine('That file is not a picture'); return; }
+  if (!s.filesDir) { s.systemLine('File sharing is off on this hub'); return; }
+  {
+    const pv = s.tryRun(false, (db, ctx) => openPreview(db, s.filesDir, ctx, f.id, 'rgb', 60, 20));
+    if (!pv) return;
+    const [oc, orows] = pv.cells.split('x').map(Number);
+    const px = fs.readFileSync(pv.path);
+    s.systemLine(`--- ${f.name} ---`);
+    for (let r = 0; r < orows; r++) {
+      let line = '';
+      for (let c = 0; c < oc; c++) { const i = (r * oc + c) * 3; line += RAMP[Math.min(9, Math.floor((299 * px[i] + 587 * px[i + 1] + 114 * px[i + 2]) * 9 / 255000))]; }
+      s.systemLine(line);
+    }
+  }
+}
 
 /** The CMD_HELP name a typed command word means, or null (C: "Unknown command"). */
 export function canonical(word: string): string | null {
@@ -576,6 +608,7 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'emoji': emojiTyped(s, rest); return false;
     case 'emojis': emojisTyped(s, rest); return false;
     case 'customemoji': customEmojiTyped(s, rest); return false;
+    case 'draw': case 'view': drawViewTyped(s, cmd, rest); return false;
     case 'clear-room': clearRoomTyped(s, rest); return false;
     case null:
       s.systemLine('Unknown command. Type /help for help.');
