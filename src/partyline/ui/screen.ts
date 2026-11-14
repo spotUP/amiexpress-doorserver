@@ -54,7 +54,10 @@ export class HubScreen implements PartylineScreen {
   private cursor = 0;
   private readonly off: () => void;
 
-  constructor(private readonly ach: AchievementsConfig, private readonly chat: ChatConfig, readonly info: ScreenInfo) {
+  /** Pictures and files the hub announced this session (livechat.c shared_files[], 1-based /view N). */
+  readonly shared: { id: string; name: string; kind: string }[] = [];
+
+  constructor(private readonly ach: AchievementsConfig, private readonly chat: ChatConfig, readonly info: ScreenInfo, readonly filesDir: string | null = null) {
     this.model = new Model(info.hello.cols, info.hello.rows);
     this.cells = new Cells(info.hello.cols, info.hello.rows);
     this.model.handle = info.user;
@@ -171,6 +174,13 @@ export class HubScreen implements PartylineScreen {
     } else if (e.type === 'delete') {
       const i = m.lines.findIndex((x) => x.id === e.ref);
       if (i >= 0) { m.lines.splice(i, 1); m.linesChanged(); }
+    } else if (e.type === 'file_shared') {
+      // livechat.c shared_add: text is "name|size|kind", the ref is the file id; only a picture says anything.
+      const [name = '', , kind = ''] = e.text.split('|');
+      if (e.ref && this.shared.length < 64) {
+        this.shared.push({ id: e.ref, name: name.slice(0, 63), kind: kind.slice(0, 11) });
+        if (kind === 'image') m.addLine(newLine(SYSTEM, '', '', `${e.user.slice(0, 30)} shared a picture: ${name.slice(0, 60)} (/view)  #${this.shared.length} [PICTURE] ${name.slice(0, 60)}`));
+      }
     } else if (e.type === 'topic' && inRoom) {
       m.paneLabel = `${m.room.slice(0, 40)} - ${e.text.slice(0, 50)}`;
       m.addLine(newLine(SYSTEM, '', '', `${(e.user || 'Someone').slice(0, 24)} set the topic: ${e.text.slice(0, 200)}`));
@@ -360,4 +370,4 @@ export class HubScreen implements PartylineScreen {
   close(): void { this.off(); }
 }
 
-export const chatScreen = (ach: AchievementsConfig, chat: ChatConfig): ScreenFactory => (info) => new HubScreen(ach, chat, info);
+export const chatScreen = (ach: AchievementsConfig, chat: ChatConfig, filesDir: string | null = null): ScreenFactory => (info) => new HubScreen(ach, chat, info, filesDir);
