@@ -8,7 +8,7 @@
  * table lists as aliases (users, channels, +1, -1, heart, fire): C_ALIAS and
  * C_DROP keep run_command's behaviour on both sides.
  */
-import { addIgnore, clearPresence, clearRoom, createRoom, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
+import { addIgnore, clearPresence, clearRoom, createRoom, getDiscordMirror, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
 import { openPreview } from '../chat/files';
 import fs from 'fs';
@@ -53,6 +53,17 @@ function drawViewTyped(s: HubScreen, cmd: string, rest: string): void {
       s.systemLine(line);
     }
   }
+}
+
+/** livechat.c discord_typed: show the board's Discord mirror, or (sysop only) switch it. */
+function discordTyped(s: HubScreen, rest: string): void {
+  const arg = firstWord(rest);
+  if (arg !== '' && arg !== 'on' && arg !== 'off') { s.systemLine('Usage: /discord [on|off]'); return; }
+  const sysop = s.tryRun(false, (_db, ctx) => ctx.sysop);
+  if (sysop === undefined) return;
+  if (arg !== '' && !sysop) { s.systemLine('Only the sysop can change the Discord mirror.'); return; }
+  const on = s.tryRun(arg !== '', (db, ctx) => (arg === '' ? getDiscordMirror(db, ctx) : setDiscordMirror(db, ctx, { on: arg === 'on' })));
+  if (on !== undefined) s.systemLine(on ? 'Discord mirror is ON for this board.' : 'Discord mirror is OFF for this board.');
 }
 
 /** The CMD_HELP name a typed command word means, or null (C: "Unknown command"). */
@@ -609,6 +620,7 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'emojis': emojisTyped(s, rest); return false;
     case 'customemoji': customEmojiTyped(s, rest); return false;
     case 'draw': case 'view': drawViewTyped(s, cmd, rest); return false;
+    case 'discord': discordTyped(s, rest); return false;
     case 'clear-room': clearRoomTyped(s, rest); return false;
     case null:
       s.systemLine('Unknown command. Type /help for help.');
