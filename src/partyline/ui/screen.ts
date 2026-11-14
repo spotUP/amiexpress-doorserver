@@ -17,11 +17,11 @@ import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
 import { newId, resolveSession } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { joinRoom, listMemberships, listRooms, postMessage } from '../../chat/store';
+import { joinRoom, listMemberships, listRooms, postMessage, roomHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState } from './draw';
-import { ACTIVITY_LINE, FOCUS_INPUT, LIVE, Model, newLine, SYSTEM, TEXT_MAX } from './model';
+import { ACTIVITY_LINE, FOCUS_INPUT, HISTORY, LIVE, Model, newLine, SYSTEM, TEXT_MAX } from './model';
 import { MODAL_NONE, MODAL_QUIT, OverlayState } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
 import { runCommand } from '../commands';
@@ -107,7 +107,22 @@ export class HubScreen implements PartylineScreen {
     this.cursor = Math.max(this.cursor, r.since);
     this.systemLine(`Joined #${r.name.slice(0, 40)} (${r.members} users)`);
     this.note(ACTIVITY_LINE, `Joined #${r.name.slice(0, 40)}`);
+    this.takeHistory(r.id);
     return true;
+  }
+
+  /** livechat.c take_history: the newest HISTORY_LIMIT (30) messages, numbered like live lines so /reply, /edit and /react reach them. */
+  private takeHistory(id: string): void {
+    const rows = this.tryRun(false, (db, ctx) => roomHistory(db, ctx, id, { limit: 30 })) ?? [];
+    if (rows.length === 0) return;
+    this.systemLine(`--- ${rows.length} earlier message${rows.length === 1 ? '' : 's'} ---`);
+    for (const h of rows) {
+      const l = newLine(HISTORY, stamp(h.at), h.user, h.text);
+      l.id = h.id;
+      l.number = ++this.msgNumber;
+      this.model.addLine(l);
+    }
+    this.info.markDirty();
   }
 
   /** livechat.c send_room_line: the line goes to the store; the event brings it back on screen. */

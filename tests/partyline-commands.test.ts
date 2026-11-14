@@ -7,7 +7,7 @@ import type { AchievementsFixture } from './achievements/helpers';
 import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
-import { createRoom } from '../src/chat/store';
+import { createRoom, joinRoom, postMessage } from '../src/chat/store';
 import { canonical } from '../src/partyline/commands';
 import { chatScreen } from '../src/partyline/ui/screen';
 import type { HubScreen } from '../src/partyline/ui/screen';
@@ -121,6 +121,14 @@ describe('hub screen commands', () => {
     type('/unpin 1'); type('/pinned'); expect(last()).toBe('No pinned messages in this room.');
     type('/deletemsg 1'); expect(lines()).toEqual(['2:answer']);
     type('/deletemsg'); expect(lines()).toEqual([]);
+  });
+
+  it('join loads the backlog as numbered lines', () => {
+    screen.run(true, (db, ctx) => { const r = createRoom(db, ctx, { name: 'old' }); joinRoom(db, ctx, r.id); postMessage(db, ctx, r.id, { content: 'older', clientId: 'a' }); postMessage(db, ctx, r.id, { content: 'newer', clientId: 'b' }); });
+    type('/join #old');
+    expect(screen.model.lines.filter((l) => l.number > 0).map((l) => `${l.number}:${l.text}`)).toEqual(['1:older', '2:newer']);
+    expect(screen.model.lines.some((l) => l.text === '--- 2 earlier messages ---')).toBe(true);
+    type('/edit 1 fixed'); expect(screen.model.lines.find((l) => l.number === 1)?.text).toBe('fixed');
   });
 
   it('slash menu Tab fills the command; /quit and Ctrl-Q quit', () => {
