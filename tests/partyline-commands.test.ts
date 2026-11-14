@@ -268,4 +268,26 @@ describe('hub screen commands', () => {
   it('upload is not on Partyline yet', () => {
     type('/upload'); expect(last()).toBe('/upload is not on Partyline yet.');
   });
+
+  it('discord: show, usage, sysop switch on and off', () => {
+    type('/discord'); expect(last()).toBe('Discord mirror is ON for this board.'); // the fixture board starts mirrored
+    type('/discord off'); type('/discord'); expect(last()).toBe('Discord mirror is OFF for this board.');
+    type('/discord maybe'); expect(last()).toBe('Usage: /discord [on|off]');
+    type('/discord on'); expect(last()).toBe('Discord mirror is ON for this board.');
+    type('/discord'); expect(last()).toBe('Discord mirror is ON for this board.');
+    type('/discord off'); expect(last()).toBe('Discord mirror is OFF for this board.');
+  });
+
+  it('discord: a caller who is not the sysop may look but not switch', () => {
+    const chat = loadChatConfig();
+    const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'amy', sysop: false, client: 'test' }).sid);
+    const hello = { cols: 80, rows: 25 } as ScreenInfo['hello'];
+    const amy = chatScreen(fx.ach, chat)({ sid, user: 'amy', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined }) as HubScreen;
+    const say = (l: string): string => { amy.input(Buffer.from(`${l}\r`, 'latin1')); amy.take(); return amy.model.lines[amy.model.lines.length - 1].text; };
+    try {
+      expect(say('/discord')).toBe('Discord mirror is ON for this board.');
+      expect(say('/discord off')).toBe('Only the sysop can change the Discord mirror.');
+      expect(say('/discord')).toBe('Discord mirror is ON for this board.');
+    } finally { amy.close(); }
+  });
 });
