@@ -323,11 +323,11 @@ export function buildManifest(cfg: ServerConfig, opts?: CatalogQuery): DoorRepoM
 // AmigaDOS-side clients with no JSON parser:
 //   DOORREPO|1|<revision>|<count>
 //   <archiveName>|<doorType>|<archiveSize>|<md5>|<name>|<description>
-//     |<author>|<releaseGroup>|<junkCount>|<hasDoc>
+//     |<author>|<releaseGroup>|<junkCount>|<hasDoc>|<sha256>
 //   ... (one line per door)
 // with a trailing CRLF after the last row.
 //
-// Fields 7-10 are an APPEND, added 2026-08-18. The format contract
+// Fields 7-10 are an APPEND, added 2026-08-18 (field 11 followed, below). The format contract
 // (amiexpress-web's docs/DOOR-REPO-API.md section 3) states that appending
 // trailing fields never bumps the header's version number, because a
 // conforming client reads the first six fields by position and ignores the
@@ -343,11 +343,14 @@ export function buildManifest(cfg: ServerConfig, opts?: CatalogQuery): DoorRepoM
 // hasDoc let a client gate its own action keys the way DOORMAN does instead
 // of advertising [V]iew doc on a door with no documentation.
 //
-// sha256 is deliberately NOT here: /archive already returns X-Archive-SHA256
-// (and X-Archive-MD5) with the bytes themselves, so a downloading client can
-// verify against the strong digest without every client paying 64 bytes per
-// row (~211 KB of extra catalog on the current 3301-row corpus) on every
-// catalog fetch.
+// Field 11 (sha256) is an APPEND too, added 2026-11-14, and the header still
+// says 1 for the same reason. It is here for update detection: DOORMAN and
+// DOORREPO compare the sha256 of the archive they installed against this
+// field to flag a door whose archive changed upstream, without a per-door
+// /manifest or /archive request. It costs 64 bytes per row on every catalog
+// fetch, which the sysop accepted for that. Empty when the row has no digest
+// yet (same rule as md5); the field is always present, so rows keep exactly
+// 11 fields.
 
 /**
  * Rendered-catalog cache, keyed by the catalog revision and the filters.
@@ -447,7 +450,7 @@ export function renderListTxt(m: DoorRepoManifest): Buffer {
     const hasDoc = d.hasDoc ? '1' : '0';
     lines.push(
       `${archiveName}|${doorType}|${archiveSize}|${md5}|${name}|${description}` +
-        `|${author}|${releaseGroup}|${d.junkCount}|${hasDoc}`
+        `|${author}|${releaseGroup}|${d.junkCount}|${hasDoc}|${d.sha256 ?? ''}`
     );
   }
 

@@ -73,6 +73,23 @@ describe('renderListTxt', () => {
     expect(lines).toHaveLength(2);
   });
 
+  it('appends sha256 as field 11, empty when the row has none', () => {
+    const db = openDb(cfg);
+    db.prepare(
+      `INSERT INTO door_catalog (id, archive_name, archive_path, name, door_type, indexed_at)
+       VALUES ('id3', 'NOSHA.LHA', 'NOSHA.LHA', 'No digest', 'XIM', 1700000000)`
+    ).run();
+    db.close();
+    const rows = renderListTxt(buildManifest(cfg)).toString('latin1').split('\r\n')
+      .filter((l) => l.length > 0 && !l.startsWith('DOORREPO|')).map((l) => l.split('|'));
+    const withSha = rows.find((f) => f[0] === 'ACC-V103.LHA')!;
+    const noSha = rows.find((f) => f[0] === 'NOSHA.LHA')!;
+    expect(withSha).toHaveLength(11);
+    expect(withSha[10]).toBe('bb');
+    expect(noSha).toHaveLength(11);
+    expect(noSha[10]).toBe('');
+  });
+
   it('collapses embedded newlines so one door is one line', () => {
     // The description column no longer reaches list.txt - it is read out of
     // FILE_ID.DIZ now (src/describe.ts) - so the one-row/one-line invariant
@@ -89,7 +106,7 @@ describe('renderListTxt', () => {
     expect(body).toContain('Name one Name two');
     const dataLines = body.split('\r\n').filter((l) => l.length > 0 && !l.startsWith('DOORREPO|'));
     expect(dataLines).toHaveLength(2);
-    for (const line of dataLines) expect(line.split('|')).toHaveLength(10);
+    for (const line of dataLines) expect(line.split('|')).toHaveLength(11);
   });
 
   it('separates every row with CRLF and terminates the body with one', () => {
@@ -144,7 +161,7 @@ describe('renderListTxt', () => {
     expect(pipe2).toContain('With a pipe in its own DIZ.');
     const dataLines = body.split('\r\n').filter((l) => l.length > 0 && !l.startsWith('DOORREPO|'));
     for (const line of dataLines) {
-      expect(line.split('|')).toHaveLength(10);
+      expect(line.split('|')).toHaveLength(11);
     }
   });
 });
