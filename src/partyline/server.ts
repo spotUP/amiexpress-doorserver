@@ -14,7 +14,8 @@ import { withAchievementsDb } from '../achievements/db';
 import type { AchievementsConfig } from '../achievements/config';
 import { loadChatConfig, nowSec } from '../chat/config';
 import type { ChatConfig } from '../chat/config';
-import { PartylineSession, stubScreen } from './session';
+import { PartylineSession } from './session';
+import { chatScreen } from './ui/screen';
 import type { ScreenFactory } from './session';
 
 export interface PartylineConfig {
@@ -69,7 +70,7 @@ export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsCon
 
   const attach = (sock: Duplex, isTls: boolean): void => {
     const s = new PartylineSession(sock, {
-      ach, chat, screen: opts.screen ?? stubScreen, tls: isTls,
+      ach, chat, screen: opts.screen ?? chatScreen(ach, chat), tls: isTls,
       isDraining: () => draining,
       onClose: (gone) => sessions.delete(gone),
       log,

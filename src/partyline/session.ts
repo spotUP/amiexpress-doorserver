@@ -27,11 +27,15 @@ export interface PartylineScreen {
   resize(cols: number, rows: number): void;
   input(bytes: Buffer): void;
   render(full: boolean): Buffer;
+  /** The connection is gone: drop subscriptions. */
+  close?(): void;
 }
 
 export interface ScreenInfo {
   sid: string;
   user: string;
+  /** The authenticated board's id (resolveSession needs it). */
+  boardId: string;
   hello: PlpHello;
   /** Call when the model changed; the session coalesces and flushes. */
   markDirty: () => void;
@@ -187,14 +191,15 @@ export class PartylineSession {
     const hello = this.hello!;
     let sid: string;
     let user: string;
+    let boardId: string;
     try {
       const out = withAchievementsDb(this.deps.ach, (db) => {
         const auth = verifyAuth(db, hello, this.nonce, mac);
         if (!auth.ok) return auth;
-        return db.transaction(() => ({ ok: true as const, ...this.openChatSession(db, auth.boardId, hello) }))();
+        return db.transaction(() => ({ ok: true as const, boardId: auth.boardId, ...this.openChatSession(db, auth.boardId, hello) }))();
       });
       if (!out.ok) return this.refuse(out.reason);
-      ({ sid, user } = out);
+      ({ sid, user, boardId } = out);
     } catch (err) {
       if (err instanceof SurfaceError && err.status === 429) return this.refuse('rate_limited');
       this.deps.log(`[ERROR] partyline ${this.id} login failed: ${(err as Error).message}`);
@@ -206,7 +211,7 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, hello, markDirty: () => this.markDirty() });
+    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty() });
     this.markDirty(true);
   }
 
@@ -291,6 +296,7 @@ export class PartylineSession {
     if (this.loginTimer) clearTimeout(this.loginTimer);
     this.timer = null;
     this.loginTimer = null;
+    this.screen?.close?.();
     this.deps.onClose(this);
   }
 }

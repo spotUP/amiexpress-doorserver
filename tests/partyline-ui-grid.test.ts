@@ -7,6 +7,15 @@ import * as path from 'path';
 import { Cells, BG_DEFAULT, BOLD, cellCh, cellFg, cellBg, cellFlags } from '../src/partyline/ui/cells';
 import { Model, newLine, newSide, SYSTEM, ACTIVITY_LINE, HISTORY, LIVE, SIDE_HEAD, SIDE_ROOM, SIDE_USER, T_BAR } from '../src/partyline/ui/model';
 import { draw, DrawState } from '../src/partyline/ui/draw';
+import request from 'supertest';
+import { makeAchievementsFixture } from './achievements/helpers';
+import type { AchievementsFixture } from './achievements/helpers';
+import { withAchievementsDb } from '../src/achievements/db';
+import { loadChatConfig } from '../src/chat/config';
+import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
+import { chatScreen } from '../src/partyline/ui/screen';
+import type { HubScreen } from '../src/partyline/ui/screen';
+import type { ScreenInfo } from '../src/partyline/session';
 
 export function mainState(cols: number, rows: number): Model {
   const m = new Model(cols, rows);
@@ -85,5 +94,55 @@ describe('partyline ui: LIVECHAT68 main screen grid', () => {
       expect(diffs.slice(0, 8)).toEqual([]);
     });
   }
-  it.skip('a /chat/v1 client drives the same grid (waits for P1 server/frames)', () => undefined);
+});
+
+/** A Partyline screen and a /chat/v1 client share one store: a line posted over HTTP lands on the screen grid. */
+describe('partyline ui: /chat/v1 drives the hub screen', () => {
+  let fx: AchievementsFixture;
+  beforeEach(() => { fx = makeAchievementsFixture(); });
+  afterEach(() => { _stopChatSweepersForTests(); fx.cleanup(); });
+
+  const rowText = (c: Cells, r: number): string => {
+    let s = '';
+    for (let x = 0; x < c.cols; x++) s += String.fromCharCode(cellCh(c.back[r * c.cols + x]));
+    return s;
+  };
+  const gridHas = (c: Cells, needle: string): boolean => {
+    for (let r = 0; r < c.rows; r++) if (rowText(c, r).includes(needle)) return true;
+    return false;
+  };
+
+  it('shows a message posted through POST /chat/v1/rooms/:id/messages', async () => {
+    const call = (method: 'post', p: string, sid: string) => request(fx.app)[method](`/chat/v1${p}`).set('Authorization', fx.auth).set('X-Chat-Session', sid);
+    const web = (await request(fx.app).post('/chat/v1/sessions').set('Authorization', fx.auth).send({ handle: 'alice', sysop: true })).body.sid as string;
+    const room = (await call('post', '/rooms', web).send({ name: 'lobby' })).body.id as string;
+    expect((await call('post', `/rooms/${room}/join`, web).send({})).status).toBe(200);
+
+    const chat = loadChatConfig();
+    const plSid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'bob', sysop: false, client: 'test' }).sid);
+    let dirty = 0;
+    const hello = { cols: 80, rows: 25 } as ScreenInfo['hello'];
+    const screen = chatScreen(fx.ach, chat)({ sid: plSid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => { dirty++; } }) as HubScreen;
+    try {
+      screen.render(true);
+      expect(screen.model.room).toBe('lobby');
+      expect(gridHas(screen.cells, 'Joined #lobby')).toBe(true);
+
+      expect((await call('post', `/rooms/${room}/messages`, web).send({ content: 'hello from the web', clientId: 'w1' })).status).toBe(201);
+      await new Promise<void>((r) => setImmediate(r));
+      expect(dirty).toBeGreaterThan(0);
+      const out = screen.render(false).toString('latin1');
+      expect(out).toContain('hello from the web');
+      expect(gridHas(screen.cells, 'hello from the web')).toBe(true);
+      expect(gridHas(screen.cells, 'alice')).toBe(true);
+
+      // And back: a line typed on the screen is a /chat/v1 message.
+      screen.input(Buffer.from('hi from partyline\r', 'latin1'));
+      await new Promise<void>((r) => setImmediate(r));
+      screen.render(false);
+      expect(gridHas(screen.cells, 'hi from partyline')).toBe(true);
+    } finally {
+      screen.close();
+    }
+  });
 });
