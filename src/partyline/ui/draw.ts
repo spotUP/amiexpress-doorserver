@@ -1,14 +1,16 @@
 /**
  * Partyline hub engine: lc_draw ported 1:1 from amiexpress-web sdk/c/examples/livechat/livechat_ui.c.
  * The C keeps its draw state in statics; the hub runs many sessions in one process, so it lives in DrawState.
- * Not ported yet: the overlays (slash menu, context popup, format/emoji pickers, help, view, search, settings,
- * theme, modal) and the canvas/pen picker. lc_draw draws them last, over this frame.
+ * Overlays (help, view, search, settings, modal) live in overlays.ts. The slash menu is slash.ts. Not ported yet: context popup,
+ * format/emoji pickers, theme and the canvas/pen picker.
  */
 import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, wrap } from './cells';
+import { cover, drawOverlays, OverlayState, Rect } from './overlays';
+import { drawSlash } from './slash';
 import { Model, Side, lineMarked, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
 
 export const HIT_NONE = 0, HIT_MENU = 1, HIT_DROPDOWN = 2, HIT_SIDEBAR = 3, HIT_CHAT = 4, HIT_INPUT = 5,
-  HIT_STATUS = 6, HIT_SCROLLBAR = 7, HIT_POPUP = 8;
+  HIT_STATUS = 6, HIT_POPUP = 7, HIT_SCROLLBAR = 12; // the C lc_hit numbers
 const WRAP_MAX = 24, CHAT_ROWS_MAX = 64;
 export const MENU_TEXT = ' Chat v4.0.0   Tools   View   Help  ';
 export const MENU_COL = [1, 15, 23, 30];
@@ -22,6 +24,8 @@ const MENU_LABELS = ['Chat v4.0.0', 'Tools', 'View', 'Help'];
 
 export class DrawState {
   hits = new Hits();
+  /** lc_covers: the boxes the overlays painted this frame (picture placement skips them). */
+  covers: Rect[] = [];
   chatBody = 0; chatLeft = 0; chatRows = 0; chatWidth = 0;
   chatRowLine = new Int16Array(CHAT_ROWS_MAX).fill(-1);
   barBody = 0; barRows = 0; barThumb = 0; barSpan = 0;
@@ -156,10 +160,11 @@ function drawInput(c: Cells, m: Model): { cr: number; cc: number } {
   return { cr: row + 1, cc: 1 + m.inputCur - from };
 }
 
-/** lc_draw without the overlays: menubar, sidebar, chat pane, input, status bar, open menu. */
-export function draw(c: Cells, m: Model, d: DrawState): { cr: number; cc: number } {
+/** lc_draw: menubar, sidebar, chat pane, input, status bar, open menu, then the overlays in the C order. */
+export function draw(c: Cells, m: Model, d: DrawState, o?: OverlayState): { cr: number; cc: number } {
   const p = m.pal, W = c.cols, H = c.rows, sw = m.sidebarWidth(), h = H - 5;
   d.hits.reset();
+  d.covers.length = 0;
   d.barRows = 0;
   drawMenubar(c, m);
   for (let i = 0; i < 4; i++) d.hits.add(HIT_MENU, 0, MENU_COL[i], 1, MENU_LABELS[i].length);
@@ -173,6 +178,8 @@ export function draw(c: Cells, m: Model, d: DrawState): { cr: number; cc: number
     c.pen(p.ink, DEFAULT, 0);
     const mw = c.menu(1, MENU_COL[m.menu] - 1, MENU_ITEMS[m.menu], m.menuSel, p.accent, p.ink, p.accent);
     d.hits.add(HIT_DROPDOWN, 2, MENU_COL[m.menu], MENU_ITEMS[m.menu].length, mw - 2);
+    cover(d, 1, MENU_COL[m.menu] - 1, MENU_ITEMS[m.menu].length + 2, mw);
   }
+  if (o) { drawSlash(c, m, d, o); drawOverlays(c, m, d, o, caret); }
   return caret;
 }
