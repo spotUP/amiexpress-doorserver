@@ -170,6 +170,13 @@ describe('hub screen commands', () => {
     type('/emoji '); expect(o.fmt).toBe(true);
   });
 
+  it('a full frame turns on SGR mouse reports only when the board says the caller has a mouse', () => {
+    expect(screen.render(true).toString('latin1')).not.toContain('\x1b[?1006h');
+    (screen.info.hello as { mouse: boolean }).mouse = true;
+    expect(screen.render(true).toString('latin1')).toContain('\x1b[?1000h\x1b[?1006h');
+    expect(screen.render(false).toString('latin1')).not.toContain('\x1b[?1006h');
+  });
+
   it('emoji picker mouse: category click, item click selects then inserts, [X] closes, wheel scrolls, outside click closes', () => {
     const o = screen.over;
     const click = (id: number, dr = 0, x = 0): void => {
