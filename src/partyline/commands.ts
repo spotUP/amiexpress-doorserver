@@ -436,22 +436,24 @@ const EMOJI_META: Record<string, [number, string]> = {
 const EMOJI_CATS: [string, number][] = [['emotions', 0], ['emotion', 0], ['actions', 1], ['action', 1], ['symbols', 2], ['symbol', 2], ['special', 3]];
 const CAT_NAMES = ['Emotions', 'Actions', 'Symbols', 'Special'];
 interface EmojiEntry { code: string; face: string; cat: number; keywords: string }
-const allEmoji = (s: HubScreen): EmojiEntry[] => [
+export const allEmoji = (s: HubScreen): EmojiEntry[] => [
   ...EMOJI.map(([code, face]) => ({ code, face, cat: EMOJI_META[code]?.[0] ?? 3, keywords: EMOJI_META[code]?.[1] ?? '' })),
   ...s.model.customEmoji.map((e) => ({ code: `:${e.name}:`, face: e.ascii, cat: 3, keywords: 'custom' })),
+  ...s.imageEmoji.map((n) => ({ code: `:${n}:`, face: `:${n}:`, cat: 3, keywords: 'custom' })),
 ];
 const emojiLine = (e: EmojiEntry): string => `  ${e.face}  ${e.code} (${e.keywords})`;
 
 /** load_custom_emoji: the hub's custom emoji, so ":name:" in a message shows its ascii face. Best effort. */
 export function loadCustomEmoji(s: HubScreen): void {
   const rows = s.tryRun(false, (db) => listEmoji(db));
+  s.imageEmoji = (rows ?? []).filter((r) => r.ascii === '' && r.display !== '').map((r) => r.name);
   s.model.customEmoji = (rows ?? []).filter((r) => r.ascii !== '').map((r) => ({ name: r.name, ascii: r.ascii }));
 }
 
-/** emoji_search_typed: code or any keyword contains the query; first 10. No query: C opens the picker, here the categories print. */
+/** emoji_search_typed: code or any keyword contains the query; first 10. No query opens the picker. */
 function emojiTyped(s: HubScreen, rest: string): void {
   const q = rest.trim().toLowerCase();
-  if (q === '') { emojisTyped(s, ''); return; }
+  if (q === '') { s.openPicker(); return; }
   const hits = allEmoji(s).filter((e) => e.code.includes(q) || e.keywords.split(', ').some((k) => k.includes(q)));
   if (hits.length === 0) { s.systemLine(`No emojis found for "${q.slice(0, 100)}"`); return; }
   s.systemLine(`Emojis matching "${q.slice(0, 100)}":`);
