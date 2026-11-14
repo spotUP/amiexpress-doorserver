@@ -352,7 +352,9 @@ export class HubScreen implements PartylineScreen {
   render(full: boolean): Buffer {
     if (full) this.cells.invalidate();
     const { cr, cc } = draw(this.cells, this.model, this.drawState, this.over);
-    return Buffer.from(this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), 'latin1');
+    // A full frame (first paint, resize, redraw) re-arms SGR mouse reports; input() parses them.
+    const mouseOn = full && this.info.hello.mouse ? '\x1b[?1000h\x1b[?1006h' : '';
+    return Buffer.from(mouseOn + this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), 'latin1');
   }
 
   close(): void { this.off(); }
