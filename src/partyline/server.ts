@@ -16,6 +16,7 @@ import { loadChatConfig, nowSec } from '../chat/config';
 import type { ChatConfig } from '../chat/config';
 import { PartylineSession } from './session';
 import { chatScreen } from './ui/screen';
+import { livechatScreen } from './livechat-host';
 import type { ScreenFactory } from './session';
 
 export interface PartylineConfig {
@@ -62,6 +63,8 @@ export interface PartylineOptions {
 export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsConfig, opts: PartylineOptions = {}): PartylineServer {
   const chat = opts.chat ?? loadChatConfig();
   const log = opts.log ?? ((line: string) => console.log(line));
+  // PARTYLINE_ENGINE=livechat hosts the board's LIVECHAT door per caller; the default is the hub's own chat screen.
+  const screen = opts.screen ?? (process.env.PARTYLINE_ENGINE === 'livechat' ? livechatScreen(ach, chat, undefined, log) : chatScreen(ach, chat, opts.filesDir ?? null));
   const sessions = new Set<PartylineSession>();
   let draining = false;
   // Stale sessions are swept by the /chat/v1 router's sweeper (createApp mounts it whenever achievements is on).
@@ -72,7 +75,7 @@ export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsCon
 
   const attach = (sock: Duplex, isTls: boolean): void => {
     const s = new PartylineSession(sock, {
-      ach, chat, screen: opts.screen ?? chatScreen(ach, chat, opts.filesDir ?? null), tls: isTls,
+      ach, chat, screen, tls: isTls,
       isDraining: () => draining,
       onClose: (gone) => sessions.delete(gone),
       log,

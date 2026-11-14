@@ -5,8 +5,6 @@ const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
-  // The hosted LIVECHAT door pulls the SDK, whose audio engine imports ESM-only tone.
-  moduleNameMapper: { '^tone$': '<rootDir>/tests/stubs/tone.js' },
   collectCoverageFrom: ['src/**/*.ts'],
 };
 
