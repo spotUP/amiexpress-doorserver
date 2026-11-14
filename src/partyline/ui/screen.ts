@@ -24,7 +24,7 @@ import { draw, DrawState } from './draw';
 import { ACTIVITY_LINE, FOCUS_INPUT, HISTORY, LIVE, Model, newLine, SYSTEM, TEXT_MAX } from './model';
 import { MODAL_NONE, MODAL_QUIT, OverlayState } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
-import { runCommand } from '../commands';
+import { loadCustomEmoji, runCommand } from '../commands';
 
 /** ui_key.h codes. */
 export const K_UP = 1000, K_DOWN = 1001, K_PGUP = 1002, K_PGDN = 1003, K_HOME = 1004, K_END = 1005, K_ENTER = 1006, K_ESC = 1007,
@@ -94,6 +94,7 @@ export class HubScreen implements PartylineScreen {
   private firstRoom(): void {
     const id = this.tryRun(false, (db, ctx) => listMemberships(db, ctx)[0]?.roomId ?? listRooms(db, ctx)[0]?.id ?? '');
     if (id) this.joinRoom(id);
+    loadCustomEmoji(this);
   }
 
   /** livechat.c join_room: switch rooms, clear the lines, say so. */

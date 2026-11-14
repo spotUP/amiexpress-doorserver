@@ -8,9 +8,10 @@
  * table lists as aliases (users, channels, +1, -1, heart, fire): C_ALIAS and
  * C_DROP keep run_command's behaviour on both sides.
  */
-import { addIgnore, clearPresence, clearRoom, createRoom, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
+import { addIgnore, clearPresence, clearRoom, createRoom, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
 import { CMD_HELP } from './ui/slash';
+import { EMOJI, emojiBuiltin } from './ui/model';
 import { stamp } from './ui/screen';
 import type { HubScreen } from './ui/screen';
 
@@ -418,6 +419,81 @@ function clearRoomTyped(s: HubScreen, rest: string): void {
   if (s.tryRun(true, (db, ctx) => { clearRoom(db, ctx, id); return true; })) s.systemLine(`Clear history requested for ${(hit?.name ?? s.model.room).slice(0, 36)}`);
 }
 
+// ---- emoji, emojis, customemoji (livechat.c emoji_search_typed, emojis_typed, customemoji_typed) ----
+/** livechat_ui.c emoji_table: category (0 Emotions, 1 Actions, 2 Symbols, 3 Special) and keywords per ui/model EMOJI code. */
+const EMOJI_META: Record<string, [number, string]> = {
+  ':smile:': [0, 'happy, grin'], ':grin:': [0, 'big, smile, laugh'], ':joy:': [0, 'laugh, lol'], ':wink:': [0, 'flirt'], ':heart:': [0, 'love'],
+  ':sad:': [0, 'unhappy, frown'], ':cry:': [0, 'tears, sob'], ':shock:': [0, 'surprised, wow'], ':angry:': [0, 'mad, furious'],
+  ':cool:': [0, 'sunglasses, awesome'], ':tongue:': [0, 'playful, silly'], ':kiss:': [0, 'love, romance'], ':blush:': [0, 'shy, embarrassed'],
+  ':confused:': [0, 'unsure, puzzled'], ':neutral:': [0, 'meh, okay'], ':surprised:': [0, 'wow, shocked'], ':evil:': [0, 'devil, mischief'],
+  ':angel:': [0, 'innocent, halo'], ':tableflip:': [1, 'rage, flip, angry'], ':unflip:': [1, 'calm, fix'], ':shrug:': [1, 'dunno, whatever'],
+  ':fight:': [1, 'battle, fite'], ':dance:': [1, 'party'], ':hug:': [1, 'cuddle, embrace'], ':run:': [1, 'flee, escape'], ':wave:': [1, 'hello, bye'],
+  ':facepalm:': [1, 'disappointed, sigh'], ':thumbsup:': [2, 'yes, ok, good'], ':thumbsdown:': [2, 'no, bad'], ':fire:': [2, 'hot, lit'],
+  ':star:': [2, 'favorite'], ':check:': [2, 'yes, done'], ':x:': [2, 'no, fail'], ':skull:': [2, 'death, pirate'], ':music:': [2, 'song, note'],
+  ':heart2:': [2, 'love, like'], ':diamond:': [2, 'gem, shine'], ':arrow:': [2, 'next, go'], ':warning:': [2, 'caution, alert'],
+  ':lightning:': [2, 'power, fast'], ':amiga:': [3, 'boing, retro, computer'], ':bbs:': [3, 'board, system'], ':door:': [3, 'game, app'],
+};
+const EMOJI_CATS: [string, number][] = [['emotions', 0], ['emotion', 0], ['actions', 1], ['action', 1], ['symbols', 2], ['symbol', 2], ['special', 3]];
+const CAT_NAMES = ['Emotions', 'Actions', 'Symbols', 'Special'];
+interface EmojiEntry { code: string; face: string; cat: number; keywords: string }
+const allEmoji = (s: HubScreen): EmojiEntry[] => [
+  ...EMOJI.map(([code, face]) => ({ code, face, cat: EMOJI_META[code]?.[0] ?? 3, keywords: EMOJI_META[code]?.[1] ?? '' })),
+  ...s.model.customEmoji.map((e) => ({ code: `:${e.name}:`, face: e.ascii, cat: 3, keywords: 'custom' })),
+];
+const emojiLine = (e: EmojiEntry): string => `  ${e.face}  ${e.code} (${e.keywords})`;
+
+/** load_custom_emoji: the hub's custom emoji, so ":name:" in a message shows its ascii face. Best effort. */
+export function loadCustomEmoji(s: HubScreen): void {
+  const rows = s.tryRun(false, (db) => listEmoji(db));
+  s.model.customEmoji = (rows ?? []).filter((r) => r.ascii !== '').map((r) => ({ name: r.name, ascii: r.ascii }));
+}
+
+/** emoji_search_typed: code or any keyword contains the query; first 10. No query: C opens the picker, here the categories print. */
+function emojiTyped(s: HubScreen, rest: string): void {
+  const q = rest.trim().toLowerCase();
+  if (q === '') { emojisTyped(s, ''); return; }
+  const hits = allEmoji(s).filter((e) => e.code.includes(q) || e.keywords.split(', ').some((k) => k.includes(q)));
+  if (hits.length === 0) { s.systemLine(`No emojis found for "${q.slice(0, 100)}"`); return; }
+  s.systemLine(`Emojis matching "${q.slice(0, 100)}":`);
+  for (const e of hits.slice(0, 10)) s.systemLine(emojiLine(e));
+  if (hits.length > 10) s.systemLine(`  ... and ${hits.length - 10} more`);
+}
+
+/** emojis_typed: the category list, or one category's emojis. */
+function emojisTyped(s: HubScreen, rest: string): void {
+  const w = firstWord(rest).toLowerCase();
+  if (w === '') {
+    for (const l of ['Emoji Categories:', '  emotions - Smileys and emotions', '  actions - Kaomoji actions', '  symbols - Common symbols', '  special - BBS-themed emojis', '',
+      'Use /emojis <category> to list emojis in a category', 'Use /emoji <search> to search emojis']) s.systemLine(l);
+    return;
+  }
+  const cat = EMOJI_CATS.find(([n]) => n === w)?.[1];
+  if (cat === undefined) { s.systemLine(`Unknown category "${w.slice(0, 30)}". Use /emojis to see all categories.`); return; }
+  s.systemLine(`${CAT_NAMES[cat]} Emojis:`);
+  for (const e of allEmoji(s).filter((x) => x.cat === cat)) s.systemLine(emojiLine(e));
+}
+
+/** customemoji_typed: list | add <name> <display> <ascii> | remove <name>. The store refuses a non-sysop add or remove. */
+function customEmojiTyped(s: HubScreen, rest: string): void {
+  const sub = firstWord(rest).toLowerCase();
+  const args = afterWord(rest).split(/ +/).filter((x) => x !== '');
+  if (sub === '' || sub === 'list') {
+    const rows = (s.tryRun(false, (db) => listEmoji(db)) ?? []).filter((r) => r.display !== '' && r.ascii !== '');
+    for (const r of rows) s.systemLine(`  ${r.name.slice(0, 32)}  web ${r.display.slice(0, 32)}  telnet ${r.ascii.slice(0, 32)}`);
+    if (rows.length === 0) s.systemLine('No custom emoji yet.');
+    return;
+  }
+  if (sub !== 'add' && sub !== 'remove') { s.systemLine('Usage: /customemoji add <name> <display> <ascii> | remove <name> | list'); return; }
+  const name = (args[0] ?? '').replace(/^:/, '').replace(/:$/, '').toLowerCase();
+  if (sub === 'remove') {
+    if (name === '') { s.systemLine('Usage: /customemoji remove <name>'); return; }
+    s.tryRun(true, (db, ctx) => { deleteEmoji(db, ctx, name, s.info.boardId); return true; });
+  } else if (name === '' || !args[1] || !args[2]) s.systemLine('Usage: /customemoji add <name> <display> <ascii>');
+  else if (emojiBuiltin(`:${name}:`)) s.systemLine(`:${name}: is a built-in emoji.`);
+  else { const [, display, ascii] = args; s.tryRun(true, (db, ctx) => { putEmoji(db, ctx, name, { display, ascii }, s.info.boardId); return true; }); }
+  loadCustomEmoji(s);
+}
+
 /** run_command: true means quit. */
 export function runCommand(s: HubScreen, line: string): boolean {
   const word = firstWord(line.slice(1)).toLowerCase();
@@ -495,6 +571,9 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'events': eventsTyped(s, rest); return false;
     case 'sounds': soundsTyped(s, rest); return false;
     case 'settings': settingsTyped(s); return false;
+    case 'emoji': emojiTyped(s, rest); return false;
+    case 'emojis': emojisTyped(s, rest); return false;
+    case 'customemoji': customEmojiTyped(s, rest); return false;
     case 'clear-room': clearRoomTyped(s, rest); return false;
     case null:
       s.systemLine('Unknown command. Type /help for help.');
