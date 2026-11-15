@@ -24,7 +24,7 @@ import { newId, resolveSession, splitUser } from '../chat/sessions';
 import type { ChatCtx } from '../chat/sessions';
 import {
   addIgnore, createRoom, deleteMessage, dmHistory, dmParticipants, dmThreads, editMessage, invite, joinRoom, leaveRoom, listEmoji, listIgnores,
-  listPins, listRooms, moderate, pin, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
+  clearRoom, deleteRoom, getPrefs, listPins, listRooms, moderate, muteSecondsLeft, pin, setOp, setPrefs, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
   search, setMode, setPresence, setRoomMotd, setTopic, setTyping, threadHistory, unreact, getDiscordMirror, setDiscordMirror,
 } from '../chat/store';
 import { SurfaceError } from '../achievements/errors';
@@ -91,11 +91,18 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     const counts = (id: string): Record<string, number> =>
       Object.fromEntries(store(false, (db, ctx) => reactionRows(db, ctx, id)).map((r) => [r.emoji, r.count]));
     const ignoreList = (): void => reply('chat:ignore-list', { users: store(false, (db, ctx) => listIgnores(db, ctx)).map((r) => short(r.user)) });
-    const pinList = (id: string): void => reply('chat:pin:list', {
+    const pinList = (id: string, ev = 'chat:pin:list'): void => reply(ev, {
       roomId: id,
       pinnedMessages: store(false, (db, ctx) => listPins(db, ctx, id)).map((p) => ({ messageId: p.messageId, id: p.messageId, username: short(p.user), content: p.content, pinnedBy: short(p.pinnedBy), createdAt: when(p.messageAt), pinnedAt: when(p.at) })),
     });
     const msgOf = (h: { id: string; user: string; text: string; at: number }): Payload => ({ id: h.id, messageId: h.id, username: short(h.user), userId: h.user, content: h.text, message: h.text, createdAt: when(h.at) });
+    // The door names a channel by name or id (admin:*, /delete #name).
+    const roomIdOf = (d: Payload): string => {
+      const n = str(d, 'channel', 'roomId', 'roomName').replace(/^#/, '').toLowerCase();
+      const hit = store(false, (db, ctx) => listRooms(db, ctx)).find((x) => x.id === n || x.name.toLowerCase() === n);
+      if (!hit) reply('room:error', { message: `Channel ${n.slice(0, 40)} not found` });
+      return hit?.id ?? '';
+    };
     const moderation = (action: 'kick' | 'ban' | 'unban' | 'mute' | 'unmute') => (d: Payload): void => needRoom((id) => {
       const minutes = Number(d.minutes ?? d.duration);
       store(true, (db, ctx) => moderate(db, ctx, id, action, { user: target(d), reason: str(d, 'reason'), ...(minutes > 0 ? { minutes } : {}) }));
@@ -151,7 +158,8 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       'chat:ignore': (d) => { store(true, (db, ctx) => addIgnore(db, ctx, { user: full(str(d, 'user', 'username')) })); ignoreList(); },
       'chat:unignore': (d) => { store(true, (db, ctx) => removeIgnore(db, ctx, full(str(d, 'user', 'username')))); ignoreList(); },
       'chat:ignore-list': ignoreList,
-      'chat:prefs': () => reply('chat:prefs', { prefs: {} }),
+      'chat:prefs': () => reply('chat:prefs', { prefs: store(false, (db, ctx) => getPrefs(db, ctx)) }),
+      'chat:prefs-set': (d) => { store(true, (db, ctx) => setPrefs(db, ctx, d.prefs)); },
       // /discord [on|off]: same replies as the board's federation bridge (chat-session-bridge.ts).
       'chat:discord': (d) => {
         const text = (on: boolean): string => `Discord mirror is ${on ? 'ON' : 'OFF'} for this board.`;
@@ -174,13 +182,19 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       'room:revoke-invite': (d) => needRoom((id) => { store(true, (db, ctx) => invite(db, ctx, id, {}, false, target(d))); }),
       'room:kick': moderation('kick'),
       'chat:kick': moderation('kick'),
+      'admin:kick-user': moderation('kick'),
+      'admin:ban-user': moderation('ban'),
+      // /op @user, /op -@user, /deop @user: the door sends room:op {username, op}; the hub answers with an op event.
+      'room:op': (d) => needRoom((id) => { store(true, (db, ctx) => setOp(db, ctx, id, { user: target(d) }, d.op !== false)); }),
+      'admin:clear-channel-history': (d) => { const id = roomIdOf(d); if (id) store(true, (db, ctx) => clearRoom(db, ctx, id)); },
+      'admin:delete-channel': (d) => { const id = roomIdOf(d); if (id) store(true, (db, ctx) => deleteRoom(db, ctx, id)); },
       'chat:ban': moderation('ban'),
       'chat:unban': moderation('unban'),
       'chat:mute': moderation('mute'),
       'chat:unmute': moderation('unmute'),
       'chat:pin:add': (d) => needRoom((id) => { store(true, (db, ctx) => pin(db, ctx, id, { messageId: str(d, 'messageId', 'id') }, true)); pinList(id); }),
       'chat:pin:remove': (d) => needRoom((id) => { store(true, (db, ctx) => pin(db, ctx, id, {}, false, str(d, 'messageId', 'id'))); pinList(id); }),
-      'chat:pin:list': () => needRoom(pinList),
+      'chat:pin:list': () => needRoom((id) => pinList(id)),
       // A hub thread is the replies to one message; the title is its first reply.
       'chat:thread:create': (d) => {
         const messageId = str(d, 'messageId', 'id');
@@ -205,7 +219,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     };
 
     // Out of scope for the Partyline host: dropped quietly (the door never waits on these).
-    const DROPPED = /^(audio|voice|video|file|draw|door):|^chat:(auth-token|prefs-set)$|^chat:keystroke/;
+    const DROPPED = /^(audio|voice|video|file|draw|door):|^admin:archive-channel$|^chat:auth-token$|^chat:keystroke/;
     const onEmit = (ev: string, data: Payload): void => {
       const h = handlers[ev];
       if (!h) { log(`[partyline-livechat] ${DROPPED.test(ev) ? 'dropped' : 'unhandled'} ${ev}`); return; }
@@ -226,7 +240,9 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         const here = !!room && e.room_id === room.id;
         const at = when(e.at);
         switch (e.type) {
-          case 'message': if (here && !mine) reply('chat:message', { id: e.ref, channelId: e.room_id, userId: e.user, username: short(e.user), content: e.text, type: 'message', createdAt: at }); break;
+          case 'message':
+            if (here && !mine && e.label.startsWith('thread:')) reply('chat:thread:reply', { threadId: e.label.slice(7), messageId: e.ref, username: short(e.user), content: e.text, createdAt: at });
+            else if (here && !mine) reply('chat:message', { id: e.ref, channelId: e.room_id, userId: e.user, username: short(e.user), content: e.text, type: 'message', createdAt: at }); break;
           case 'edit': if (here) reply('chat:edited', { messageId: e.ref, username: short(e.user), content: e.text, createdAt: at }); break;
           case 'delete': if (here && e.ref !== '*') reply('chat:deleted', { messageId: e.ref }); break;
           case 'react': case 'unreact': if (here) reply('chat:reaction', { messageId: e.ref, username: short(e.user), emoji: e.text, action: e.type === 'react' ? 'add' : 'remove', counts: counts(e.ref) }); break;
@@ -234,10 +250,24 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
           case 'topic': if (here) reply('room:topic', { roomId: e.room_id, topic: e.text, by: short(e.user) }); break;
           case 'room_motd': if (here) reply('room:motd', { motd: e.text }); break;
           case 'mode': if (here) reply('room:mode', { applied: e.text, by: short(e.user) }); break;
+          // The board's own activity: the door prints it as [EVENT] lines (payload as the web board's bbs:event).
+          case 'bbs': {
+            const data = Object.fromEntries(new URLSearchParams(e.text));
+            reply('bbs:event', { type: e.ref, username: short(e.user), nodeId: Number(e.label) || 0, timestamp: e.at * 1000, data });
+            break;
+          }
           case 'presence': { const [status, ...custom] = e.text.split('|'); reply('chat:presence', { userId: e.user, username: short(e.user), status, custom: custom.join('|') }); break; }
+          case 'pin': if (here) pinList(e.room_id!, 'chat:pin:updated'); break;
+          case 'joined': case 'left': if (here && !mine) reply(`room:user-${e.type}`, { userId: e.user, username: short(e.user) }); break;
+          case 'op': case 'deop': if (here) reply('room:op-changed', { username: short(e.user), op: e.type === 'op', by: short(e.ref) }); break;
+          case 'room_deleted':
+            reply('room:deleted', { roomId: e.room_id, roomName: e.text });
+            if (here) room = null;
+            break;
           case 'kicked': case 'banned': case 'muted':
             if (here && e.user === me) {
-              reply(`chat:${e.type}`, { reason: e.text, duration: 'permanent' });
+              const left = e.type === 'muted' ? store(false, (db) => muteSecondsLeft(db, e.room_id!, e.user)) : null;
+              reply(`chat:${e.type}`, { reason: e.text, ...(left !== null ? { duration: left } : {}) });
               if (e.type !== 'muted') room = null;
             }
             break;

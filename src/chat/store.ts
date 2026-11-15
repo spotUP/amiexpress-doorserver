@@ -319,6 +319,20 @@ export function removeIgnore(db: Database.Database, ctx: ChatCtx, target: string
   db.prepare('DELETE FROM chat_ignores WHERE owner = ? AND target = ?').run(ctx.user, target);
 }
 
+/** The door preferences stored for the caller; {} when none. */
+export function getPrefs(db: Database.Database, ctx: ChatCtx): Record<string, unknown> {
+  requireSession(ctx);
+  const r = db.prepare('SELECT json FROM chat_prefs WHERE user = ?').get(ctx.user) as { json: string } | undefined;
+  return r ? (JSON.parse(r.json) as Record<string, unknown>) : {};
+}
+
+export function setPrefs(db: Database.Database, ctx: ChatCtx, prefs: unknown): void {
+  requireSession(ctx);
+  const json = JSON.stringify(prefs);
+  if (prefs === null || typeof prefs !== 'object' || Array.isArray(prefs) || json.length > 4000) throw new SurfaceError('bad_request', 400, 'prefs must be an object under 4000 characters');
+  db.prepare('INSERT OR REPLACE INTO chat_prefs (user, json, updated_at) VALUES (?, ?, ?)').run(ctx.user, json, nowSec());
+}
+
 // ---- messages ----
 
 interface MsgRow {
@@ -732,6 +746,12 @@ export function moderate(db: Database.Database, ctx: ChatCtx, id: string, action
   }
 }
 
+/** Seconds left of a timed mute, or null when the mute has no end (or there is none). */
+export function muteSecondsLeft(db: Database.Database, roomId: string, user: string): number | null {
+  const r = db.prepare('SELECT until FROM chat_mutes WHERE room_id = ? AND user = ?').get(roomId, user) as { until: number | null } | undefined;
+  return r?.until ? Math.max(0, r.until - nowSec()) : null;
+}
+
 export function setOp(db: Database.Database, ctx: ChatCtx, id: string, b: Body, on: boolean): void {
   const room = getRoom(db, id);
   requireOwner(room, ctx);
@@ -883,6 +903,7 @@ export function pin(db: Database.Database, ctx: ChatCtx, id: string, b: Body, on
   } else {
     db.prepare('DELETE FROM chat_pins WHERE room_id = ? AND message_id = ?').run(id, mid);
   }
+  emitEvent(db, { type: 'pin', roomId: id, user: ctx.user || 'admin', ref: mid, text: on ? '1' : '0' });
 }
 
 export function search(db: Database.Database, ctx: ChatCtx, q: { q?: unknown; room?: unknown; user?: unknown; limit?: unknown }): SearchHit[] {
