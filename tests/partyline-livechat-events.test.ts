@@ -100,6 +100,8 @@ test('/discord answers from the hub store and a sysop can switch the mirror', as
   type('bob', '/discord on');
   await until(() => answers() > n, 10_000);
   expect(text.bob).not.toContain('needs the federated chat');
+  // The other caller is told, in the board bridge's words.
+  await until(() => /Discord mirror switched/.test(text.alice), 10_000);
 });
 
 test('a BBS event of the board reaches the caller as an event line', async () => {
