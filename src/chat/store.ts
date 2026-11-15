@@ -353,7 +353,7 @@ export function requireVoice(db: Database.Database, room: RoomRec, ctx: ChatCtx)
   throw new SurfaceError('moderated', 403, 'Room is moderated (+m); you need voice (+v) or op (+o) to speak');
 }
 
-function indexFts(db: Database.Database, id: string): void {
+export function indexFts(db: Database.Database, id: string): void {
   db.prepare("INSERT INTO chat_messages_fts(rowid, content) SELECT rowid, content FROM chat_messages WHERE id = ?").run(id);
 }
 

@@ -168,6 +168,9 @@ jobs:
             echo "== health =="
             sleep 10
             curl -fsS http://localhost:3010/api/door-repo/health
+            echo "== partyline #updates changelog =="
+            . scripts/partyline-changelog.sh
+            partyline_changelog_update "$PWD" "$(git rev-parse HEAD)" || echo "[WARN] #updates changelog not posted; sha not advanced"
             if [ "${COMPOSE_PROFILES:-}" = "discord" ]; then
               echo "== discord bridge =="
               docker compose ps discord-bridge
