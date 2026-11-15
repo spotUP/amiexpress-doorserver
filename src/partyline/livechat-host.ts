@@ -279,6 +279,10 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
             reply('bbs:event', { type: e.ref, username: short(e.user), nodeId: Number(e.label) || 0, timestamp: e.at * 1000, data });
             break;
           }
+          // Same wording as the board bridge (chat-session-bridge.ts); the switcher already got the /discord reply.
+          case 'discord_mirror':
+            if (!mine && e.ref.toUpperCase() === info.boardId.toUpperCase()) reply('chat:discord', { message: `Discord mirror switched ${e.text === '1' ? 'ON' : 'OFF'} for ${e.ref.toUpperCase()}.` });
+            break;
           case 'presence': { const [status, ...custom] = e.text.split('|'); reply('chat:presence', { userId: e.user, username: short(e.user), status, custom: custom.join('|') }); break; }
           case 'pin': if (here) pinList(e.room_id!, 'chat:pin:updated'); break;
           case 'joined': case 'left': if (here && !mine) reply(`room:user-${e.type}`, { userId: e.user, username: short(e.user) }); break;
