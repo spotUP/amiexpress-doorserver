@@ -87,3 +87,13 @@ test('ignore adds to the hub ignore list', async () => {
   type('alice', '/ignore bob');
   await until(() => peek('alice', (db, ctx) => listIgnores(db, ctx)).some((r) => r.user.startsWith('bob@')), 10_000);
 });
+
+test('/discord answers from the hub store and a sysop can switch the mirror', async () => {
+  type('bob', '/discord');
+  await until(() => /Discord mirror is (ON|OFF)/.test(text.bob), 10_000);
+  type('bob', '/discord off');
+  await until(() => text.bob.includes('Discord mirror is OFF'), 10_000);
+  type('bob', '/discord on');
+  await until(() => text.bob.includes('Discord mirror is ON'), 10_000);
+  expect(text.bob).not.toContain('needs the federated chat');
+});
