@@ -20,7 +20,7 @@ import { encodeFrame, FrameDecoder, FrameError, kvPayload, parseKv, readAck, seq
 import { createPartylineServer } from '../src/partyline/server';
 import type { PartylineServer } from '../src/partyline/server';
 import { OLD_CLIENT_SCREEN } from '../src/partyline/session';
-import type { ScreenFactory, ScreenInfo } from '../src/partyline/session';
+import type { RenderPart, ScreenFactory, ScreenInfo } from '../src/partyline/session';
 import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 
@@ -96,12 +96,14 @@ let renders: string[];
 
 /** The model each test drives: render returns `state`. */
 let state = 'v0';
+/** When set, render returns these parts (D text and G kitty bytes) instead of `state`. */
+let parts: RenderPart[] | null = null;
 const testScreen: ScreenFactory = (info) => {
   screens.push(info);
   return {
     resize() { /* the stub's job */ },
     input() { /* none */ },
-    render() { renders.push(state); return Buffer.from(state); },
+    render() { renders.push(state); return parts ?? Buffer.from(state); },
   };
 };
 
@@ -118,6 +120,7 @@ beforeEach(async () => {
   screens = [];
   renders = [];
   state = 'v0';
+  parts = null;
   hub = createPartylineServer({ enabled: true, port: 0, host: '127.0.0.1', tlsCert: null, tlsKey: null }, fx.ach,
     { screen: testScreen, log: () => undefined, tlsContext: tlsCtx });
   port = await hub.listen();
@@ -217,6 +220,36 @@ describe('live loop', () => {
     expect(text(second)).toBe('v2');
     expect(second.payload.readUInt32BE(0)).toBe(first.payload.readUInt32BE(0) + 1);
     expect(renders).toEqual(['v0', 'v2']);
+  });
+
+  it('hands the screen the caller kitty flag and connection type, telnet when unknown', async () => {
+    const a = await dial(false);
+    await login(a, { extra: { kitty: 1, conn: 'web' } });
+    const b = await dial(false);
+    await login(b, { extra: { conn: 'modem' } });
+    expect([screens[0].hello.kitty, screens[0].hello.conn]).toEqual([true, 'web']);
+    expect([screens[1].hello.kitty, screens[1].hello.conn]).toEqual([false, 'telnet']);
+  });
+
+  it('sends D and G parts in render order on one sequence, one frame per C, splitting a big G', async () => {
+    const c = await dial(false);
+    await login(c);
+    const first = await c.next('D');
+    const big = Buffer.alloc(PLP_MAX_PAYLOAD, 'A');
+    parts = [{ type: 'D', bytes: Buffer.from('a') }, { type: 'G', bytes: big }, { type: 'D', bytes: Buffer.from('b') }];
+    screens[0].markDirty();
+    let seq = first.payload.readUInt32BE(0);
+    const got: Array<[string, number]> = [];
+    for (let i = 0; i < 4; i++) {
+      c.send('C', seqPayload(seq, Buffer.alloc(0)));
+      for (;;) {
+        const f = c.frames.find((x) => x.type === 'D' || x.type === 'G');
+        if (f) { c.frames.splice(c.frames.indexOf(f), 1); got.push([f.type, f.payload.length - 4]); seq = f.payload.readUInt32BE(0); break; }
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      expect(seq).toBe(first.payload.readUInt32BE(0) + i + 1);
+    }
+    expect(got).toEqual([['D', 1], ['G', PLP_MAX_PAYLOAD - 4], ['G', 4], ['D', 1]]);
   });
 
   it('resumes the same chat session after a disconnect', async () => {

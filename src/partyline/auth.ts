@@ -43,6 +43,7 @@ export function parseHello(payload: Buffer): PlpHello {
     media: flag(kv.get('media')),
     upload: oneOf(kv.get('upload'), ['none', 'zmodem', 'web', 'aew'] as const, 'none'),
     console: flag(kv.get('console')),
+    conn: oneOf(kv.get('conn'), ['telnet', 'web', 'ssh'] as const, 'telnet'),
     modem: int(kv.get('modem'), 0),
     resume: kv.get('resume') ?? '',
   };

@@ -10,9 +10,13 @@ import { createSession, resolveSession, _stopChatSweepersForTests } from '../src
 import type { ChatCtx } from '../src/chat/sessions';
 import { createRoom, dmThreads, getPrefs, moderate, pin, postMessage, postThread, relayBbsEvent, listIgnores, listRooms, reactionRows, roomHistory } from '../src/chat/store';
 import { livechatScreen } from '../src/partyline/livechat-host';
+import { renderParts } from '../src/partyline/session';
 import type { PartylineScreen, ScreenInfo } from '../src/partyline/session';
 import { makeAchievementsFixture } from './achievements/helpers';
 import type Database from 'better-sqlite3';
+
+/** The caller's text (D parts); kitty G parts are not screen text. */
+const screenText = (s: PartylineScreen): string => renderParts(s.render(false)).filter((p) => p.type === 'D').map((p) => p.bytes.toString('latin1')).join('');
 
 jest.setTimeout(180_000);
 
@@ -40,7 +44,7 @@ beforeAll(async () => {
   peek('bob', (db, ctx) => createRoom(db, ctx, { name: 'general' }));
   const factory = livechatScreen(fx.ach, chat, undefined, (l) => logs.push(l));
   for (const who of ['bob', 'alice'] as const) {
-    const s: PartylineScreen = factory({ sid: sids[who], user: who, boardId: fx.boardId, hello: { cols: 80, rows: 25, access: 255, sysop: true } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { text[who] += s.render(false).toString('latin1'); }); }, quit: () => {} });
+    const s: PartylineScreen = factory({ sid: sids[who], user: who, boardId: fx.boardId, hello: { cols: 80, rows: 25, access: 255, sysop: true } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { text[who] += screenText(s); }); }, quit: () => {} });
     callers[who] = s;
     screens.push(s);
   }

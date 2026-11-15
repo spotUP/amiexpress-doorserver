@@ -7,8 +7,12 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, listRooms, roomHistory } from '../src/chat/store';
 import { livechatScreen } from '../src/partyline/livechat-host';
+import { renderParts } from '../src/partyline/session';
 import type { PartylineScreen, ScreenInfo } from '../src/partyline/session';
 import { makeAchievementsFixture } from './achievements/helpers';
+
+/** The caller's text (D parts); kitty G parts are not screen text. */
+const screenText = (s: PartylineScreen): string => renderParts(s.render(false)).filter((p) => p.type === 'D').map((p) => p.bytes.toString('latin1')).join('');
 
 jest.setTimeout(120_000);
 
@@ -36,7 +40,7 @@ test('two LIVECHAT callers run side by side, talk, and one leaving keeps the oth
     const start = (user: string, id: string): Caller => {
       let text = '';
       let s: PartylineScreen | undefined;
-      s = factory({ sid: id, user, boardId: fx.boardId, hello: { cols: 80, rows: 25 } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { text += s?.render(false).toString('latin1') ?? ''; }); }, quit: () => {} });
+      s = factory({ sid: id, user, boardId: fx.boardId, hello: { cols: 80, rows: 25 } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { if (s) text += screenText(s); }); }, quit: () => {} });
       const c = { s, screen: () => text };
       callers.push(c);
       return c;

@@ -45,7 +45,7 @@ Hub to client:
 | `N` | CHALLENGE | 32 hex chars (16 random bytes) |
 | `W` | WELCOME | `key=value` lines: `proto`, `features`, `session`, `resume` |
 | `D` | OUTPUT | u32 BE sequence, then terminal bytes |
-| `G` | GRAPHICS | u32 BE sequence, then a kitty APC chunk (only with `kitty=1`) |
+| `G` | GRAPHICS | u32 BE sequence, then kitty APC bytes (only with `kitty=1`); one APC may span several `G` frames, so the client writes them to the terminal as they come, in sequence order with `D` |
 | `S` | SOUND | cue name |
 | `M` | MEDIA | voice/video signalling (only with `media=1`) |
 | `T` | CTRL | host action (`write-cfg`, `upload`, `set-line-mode`, `redirect host:port`, `quit`) |
@@ -59,7 +59,7 @@ Hub to client:
 `proto=1.<minor>`, `client=<name>/<version>`, `board=<id>`, `handle=<from the board
 session, never typed>`, `access`, `sysop=0|1`, `node`, `cols`, `rows`,
 `charset=latin1|utf8`, `kitty=0|1`, `mouse=0|1`, `media=0|1`,
-`upload=none|zmodem|web|aew`, `console=0|1`, `modem=<bps or 0>`, `resume=<token or empty>`.
+`upload=none|zmodem|web|aew`, `console=0|1`, `conn=telnet|web|ssh`, `modem=<bps or 0>`, `resume=<token or empty>`.
 Unknown keys are ignored; missing ones take defaults (80x25, latin1, flags off).
 
 ## Login

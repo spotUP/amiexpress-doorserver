@@ -26,11 +26,19 @@ import { newNonce, parseHello, pickVersion, verifyAuth } from './auth';
 export interface PartylineScreen {
   resize(cols: number, rows: number): void;
   input(bytes: Buffer): void;
-  render(full: boolean): Buffer;
+  render(full: boolean): Buffer | RenderPart[];
   /** A `U` frame from the relay: `ok <fileId>` or `fail <reason>`. */
   upload?(payload: Buffer): void;
   /** The connection is gone: drop subscriptions. */
   close?(): void;
+}
+
+/** Ordered output: `D` terminal bytes, `G` kitty APC bytes (only for a kitty=1 caller). */
+export interface RenderPart { type: 'D' | 'G'; bytes: Buffer }
+
+/** A render as parts: a bare Buffer is one D part. */
+export function renderParts(out: Buffer | RenderPart[]): RenderPart[] {
+  return Buffer.isBuffer(out) ? [{ type: 'D', bytes: out }] : out;
 }
 
 export interface ScreenInfo {
@@ -102,7 +110,7 @@ export class PartylineSession {
   private screen: PartylineScreen | null = null;
   private seq = 0;
   private inFlight: number | null = null;
-  private queue: Buffer[] = [];
+  private queue: RenderPart[] = [];
   private dirty = false;
   private full = false;
   private lastFlush = 0;
@@ -258,17 +266,19 @@ export class PartylineSession {
     if (this.inFlight !== null || this.state !== 'live') return;
     if (this.queue.length === 0 && this.dirty) {
       // Render only now, so everything that changed while waiting is one latest diff, never a backlog.
-      const bytes = this.screen!.render(this.full);
+      const out = this.screen!.render(this.full);
       this.dirty = false;
       this.full = false;
-      for (let i = 0; i < bytes.length; i += PLP_MAX_PAYLOAD - 4) this.queue.push(bytes.subarray(i, i + PLP_MAX_PAYLOAD - 4));
+      for (const { type, bytes } of renderParts(out)) {
+        for (let i = 0; i < bytes.length; i += PLP_MAX_PAYLOAD - 4) this.queue.push({ type, bytes: bytes.subarray(i, i + PLP_MAX_PAYLOAD - 4) });
+      }
     }
     const next = this.queue.shift();
     if (!next) return;
     this.seq += 1;
     this.inFlight = this.seq;
     this.lastFlush = Date.now();
-    this.send(PLP_HUB.OUTPUT, seqPayload(this.seq, next));
+    this.send(next.type === 'G' ? PLP_HUB.GRAPHICS : PLP_HUB.OUTPUT, seqPayload(this.seq, next.bytes));
   }
 
   /** One D with the refusal screen, then X; the chat session (if any) is untouched. */
