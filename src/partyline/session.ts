@@ -27,6 +27,8 @@ export interface PartylineScreen {
   resize(cols: number, rows: number): void;
   input(bytes: Buffer): void;
   render(full: boolean): Buffer;
+  /** A `U` frame from the relay: `ok <fileId>` or `fail <reason>`. */
+  upload?(payload: Buffer): void;
   /** The connection is gone: drop subscriptions. */
   close?(): void;
 }
@@ -41,6 +43,8 @@ export interface ScreenInfo {
   markDirty: () => void;
   /** /quit: end the connection the way a BYE does (no resume). */
   quit?: () => void;
+  /** Send a `T` frame (host action) to the client. */
+  ctrl?: (text: string) => void;
 }
 export type ScreenFactory = (info: ScreenInfo) => PartylineScreen;
 
@@ -165,6 +169,9 @@ export class PartylineSession {
         }
         return;
       }
+      case PLP_CLIENT.UPLOAD:
+        this.screen!.upload?.(f.payload);
+        return;
       case PLP_CLIENT.PING:
         this.send(PLP_HUB.PONG, f.payload);
         return;
@@ -172,7 +179,7 @@ export class PartylineSession {
         this.bye(f.payload.toString('latin1').trim());
         return;
       default:
-        // UPLOAD lands in P6; unknown types are skipped (forward compatibility).
+        // Unknown types are skipped (forward compatibility).
         return;
     }
   }
@@ -213,7 +220,7 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit') });
+    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit'), ctrl: (t) => this.send(PLP_HUB.CTRL, t) });
     this.markDirty(true);
   }
 

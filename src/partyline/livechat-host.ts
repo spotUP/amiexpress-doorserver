@@ -9,7 +9,7 @@
  * Every event is answered by calling the same src/chat/store.ts function the
  * HTTP router (src/chat/router.ts) calls; only the reply shapes are new here.
  * Effects other callers (and the actor) must see arrive through the event
- * relay below, not as a direct reply. Not hosted: audio/voice/video/file/draw
+ * relay below, not as a direct reply. File, upload and draw events live in livechat-files.ts. Not hosted: audio/voice/video/door
  * events, chat:auth-token, chat:discord, chat:keystroke, chat:prefs-set
  * (the hub stores no per-user prefs); they are logged and dropped.
  */
@@ -30,6 +30,7 @@ import {
 import { SurfaceError } from '../achievements/errors';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from './session';
 import type { FromChild, ToChild } from './livechat-child';
+import { filesAndDrawing } from './livechat-files';
 
 // Each caller's door runs in its own process: the door's module singletons cannot be shared.
 const CHILD = path.join(__dirname, `livechat-child${path.extname(__filename)}`);
@@ -41,7 +42,7 @@ export function livechatDoorDir(env: NodeJS.ProcessEnv = process.env): string {
 
 type Payload = Record<string, unknown>;
 
-export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDir = livechatDoorDir(), log: (l: string) => void = (l) => console.log(l)): ScreenFactory {
+export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDir = livechatDoorDir(), log: (l: string) => void = (l) => console.log(l), filesDir: string | null = null): ScreenFactory {
   return (info: ScreenInfo): PartylineScreen => {
     const enc: BufferEncoding = info.hello.charset === 'utf8' ? 'utf8' : 'latin1';
     let cols = info.hello.cols;
@@ -69,7 +70,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     const join = (name: string): void => {
       const r = store(true, (db, ctx) => {
         let row = listRooms(db, ctx).find((x) => x.name === name);
-        const id = row ? row.id : createRoom(db, ctx, { name }).id;
+        const id = row ? row.id : createRoom(db, ctx, name.startsWith('art:') ? { name, kind: 'art' } : { name }).id;
         const j = joinRoom(db, ctx, id);
         return { j, history: roomHistory(db, ctx, id, { limit: 50 }) };
       });
@@ -108,7 +109,9 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       store(true, (db, ctx) => moderate(db, ctx, id, action, { user: target(d), reason: str(d, 'reason'), ...(minutes > 0 ? { minutes } : {}) }));
     });
 
+    const files = filesAndDrawing({ store, reply, str, short, room: () => room, filesDir, uploadMode: info.hello.upload, ctrl: info.ctrl });
     const handlers: Record<string, (d: Payload) => void> = {
+      ...files.handlers,
       'room:list': () => {
         const rooms = store(false, (db, ctx) => listRooms(db, ctx));
         reply('room:list', { rooms: rooms.map((x) => ({ room_id: x.id, room_name: x.name, topic: x.topic, is_public: x.visibility !== 'private', member_count: x.members, created_by_username: x.owner, kind: x.kind })) });
@@ -219,7 +222,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     };
 
     // Out of scope for the Partyline host: dropped quietly (the door never waits on these).
-    const DROPPED = /^(audio|voice|video|file|draw|door):|^admin:archive-channel$|^chat:auth-token$|^chat:keystroke/;
+    const DROPPED = /^(audio|voice|video|door):|^admin:archive-channel$|^chat:auth-token$|^chat:keystroke/;
     const onEmit = (ev: string, data: Payload): void => {
       const h = handlers[ev];
       if (!h) { log(`[partyline-livechat] ${DROPPED.test(ev) ? 'dropped' : 'unhandled'} ${ev}`); return; }
@@ -239,6 +242,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         const mine = e.user === me;
         const here = !!room && e.room_id === room.id;
         const at = when(e.at);
+        if (here && files.onEvent(e)) continue;
         switch (e.type) {
           case 'message':
             if (here && !mine && e.label.startsWith('thread:')) reply('chat:thread:reply', { threadId: e.label.slice(7), messageId: e.ref, username: short(e.user), content: e.text, createdAt: at });
@@ -291,6 +295,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     return {
       resize(c: number, r: number) { cols = c; rows = r; tell({ t: 'resize', cols: c, rows: r }); },
       input(bytes: Buffer) { tell({ t: 'input', s: bytes.toString(enc) }); },
+      upload(payload: Buffer) { files.onUploadResult(payload.toString('latin1')); },
       render(full: boolean) { if (full) tell({ t: 'repaint' }); const b = Buffer.from(out.join(''), enc); out = []; return b; },
       close() { closed = true; off(); child.kill(); },
     };
