@@ -13,3 +13,4 @@ data/bbs_ads.db
 
 # Working notes (handoffs, plans, ledgers) stay out of the public repository.
 /thoughts/
+.partyline-changelog-sha
