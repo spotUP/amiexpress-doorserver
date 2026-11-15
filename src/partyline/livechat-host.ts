@@ -10,8 +10,7 @@
  * HTTP router (src/chat/router.ts) calls; only the reply shapes are new here.
  * Effects other callers (and the actor) must see arrive through the event
  * relay below, not as a direct reply. File, upload and draw events live in livechat-files.ts. Not hosted: audio/voice/video/door
- * events, chat:auth-token, chat:discord, chat:keystroke, chat:prefs-set
- * (the hub stores no per-user prefs); they are logged and dropped.
+ * events other than audio:play, chat:auth-token; they are logged and dropped.
  */
 import { fork } from 'child_process';
 import type { ChildProcess } from 'child_process';
@@ -136,6 +135,8 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     });
 
     const files = filesAndDrawing({ store, reply, str, short, room: () => room, filesDir, uploadMode: info.hello.upload, conn: info.hello.conn, ctrl: info.ctrl });
+    let typed = '';
+    const showTyped = (): void => { if (room) { const id = room.id; store(true, (db, ctx) => setTyping(db, ctx, id, { text: typed })); } };
     const handlers: Record<string, (d: Payload) => void> = {
       ...files.handlers,
       'room:list': () => {
@@ -204,6 +205,12 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       },
       'chat:emoji:list': () => reply('chat:emoji-list', { emojis: store(false, (_db) => listEmoji(_db)) }),
       'chat:typing': (d) => needRoom((id) => { store(true, (db, ctx) => setTyping(db, ctx, id, { text: str(d, 'text') })); }),
+      // The door sends one event per key (like the board's chat:keystroke); the store keeps the whole line, so fold them here.
+      'chat:keystroke': (d) => { const c = str(d, 'char'); typed = c === 'BACKSPACE' ? typed.slice(0, -1) : typed + c; showTyped(); },
+      'chat:keystroke-clear': () => { typed = ''; showTyped(); },
+      'chat:keystroke-submit': () => { typed = ''; showTyped(); },
+      // Notification sound cue: the caller's board plays it (S frame), as the web client plays audio:play in LC.
+      'audio:play': (d) => { const cue = str(d, 'soundId'); if (cue) info.sound?.(cue); },
       'room:topic': (d) => needRoom((id) => { store(true, (db, ctx) => setTopic(db, ctx, id, { topic: str(d, 'topic') })); }),
       'room:motd': (d) => needRoom((id) => { store(true, (db, ctx) => setRoomMotd(db, ctx, id, { motd: str(d, 'motd') })); }),
       'room:mode': (d) => needRoom((id) => { store(true, (db, ctx) => setMode(db, ctx, id, { modes: str(d, 'modeString', 'modes'), params: Array.isArray(d.params) ? d.params.join(' ') : str(d, 'params') })); }),

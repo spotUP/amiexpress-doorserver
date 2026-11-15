@@ -46,7 +46,7 @@ Hub to client:
 | `W` | WELCOME | `key=value` lines: `proto`, `features`, `session`, `resume` |
 | `D` | OUTPUT | u32 BE sequence, then terminal bytes |
 | `G` | GRAPHICS | u32 BE sequence, then kitty APC bytes (only with `kitty=1`); one APC may span several `G` frames, so the client writes them to the terminal as they come, in sequence order with `D` |
-| `S` | SOUND | cue name |
+| `S` | SOUND | cue name: the door's `audio:play` soundId; the relay re-emits it on the caller's socket as `audio:play` |
 | `M` | MEDIA | voice/video signalling (only with `media=1`) |
 | `T` | CTRL | host action (`write-cfg`, `upload`, `set-line-mode`, `redirect host:port`, `quit`) |
 | `O` | PONG | the `P` payload |

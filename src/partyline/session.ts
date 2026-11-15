@@ -53,6 +53,8 @@ export interface ScreenInfo {
   quit?: () => void;
   /** Send a `T` frame (host action) to the client. */
   ctrl?: (text: string) => void;
+  /** Send an `S` frame: a notification sound cue for the caller's board to play. */
+  sound?: (cue: string) => void;
 }
 export type ScreenFactory = (info: ScreenInfo) => PartylineScreen;
 
@@ -228,7 +230,7 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit'), ctrl: (t) => this.send(PLP_HUB.CTRL, t) });
+    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit'), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c) });
     this.markDirty(true);
   }
 

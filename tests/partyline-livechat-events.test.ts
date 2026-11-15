@@ -148,3 +148,11 @@ test('a timed mute tells the caller how many seconds it lasts', async () => {
   await until(() => /You have been muted for \d+s/.test(text.alice.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')), 10_000);
   peek('bob', (db, ctx) => moderate(db, ctx, id, 'unmute', { user: peek('alice', (_db, c) => c.user) }));
 });
+
+test('a caller typing without sending shows the whole buffer to the room (LC chat:keystroke parity)', async () => {
+  const typing = (): string | undefined => peek('bob', (db) => (db.prepare("SELECT text FROM chat_events WHERE type = 'typing' AND user LIKE 'alice@%' ORDER BY seq DESC LIMIT 1").get() as { text: string } | undefined)?.text);
+  callers.alice.input(Buffer.from('hix', 'latin1'));
+  await until(() => typing() === 'hix', 10_000);
+  callers.alice.input(Buffer.from([0x7f]));
+  await until(() => typing() === 'hi', 10_000);
+});
