@@ -57,6 +57,8 @@ function start(init: ChildInit): void {
     off: (ev: string, fn: (...a: unknown[]) => void) => { toDoor.off(ev, fn); return socket; },
     once: (ev: string, fn: (...a: unknown[]) => void) => { toDoor.once(ev, fn); return socket; },
     emit: (ev: string, data: Record<string, unknown> = {}) => { send({ t: 'emit', ev, data }); return true; },
+    // The door's BBSEventBus calls socket.send after its local event; socket.io's send is a plain 'message' emit the hub has no use for.
+    send: () => socket,
   };
 
   // Keep the door's blessed screen so render(full) can force a whole repaint.

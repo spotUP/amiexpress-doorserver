@@ -399,4 +399,15 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       if (!cols.some((c) => c.name === 'plp_key')) db.exec('ALTER TABLE boards ADD COLUMN plp_key TEXT');
     },
   },
+  {
+    version: 16,
+    name: 'chat: chat_prefs keeps a caller\'s door preferences per handle@BOARD',
+    // One JSON object per chat identity; the LIVECHAT door sends it whole (chat:prefs-set) and reads it back on open (chat:prefs).
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS chat_prefs (
+          user TEXT PRIMARY KEY COLLATE NOCASE,
+          json TEXT NOT NULL,
+          updated_at INTEGER NOT NULL)`);
+    },
+  },
 ];

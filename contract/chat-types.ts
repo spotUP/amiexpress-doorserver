@@ -61,6 +61,8 @@ export const CHAT_EVENT_TYPES = [
   'unmuted',
   'op',
   'deop',
+  /** A message was pinned (text '1') or unpinned (text '0'); ref = the message id. */
+  'pin',
   /** A /mode change; text = the applied modes, e.g. `+i +o alice@BOARD`. */
   'mode',
   /** A member's whole input buffer while typing; text empty = stopped. Trimmed to 200 characters. */
