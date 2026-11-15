@@ -14,6 +14,7 @@
  * (the hub stores no per-user prefs); they are logged and dropped.
  */
 import { fork } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import * as path from 'path';
 import type Database from 'better-sqlite3';
 import { withAchievementsDb } from '../achievements/db';
@@ -42,7 +43,24 @@ export function livechatDoorDir(env: NodeJS.ProcessEnv = process.env): string {
 
 type Payload = Record<string, unknown>;
 
+/**
+ * Fork a LIVECHAT child that loads the door at once. The host keeps one such spare
+ * idle so a caller's PL skips process boot and the door's module load (seconds,
+ * and far more on a cold file cache). An idle spare does not hold the hub open.
+ */
+export function forkLivechatChild(doorDir: string, log: (l: string) => void): ChildProcess {
+  const child = fork(CHILD, [doorDir], { execArgv: CHILD.endsWith('.ts') ? ['--require', require.resolve('tsx/cjs')] : [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced' });
+  for (const std of [child.stdout, child.stderr]) {
+    std?.on('data', (d: Buffer) => { for (const l of d.toString('utf8').split('\n')) if (l.trim()) log(`[partyline-livechat ${child.pid}] ${l}`); });
+  }
+  child.on('error', (e) => log(`[partyline-livechat] child ${child.pid} error: ${e.message}`));
+  child.unref();
+  child.channel?.unref();
+  return child;
+}
+
 export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDir = livechatDoorDir(), log: (l: string) => void = (l) => console.log(l), filesDir: string | null = null): ScreenFactory {
+  let spare = forkLivechatChild(doorDir, log);
   return (info: ScreenInfo): PartylineScreen => {
     const enc: BufferEncoding = info.hello.charset === 'utf8' ? 'utf8' : 'latin1';
     let cols = info.hello.cols;
@@ -57,12 +75,13 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         return write ? db.transaction(() => fn(db, ctx))() : fn(db, ctx);
       });
 
-    const child = fork(CHILD, [], { execArgv: CHILD.endsWith('.ts') ? ['--require', require.resolve('tsx/cjs')] : [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced' });
+    // Take the warm spare (a dead one is replaced) and start the next spare for the caller after.
+    const child = spare.connected && spare.exitCode === null ? spare : forkLivechatChild(doorDir, log);
+    spare = forkLivechatChild(doorDir, log);
+    child.ref();
+    child.channel?.ref();
     // 'advanced' IPC keeps Date objects: the door formats createdAt with getHours().
     const tell = (m: ToChild): void => { if (child.connected) child.send(m); };
-    for (const std of [child.stdout, child.stderr]) {
-      std?.on('data', (d: Buffer) => { for (const l of d.toString('utf8').split('\n')) if (l.trim()) log(`[partyline-livechat ${child.pid}] ${l}`); });
-    }
     tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8' });
     // Hub replies go to the door's socket listeners in the child.
     const reply = (ev: string, data: Payload): void => { if (!closed) tell({ t: 'event', ev, data }); };

@@ -18,7 +18,9 @@ export type ToChild =
 export type FromChild =
   | { t: 'out'; s: string }
   | { t: 'emit'; ev: string; data: Record<string, unknown> }
-  | { t: 'end'; error?: string };
+  | { t: 'end'; error?: string }
+  /** A spare finished loading the door. */
+  | { t: 'ready' };
 
 interface RepaintableScreen { alloc?(): void; render(): void }
 interface DoorApp { run(): Promise<void> }
@@ -80,5 +82,8 @@ function start(init: ChildInit): void {
     .finally(() => process.disconnect?.());
 }
 
+// Forked as the host's warm spare (argv[2] = door dir): load the door now, before any caller,
+// so a PL waits only for createApp, not for process boot and the door's module load.
+if (process.argv[2]) { require(path.join(process.argv[2], 'dist/ui/screen.js')); require(path.join(process.argv[2], 'dist/server.js')); send({ t: 'ready' }); } // eslint-disable-line @typescript-eslint/no-require-imports
 process.once('message', (m: ToChild) => { if (m.t === 'init') start(m); });
 process.on('disconnect', () => process.exit(0));
