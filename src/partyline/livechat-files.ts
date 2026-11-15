@@ -29,6 +29,8 @@ export interface FilesHost {
   filesDir: string | null;
   /** The hello's `upload=` value. */
   uploadMode: 'none' | 'zmodem' | 'web' | 'aew';
+  /** The hello's `conn=`; picks the preview quality as the board's previewQuality does. */
+  conn: 'web' | 'telnet' | 'ssh';
   /** Send a `T` frame to the relay; absent when the session cannot. */
   ctrl?: (text: string) => void;
 }
@@ -39,6 +41,14 @@ const PICTURE_MAX_BYTES = 2 * 1024 * 1024;
 const UPLOAD_WAIT_MS = 5 * 60 * 1000;
 const PREVIEW_REASON: Record<number, string> = { 403: 'not_member', 415: 'not_image', 503: 'files_disabled' };
 const DRAW_REFUSALS = [403, 413, 422, 429];
+
+/**
+ * The board's LC path asks the hub for 'full' on a web caller and 'pal' on telnet
+ * (amiexpress-web chat-session-bridge.ts previewQuality); Partyline asks the same.
+ */
+export function previewQuality(conn: FilesHost['conn']): 'full' | 'pal' {
+  return conn === 'web' ? 'full' : 'pal';
+}
 
 export function filesAndDrawing(h: FilesHost): {
   handlers: Record<string, (d: Payload) => void>;
@@ -69,7 +79,7 @@ export function filesAndDrawing(h: FilesHost): {
       const fileId = h.str(d, 'fileId');
       const fmt = d.fmt === 'rgb' ? 'rgb' : 'png';
       try {
-        const pv = h.store(false, (db, ctx) => openPreview(db, h.filesDir, ctx, fileId, fmt, d.cols, d.rows));
+        const pv = h.store(false, (db, ctx) => openPreview(db, h.filesDir, ctx, fileId, fmt, d.cols, d.rows, previewQuality(h.conn)));
         const [c, r] = pv.cells.split('x').map(Number);
         h.reply('file:preview', { fileId, fmt, cols: c, rows: r, data: fs.readFileSync(pv.path).toString('base64') });
       } catch (e) {
