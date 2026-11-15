@@ -62,7 +62,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     for (const std of [child.stdout, child.stderr]) {
       std?.on('data', (d: Buffer) => { for (const l of d.toString('utf8').split('\n')) if (l.trim()) log(`[partyline-livechat ${child.pid}] ${l}`); });
     }
-    tell({ t: 'init', doorDir, user: info.user, cols, rows, utf8: enc === 'utf8' });
+    tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8' });
     // Hub replies go to the door's socket listeners in the child.
     const reply = (ev: string, data: Payload): void => { if (!closed) tell({ t: 'event', ev, data }); };
 

@@ -8,7 +8,7 @@
 import { EventEmitter } from 'events';
 import * as path from 'path';
 
-export interface ChildInit { t: 'init'; doorDir: string; user: string; cols: number; rows: number; utf8: boolean }
+export interface ChildInit { t: 'init'; doorDir: string; user: string; access: number; sysop: boolean; cols: number; rows: number; utf8: boolean }
 export type ToChild =
   | ChildInit
   | { t: 'input'; s: string }
@@ -46,7 +46,8 @@ function start(init: ChildInit): void {
     getModemSpeed: () => 0,
     modemEmulationEnabled: false,
   });
-  const user = { username: init.user, id: 0, secLevel: 10 };
+  // The door gates commands on secLevel (80 kick, 100 ban) and treats 255 as sysop; the hub store still checks every write.
+  const user = { username: init.user, id: 0, secLevel: init.sysop ? Math.max(init.access, 255) : init.access };
   const bbsSession: { user: typeof user; nodeId: number; tempData: Record<string, unknown>; doorInputHandler?: (d: string) => void } =
     { user, nodeId: 0, tempData: {} };
   const toDoor = new EventEmitter();
