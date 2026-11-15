@@ -19,12 +19,14 @@ export type ToChild =
   | { t: 'input'; s: string }
   | { t: 'resize'; cols: number; rows: number }
   | { t: 'event'; ev: string; data: Record<string, unknown> }
+  /** The host's answer to an emit that carried `ack`. */
+  | { t: 'ack'; id: number; result: unknown }
   | { t: 'repaint' };
 export type FromChild =
   | { t: 'out'; s: string }
   /** Kitty APC bytes, after every 'out' written before them; the hub sends them as G frames. */
   | { t: 'gfx'; s: string }
-  | { t: 'emit'; ev: string; data: Record<string, unknown> }
+  | { t: 'emit'; ev: string; data: Record<string, unknown>; ack?: number }
   | { t: 'end'; error?: string }
   /** A spare finished loading the door. */
   | { t: 'ready' };
@@ -75,12 +77,17 @@ function start(init: ChildInit): void {
   const bbsSession: { user: typeof user; nodeId: number; tempData: Record<string, unknown>; doorInputHandler?: (d: string) => void } =
     { user, nodeId: 0, tempData: {} };
   const toDoor = new EventEmitter();
+  let ackId = 0;
+  const acks = new Map<number, (r: unknown) => void>();
   const socket = {
     id: `pl-${process.pid}`, connected: true,
     on: (ev: string, fn: (...a: unknown[]) => void) => { toDoor.on(ev, fn); return socket; },
     off: (ev: string, fn: (...a: unknown[]) => void) => { toDoor.off(ev, fn); return socket; },
     once: (ev: string, fn: (...a: unknown[]) => void) => { toDoor.once(ev, fn); return socket; },
-    emit: (ev: string, data: Record<string, unknown> = {}) => { send({ t: 'emit', ev, data }); return true; },
+    emit: (ev: string, data: Record<string, unknown> = {}, cb?: (r: unknown) => void) => {
+      if (typeof cb === 'function') { const id = ++ackId; acks.set(id, cb); send({ t: 'emit', ev, data, ack: id }); } else send({ t: 'emit', ev, data });
+      return true;
+    },
     // The door's BBSEventBus calls socket.send after its local event; socket.io's send is a plain 'message' emit the hub has no use for.
     send: () => socket,
   };
@@ -95,6 +102,7 @@ function start(init: ChildInit): void {
     if (m.t === 'input') bbsSession.doorInputHandler?.(m.s);
     else if (m.t === 'resize') { cols = m.cols; rows = m.rows; bbs.emit('screen:resize', { cols, rows }); }
     else if (m.t === 'event') toDoor.emit(m.ev, m.data);
+    else if (m.t === 'ack') { const cb = acks.get(m.id); acks.delete(m.id); cb?.(m.result); }
     else if (m.t === 'repaint' && screen) { screen.alloc?.(); screen.render(); }
   });
 

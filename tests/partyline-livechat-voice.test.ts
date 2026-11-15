@@ -2,6 +2,11 @@
  * Partyline voice parity with LC (board voice-channel.handler.ts + audio-video.handler.ts):
  * the same door/browser event sequence in gives the same events out, across two boards.
  */
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { forkLivechatChild } from '../src/partyline/livechat-host';
+import type { FromChild } from '../src/partyline/livechat-child';
 import { encodeMedia, joinVoiceHub, MediaDecoder, resetVoiceHub, VoiceSink } from '../src/partyline/livechat-voice';
 
 type Got = { ev: string; data: Record<string, unknown> };
@@ -79,3 +84,23 @@ test('capture commands go to the own browser; media fans out like audio-video.ha
     { ev: 'audio-speaking-status', data: status },
   ]);
 });
+
+test('child emit with a callback sends an ack id; the host reply reaches the door callback', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pl-stub-door-'));
+  fs.mkdirSync(path.join(dir, 'dist/ui'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'dist/ui/screen.js'), 'exports.createScreen = () => ({ render() {} });');
+  fs.writeFileSync(path.join(dir, 'dist/server.js'),
+    'exports.createApp = (s) => ({ run: () => new Promise((done) => { s.socket.emit("voice:join-channel", { channelId: "v" }, (r) => { s.bbs.write("got:" + JSON.stringify(r)); setTimeout(done, 100); }); }) });');
+  const child = forkLivechatChild(dir, () => undefined);
+  try {
+    const seen: FromChild[] = [];
+    const out = new Promise<string>((resolve) => child.on('message', (m: FromChild) => {
+      seen.push(m);
+      if (m.t === 'emit' && m.ack !== undefined) child.send({ t: 'ack', id: m.ack, result: { success: true, participants: [] } });
+      if (m.t === 'out' && m.s.startsWith('got:')) resolve(m.s);
+    }));
+    child.send({ t: 'init', doorDir: dir, user: 'u', access: 1, sysop: false, cols: 80, rows: 25, utf8: false, kitty: false, conn: 'web' });
+    expect(await out).toBe('got:{"success":true,"participants":[]}');
+    expect(seen.find((m) => m.t === 'emit')).toMatchObject({ ev: 'voice:join-channel', ack: 1 });
+  } finally { child.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
+}, 60_000);

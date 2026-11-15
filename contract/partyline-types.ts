@@ -7,7 +7,7 @@
 
 export const PLP_MAJOR = 1;
 /** Highest minor this hub serves; every minor of PLP_MAJOR from 0 up is served. */
-export const PLP_MINOR = 0;
+export const PLP_MINOR = 1;
 export const PLP_MAX_PAYLOAD = 4096;
 export const PLP_HEADER_BYTES = 3;
 
