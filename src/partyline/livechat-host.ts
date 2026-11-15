@@ -25,7 +25,7 @@ import type { ChatCtx } from '../chat/sessions';
 import {
   addIgnore, createRoom, deleteMessage, dmHistory, dmParticipants, dmThreads, editMessage, invite, joinRoom, leaveRoom, listEmoji, listIgnores,
   listPins, listRooms, moderate, pin, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
-  search, setMode, setPresence, setRoomMotd, setTopic, setTyping, threadHistory, unreact,
+  search, setMode, setPresence, setRoomMotd, setTopic, setTyping, threadHistory, unreact, getDiscordMirror, setDiscordMirror,
 } from '../chat/store';
 import { SurfaceError } from '../achievements/errors';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from './session';
@@ -152,6 +152,19 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       'chat:unignore': (d) => { store(true, (db, ctx) => removeIgnore(db, ctx, full(str(d, 'user', 'username')))); ignoreList(); },
       'chat:ignore-list': ignoreList,
       'chat:prefs': () => reply('chat:prefs', { prefs: {} }),
+      // /discord [on|off]: same replies as the board's federation bridge (chat-session-bridge.ts).
+      'chat:discord': (d) => {
+        const text = (on: boolean): string => `Discord mirror is ${on ? 'ON' : 'OFF'} for this board.`;
+        try {
+          const on = typeof d.on === 'boolean'
+            ? store(true, (db, ctx) => setDiscordMirror(db, ctx, { on: d.on }))
+            : store(false, (db, ctx) => getDiscordMirror(db, ctx));
+          reply('chat:discord', { message: text(on), on });
+        } catch (e) {
+          if (e instanceof SurfaceError && e.status === 403) reply('chat:discord', { message: 'Only the sysop can change the Discord mirror.' });
+          else throw e;
+        }
+      },
       'chat:emoji:list': () => reply('chat:emoji-list', { emojis: store(false, (_db) => listEmoji(_db)) }),
       'chat:typing': (d) => needRoom((id) => { store(true, (db, ctx) => setTyping(db, ctx, id, { text: str(d, 'text') })); }),
       'room:topic': (d) => needRoom((id) => { store(true, (db, ctx) => setTopic(db, ctx, id, { topic: str(d, 'topic') })); }),
@@ -192,7 +205,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     };
 
     // Out of scope for the Partyline host: dropped quietly (the door never waits on these).
-    const DROPPED = /^(audio|voice|video|file|draw|door):|^chat:(auth-token|discord|prefs-set)$|^chat:keystroke/;
+    const DROPPED = /^(audio|voice|video|file|draw|door):|^chat:(auth-token|prefs-set)$|^chat:keystroke/;
     const onEmit = (ev: string, data: Payload): void => {
       const h = handlers[ev];
       if (!h) { log(`[partyline-livechat] ${DROPPED.test(ev) ? 'dropped' : 'unhandled'} ${ev}`); return; }
