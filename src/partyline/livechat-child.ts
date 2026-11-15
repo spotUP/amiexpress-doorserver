@@ -107,7 +107,14 @@ function start(init: ChildInit): void {
   });
 
   const mod = require(path.join(init.doorDir, 'dist/server.js')) as DoorModule; // eslint-disable-line @typescript-eslint/no-require-imports
-  Promise.resolve(mod.createApp({ socket, user, bbsSession, bbs, params: [] })).then((app) => app.run())
+  // The SDK's media classes only emit/listen on the socket, so the door's ctx.audio/ctx.video
+  // reach the caller's browser as relayed M frames. Absolute paths: the SDK exports map hides media/.
+  const sdkDir = path.dirname(require.resolve('@amiexpress/bbs-door-sdk', { paths: [init.doorDir] }));
+  const { Audio } = require(path.join(sdkDir, 'media/Audio.js')) as { Audio: new (s: typeof socket, roomId?: string) => unknown }; // eslint-disable-line @typescript-eslint/no-require-imports
+  const { Video } = require(path.join(sdkDir, 'media/Video.js')) as { Video: new (s: typeof socket) => unknown }; // eslint-disable-line @typescript-eslint/no-require-imports
+  const audio = new Audio(socket, (bbsSession as { currentRoomId?: string }).currentRoomId);
+  const video = new Video(socket);
+  Promise.resolve(mod.createApp({ socket, user, bbsSession, bbs, audio, video, params: [] })).then((app) => app.run())
     .then(() => send({ t: 'end' }), (e: Error) => send({ t: 'end', error: e.message }))
     .finally(() => process.disconnect?.());
 }
