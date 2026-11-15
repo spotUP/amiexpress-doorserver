@@ -134,10 +134,10 @@ function main(): void {
     console.log(`[INFO] mail drain every ${MAIL_DRAIN_INTERVAL_MS / 1000}s`);
   }
 
-  // Partyline (PLP/1) is off unless PARTYLINE_ENABLED=1; it lives on the chat store, so it needs achievements.
+  // Partyline (PLP/1) is on unless PARTYLINE_ENABLED=0; it lives on the chat store, so it needs achievements.
   const plp = loadPartylineConfig();
   if (plp.enabled && !cfg.achievements) {
-    console.error('[ERROR] PARTYLINE_ENABLED=1 needs ACHIEVEMENTS_DB; partyline not started');
+    console.error('[ERROR] Partyline needs ACHIEVEMENTS_DB; partyline not started (PARTYLINE_ENABLED=0 silences this)');
   } else if (plp.enabled && cfg.achievements) {
     const partyline = createPartylineServer(plp, cfg.achievements, { filesDir: cfg.chatFilesDir });
     partyline.listen().catch((err: Error) => console.error(`[ERROR] partyline listen on ${plp.port} failed: ${err.message}`));

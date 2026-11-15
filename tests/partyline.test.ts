@@ -17,7 +17,7 @@ import { setBoardSuspended, _clearBoardKeyCacheForTests } from '../src/achieveme
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { authMac, plpKeyOf } from '../src/partyline/auth';
 import { encodeFrame, FrameDecoder, FrameError, kvPayload, parseKv, readAck, seqPayload } from '../src/partyline/frames';
-import { createPartylineServer } from '../src/partyline/server';
+import { createPartylineServer, loadPartylineConfig } from '../src/partyline/server';
 import type { PartylineServer } from '../src/partyline/server';
 import { OLD_CLIENT_SCREEN } from '../src/partyline/session';
 import type { ScreenFactory, ScreenInfo } from '../src/partyline/session';
@@ -249,5 +249,13 @@ describe('live loop', () => {
     c.send('Q', 'user');
     await c.untilClosed();
     expect((await request(fx.app).get('/chat/v1/who.txt').set('Authorization', fx.auth).set('X-Chat-Session', sid)).status).toBe(401);
+  });
+});
+
+describe('loadPartylineConfig', () => {
+  it('is on by default and off only with PARTYLINE_ENABLED=0', () => {
+    expect(loadPartylineConfig({}).enabled).toBe(true);
+    expect(loadPartylineConfig({ PARTYLINE_ENABLED: '1' }).enabled).toBe(true);
+    expect(loadPartylineConfig({ PARTYLINE_ENABLED: '0' }).enabled).toBe(false);
   });
 });

@@ -16,7 +16,7 @@ Server: `src/partyline/`.
 - **Plain TCP is unencrypted.** The board key never travels (HMAC login), but
   anyone on the path can read what that board's callers type and see. The hub
   logs `tls` or `plain` with every HELLO.
-- Off by default. `PARTYLINE_ENABLED=1` turns it on; it needs `ACHIEVEMENTS_DB`
+- On by default. `PARTYLINE_ENABLED=0` turns it off; it needs `ACHIEVEMENTS_DB`
   (the chat store). `PARTYLINE_HOST` sets the bind address (default `0.0.0.0`).
 
 ## Frames

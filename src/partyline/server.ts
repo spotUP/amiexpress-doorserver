@@ -3,7 +3,7 @@
  *
  * A TLS ClientHello starts with byte 0x16; a PLP HELLO starts with 'H'. The
  * first byte picks the path, so a board without TLS (68K, D14) and one with it
- * (D13) dial the same port. Off unless PARTYLINE_ENABLED=1.
+ * (D13) dial the same port. On by default; PARTYLINE_ENABLED=0 turns it off.
  */
 import * as fs from 'fs';
 import * as net from 'net';
@@ -31,7 +31,8 @@ export interface PartylineConfig {
 export function loadPartylineConfig(env: NodeJS.ProcessEnv = process.env): PartylineConfig {
   const port = Number(env.PARTYLINE_PORT);
   return {
-    enabled: env.PARTYLINE_ENABLED === '1',
+    // On by default: Partyline is the reason the board runs the chat door here.
+    enabled: env.PARTYLINE_ENABLED !== '0',
     port: Number.isInteger(port) && port > 0 && port < 65536 ? port : PLP_LIMITS.defaultPort,
     host: env.PARTYLINE_HOST || '0.0.0.0',
     tlsCert: env.PARTYLINE_TLS_CERT || null,
