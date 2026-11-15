@@ -10,7 +10,7 @@
  * HTTP router (src/chat/router.ts) calls; only the reply shapes are new here.
  * Effects other callers (and the actor) must see arrive through the event
  * relay below, not as a direct reply. File, upload and draw events live in livechat-files.ts. Not hosted: audio/voice/video/door
- * events other than audio:play, chat:auth-token; they are logged and dropped.
+ * events other than audio:play and the voice/video ones (livechat-voice.ts), chat:auth-token; they are logged and dropped.
  */
 import { fork } from 'child_process';
 import type { ChildProcess } from 'child_process';
@@ -31,6 +31,7 @@ import { SurfaceError } from '../achievements/errors';
 import type { PartylineScreen, RenderPart, ScreenFactory, ScreenInfo } from './session';
 import type { FromChild, ToChild } from './livechat-child';
 import { filesAndDrawing } from './livechat-files';
+import { joinVoiceHub } from './livechat-voice';
 
 // Each caller's door runs in its own process: the door's module singletons cannot be shared.
 const CHILD = path.join(__dirname, `livechat-child${path.extname(__filename)}`);
@@ -256,7 +257,14 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
 
     // Out of scope for the Partyline host: dropped quietly (the door never waits on these).
     const DROPPED = /^(audio|voice|video|door):|^admin:archive-channel$|^chat:auth-token$|^chat:keystroke/;
-    const onEmit = (ev: string, data: Payload): void => {
+    // Voice/video: the hub-wide registry fans out between callers; browser media rides M frames.
+    const voice = joinVoiceHub({
+      userId: short(me), username: short(me), room: () => room?.id ?? null,
+      event: (ev, data) => reply(ev, data),
+      media: (p) => info.media?.(p),
+    });
+    const onEmit = (ev: string, data: Payload, ack?: number): void => {
+      if (voice.onDoorEmit(ev, data, ack === undefined ? undefined : (result) => tell({ t: 'ack', id: ack, result }))) return;
       const h = handlers[ev];
       if (!h) { log(`[partyline-livechat] ${DROPPED.test(ev) ? 'dropped' : 'unhandled'} ${ev}`); return; }
       try { h(data); } catch (e) {
@@ -325,17 +333,18 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     child.on('message', (m: FromChild) => {
       if (m.t === 'out') push('D', m.s);
       else if (m.t === 'gfx') push('G', m.s);
-      else if (m.t === 'emit') onEmit(m.ev, m.data);
+      else if (m.t === 'emit') onEmit(m.ev, m.data, m.ack);
       else if (m.t === 'end' && m.error) log(`[partyline-livechat] door ended with error: ${m.error}`);
     });
-    child.on('exit', () => { off(); if (!closed) info.quit?.(); });
+    child.on('exit', () => { off(); voice.close(); if (!closed) info.quit?.(); });
 
     return {
       resize(c: number, r: number) { cols = c; rows = r; tell({ t: 'resize', cols: c, rows: r }); },
       input(bytes: Buffer) { tell({ t: 'input', s: bytes.toString(enc) }); },
+      media(payload: Buffer) { voice.onMedia(payload); },
       upload(payload: Buffer) { files.onUploadResult(payload.toString('latin1')); },
       render(full: boolean) { if (full) tell({ t: 'repaint' }); const parts = out; out = []; return parts; },
-      close() { closed = true; off(); child.kill(); },
+      close() { closed = true; off(); voice.close(); child.kill(); },
     };
   };
 }

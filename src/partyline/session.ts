@@ -29,6 +29,8 @@ export interface PartylineScreen {
   render(full: boolean): Buffer | RenderPart[];
   /** A `U` frame from the relay: `ok <fileId>` or `fail <reason>`. */
   upload?(payload: Buffer): void;
+  /** An `M` frame from the caller's board (voice/video); present only for media=1 callers' screens. */
+  media?(payload: Buffer): void;
   /** The connection is gone: drop subscriptions. */
   close?(): void;
 }
@@ -55,6 +57,8 @@ export interface ScreenInfo {
   ctrl?: (text: string) => void;
   /** Send an `S` frame: a notification sound cue for the caller's board to play. */
   sound?: (cue: string) => void;
+  /** Send an `M` frame (voice/video), only when the caller said media=1; dropped when the socket is backed up. */
+  media?: (payload: Buffer) => void;
 }
 export type ScreenFactory = (info: ScreenInfo) => PartylineScreen;
 
@@ -100,6 +104,7 @@ export interface SessionDeps {
   log: (line: string) => void;
 }
 
+const PLP_MEDIA_BACKLOG = 256 * 1024;
 type State = 'hello' | 'auth' | 'live' | 'closed';
 
 export class PartylineSession {
@@ -132,6 +137,12 @@ export class PartylineSession {
 
   private send(type: string, payload?: Buffer | string): void {
     if (this.state !== 'closed' && !this.sock.destroyed) this.sock.write(encodeFrame(type, payload));
+  }
+
+  /** M frames are lossy: over 256 KB buffered, drop them so terminal output always wins. */
+  private sendMedia(payload: Buffer): void {
+    if (this.sock.writableLength > PLP_MEDIA_BACKLOG) return;
+    this.send(PLP_HUB.MEDIA, payload);
   }
 
   private onData(chunk: Buffer): void {
@@ -182,6 +193,9 @@ export class PartylineSession {
       case PLP_CLIENT.UPLOAD:
         this.screen!.upload?.(f.payload);
         return;
+      case PLP_CLIENT.MEDIA:
+        if (this.hello?.media) this.screen!.media?.(f.payload);
+        return;
       case PLP_CLIENT.PING:
         this.send(PLP_HUB.PONG, f.payload);
         return;
@@ -230,7 +244,7 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit'), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c) });
+    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit'), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
     this.markDirty(true);
   }
 

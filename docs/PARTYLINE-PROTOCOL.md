@@ -36,6 +36,7 @@ Client to hub:
 | `C` | ACK | u32 BE: sequence of the last `D`/`G` fully written |
 | `P` | PING | any bytes; echoed in `O` |
 | `U` | UPLOAD result | `ok <fileId>` or `fail <reason>` (P6) |
+| `M` | MEDIA (1.1) | voice/video from the caller's browser, only with `media=1`; same layout as hub `M` below; ignored by older hubs |
 | `Q` | BYE | `carrier`, `timeout`, `sysop` or `user` |
 
 Hub to client:
@@ -47,7 +48,7 @@ Hub to client:
 | `D` | OUTPUT | u32 BE sequence, then terminal bytes |
 | `G` | GRAPHICS | u32 BE sequence, then kitty APC bytes (only with `kitty=1`); one APC may span several `G` frames, so the client writes them to the terminal as they come, in sequence order with `D` |
 | `S` | SOUND | cue name: the door's `audio:play` soundId; the relay re-emits it on the caller's socket as `audio:play` |
-| `M` | MEDIA | voice/video signalling (only with `media=1`) |
+| `M` | MEDIA | voice/video (only with `media=1`): event name (ASCII), `0x00`, body. Body is UTF-8 JSON, or raw bytes for `audio:data` (hub to client: `userId`, `0x00`, int16 PCM) and `video:cells`. A body over the frame limit is split: every piece but the last names the event with a trailing `~`; the receiver joins them per name. Outside the `D`/`G` sequence and ACK window; the hub drops `M` while the socket has over 256 KB queued |
 | `T` | CTRL | host action (`write-cfg`, `upload`, `set-line-mode`, `redirect host:port`, `quit`) |
 | `O` | PONG | the `P` payload |
 | `X` | EXIT | reason; the client returns the caller to the board menu |

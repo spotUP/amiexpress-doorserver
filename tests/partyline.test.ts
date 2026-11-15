@@ -19,6 +19,7 @@ import { authMac, plpKeyOf } from '../src/partyline/auth';
 import { encodeFrame, FrameDecoder, FrameError, kvPayload, parseKv, readAck, seqPayload } from '../src/partyline/frames';
 import { createPartylineServer } from '../src/partyline/server';
 import type { PartylineServer } from '../src/partyline/server';
+import { encodeMedia, joinVoiceHub, MediaDecoder, resetVoiceHub } from '../src/partyline/livechat-voice';
 import { OLD_CLIENT_SCREEN } from '../src/partyline/session';
 import type { RenderPart, ScreenFactory, ScreenInfo } from '../src/partyline/session';
 import { makeAchievementsFixture } from './achievements/helpers';
@@ -98,12 +99,15 @@ let renders: string[];
 let state = 'v0';
 /** When set, render returns these parts (D text and G kitty bytes) instead of `state`. */
 let parts: RenderPart[] | null = null;
+/** Per session id: where an M frame from that caller goes. */
+const mediaIn = new Map<string, (p: Buffer) => void>();
 const testScreen: ScreenFactory = (info) => {
   screens.push(info);
   return {
     resize() { /* the stub's job */ },
     input() { /* none */ },
     render() { renders.push(state); return parts ?? Buffer.from(state); },
+    media: (p) => mediaIn.get(info.sid)?.(p),
   };
 };
 
@@ -187,7 +191,7 @@ describe('login', () => {
 
   it('serves a newer minor at ours and refuses an old major with the update screen', async () => {
     const c1 = await dial(false);
-    expect((await login(c1, { extra: { proto: '1.7' } })).get('proto')).toBe('1.0');
+    expect((await login(c1, { extra: { proto: '1.7' } })).get('proto')).toBe('1.1');
     c1.sock.destroy();
     const c2 = await dial(false);
     c2.send('H', hello({ proto: '0.9' }));
@@ -282,5 +286,65 @@ describe('live loop', () => {
     c.send('Q', 'user');
     await c.untilClosed();
     expect((await request(fx.app).get('/chat/v1/who.txt').set('Authorization', fx.auth).set('X-Chat-Session', sid)).status).toBe(401);
+  });
+});
+
+describe('media (M frames)', () => {
+  const dials = async (extra: Record<string, string | number>): Promise<{ c: Client; info: ScreenInfo }> => {
+    const c = await dial(false);
+    await login(c, { extra });
+    await c.next('D');
+    return { c, info: screens[screens.length - 1] };
+  };
+
+  it('relays a client M to the screen and hub M back, only with media=1', async () => {
+    const got: Buffer[] = [];
+    const on = await dials({ media: 1 });
+    mediaIn.set(on.info.sid, (p) => got.push(p));
+    on.c.send('M', encodeMedia('voice:speaking', { isSpeaking: true })[0]);
+    on.c.send('P', 'x');
+    await on.c.next('O');
+    on.info.media!(encodeMedia('audio:start-streaming', {})[0]);
+    expect((await on.c.next('M')).payload.toString('latin1')).toContain('audio:start-streaming');
+    expect(got).toHaveLength(1);
+
+    const off = await dials({ media: 0 });
+    mediaIn.set(off.info.sid, (p) => got.push(p));
+    off.c.send('M', encodeMedia('voice:speaking', {})[0]);
+    off.c.send('P', 'x');
+    await off.c.next('O');
+    expect(off.info.media).toBeUndefined();
+    expect(got).toHaveLength(1);
+  });
+
+  it('carries audio:data from caller A to caller B as userId|NUL|pcm, not back to A', async () => {
+    resetVoiceHub();
+    const a = await dials({ media: 1 });
+    const b = await dials({ media: 1 });
+    for (const [who, id] of [[a, 'a@x'], [b, 'b@y']] as const) {
+      const v = joinVoiceHub({ userId: id, username: id, room: () => 'main', event: () => undefined, media: (p) => who.info.media!(p) });
+      mediaIn.set(who.info.sid, (p) => v.onMedia(p));
+    }
+    const pcm = Buffer.from([1, 2, 3, 4]);
+    a.c.send('M', encodeMedia('audio:data', pcm)[0]);
+    const got = new MediaDecoder().push((await b.c.next('M')).payload);
+    expect(got).toEqual({ ev: 'audio:data', body: Buffer.concat([Buffer.from('a@x\0'), pcm]) });
+    a.c.send('P', 'x');
+    await a.c.next('O');
+    await expect(a.c.next('M', 200)).rejects.toThrow();
+    resetVoiceHub();
+  });
+
+  it('drops M frames while the socket has over 256 KB queued, terminal output still flows', async () => {
+    const { c, info } = await dials({ media: 1 });
+    c.sock.pause();
+    const chunk = Buffer.alloc(4000, 7);
+    for (let i = 0; i < 3000; i++) info.media!(encodeMedia('audio:data', chunk)[0]);
+    c.sock.resume();
+    c.send('P', 'x');
+    await c.next('O', 10_000);
+    const n = (c as unknown as { frames: PlpFrame[] }).frames.filter((f) => f.type === 'M').length;
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBeLessThan(3000);
   });
 });
