@@ -7,8 +7,13 @@
  */
 import { EventEmitter } from 'events';
 import * as path from 'path';
+import { encodeKittyDelete, encodeKittyImage, encodeKittyPlace, type KittyCrop, type KittyImage, type SendKittyImageOptions } from './kitty-encode';
 
-export interface ChildInit { t: 'init'; doorDir: string; user: string; access: number; sysop: boolean; cols: number; rows: number; utf8: boolean }
+export interface ChildInit { t: 'init'; doorDir: string; user: string; access: number; sysop: boolean; cols: number; rows: number; utf8: boolean;
+  /** The caller's terminal draws kitty pictures (hello kitty=1). */
+  kitty: boolean;
+  /** The caller's board connection (hello conn=), as the board's bbs.connectionType. */
+  conn: 'web' | 'telnet' | 'ssh' }
 export type ToChild =
   | ChildInit
   | { t: 'input'; s: string }
@@ -17,6 +22,8 @@ export type ToChild =
   | { t: 'repaint' };
 export type FromChild =
   | { t: 'out'; s: string }
+  /** Kitty APC bytes, after every 'out' written before them; the hub sends them as G frames. */
+  | { t: 'gfx'; s: string }
   | { t: 'emit'; ev: string; data: Record<string, unknown> }
   | { t: 'end'; error?: string }
   /** A spare finished loading the door. */
@@ -33,12 +40,27 @@ function start(init: ChildInit): void {
   let cols = init.cols;
   let rows = init.rows;
   let out = '';
+  const flush = (): void => { if (out) { const s2 = out; out = ''; send({ t: 'out', s: s2 }); } };
   const write = (s: string): void => {
-    if (!out) setImmediate(() => { const s2 = out; out = ''; send({ t: 'out', s: s2 }); });
+    if (!out) setImmediate(flush);
     out += s;
   };
+  // Pictures go out raw, never through write (the board's BBSApi does the same: a wrap breaks base64).
+  const gfx = (apc: string): true => { flush(); send({ t: 'gfx', s: apc }); return true; };
   const bbs = Object.assign(new EventEmitter(), {
-    connectionType: 'telnet',
+    connectionType: init.conn,
+    kittyGraphics: init.kitty,
+    sendImage: (image: KittyImage, opts: SendKittyImageOptions = {}): boolean => {
+      const { fallback, ...keys } = opts;
+      const apc = init.kitty ? encodeKittyImage(image, keys) : null;
+      if (apc !== null) return gfx(apc);
+      if (fallback) write(fallback);
+      return false;
+    },
+    placeImage: (id: number, c: number, r: number, crop?: KittyCrop, placement?: number, z?: number): boolean =>
+      init.kitty && gfx(encodeKittyPlace(id, c, r, crop, placement, z)),
+    deleteImage: (id: number, keepData = true, placement?: number): boolean =>
+      init.kitty && gfx(encodeKittyDelete(id, keepData, placement)),
     unicodeCapable: init.utf8,
     write,
     writeLine: (s: string) => write(s + '\r\n'),

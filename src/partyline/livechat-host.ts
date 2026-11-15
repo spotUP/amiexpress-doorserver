@@ -29,7 +29,7 @@ import {
   search, setMode, setPresence, setRoomMotd, setTopic, setTyping, threadHistory, unreact, getDiscordMirror, setDiscordMirror,
 } from '../chat/store';
 import { SurfaceError } from '../achievements/errors';
-import type { PartylineScreen, ScreenFactory, ScreenInfo } from './session';
+import type { PartylineScreen, RenderPart, ScreenFactory, ScreenInfo } from './session';
 import type { FromChild, ToChild } from './livechat-child';
 import { filesAndDrawing } from './livechat-files';
 
@@ -65,7 +65,14 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     const enc: BufferEncoding = info.hello.charset === 'utf8' ? 'utf8' : 'latin1';
     let cols = info.hello.cols;
     let rows = info.hello.rows;
-    let out: string[] = [];
+    // Door output in order: text and kitty APC alternate, and a picture must land where the text before it put the cursor.
+    let out: RenderPart[] = [];
+    const push = (type: RenderPart['type'], s: string): void => {
+      const last = out[out.length - 1];
+      if (last?.type === type) last.bytes = Buffer.concat([last.bytes, Buffer.from(s, type === 'G' ? 'latin1' : enc)]);
+      else out.push({ type, bytes: Buffer.from(s, type === 'G' ? 'latin1' : enc) });
+      info.markDirty();
+    };
     let room: { id: string; name: string } | null = null;
     let closed = false;
 
@@ -82,7 +89,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     child.channel?.ref();
     // 'advanced' IPC keeps Date objects: the door formats createdAt with getHours().
     const tell = (m: ToChild): void => { if (child.connected) child.send(m); };
-    tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8' });
+    tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8', kitty: info.hello.kitty, conn: info.hello.conn });
     // Hub replies go to the door's socket listeners in the child.
     const reply = (ev: string, data: Payload): void => { if (!closed) tell({ t: 'event', ev, data }); };
 
@@ -309,7 +316,8 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     });
 
     child.on('message', (m: FromChild) => {
-      if (m.t === 'out') { out.push(m.s); info.markDirty(); }
+      if (m.t === 'out') push('D', m.s);
+      else if (m.t === 'gfx') push('G', m.s);
       else if (m.t === 'emit') onEmit(m.ev, m.data);
       else if (m.t === 'end' && m.error) log(`[partyline-livechat] door ended with error: ${m.error}`);
     });
@@ -319,7 +327,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       resize(c: number, r: number) { cols = c; rows = r; tell({ t: 'resize', cols: c, rows: r }); },
       input(bytes: Buffer) { tell({ t: 'input', s: bytes.toString(enc) }); },
       upload(payload: Buffer) { files.onUploadResult(payload.toString('latin1')); },
-      render(full: boolean) { if (full) tell({ t: 'repaint' }); const b = Buffer.from(out.join(''), enc); out = []; return b; },
+      render(full: boolean) { if (full) tell({ t: 'repaint' }); const parts = out; out = []; return parts; },
       close() { closed = true; off(); child.kill(); },
     };
   };

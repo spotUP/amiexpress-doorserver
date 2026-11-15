@@ -68,6 +68,8 @@ export interface PlpHello {
   media: boolean;
   upload: 'none' | 'zmodem' | 'web' | 'aew';
   console: boolean;
+  /** The caller's board connection; the door shows web-only features (voice, video) for `web`. */
+  conn: 'telnet' | 'web' | 'ssh';
   modem: number;
   /** Empty for a fresh login. */
   resume: string;
