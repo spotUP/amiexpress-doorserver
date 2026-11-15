@@ -64,7 +64,7 @@ export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsCon
   const chat = opts.chat ?? loadChatConfig();
   const log = opts.log ?? ((line: string) => console.log(line));
   // PARTYLINE_ENGINE=livechat hosts the board's LIVECHAT door per caller; the default is the hub's own chat screen.
-  const screen = opts.screen ?? (process.env.PARTYLINE_ENGINE === 'livechat' ? livechatScreen(ach, chat, undefined, log) : chatScreen(ach, chat, opts.filesDir ?? null));
+  const screen = opts.screen ?? (process.env.PARTYLINE_ENGINE === 'livechat' ? livechatScreen(ach, chat, undefined, log, opts.filesDir ?? null) : chatScreen(ach, chat, opts.filesDir ?? null));
   const sessions = new Set<PartylineSession>();
   let draining = false;
   // Stale sessions are swept by the /chat/v1 router's sweeper (createApp mounts it whenever achievements is on).
