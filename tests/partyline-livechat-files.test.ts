@@ -7,6 +7,7 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import type { ChatCtx } from '../src/chat/sessions';
 import { createRoom, joinRoom } from '../src/chat/store';
+import * as chatFiles from '../src/chat/files';
 import { filesAndDrawing, UPLOAD_NOT_HERE } from '../src/partyline/livechat-files';
 import type { FilesHost } from '../src/partyline/livechat-files';
 import { makeAchievementsFixture } from './achievements/helpers';
@@ -27,7 +28,7 @@ function setup(over: Partial<FilesHost> = {}, roomId = art.id): { sent: Sent[]; 
   const f = filesAndDrawing({
     store, reply: (ev, data) => sent.push({ ev, data }),
     str: (d, ...keys) => { for (const k of keys) if (typeof d[k] === 'string') return d[k] as string; return ''; },
-    short: (u) => u.split('@')[0], room: () => ({ id: roomId, name: 'r' }), filesDir: null, uploadMode: 'web', ctrl: (t) => ctrl.push(t), ...over,
+    short: (u) => u.split('@')[0], room: () => ({ id: roomId, name: 'r' }), filesDir: null, uploadMode: 'web', conn: 'web', ctrl: (t) => ctrl.push(t), ...over,
   });
   return { sent, ctrl, f };
 }
@@ -42,6 +43,16 @@ test('file list, share and preview answer from the hub when file sharing is off'
   expect(sent[0]).toEqual({ ev: 'file:list', data: { path: '/x', files: [], directories: [] } });
   expect(sent[1].ev).toBe('room:error');
   expect(sent[2]).toEqual({ ev: 'file:preview', data: { fileId: 'nope', fmt: 'png', error: 'files_disabled' } });
+});
+
+// LC asks the hub for 'full' on a web caller and 'pal' on telnet (board previewQuality);
+// without it the hub fell back to 'fit', a 64 KB picture the browser scaled up blurred.
+test.each([['web', 'full'], ['telnet', 'pal'], ['ssh', 'pal']] as const)('a %s caller gets the %s preview LC asks for', (conn, q) => {
+  const spy = jest.spyOn(chatFiles, 'openPreview').mockImplementation(() => { throw new Error('stop'); });
+  try {
+    expect(() => setup({ conn }).f.handlers['file:preview']({ fileId: 'x', cols: 10, rows: 5, fmt: 'png' })).toThrow('stop');
+    expect(spy.mock.calls[0][7]).toBe(q);
+  } finally { spy.mockRestore(); }
 });
 
 test('file upload asks the relay, refuses a second request, and ends on the relay answer', () => {

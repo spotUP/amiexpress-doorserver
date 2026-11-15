@@ -135,7 +135,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       store(true, (db, ctx) => moderate(db, ctx, id, action, { user: target(d), reason: str(d, 'reason'), ...(minutes > 0 ? { minutes } : {}) }));
     });
 
-    const files = filesAndDrawing({ store, reply, str, short, room: () => room, filesDir, uploadMode: info.hello.upload, ctrl: info.ctrl });
+    const files = filesAndDrawing({ store, reply, str, short, room: () => room, filesDir, uploadMode: info.hello.upload, conn: info.hello.conn, ctrl: info.ctrl });
     const handlers: Record<string, (d: Payload) => void> = {
       ...files.handlers,
       'room:list': () => {

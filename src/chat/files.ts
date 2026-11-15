@@ -424,7 +424,8 @@ export function openPreview(db: Database.Database, dir: string | null, ctx: Chat
   const rows = dimParam(rowsQ, ROWS_MIN, ROWS_MAX, 10);
   // q applies to preview.png only; anything but full/pal is the original 64 KB fit.
   const q: PreviewQuality = fmt === 'png' && (qQ === 'full' || qQ === 'pal') ? qQ : 'fit';
-  const stem = path.join(needDir(dir), `${row.blob_id ?? row.id}.p${cols}x${rows}${q === 'fit' ? '' : `.${q}`}`);
+  // .full2: full previews cached at 1x before the density change keep their old name and are not served.
+  const stem = path.join(needDir(dir), `${row.blob_id ?? row.id}.p${cols}x${rows}${q === 'fit' ? '' : q === 'full' ? '.full2' : `.${q}`}`);
   const file = `${stem}.${fmt}`;
   const meta = `${stem}.${fmt}.cells`;
   const contentType = fmt === 'png' ? 'image/png' : 'application/octet-stream';

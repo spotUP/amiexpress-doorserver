@@ -152,7 +152,7 @@ describe('chat previews', () => {
     expect(t.height).toBeLessThanOrEqual(32);
   });
 
-  it('q=full: RGB PNG at exactly cells x 8/16 px with no byte cap; q=pal: at most 255 colours, same box, under 128 KB', async () => {
+  it('q=full: RGB PNG at cells x 8/16 px times the source-limited density (up to 2), no byte cap; q=pal: at most 255 colours, same box, under 128 KB', async () => {
     const a = await login('alice');
     const r = await room(a);
     const id = await upload(a, r, 'noise.png', noisyPng(960, 540));
@@ -160,7 +160,8 @@ describe('chat previews', () => {
     expect(full.status).toBe(200);
     expect(full.headers['x-cells']).toBe('80x23'); // 640x360 fit -> 22.5 rows, nearest 23
     const f = PNG.sync.read(full.body as Buffer);
-    expect([f.width, f.height]).toEqual([640, 23 * 16]);
+    // Source 960x540 into 640x368: density min(2, 1.5, 1.467) = 1.467, never upscaled past the source.
+    expect([f.width, f.height]).toEqual([Math.round(640 * (540 / 368)), 540]);
     expect((full.body as Buffer).length).toBeGreaterThan(65536); // noise: no shrink to the 64 KB cap
     const pal = await bin(call('get', `/files/${id}/preview.png?cols=80&rows=64&q=pal`, a));
     expect(pal.status).toBe(200);

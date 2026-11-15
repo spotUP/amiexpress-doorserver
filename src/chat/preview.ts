@@ -72,8 +72,8 @@ export function makeRgb(src: Rgb, cols: number, rows: number): PreviewOut {
 /**
  * Preview quality a caller asks for with `?q=`:
  * - `fit` (default, the original route): RGB PNG shrunk to 64 KB, cells from the fit.
- * - `full`: full-colour RGB PNG at exactly cells x 8 by cells x 16 pixels, no byte cap
- *   (web terminal and TS LiveChat: drawn 1:1, sharp).
+ * - `full`: full-colour RGB PNG of cells x 8 by cells x 16 pixels times fullDensity (1..2),
+ *   no byte cap (web callers: the browser draws it into the cells near 1:1 on a 2x screen).
  * - `pal`: indexed PNG of at most 255 colours at exactly cells x 8 by cells x 16 pixels,
  *   at most PALETTE_PREVIEW_MAX_BYTES (LIVECHAT68 and DCTelnet: 1:1, no dither).
  * The exact pixel box makes every row of cells a whole 16 px band, so a caller cropping
@@ -98,6 +98,20 @@ function rgbPng(pic: Rgb): Buffer {
   return PNG.sync.write(png, { colorType: 2, inputColorType: 6, inputHasAlpha: true, deflateLevel: 9 });
 }
 
+/** Most device pixels per 8x16 cell a `full` preview carries; see fullDensity. */
+export const FULL_MAX_DENSITY = 2;
+
+/**
+ * Pixels per 8x16 cell for a `full` preview. The web terminal's cell is about
+ * 9.6x19 CSS px, 19x38 device px on a 2x screen, so an 8x16-per-cell picture was
+ * scaled up more than twice by the browser and looked blurred (sysop, 2026-11-15).
+ * Up to FULL_MAX_DENSITY, never past the source's own pixels: an upscale here is
+ * no sharper than the browser's.
+ */
+export function fullDensity(src: Rgb, c: number, r: number): number {
+  return Math.max(1, Math.min(FULL_MAX_DENSITY, src.w / (c * CELL_W), src.h / (r * CELL_H)));
+}
+
 /**
  * `full` and `pal` previews. Cells are what the PNG is drawn into, always its exact
  * pixel size / 8x16; a palette picture over its byte cap gets fewer cells (smaller
@@ -105,10 +119,14 @@ function rgbPng(pic: Rgb): Buffer {
  */
 export function makeCellPng(src: Rgb, cols: number, rows: number, q: 'full' | 'pal'): PreviewOut {
   let { c, r } = cellBox(src.w, src.h, cols, rows);
+  if (q === 'full') {
+    const k = fullDensity(src, c, r);
+    return { data: rgbPng(resample(src, Math.round(c * CELL_W * k), Math.round(r * CELL_H * k))), cells: `${c}x${r}` };
+  }
   for (;;) {
     const pic = resample(src, c * CELL_W, r * CELL_H);
-    const data = q === 'full' ? rgbPng(pic) : writeIndexedPng(quantize(pic));
-    if (q === 'full' || data.length <= PALETTE_PREVIEW_MAX_BYTES || (c === 1 && r === 1)) {
+    const data = writeIndexedPng(quantize(pic));
+    if (data.length <= PALETTE_PREVIEW_MAX_BYTES || (c === 1 && r === 1)) {
       return { data, cells: `${c}x${r}` };
     }
     const k = Math.min(0.95, Math.sqrt(PALETTE_PREVIEW_MAX_BYTES / data.length) * 0.95);
