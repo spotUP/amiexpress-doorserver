@@ -21,6 +21,7 @@ export const PLP_CLIENT = {
   PING: 'P',
   UPLOAD: 'U',
   BYE: 'Q',
+  MEDIA: 'M',
 } as const;
 
 /** Hub to client. */
