@@ -35,7 +35,7 @@ export type FromChild =
   /** A spare finished loading the door. */
   | { t: 'ready' };
 
-interface RepaintableScreen { alloc?(): void; render(): void }
+interface RepaintableScreen { alloc?(): void; render(): void; destroyed?: boolean }
 interface DoorApp { run(): Promise<void> }
 interface DoorModule { createApp(session: unknown): DoorApp | Promise<DoorApp> }
 interface ScreenModule { createScreen(bbs: unknown): RepaintableScreen }
@@ -113,7 +113,8 @@ function start(init: ChildInit): void {
     else if (m.t === 'resize') { cols = m.cols; rows = m.rows; bbs.emit('screen:resize', { cols, rows }); }
     else if (m.t === 'event') toDoor.emit(m.ev, m.data);
     else if (m.t === 'ack') { const cb = acks.get(m.id); acks.delete(m.id); cb?.(m.result); }
-    else if (m.t === 'repaint' && screen) { screen.alloc?.(); screen.render(); }
+    // A destroyed screen (door quit; the board's 80-column resize still arrives before X) must not repaint.
+    else if (m.t === 'repaint' && screen && !screen.destroyed) { screen.alloc?.(); screen.render(); }
   });
 
   const mod = require(path.join(init.doorDir, 'dist/server.js')) as DoorModule; // eslint-disable-line @typescript-eslint/no-require-imports
