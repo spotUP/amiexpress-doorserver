@@ -13,7 +13,9 @@ export interface ChildInit { t: 'init'; doorDir: string; user: string; access: n
   /** The caller's terminal draws kitty pictures (hello kitty=1). */
   kitty: boolean;
   /** The caller's board connection (hello conn=), as the board's bbs.connectionType. */
-  conn: 'web' | 'telnet' | 'ssh' }
+  conn: 'web' | 'telnet' | 'ssh';
+  /** The caller's Alt+Enter choice this call (hello wide=1): responsive instead of 80x25. */
+  wide: boolean }
 export type ToChild =
   | ChildInit
   | { t: 'input'; s: string }
@@ -28,6 +30,8 @@ export type FromChild =
   | { t: 'gfx'; s: string }
   | { t: 'emit'; ev: string; data: Record<string, unknown>; ack?: number }
   | { t: 'end'; error?: string }
+  /** The door asks the caller's terminal for 80x25 or responsive (`mode`), or remembers the caller's Alt+Enter choice for the call (`choice`). */
+  | { t: 'term'; mode?: 'wide' | 'fixed'; choice?: boolean }
   /** A spare finished loading the door. */
   | { t: 'ready' };
 
@@ -41,6 +45,7 @@ const send = (m: FromChild): void => { if (process.connected) process.send?.(m);
 function start(init: ChildInit): void {
   let cols = init.cols;
   let rows = init.rows;
+  let wide = init.wide;
   let out = '';
   const flush = (): void => { if (out) { const s2 = out; out = ''; send({ t: 'out', s: s2 }); } };
   const write = (s: string): void => {
@@ -67,6 +72,11 @@ function start(init: ChildInit): void {
     write,
     writeLine: (s: string) => write(s + '\r\n'),
     getTerminalSize: () => ({ width: cols, height: rows }),
+    // The board's BBSApi terminal-mode calls; the board applies them (PLP T terminal-mode / terminal-choice).
+    getTerminalModeChoice: () => wide,
+    setTerminalModeChoice: (on: boolean) => { wide = on; flush(); send({ t: 'term', choice: on }); },
+    enableWideMode: () => { flush(); send({ t: 'term', mode: 'wide' }); },
+    disableWideMode: () => { flush(); send({ t: 'term', mode: 'fixed' }); },
     isPetsciiMode: () => false,
     isAnsiMode: () => true,
     getModemSpeed: () => 0,
@@ -109,11 +119,18 @@ function start(init: ChildInit): void {
   const mod = require(path.join(init.doorDir, 'dist/server.js')) as DoorModule; // eslint-disable-line @typescript-eslint/no-require-imports
   // The SDK's media classes only emit/listen on the socket, so the door's ctx.audio/ctx.video
   // reach the caller's browser as relayed M frames. Absolute paths: the SDK exports map hides media/.
-  const sdkDir = path.dirname(require.resolve('@amiexpress/bbs-door-sdk', { paths: [init.doorDir] }));
-  const { Audio } = require(path.join(sdkDir, 'media/Audio.js')) as { Audio: new (s: typeof socket, roomId?: string) => unknown }; // eslint-disable-line @typescript-eslint/no-require-imports
-  const { Video } = require(path.join(sdkDir, 'media/Video.js')) as { Video: new (s: typeof socket) => unknown }; // eslint-disable-line @typescript-eslint/no-require-imports
-  const audio = new Audio(socket, (bbsSession as { currentRoomId?: string }).currentRoomId);
-  const video = new Video(socket);
+  // A door without the SDK (test stubs, older doors) runs without ctx.audio/ctx.video.
+  let audio: unknown;
+  let video: unknown;
+  try {
+    const sdkDir = path.dirname(require.resolve('@amiexpress/bbs-door-sdk', { paths: [init.doorDir] }));
+    const { Audio } = require(path.join(sdkDir, 'media/Audio.js')) as { Audio: new (s: typeof socket, roomId?: string) => unknown }; // eslint-disable-line @typescript-eslint/no-require-imports
+    const { Video } = require(path.join(sdkDir, 'media/Video.js')) as { Video: new (s: typeof socket) => unknown }; // eslint-disable-line @typescript-eslint/no-require-imports
+    audio = new Audio(socket, (bbsSession as { currentRoomId?: string }).currentRoomId);
+    video = new Video(socket);
+  } catch (e) {
+    process.stderr.write(`[partyline] door SDK media unavailable: ${(e as Error).message}\n`);
+  }
   Promise.resolve(mod.createApp({ socket, user, bbsSession, bbs, audio, video, params: [] })).then((app) => app.run())
     .then(() => send({ t: 'end' }), (e: Error) => send({ t: 'end', error: e.message }))
     .finally(() => process.disconnect?.());
