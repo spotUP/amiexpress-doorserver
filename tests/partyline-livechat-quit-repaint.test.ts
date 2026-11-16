@@ -41,3 +41,27 @@ test('a repaint after the door destroyed its screen writes nothing', async () =>
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// LIVECHAT writes its clear + goodbye and returns from run(); those bytes wait on setImmediate,
+// so 'end' (and the disconnect) used to win and the board prompt drew over the chat screen.
+test('the door\'s last writes reach the host before end', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pl-bye-'));
+  fs.mkdirSync(path.join(dir, 'dist/ui'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'dist/ui/screen.js'), 'exports.createScreen = () => ({ render() {} });');
+  fs.writeFileSync(path.join(dir, 'dist/server.js'), `
+    exports.createApp = (ctx) => ({ run: async () => { ctx.bbs.write('\\x1b[2J\\x1b[H'); ctx.bbs.writeLine('Goodbye.'); } });`);
+  const child = forkLivechatChild(dir, () => {});
+  const got: FromChild[] = [];
+  const ended = new Promise<void>((r) => child.on('message', (m: FromChild) => { got.push(m); if (m.t === 'end') r(); }));
+  try {
+    const init: ChildInit = { t: 'init', doorDir: dir, user: 'u', access: 10, sysop: false, cols: 80, rows: 25, utf8: true, kitty: false, conn: 'web', wide: false };
+    child.send(init);
+    await ended;
+    const outs = got.filter((m): m is { t: 'out'; s: string } => m.t === 'out').map((m) => m.s).join('');
+    expect(outs).toBe('\x1b[2J\x1b[HGoodbye.\r\n');
+    expect(got[got.length - 1]).toEqual({ t: 'end' });
+  } finally {
+    child.kill();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

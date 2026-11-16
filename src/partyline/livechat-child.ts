@@ -133,7 +133,8 @@ function start(init: ChildInit): void {
     process.stderr.write(`[partyline] door SDK media unavailable: ${(e as Error).message}\n`);
   }
   Promise.resolve(mod.createApp({ socket, user, bbsSession, bbs, audio, video, params: [] })).then((app) => app.run())
-    .then(() => send({ t: 'end' }), (e: Error) => send({ t: 'end', error: e.message }))
+    // Flush first: the door's last writes (LIVECHAT's clear + goodbye) wait on setImmediate, after this microtask and the disconnect.
+    .then(() => { flush(); send({ t: 'end' }); }, (e: Error) => { flush(); send({ t: 'end', error: e.message }); })
     .finally(() => process.disconnect?.());
 }
 
