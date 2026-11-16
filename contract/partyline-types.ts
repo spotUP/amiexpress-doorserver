@@ -65,6 +65,8 @@ export interface PlpHello {
   rows: number;
   charset: 'latin1' | 'utf8';
   kitty: boolean;
+  /** The caller's Alt+Enter choice on the board this call (BBSApi.getTerminalModeChoice). */
+  wide: boolean;
   mouse: boolean;
   media: boolean;
   upload: 'none' | 'zmodem' | 'web' | 'aew';

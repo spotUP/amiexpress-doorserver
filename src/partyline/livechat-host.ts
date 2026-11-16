@@ -89,7 +89,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     child.channel?.ref();
     // 'advanced' IPC keeps Date objects: the door formats createdAt with getHours().
     const tell = (m: ToChild): void => { if (child.connected) child.send(m); };
-    tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8', kitty: info.hello.kitty, conn: info.hello.conn });
+    tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8', kitty: info.hello.kitty, conn: info.hello.conn, wide: info.hello.wide });
     // Hub replies go to the door's socket listeners in the child.
     const reply = (ev: string, data: Payload): void => { if (!closed) tell({ t: 'event', ev, data }); };
 
@@ -334,6 +334,10 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       if (m.t === 'out') push('D', m.s);
       else if (m.t === 'gfx') push('G', m.s);
       else if (m.t === 'emit') onEmit(m.ev, m.data, m.ack);
+      else if (m.t === 'term') {
+        if (m.choice !== undefined) info.ctrl?.(`terminal-choice ${m.choice ? 1 : 0}`);
+        if (m.mode) info.ctrl?.(`terminal-mode ${m.mode}`);
+      }
       else if (m.t === 'end' && m.error) log(`[partyline-livechat] door ended with error: ${m.error}`);
     });
     child.on('exit', () => { off(); voice.close(); if (!closed) info.quit?.(); });

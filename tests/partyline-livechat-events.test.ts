@@ -38,13 +38,14 @@ const peek = <T>(who: string, fn: (db: Database.Database, ctx: ChatCtx) => T): T
   withAchievementsDb(fx.ach, (db) => fn(db, resolveSession(db, chat, sids[who], fx.boardId)));
 const type = (who: 'bob' | 'alice', line: string): void => { callers[who].input(Buffer.from(`${line}\r`, 'latin1')); };
 const callers = {} as Record<'bob' | 'alice', PartylineScreen>;
+const ctrls: Record<string, string[]> = { bob: [], alice: [] };
 
 beforeAll(async () => {
   for (const handle of ['bob', 'alice']) sids[handle] = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle, sysop: true, client: 'test' }).sid);
   peek('bob', (db, ctx) => createRoom(db, ctx, { name: 'general' }));
   const factory = livechatScreen(fx.ach, chat, undefined, (l) => logs.push(l));
   for (const who of ['bob', 'alice'] as const) {
-    const s: PartylineScreen = factory({ sid: sids[who], user: who, boardId: fx.boardId, hello: { cols: 80, rows: 25, access: 255, sysop: true } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { text[who] += screenText(s); }); }, quit: () => {} });
+    const s: PartylineScreen = factory({ sid: sids[who], user: who, boardId: fx.boardId, hello: { cols: 80, rows: 25, access: 255, sysop: true } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { text[who] += screenText(s); }); }, quit: () => {}, ctrl: (t) => { ctrls[who].push(t); } });
     callers[who] = s;
     screens.push(s);
   }
@@ -79,6 +80,16 @@ test.skip('edit and react reach the store and the other caller', async () => {
   type('bob', '/react :+1:');
   await until(() => peek('bob', (db, ctx) => reactionRows(db, ctx, id)).length > 0, 10_000);
   expect(logs.filter((l) => /unhandled|failed/.test(l))).toEqual([]);
+});
+
+test('Alt+Enter asks the board to switch the terminal size and remember the choice', async () => {
+  callers.alice.input(Buffer.from('\x1b\r', 'latin1'));
+  await until(() => ctrls.alice.includes('terminal-mode wide'), 10_000);
+  expect(ctrls.alice).toContain('terminal-choice 1');
+  // The room already said 'terminal-mode fixed' at start, so wait on what follows the second press.
+  callers.alice.input(Buffer.from('\x1b\r', 'latin1'));
+  await until(() => ctrls.alice.includes('terminal-choice 0'), 10_000);
+  expect(ctrls.alice.slice(-2)).toEqual(['terminal-choice 0', 'terminal-mode fixed']);
 });
 
 test('a DM between two callers is stored and listed', async () => {

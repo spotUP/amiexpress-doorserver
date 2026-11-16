@@ -49,7 +49,7 @@ Hub to client:
 | `G` | GRAPHICS | u32 BE sequence, then kitty APC bytes (only with `kitty=1`); one APC may span several `G` frames, so the client writes them to the terminal as they come, in sequence order with `D` |
 | `S` | SOUND | cue name: the door's `audio:play` soundId; the relay re-emits it on the caller's socket as `audio:play` |
 | `M` | MEDIA | voice/video (only with `media=1`): event name (ASCII), `0x00`, body. Body is UTF-8 JSON, or raw bytes for `audio:data` (hub to client: `userId`, `0x00`, int16 PCM) and `video:cells`. A body over the frame limit is split: every piece but the last names the event with a trailing `~`; the receiver joins them per name. Outside the `D`/`G` sequence and ACK window; the hub drops `M` while the socket has over 256 KB queued |
-| `T` | CTRL | host action (`write-cfg`, `upload`, `set-line-mode`, `redirect host:port`, `quit`) |
+| `T` | CTRL | host action (`write-cfg`, `upload`, `set-line-mode`, `redirect host:port`, `quit`, `terminal-mode wide|fixed` (ask the caller's terminal for responsive or 80x25), `terminal-choice 0|1` (remember the caller's Alt+Enter choice for the call)) |
 | `O` | PONG | the `P` payload |
 | `X` | EXIT | reason; the client returns the caller to the board menu |
 
@@ -59,7 +59,7 @@ Hub to client:
 
 `proto=1.<minor>`, `client=<name>/<version>`, `board=<id>`, `handle=<from the board
 session, never typed>`, `access`, `sysop=0|1`, `node`, `cols`, `rows`,
-`charset=latin1|utf8`, `kitty=0|1`, `mouse=0|1`, `media=0|1`,
+`charset=latin1|utf8`, `kitty=0|1`, `wide=0|1` (the caller's Alt+Enter choice this call), `mouse=0|1`, `media=0|1`,
 `upload=none|zmodem|web|aew`, `console=0|1`, `conn=telnet|web|ssh`, `modem=<bps or 0>`, `resume=<token or empty>`.
 Unknown keys are ignored; missing ones take defaults (80x25, latin1, flags off).
 
