@@ -226,6 +226,22 @@ describe('live loop', () => {
     expect(renders).toEqual(['v0', 'v2']);
   });
 
+  it('a door quit sends its last screen and waits for its C before closing', async () => {
+    // LIVECHAT /quit writes a clear then ends; closing at once left the wide chat on screen (sysop, 2026-11-16).
+    const c = await dial(false);
+    await login(c);
+    const first = await c.next('D');
+    state = 'cleared'; screens[0].markDirty();
+    screens[0].quit!();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(c.sock.destroyed || c.sock.readableEnded).toBe(false);
+    c.send('C', seqPayload(first.payload.readUInt32BE(0), Buffer.alloc(0)));
+    const last = await c.next('D');
+    expect(text(last)).toBe('cleared');
+    c.send('C', seqPayload(last.payload.readUInt32BE(0), Buffer.alloc(0)));
+    await c.untilClosed();
+  });
+
   it('hands the screen the caller kitty flag and connection type, telnet when unknown', async () => {
     const a = await dial(false);
     await login(a, { extra: { kitty: 1, conn: 'web' } });
