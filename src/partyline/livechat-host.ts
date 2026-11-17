@@ -112,10 +112,11 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     // Hub replies go to the door's socket listeners in the child.
     const reply = (ev: string, data: Payload): void => { if (!closed) tell({ t: 'event', ev, data }); };
 
-    const join = (name: string): void => {
+    // made: a /create's topic, visibility and kind, used only when the room is new.
+    const join = (name: string, made: Payload = {}): void => {
       const r = store(true, (db, ctx) => {
         let row = listRooms(db, ctx).find((x) => x.name === name);
-        const id = row ? row.id : createRoom(db, ctx, name.startsWith('art:') ? { name, kind: 'art' } : { name }).id;
+        const id = row ? row.id : createRoom(db, ctx, name.startsWith('art:') ? { name, kind: 'art' } : { ...made, name }).id;
         const j = joinRoom(db, ctx, id);
         return { j, history: roomHistory(db, ctx, id, { limit: 50 }) };
       });
@@ -164,7 +165,13 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         reply('room:list', { rooms: rooms.map((x) => ({ room_id: x.id, room_name: x.name, topic: x.topic, is_public: x.visibility !== 'private', member_count: x.members, created_by_username: x.owner, kind: x.kind })) });
       },
       'room:join': (d) => join(String(d.roomName ?? d.roomId ?? '')),
-      'room:create': (d) => join(String(d.roomName ?? '')),
+      // The door's sidebar only learns of rooms from room:list (sysop 2026-11-17: a created room was missing).
+      'room:create': (d) => {
+        const made: Payload = { topic: str(d, 'topic'), visibility: d.isPublic === false || d.isInviteOnly === true ? 'private' : 'public' };
+        if (typeof d.kind === 'string') made.kind = d.kind;
+        join(String(d.roomName ?? ''), made);
+        handlers['room:list']({});
+      },
       'room:leave': () => { if (room) { const id = room.id; store(true, (db, ctx) => leaveRoom(db, ctx, id)); room = null; } },
       'room:message': (d) => {
         if (!room) return;
