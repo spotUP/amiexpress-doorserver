@@ -40,6 +40,7 @@ export function parseHello(payload: Buffer): PlpHello {
     charset: oneOf(kv.get('charset'), ['latin1', 'utf8'] as const, 'latin1'),
     kitty: flag(kv.get('kitty')),
     wide: flag(kv.get('wide')),
+    chatOnly: flag(kv.get('chatonly')),
     mouse: flag(kv.get('mouse')),
     media: flag(kv.get('media')),
     upload: oneOf(kv.get('upload'), ['none', 'zmodem', 'web', 'aew'] as const, 'none'),

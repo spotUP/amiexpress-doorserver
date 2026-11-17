@@ -67,6 +67,8 @@ export interface PlpHello {
   kitty: boolean;
   /** The caller's Alt+Enter choice on the board this call (BBSApi.getTerminalModeChoice). */
   wide: boolean;
+  /** The caller came from the board's /chat page (session tempData.chatOnly): no Quit, the tab is the exit. */
+  chatOnly: boolean;
   mouse: boolean;
   media: boolean;
   upload: 'none' | 'zmodem' | 'web' | 'aew';

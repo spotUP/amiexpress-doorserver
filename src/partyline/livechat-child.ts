@@ -15,7 +15,9 @@ export interface ChildInit { t: 'init'; doorDir: string; user: string; access: n
   /** The caller's board connection (hello conn=), as the board's bbs.connectionType. */
   conn: 'web' | 'telnet' | 'ssh';
   /** The caller's Alt+Enter choice this call (hello wide=1): responsive instead of 80x25. */
-  wide: boolean }
+  wide: boolean;
+  /** hello chatonly=1: the door's bbsSession.tempData.chatOnly (the board's /chat page). */
+  chatOnly: boolean }
 export type ToChild =
   | ChildInit
   | { t: 'input'; s: string }
@@ -85,7 +87,7 @@ function start(init: ChildInit): void {
   // The door gates commands on secLevel (80 kick, 100 ban) and treats 255 as sysop; the hub store still checks every write.
   const user = { username: init.user, id: 0, secLevel: init.sysop ? Math.max(init.access, 255) : init.access };
   const bbsSession: { user: typeof user; nodeId: number; tempData: Record<string, unknown>; doorInputHandler?: (d: string) => void } =
-    { user, nodeId: 0, tempData: {} };
+    { user, nodeId: 0, tempData: { chatOnly: init.chatOnly } };
   const toDoor = new EventEmitter();
   let ackId = 0;
   const acks = new Map<number, (r: unknown) => void>();

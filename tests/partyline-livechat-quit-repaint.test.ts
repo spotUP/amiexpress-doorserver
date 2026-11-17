@@ -26,7 +26,7 @@ test('a repaint after the door destroyed its screen writes nothing', async () =>
   child.on('message', (m: FromChild) => got.push(m));
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   try {
-    const init: ChildInit = { t: 'init', doorDir: dir, user: 'u', access: 10, sysop: false, cols: 120, rows: 40, utf8: true, kitty: false, conn: 'web', wide: true };
+    const init: ChildInit = { t: 'init', doorDir: dir, user: 'u', access: 10, sysop: false, cols: 120, rows: 40, utf8: true, kitty: false, conn: 'web', wide: true, chatOnly: false };
     child.send(init);
     await wait(1500);
     child.send({ t: 'repaint' });
@@ -54,7 +54,7 @@ test('the door\'s last writes reach the host before end', async () => {
   const got: FromChild[] = [];
   const ended = new Promise<void>((r) => child.on('message', (m: FromChild) => { got.push(m); if (m.t === 'end') r(); }));
   try {
-    const init: ChildInit = { t: 'init', doorDir: dir, user: 'u', access: 10, sysop: false, cols: 80, rows: 25, utf8: true, kitty: false, conn: 'web', wide: false };
+    const init: ChildInit = { t: 'init', doorDir: dir, user: 'u', access: 10, sysop: false, cols: 80, rows: 25, utf8: true, kitty: false, conn: 'web', wide: false, chatOnly: false };
     child.send(init);
     await ended;
     const outs = got.filter((m): m is { t: 'out'; s: string } => m.t === 'out').map((m) => m.s).join('');
