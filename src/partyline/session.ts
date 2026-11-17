@@ -111,6 +111,7 @@ export class PartylineSession {
   readonly id = newId('pl');
   sid: string | null = null;
   private state: State = 'hello';
+  private quitting = false;
   private hello: PlpHello | null = null;
   private nonce = '';
   private decoder = new FrameDecoder();
@@ -187,6 +188,7 @@ export class PartylineSession {
           this.inFlight = null;
           if (this.queue.length > 0) this.flush();
           else this.schedule();
+          this.settleQuit();
         }
         return;
       }
@@ -244,7 +246,7 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.bye('quit'), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
+    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.quitAfterOutput(), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
     this.markDirty(true);
   }
 
@@ -290,7 +292,7 @@ export class PartylineSession {
       }
     }
     const next = this.queue.shift();
-    if (!next) return;
+    if (!next) { this.settleQuit(); return; }
     this.seq += 1;
     this.inFlight = this.seq;
     this.lastFlush = Date.now();
@@ -302,6 +304,22 @@ export class PartylineSession {
     this.send(PLP_HUB.OUTPUT, seqPayload(++this.seq, Buffer.from(`\r\n${REFUSAL_TEXT[reason]}\r\n`, 'latin1')));
     this.send(PLP_HUB.EXIT, reason);
     this.end();
+  }
+
+  /**
+   * The door quit (LIVECHAT /quit): its last writes - the clear that wipes the chat screen
+   * off the caller's terminal - are still to render, so send them and their C first, then
+   * BYE. Ending at once left the wide chat screen above the board prompt (sysop, 2026-11-16).
+   */
+  private quitAfterOutput(): void {
+    if (this.state !== 'live') { this.bye('quit'); return; }
+    this.quitting = true;
+    this.schedule();
+    this.settleQuit();
+  }
+
+  private settleQuit(): void {
+    if (this.quitting && this.inFlight === null && this.queue.length === 0 && !this.dirty && !this.timer) this.bye('quit');
   }
 
   /** Caller left on purpose: the chat session goes with it, no resume. */
