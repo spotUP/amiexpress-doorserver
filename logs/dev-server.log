@@ -1,0 +1,3 @@
+[INFO] admin API disabled: DOORSERVER_JWT_SECRET is not set
+[OK] door server listening on 3010
+[INFO] catalog 4129 doors, revision c4129-t1787969301-o3575925940
