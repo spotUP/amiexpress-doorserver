@@ -67,6 +67,10 @@ export interface PlpHello {
   kitty: boolean;
   /** The caller's Alt+Enter choice on the board this call (BBSApi.getTerminalModeChoice). */
   wide: boolean;
+  /** The caller's Responsive Doors setting (hello `responsive=<board on|off>,<this door's override>,<door key>`). Absent from an older board. */
+  responsive?: { board: 'on' | 'off'; choice: 'default' | 'on' | 'off'; door: string };
+  /** The caller came from the board's /chat page (session tempData.chatOnly): no Quit, the tab is the exit. */
+  chatOnly: boolean;
   mouse: boolean;
   media: boolean;
   upload: 'none' | 'zmodem' | 'web' | 'aew';

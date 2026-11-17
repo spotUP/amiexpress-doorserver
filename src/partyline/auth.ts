@@ -24,6 +24,12 @@ const flag = (v: string | undefined): boolean => v === '1';
 const oneOf = <T extends string>(v: string | undefined, allowed: readonly T[], fallback: T): T =>
   allowed.includes(v as T) ? (v as T) : fallback;
 
+/** `on,default,partyline`; anything else (an older board sends nothing) is undefined. */
+export function parseResponsive(v: string | undefined): PlpHello['responsive'] {
+  const m = /^(on|off),(default|on|off),([^,]*)$/.exec(v ?? '');
+  return m ? { board: m[1] as 'on' | 'off', choice: m[2] as 'default' | 'on' | 'off', door: m[3] } : undefined;
+}
+
 /** Unknown keys are ignored; missing ones take defaults. Board and handle are checked in verifyAuth. */
 export function parseHello(payload: Buffer): PlpHello {
   const kv = parseKv(payload);
@@ -40,6 +46,8 @@ export function parseHello(payload: Buffer): PlpHello {
     charset: oneOf(kv.get('charset'), ['latin1', 'utf8'] as const, 'latin1'),
     kitty: flag(kv.get('kitty')),
     wide: flag(kv.get('wide')),
+    responsive: parseResponsive(kv.get('responsive')),
+    chatOnly: flag(kv.get('chatonly')),
     mouse: flag(kv.get('mouse')),
     media: flag(kv.get('media')),
     upload: oneOf(kv.get('upload'), ['none', 'zmodem', 'web', 'aew'] as const, 'none'),

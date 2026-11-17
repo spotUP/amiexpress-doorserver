@@ -15,7 +15,11 @@ export interface ChildInit { t: 'init'; doorDir: string; user: string; access: n
   /** The caller's board connection (hello conn=), as the board's bbs.connectionType. */
   conn: 'web' | 'telnet' | 'ssh';
   /** The caller's Alt+Enter choice this call (hello wide=1): responsive instead of 80x25. */
-  wide: boolean }
+  wide: boolean;
+  /** hello responsive=: the board's Responsive Doors state; absent from an older board. */
+  responsive?: { board: 'on' | 'off'; choice: 'default' | 'on' | 'off'; door: string };
+  /** hello chatonly=1: the door's bbsSession.tempData.chatOnly (the board's /chat page). */
+  chatOnly: boolean }
 export type ToChild =
   | ChildInit
   | { t: 'input'; s: string }
@@ -31,7 +35,7 @@ export type FromChild =
   | { t: 'emit'; ev: string; data: Record<string, unknown>; ack?: number }
   | { t: 'end'; error?: string }
   /** The door asks the caller's terminal for 80x25 or responsive (`mode`), or remembers the caller's Alt+Enter choice for the call (`choice`). */
-  | { t: 'term'; mode?: 'wide' | 'fixed'; choice?: boolean }
+  | { t: 'term'; mode?: 'wide' | 'fixed'; choice?: boolean; responsive?: 'default' | 'on' | 'off' }
   /** A spare finished loading the door. */
   | { t: 'ready' };
 
@@ -46,6 +50,7 @@ function start(init: ChildInit): void {
   let cols = init.cols;
   let rows = init.rows;
   let wide = init.wide;
+  let responsive = init.responsive;
   let out = '';
   const flush = (): void => { if (out) { const s2 = out; out = ''; send({ t: 'out', s: s2 }); } };
   const write = (s: string): void => {
@@ -75,6 +80,13 @@ function start(init: ChildInit): void {
     // The board's BBSApi terminal-mode calls; the board applies them (PLP T terminal-mode / terminal-choice).
     getTerminalModeChoice: () => wide,
     setTerminalModeChoice: (on: boolean) => { wide = on; flush(); send({ t: 'term', choice: on }); },
+    // Responsive Doors (W row 24): none without the hello field, so the SDK ignores it as for an older board.
+    getResponsiveDoors: responsive && (() => ({ board: responsive!.board, doors: responsive!.choice === 'default' ? {} : { [responsive!.door]: responsive!.choice }, door: responsive!.door })),
+    setResponsiveDoors: responsive && (async (choice: 'default' | 'on' | 'off') => {
+      responsive = { ...responsive!, choice };
+      flush(); send({ t: 'term', responsive: choice });
+      return { board: responsive.board, doors: choice === 'default' ? {} : { [responsive.door]: choice }, door: responsive.door };
+    }),
     enableWideMode: () => { flush(); send({ t: 'term', mode: 'wide' }); },
     disableWideMode: () => { flush(); send({ t: 'term', mode: 'fixed' }); },
     isPetsciiMode: () => false,
@@ -85,7 +97,7 @@ function start(init: ChildInit): void {
   // The door gates commands on secLevel (80 kick, 100 ban) and treats 255 as sysop; the hub store still checks every write.
   const user = { username: init.user, id: 0, secLevel: init.sysop ? Math.max(init.access, 255) : init.access };
   const bbsSession: { user: typeof user; nodeId: number; tempData: Record<string, unknown>; doorInputHandler?: (d: string) => void } =
-    { user, nodeId: 0, tempData: {} };
+    { user, nodeId: 0, tempData: { chatOnly: init.chatOnly } };
   const toDoor = new EventEmitter();
   let ackId = 0;
   const acks = new Map<number, (r: unknown) => void>();
