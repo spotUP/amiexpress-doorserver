@@ -35,6 +35,7 @@ export class Palette {
   get dim(): number { return this.col[T_DIM]; }
   get activity(): number { return this.col[T_ACCENT_ALT]; }
   get ok(): number { return this.col[T_OK]; }
+  get warn(): number { return this.col[T_WARN]; }
   get barInk(): number { return this.col[T_GROUND]; }
   get grey(): number { return this.col[T_INK]; }
   get labelBg(): number { return this.col[T_BAR]; }
@@ -279,6 +280,25 @@ function braceTag(s: string, at: number, f: Fmt): { n: number; lit: string } {
 const isWord = (c: string | undefined): boolean => c !== undefined && /^[0-9A-Za-z_]$/.test(c);
 const sameWord = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 const MARKS = '*_`~{@[:';
+
+/**
+ * Does this chat line @-mention the reader? Same word rule as the inline @name
+ * spot in sbMarkdown; the reader's own lines never count. The log paints such a
+ * line as one full-width warn bar (sysop 2026-11-18).
+ */
+export function mentionsSelf(m: Model, l: Line): boolean {
+  if ((l.kind !== HISTORY && l.kind !== LIVE) || m.selfNick === '') return false;
+  const at = l.nick.indexOf('@');
+  if (sameWord(at >= 0 ? l.nick.slice(0, at) : l.nick, m.selfNick)) return false;
+  const t = l.text;
+  for (let i = t.indexOf('@'); i >= 0; i = t.indexOf('@', i + 1)) {
+    if (isWord(t[i - 1])) continue;
+    let e = i + 1;
+    while (isWord(t[e])) e++;
+    if (e - i - 1 === m.selfNick.length && sameWord(t.slice(i + 1, e), m.selfNick)) return true;
+  }
+  return false;
+}
 
 /** sb_markdown: emoji codes, markdown, colour tags and effects, links, mentions. A marker with no partner stays as typed. */
 function sbMarkdown(m: Model, b: Sb, text: string): void {

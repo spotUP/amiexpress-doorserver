@@ -4,10 +4,10 @@
  * Overlays (help, view, search, settings, modal) live in overlays.ts. The slash menu is slash.ts. Not ported yet: context popup,
  * format picker, theme and the canvas/pen picker.
  */
-import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, wrap } from './cells';
+import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, REVERSE, wrap } from './cells';
 import { cover, drawOverlays, OverlayState, Rect } from './overlays';
 import { drawSlash } from './slash';
-import { Model, Line, Side, lineMarked, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
+import { Model, Line, Side, lineMarked, mentionsSelf, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
 
 export const HIT_NONE = 0, HIT_MENU = 1, HIT_DROPDOWN = 2, HIT_SIDEBAR = 3, HIT_CHAT = 4, HIT_INPUT = 5,
   HIT_STATUS = 6, HIT_POPUP = 7, HIT_SCROLLBAR = 12; // the C lc_hit numbers
@@ -99,11 +99,12 @@ function drawSidebar(c: Cells, m: Model, top: number, h: number, w: number): voi
   for (let i = 0; i < m.side.length && i < h - 2; i++) drawSideItem(c, m, m.side[i], top + 1 + i, w - 2, i === m.sideSel);
 }
 
-function tintRow(c: Cells, m: Model, row: number, col: number, width: number): void {
+/** One log row on a bar: barInk on bg. `flat` also drops reverse, so an inline @name spot does not punch a hole in the bar. */
+function tintRow(c: Cells, m: Model, row: number, col: number, width: number, bg = m.pal.accent, flat = false): void {
   for (let k = 0; k < width; k++) {
     const i = row * c.cols + col + k, v = c.back[i];
-    const flags = (v >>> 24) & ~(BG_DEFAULT | BOLD);
-    c.back[i] = ((v & 0xff) | (m.pal.barInk << 8) | (m.pal.accent << 16) | (flags << 24)) >>> 0;
+    const flags = (v >>> 24) & ~(BG_DEFAULT | BOLD | (flat ? REVERSE : 0));
+    c.back[i] = ((v & 0xff) | (m.pal.barInk << 8) | (bg << 16) | (flags << 24)) >>> 0;
   }
 }
 
@@ -132,6 +133,7 @@ function drawChat(c: Cells, m: Model, d: DrawState, top: number, h: number, left
   if (first < 0) first = 0;
   c.pen(p.ink, DEFAULT, 0);
   const paint = (s: string, line: number): void => {
+    const named = line >= 0 && line !== picked && mentionsSelf(m, m.lines[line]);
     for (const [from, to] of wrap(s, width, WRAP_MAX)) {
       const r = at - first;
       at++;
@@ -141,6 +143,7 @@ function drawChat(c: Cells, m: Model, d: DrawState, top: number, h: number, left
       c.fill(body + r, left + 1 + cols, 1, w - 2 - cols, 0x20);
       used = r + 1;
       if (line >= 0 && line === picked) tintRow(c, m, body + r, left + 1, width);
+      else if (named) tintRow(c, m, body + r, left + 1, width, m.pal.warn, true);
     }
   };
   for (let i = 0; i < m.lines.length && at < first + rows; i++) {

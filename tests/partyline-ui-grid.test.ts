@@ -146,3 +146,47 @@ describe('partyline ui: /chat/v1 drives the hub screen', () => {
     }
   });
 });
+
+/** A line that @-mentions the reader is one full-width warn bar (sysop 2026-11-18), every cell, no segment colours. */
+describe('partyline ui: mention bar', () => {
+  const rowsOf = (c: Cells, needle: string): number[] => {
+    const out: number[] = [];
+    for (let r = 0; r < c.rows; r++) {
+      let s = '';
+      for (let x = 0; x < c.cols; x++) s += String.fromCharCode(cellCh(c.back[r * c.cols + x]));
+      if (s.includes(needle)) out.push(r);
+    }
+    return out;
+  };
+  const paint = (nick: string, text: string): { c: Cells; m: Model; row: number } => {
+    const m = mainState(80, 25), c = new Cells(80, 25);
+    m.setSelf('Guest@BOARD');
+    m.addLine(newLine(LIVE, '17:04', nick, text));
+    draw(c, m, new DrawState());
+    return { c, m, row: rowsOf(c, text.slice(0, 12))[0] };
+  };
+  const barCells = (c: Cells, m: Model, row: number): number => {
+    let n = 0;
+    for (let x = 0; x < c.cols; x++) {
+      const v = c.back[row * c.cols + x];
+      if (cellBg(v) === m.pal.warn && cellFg(v) === m.pal.barInk && !(cellFlags(v) & BG_DEFAULT)) n++;
+    }
+    return n;
+  };
+
+  it('paints the whole message row black on warn', () => {
+    const { c, m, row } = paint('alice', 'hey @guest look here');
+    expect(row).toBeGreaterThanOrEqual(0);
+    expect(barCells(c, m, row)).toBeGreaterThanOrEqual(50);   // the chat pane width beside the sidebar
+  });
+
+  it('leaves a line without the reader alone', () => {
+    const { c, m, row } = paint('alice', 'hey @guesty and bob@guest');
+    expect(barCells(c, m, row)).toBe(0);
+  });
+
+  it('never bars the reader\'s own line', () => {
+    const { c, m, row } = paint('Guest@BOARD', 'ping @guest myself');
+    expect(barCells(c, m, row)).toBe(0);
+  });
+});
