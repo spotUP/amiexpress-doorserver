@@ -25,7 +25,7 @@ import { newId, resolveSession, splitUser } from '../chat/sessions';
 import type { ChatCtx } from '../chat/sessions';
 import {
   addIgnore, createRoom, deleteMessage, dmHistory, dmParticipants, dmThreads, editMessage, invite, joinRoom, leaveRoom, listEmoji, listIgnores,
-  clearRoom, deleteRoom, getPrefs, listPins, listRooms, moderate, muteSecondsLeft, pin, setOp, setPrefs, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
+  clearRoom, deleteRoom, markRead, roomHeadSeq, listMemberships, getPrefs, listPins, listRooms, moderate, muteSecondsLeft, pin, setOp, setPrefs, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
   search, setMode, setPresence, setRoomMotd, setTopic, setTyping, threadHistory, unreact, getDiscordMirror, setDiscordMirror,
 } from '../chat/store';
 import { SurfaceError } from '../achievements/errors';
@@ -93,6 +93,8 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       else out.push({ type, bytes: Buffer.from(s, type === 'G' ? 'latin1' : enc) });
       info.markDirty();
     };
+    // Every room the caller belongs to (id -> name) and the one on screen. Switching changes `room` only.
+    const joined = new Map<string, string>();
     let room: { id: string; name: string } | null = null;
     let closed = false;
 
@@ -118,11 +120,13 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         let row = listRooms(db, ctx).find((x) => x.name === name);
         const id = row ? row.id : createRoom(db, ctx, name.startsWith('art:') ? { name, kind: 'art' } : { ...made, name }).id;
         const j = joinRoom(db, ctx, id);
+        markRead(db, ctx, id, { seq: roomHeadSeq(db, id) }); // viewing it reads it; plain recent history, no replay
         return { j, history: roomHistory(db, ctx, id, { limit: 50 }) };
       });
+      joined.set(r.j.id, r.j.name);
       room = { id: r.j.id, name: r.j.name };
       reply('room:joined', {
-        roomId: r.j.id, roomName: r.j.name, topic: r.j.topic, memberCount: r.j.members,
+        channel: r.j.name, roomId: r.j.id, roomName: r.j.name, topic: r.j.topic, memberCount: r.j.members,
         history: r.history.map((h) => ({ id: h.id, channelId: r.j.id, username: h.user, userId: h.user, content: h.text, type: 'message', createdAt: new Date(h.at * 1000) })),
       });
     };
@@ -134,12 +138,18 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     const str = (d: Payload, ...keys: string[]): string => { for (const k of keys) { const v = d[k]; if (typeof v === 'string' && v !== '') return v; } return ''; };
     const target = (d: Payload): string => full(str(d, 'targetUsername', 'target', 'targetUserId', 'username', 'user'));
     const when = (at: number): Date => new Date(at * 1000);
-    const needRoom = (fn: (id: string) => void): void => { if (room) fn(room.id); else reply('room:error', { message: 'Join a room first' }); };
+    // Client room actions name their room (roomId / roomName / channel) or mean the active one.
+    const roomOfD = (d: Payload): { id: string; name: string } | null => {
+      const n = str(d, 'roomId', 'roomName', 'channel').replace(/^#/, '').toLowerCase();
+      if (n) for (const [id, name] of joined) if (id === n || name.toLowerCase() === n) return { id, name };
+      return room;
+    };
+    const needRoom = (d: Payload, fn: (id: string) => void): void => { const r = roomOfD(d); if (r) fn(r.id); else reply('room:error', { message: 'Join a room first' }); };
     const counts = (id: string): Record<string, number> =>
       Object.fromEntries(store(false, (db, ctx) => reactionRows(db, ctx, id)).map((r) => [r.emoji, r.count]));
     const ignoreList = (): void => reply('chat:ignore-list', { users: store(false, (db, ctx) => listIgnores(db, ctx)).map((r) => short(r.user)) });
     const pinList = (id: string, ev = 'chat:pin:list'): void => reply(ev, {
-      roomId: id,
+      channel: joined.get(id), roomId: id,
       pinnedMessages: store(false, (db, ctx) => listPins(db, ctx, id)).map((p) => ({ messageId: p.messageId, id: p.messageId, username: short(p.user), content: p.content, pinnedBy: short(p.pinnedBy), createdAt: when(p.messageAt), pinnedAt: when(p.at) })),
     });
     const msgOf = (h: { id: string; user: string; text: string; at: number }): Payload => ({ id: h.id, messageId: h.id, username: short(h.user), userId: h.user, content: h.text, message: h.text, createdAt: when(h.at) });
@@ -150,7 +160,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       if (!hit) reply('room:error', { message: `Channel ${n.slice(0, 40)} not found` });
       return hit?.id ?? '';
     };
-    const moderation = (action: 'kick' | 'ban' | 'unban' | 'mute' | 'unmute') => (d: Payload): void => needRoom((id) => {
+    const moderation = (action: 'kick' | 'ban' | 'unban' | 'mute' | 'unmute') => (d: Payload): void => needRoom(d, (id) => {
       const minutes = Number(d.minutes ?? d.duration);
       store(true, (db, ctx) => moderate(db, ctx, id, action, { user: target(d), reason: str(d, 'reason'), ...(minutes > 0 ? { minutes } : {}) }));
     });
@@ -162,7 +172,11 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       ...files.handlers,
       'room:list': () => {
         const rooms = store(false, (db, ctx) => listRooms(db, ctx));
-        reply('room:list', { rooms: rooms.map((x) => ({ room_id: x.id, room_name: x.name, topic: x.topic, is_public: x.visibility !== 'private', member_count: x.members, created_by_username: x.owner, kind: x.kind })) });
+        const unread = store(false, (db, ctx) => new Map(listMemberships(db, ctx).map((m) => {
+          const mention = m.unread > 0 && roomHistory(db, ctx, m.roomId, { after: m.lastRead, limit: 50 }).some((h) => h.user !== me && h.text.toLowerCase().includes(`@${short(me).toLowerCase()}`));
+          return [m.roomId, { unreadCount: m.unread, mention }] as const;
+        })));
+        reply('room:list', { rooms: rooms.map((x) => ({ room_id: x.id, room_name: x.name, topic: x.topic, is_public: x.visibility !== 'private', member_count: x.members, created_by_username: x.owner, kind: x.kind, unreadCount: unread.get(x.id)?.unreadCount ?? 0, mention: unread.get(x.id)?.mention ?? false })) });
       },
       'room:join': (d) => join(String(d.roomName ?? d.roomId ?? '')),
       // The door's sidebar only learns of rooms from room:list (sysop 2026-11-17: a created room was missing).
@@ -172,10 +186,18 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         join(String(d.roomName ?? ''), made);
         handlers['room:list']({});
       },
-      'room:leave': () => { if (room) { const id = room.id; store(true, (db, ctx) => leaveRoom(db, ctx, id)); room = null; } },
+      // Explicit /leave only: ends membership (and the read marker). Switching never sends it.
+      'room:leave': (d) => {
+        const r = roomOfD(d);
+        if (!r) return;
+        store(true, (db, ctx) => leaveRoom(db, ctx, r.id));
+        joined.delete(r.id);
+        if (room?.id === r.id) room = null;
+      },
       'room:message': (d) => {
-        if (!room) return;
-        const id = room.id;
+        const r = roomOfD(d);
+        if (!r) return;
+        const id = r.id;
         const clientId = String(d.clientId ?? newId('pl'));
         const sent = store(true, (db, ctx) => postMessage(db, ctx, id, { content: String(d.message ?? ''), clientId }));
         reply('room:message:ack', { clientId, id: sent.id });
@@ -231,33 +253,33 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         }
       },
       'chat:emoji:list': () => reply('chat:emoji-list', { emojis: store(false, (_db) => listEmoji(_db)) }),
-      'chat:typing': (d) => needRoom((id) => { store(true, (db, ctx) => setTyping(db, ctx, id, { text: str(d, 'text') })); }),
+      'chat:typing': (d) => needRoom(d, (id) => { store(true, (db, ctx) => setTyping(db, ctx, id, { text: str(d, 'text') })); }),
       // The door sends one event per key (like the board's chat:keystroke); the store keeps the whole line, so fold them here.
       'chat:keystroke': (d) => { const c = str(d, 'char'); typed = c === 'BACKSPACE' ? typed.slice(0, -1) : typed + c; showTyped(); },
       'chat:keystroke-clear': () => { typed = ''; showTyped(); },
       'chat:keystroke-submit': () => { typed = ''; showTyped(); },
       // Notification sound cue: the caller's board plays it (S frame), as the web client plays audio:play in LC.
       'audio:play': (d) => { const cue = str(d, 'soundId'); if (cue) info.sound?.(cue); },
-      'room:topic': (d) => needRoom((id) => { store(true, (db, ctx) => setTopic(db, ctx, id, { topic: str(d, 'topic') })); }),
-      'room:motd': (d) => needRoom((id) => { store(true, (db, ctx) => setRoomMotd(db, ctx, id, { motd: str(d, 'motd') })); }),
-      'room:mode': (d) => needRoom((id) => { store(true, (db, ctx) => setMode(db, ctx, id, { modes: str(d, 'modeString', 'modes'), params: Array.isArray(d.params) ? d.params.join(' ') : str(d, 'params') })); }),
-      'room:invite': (d) => needRoom((id) => { store(true, (db, ctx) => invite(db, ctx, id, { user: target(d) }, true)); }),
-      'room:revoke-invite': (d) => needRoom((id) => { store(true, (db, ctx) => invite(db, ctx, id, {}, false, target(d))); }),
+      'room:topic': (d) => needRoom(d, (id) => { store(true, (db, ctx) => setTopic(db, ctx, id, { topic: str(d, 'topic') })); }),
+      'room:motd': (d) => needRoom(d, (id) => { store(true, (db, ctx) => setRoomMotd(db, ctx, id, { motd: str(d, 'motd') })); }),
+      'room:mode': (d) => needRoom(d, (id) => { store(true, (db, ctx) => setMode(db, ctx, id, { modes: str(d, 'modeString', 'modes'), params: Array.isArray(d.params) ? d.params.join(' ') : str(d, 'params') })); }),
+      'room:invite': (d) => needRoom(d, (id) => { store(true, (db, ctx) => invite(db, ctx, id, { user: target(d) }, true)); }),
+      'room:revoke-invite': (d) => needRoom(d, (id) => { store(true, (db, ctx) => invite(db, ctx, id, {}, false, target(d))); }),
       'room:kick': moderation('kick'),
       'chat:kick': moderation('kick'),
       'admin:kick-user': moderation('kick'),
       'admin:ban-user': moderation('ban'),
       // /op @user, /op -@user, /deop @user: the door sends room:op {username, op}; the hub answers with an op event.
-      'room:op': (d) => needRoom((id) => { store(true, (db, ctx) => setOp(db, ctx, id, { user: target(d) }, d.op !== false)); }),
+      'room:op': (d) => needRoom(d, (id) => { store(true, (db, ctx) => setOp(db, ctx, id, { user: target(d) }, d.op !== false)); }),
       'admin:clear-channel-history': (d) => { const id = roomIdOf(d); if (id) store(true, (db, ctx) => clearRoom(db, ctx, id)); },
       'admin:delete-channel': (d) => { const id = roomIdOf(d); if (id) store(true, (db, ctx) => deleteRoom(db, ctx, id)); },
       'chat:ban': moderation('ban'),
       'chat:unban': moderation('unban'),
       'chat:mute': moderation('mute'),
       'chat:unmute': moderation('unmute'),
-      'chat:pin:add': (d) => needRoom((id) => { store(true, (db, ctx) => pin(db, ctx, id, { messageId: str(d, 'messageId', 'id') }, true)); pinList(id); }),
-      'chat:pin:remove': (d) => needRoom((id) => { store(true, (db, ctx) => pin(db, ctx, id, {}, false, str(d, 'messageId', 'id'))); pinList(id); }),
-      'chat:pin:list': () => needRoom((id) => pinList(id)),
+      'chat:pin:add': (d) => needRoom(d, (id) => { store(true, (db, ctx) => pin(db, ctx, id, { messageId: str(d, 'messageId', 'id') }, true)); pinList(id); }),
+      'chat:pin:remove': (d) => needRoom(d, (id) => { store(true, (db, ctx) => pin(db, ctx, id, {}, false, str(d, 'messageId', 'id'))); pinList(id); }),
+      'chat:pin:list': (d) => needRoom(d, (id) => pinList(id)),
       // A hub thread is the replies to one message; the title is its first reply.
       'chat:thread:create': (d) => {
         const messageId = str(d, 'messageId', 'id');
@@ -299,6 +321,9 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       }
     };
 
+    // Entry: a member of every public room (a banned or full room is skipped); the door picks the one to show.
+    store(true, (db, ctx) => { for (const r of listRooms(db, ctx)) if (r.visibility === 'public') { try { joinRoom(db, ctx, r.id); joined.set(r.id, r.name); } catch (e) { if (!(e instanceof SurfaceError)) throw e; } } });
+
     // What the hub says about the caller's room, DMs and presence reaches the door as its own events.
     let cursor = withAchievementsDb(ach, (db) => headSeq(db));
     const off = onEvents(() => {
@@ -307,20 +332,27 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       for (const e of evs) {
         cursor = Math.max(cursor, e.seq);
         const mine = e.user === me;
-        const here = !!room && e.room_id === room.id;
+        // `here`: the caller is in the event's room (active or not). Every such event carries `channel`.
+        const chan = e.room_id ? joined.get(e.room_id) : undefined;
+        const here = chan !== undefined;
+        const active = !!room && e.room_id === room.id;
+        const ch = { channel: chan };
         const at = when(e.at);
-        if (here && files.onEvent(e)) continue;
+        if (active && files.onEvent(e)) continue;
         switch (e.type) {
           case 'message':
-            if (here && !mine && e.label.startsWith('thread:')) reply('chat:thread:reply', { threadId: e.label.slice(7), messageId: e.ref, username: short(e.user), content: e.text, createdAt: at });
-            else if (here && !mine) reply('chat:message', { id: e.ref, channelId: e.room_id, userId: e.user, username: short(e.user), content: e.text, type: 'message', createdAt: at }); break;
-          case 'edit': if (here) reply('chat:edited', { messageId: e.ref, username: short(e.user), content: e.text, createdAt: at }); break;
-          case 'delete': if (here && e.ref !== '*') reply('chat:deleted', { messageId: e.ref }); break;
-          case 'react': case 'unreact': if (here) reply('chat:reaction', { messageId: e.ref, username: short(e.user), emoji: e.text, action: e.type === 'react' ? 'add' : 'remove', counts: counts(e.ref) }); break;
-          case 'typing': if (here && !mine) reply('chat:typing', { channelId: e.room_id, userId: e.user, username: short(e.user), text: e.text }); break;
-          case 'topic': if (here) reply('room:topic', { roomId: e.room_id, topic: e.text, by: short(e.user) }); break;
-          case 'room_motd': if (here) reply('room:motd', { motd: e.text }); break;
-          case 'mode': if (here) reply('room:mode', { applied: e.text, by: short(e.user) }); break;
+            if (here && !mine && e.label.startsWith('thread:')) reply('chat:thread:reply', { ...ch, threadId: e.label.slice(7), messageId: e.ref, username: short(e.user), content: e.text, createdAt: at });
+            else if (here && !mine) {
+              if (active) store(true, (db, ctx) => markRead(db, ctx, e.room_id!, { seq: roomHeadSeq(db, e.room_id!) }));
+              reply('chat:message', { ...ch, id: e.ref, channelId: e.room_id, userId: e.user, username: short(e.user), content: e.text, type: 'message', createdAt: at });
+            } break;
+          case 'edit': if (here) reply('chat:edited', { ...ch, messageId: e.ref, username: short(e.user), content: e.text, createdAt: at }); break;
+          case 'delete': if (here && e.ref !== '*') reply('chat:deleted', { ...ch, messageId: e.ref }); break;
+          case 'react': case 'unreact': if (here) reply('chat:reaction', { ...ch, messageId: e.ref, username: short(e.user), emoji: e.text, action: e.type === 'react' ? 'add' : 'remove', counts: counts(e.ref) }); break;
+          case 'typing': if (here && !mine) reply('chat:typing', { ...ch, channelId: e.room_id, userId: e.user, username: short(e.user), text: e.text }); break;
+          case 'topic': if (here) reply('room:topic', { ...ch, roomId: e.room_id, topic: e.text, by: short(e.user) }); break;
+          case 'room_motd': if (here) reply('room:motd', { ...ch, motd: e.text }); break;
+          case 'mode': if (here) reply('room:mode', { ...ch, applied: e.text, by: short(e.user) }); break;
           // The board's own activity: the door prints it as [EVENT] lines (payload as the web board's bbs:event).
           case 'bbs': {
             const data = Object.fromEntries(new URLSearchParams(e.text));
@@ -333,17 +365,29 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
             break;
           case 'presence': { const [status, ...custom] = e.text.split('|'); reply('chat:presence', { userId: e.user, username: short(e.user), status, custom: custom.join('|') }); break; }
           case 'pin': if (here) pinList(e.room_id!, 'chat:pin:updated'); break;
-          case 'joined': case 'left': if (here && !mine) reply(`room:user-${e.type}`, { userId: e.user, username: short(e.user) }); break;
-          case 'op': case 'deop': if (here) reply('room:op-changed', { username: short(e.user), op: e.type === 'op', by: short(e.ref) }); break;
+          case 'joined': case 'left': if (here && !mine) reply(`room:user-${e.type}`, { ...ch, userId: e.user, username: short(e.user) }); break;
+          case 'op': case 'deop': if (here) reply('room:op-changed', { ...ch, username: short(e.user), op: e.type === 'op', by: short(e.ref) }); break;
+          // Every user is a member of every public room: join a room created after entry (membership only, active room unchanged).
+          case 'room_created':
+            if (e.room_id && !joined.has(e.room_id)) {
+              const made = store(true, (db, ctx) => {
+                const r = listRooms(db, ctx).find((x) => x.id === e.room_id);
+                if (!r || r.visibility !== 'public') return null;
+                try { joinRoom(db, ctx, r.id); return r.name; } catch (err) { if (err instanceof SurfaceError) return null; throw err; }
+              });
+              if (made) { joined.set(e.room_id, made); handlers['room:list']({}); }
+            }
+            break;
           case 'room_deleted':
-            reply('room:deleted', { roomId: e.room_id, roomName: e.text });
-            if (here) room = null;
+            reply('room:deleted', { channel: e.text, roomId: e.room_id, roomName: e.text });
+            if (e.room_id) joined.delete(e.room_id);
+            if (active) room = null;
             break;
           case 'kicked': case 'banned': case 'muted':
             if (here && e.user === me) {
               const left = e.type === 'muted' ? store(false, (db) => muteSecondsLeft(db, e.room_id!, e.user)) : null;
-              reply(`chat:${e.type}`, { reason: e.text, ...(left !== null ? { duration: left } : {}) });
-              if (e.type !== 'muted') room = null;
+              reply(`chat:${e.type}`, { ...ch, reason: e.text, ...(left !== null ? { duration: left } : {}) });
+              if (e.type !== 'muted') { joined.delete(e.room_id!); if (active) room = null; }
             }
             break;
           case 'dm': if (!mine) {
@@ -355,6 +399,8 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         }
       }
     });
+
+    handlers['room:list']({}); // unreadCount and mention per room, before the door asks
 
     child.on('message', (m: FromChild) => {
       if (m.t === 'out') push('D', m.s);

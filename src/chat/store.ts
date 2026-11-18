@@ -121,7 +121,7 @@ export function joinRoom(db: Database.Database, ctx: ChatCtx, id: string): JoinR
 }
 
 /** The newest top-level message seq of a room; 0 for an empty room. */
-function roomHeadSeq(db: Database.Database, roomId: string): number {
+export function roomHeadSeq(db: Database.Database, roomId: string): number {
   return (db.prepare('SELECT COALESCE(MAX(seq), 0) AS n FROM chat_messages WHERE room_id = ? AND thread_id IS NULL AND deleted_at IS NULL').get(roomId) as { n: number }).n;
 }
 
