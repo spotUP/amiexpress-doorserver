@@ -45,7 +45,7 @@ beforeAll(async () => {
   peek('bob', (db, ctx) => createRoom(db, ctx, { name: 'general' }));
   const factory = livechatScreen(fx.ach, chat, undefined, (l) => logs.push(l));
   for (const who of ['bob', 'alice'] as const) {
-    const s: PartylineScreen = factory({ sid: sids[who], user: who, boardId: fx.boardId, hello: { cols: 80, rows: 25, access: 255, sysop: true } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { text[who] += screenText(s); }); }, quit: () => {}, ctrl: (t) => { ctrls[who].push(t); } });
+    const s: PartylineScreen = factory({ sid: sids[who], user: peek(who, (_db, ctx) => ctx.user), boardId: fx.boardId, hello: { cols: 80, rows: 25, access: 255, sysop: true } as ScreenInfo['hello'], markDirty: () => { setImmediate(() => { text[who] += screenText(s); }); }, quit: () => {}, ctrl: (t) => { ctrls[who].push(t); } });
     callers[who] = s;
     screens.push(s);
   }
@@ -67,6 +67,13 @@ const lastFrom = (user: string): { id: string; text: string } =>
     const h = roomHistory(db, ctx, id, { limit: 20 }).filter((m) => m.user.startsWith(`${user}@`)).pop()!;
     return { id: h.id, text: h.text };
   });
+
+// Sidebar rows under the active channel come from the door's online-user map (room:joined members + room:user-joined).
+test('two callers in the same channel each list both names', async () => {
+  const plain = (who: string): string => text[who].replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ' ').replace(/\s+/g, ' ');
+  const lists = (who: string): boolean => /# general \S (bob \S alice|alice \S bob)\b/.test(plain(who));
+  await until(() => lists('bob') && lists('alice'), 15_000);
+});
 
 // Skipped: the door's /edit and /react only treat all-digit ids as its own messages; hub ids are not digits,
 // so the door answers 'No message to edit' before it ever emits chat:edit. Handlers are unverified end to end.

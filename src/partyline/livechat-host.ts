@@ -114,6 +114,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     // Hub replies go to the door's socket listeners in the child.
     const reply = (ev: string, data: Payload): void => { if (!closed) tell({ t: 'event', ev, data }); };
 
+    // The door finds itself in `members` by its own init name (info.user, the full handle@BOARD); no match and it lists nobody.
     // made: a /create's topic, visibility and kind, used only when the room is new.
     const join = (name: string, made: Payload = {}): void => {
       const r = store(true, (db, ctx) => {
@@ -121,7 +122,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         const id = row ? row.id : createRoom(db, ctx, name.startsWith('art:') ? { name, kind: 'art' } : { ...made, name }).id;
         const j = joinRoom(db, ctx, id);
         markRead(db, ctx, id, { seq: roomHeadSeq(db, id) }); // viewing it reads it; plain recent history, no replay
-        return { j, history: roomHistory(db, ctx, id, { limit: 50 }), roster: doorRoster(db, id, short) };
+        return { j, history: roomHistory(db, ctx, id, { limit: 50 }), roster: doorRoster(db, id, (u) => (u === me ? info.user : short(u))) };
       });
       joined.set(r.j.id, r.j.name);
       room = { id: r.j.id, name: r.j.name };
