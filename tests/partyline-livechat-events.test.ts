@@ -96,6 +96,8 @@ test('a DM between two callers is stored and listed', async () => {
   type('alice', '/msg @bob hello bob');
   await until(() => peek('bob', (db, ctx) => dmThreads(db, ctx)).length > 0, 10_000);
   await until(() => text.bob.includes('hello bob'), 10_000);
+  // The thread list is pushed on every DM (LC parity), so the receiver's sidebar gets a DIRECT MESSAGES row to open it.
+  await until(() => text.bob.includes('DIRECT MESSAGES') && text.alice.includes('DIRECT MESSAGES'), 10_000);
 });
 
 test('ignore adds to the hub ignore list', async () => {

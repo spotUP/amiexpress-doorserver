@@ -138,6 +138,13 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     const str = (d: Payload, ...keys: string[]): string => { for (const k of keys) { const v = d[k]; if (typeof v === 'string' && v !== '') return v; } return ''; };
     const target = (d: Payload): string => full(str(d, 'targetUsername', 'target', 'targetUserId', 'username', 'user'));
     const when = (at: number): Date => new Date(at * 1000);
+    // LC shape (web/backend dm-thread-list.handler.ts): participants = the others, displayName names the thread.
+    const sendThreads = (): void => reply('chat:dm-threads', {
+      threads: store(false, (db, ctx) => dmThreads(db, ctx)).map((t) => {
+        const others = t.peer.split(',').map(short);
+        return { threadId: t.threadId, isGroup: t.threadId.startsWith('dg'), displayName: others.join(', '), participants: others, lastMessageAt: when(t.lastAt), unread: t.unread };
+      }),
+    });
     // Client room actions name their room (roomId / roomName / channel) or mean the active one.
     const roomOfD = (d: Payload): { id: string; name: string } | null => {
       const n = str(d, 'roomId', 'roomName', 'channel').replace(/^#/, '').toLowerCase();
@@ -213,16 +220,16 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         const message = str(d, 'message', 'content');
         store(true, (db, ctx) => postDm(db, ctx, to, { content: message, clientId: newId('pl') }));
         reply('chat:dm', { direction: 'sent', from: short(me), to: short(to), message, isGroup: false });
+        sendThreads();
       },
       'chat:group-dm': (d) => {
         const people = (Array.isArray(d.participants) ? d.participants : []).filter((x): x is string => typeof x === 'string').map(full);
         const message = str(d, 'message', 'content');
         store(true, (db, ctx) => postDmGroup(db, ctx, { participants: people, content: message, clientId: newId('pl') }));
         reply('chat:dm', { direction: 'sent', from: short(me), message, isGroup: true, participants: people.map(short) });
+        sendThreads();
       },
-      'chat:dm-threads:list': () => reply('chat:dm-threads', {
-        threads: store(false, (db, ctx) => dmThreads(db, ctx)).map((t) => ({ threadId: t.threadId, participants: [short(me), short(t.peer)], isGroup: t.threadId.startsWith('dg'), lastMessageAt: when(t.lastAt), unread: t.unread })),
-      }),
+      'chat:dm-threads:list': () => sendThreads(),
       'chat:dm-history': (d) => {
         const threadId = str(d, 'threadId');
         const rows = store(false, (db, ctx) => dmHistory(db, ctx, threadId, { limit: d.limit }));
@@ -394,6 +401,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
             const isGroup = e.label.startsWith('dg');
             const people = isGroup ? store(false, (db, ctx) => dmParticipants(db, ctx, e.label)) : [];
             reply('chat:dm', { direction: 'received', from: short(e.user), message: e.text, isGroup, ...(isGroup ? { participants: people.map(short) } : {}) });
+            sendThreads();
           } break;
           default: break;
         }
