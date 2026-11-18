@@ -303,6 +303,20 @@ describe('live loop', () => {
     await c.untilClosed();
     expect((await request(fx.app).get('/chat/v1/who.txt').set('Authorization', fx.auth).set('X-Chat-Session', sid)).status).toBe(401);
   });
+
+  // Sysop 2026-11-18: a resumed tab shares the sid; the old tab's quit expired it under the live tab,
+  // which then received no room events (no chat_members row) and never saw a newcomer.
+  it('keeps a resumed chat session alive when the older connection of the same sid quits', async () => {
+    const c1 = await dial(false);
+    const sid = (await login(c1)).get('resume') as string;
+    const c2 = await dial(false);
+    expect((await login(c2, { extra: { resume: sid } })).get('resume')).toBe(sid);
+    c1.send('Q', 'user');
+    await c1.untilClosed();
+    const res = await request(fx.app).get('/chat/v1/who.txt').set('Authorization', fx.auth).set('X-Chat-Session', sid);
+    expect(res.status).toBe(200);
+    c2.sock.destroy();
+  });
 });
 
 describe('loadPartylineConfig', () => {

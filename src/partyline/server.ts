@@ -79,6 +79,7 @@ export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsCon
       ach, chat, screen, tls: isTls,
       isDraining: () => draining,
       onClose: (gone) => sessions.delete(gone),
+      sidHeldElsewhere: (sid, self) => [...sessions].some((o) => o !== self && o.live && o.sid === sid),
       log,
     });
     sessions.add(s);

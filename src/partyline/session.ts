@@ -101,6 +101,8 @@ export interface SessionDeps {
   tls: boolean;
   isDraining: () => boolean;
   onClose: (s: PartylineSession) => void;
+  /** Another live connection resumed the same chat session (a second tab). */
+  sidHeldElsewhere: (sid: string, self: PartylineSession) => boolean;
   log: (line: string) => void;
 }
 
@@ -326,7 +328,8 @@ export class PartylineSession {
   private bye(reason: string): void {
     this.deps.log(`[INFO] partyline ${this.id} bye ${reason || '?'}`);
     const sid = this.sid;
-    if (sid) withAchievementsDb(this.deps.ach, (db) => db.transaction(() => expireSession(db, sid))());
+    // A resumed tab shares the sid: expiring it would strip the live tab of its rooms and events.
+    if (sid && !this.deps.sidHeldElsewhere(sid, this)) withAchievementsDb(this.deps.ach, (db) => db.transaction(() => expireSession(db, sid))());
     this.sid = null;
     this.end();
   }
