@@ -182,6 +182,12 @@ export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { 
   }));
 }
 
+/** Who holds a socket in the room, in the LIVECHAT room:joined `members` shape (the door's ou map reads user_id / username / is_online). */
+export function doorRoster(db: Database.Database, id: string, name: (user: string) => string = (u) => u): { user_id: string; username: string; is_online: boolean; is_muted: boolean }[] {
+  const rows = db.prepare('SELECT DISTINCT user FROM chat_members WHERE room_id = ? ORDER BY user').all(id) as { user: string }[];
+  return rows.map((r) => ({ user_id: r.user, username: name(r.user), is_online: true, is_muted: false }));
+}
+
 export function whoRows(db: Database.Database, ctx: ChatCtx): { user: string; room: string; sysop: boolean; idle: number; status: string; statusText: string }[] {
   const now = nowSec();
   const pres = presenceMap(db);

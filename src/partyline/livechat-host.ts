@@ -25,7 +25,7 @@ import { newId, resolveSession, splitUser } from '../chat/sessions';
 import type { ChatCtx } from '../chat/sessions';
 import {
   addIgnore, createRoom, deleteMessage, dmHistory, dmParticipants, dmThreads, editMessage, invite, joinRoom, leaveRoom, listEmoji, listIgnores,
-  clearRoom, deleteRoom, markRead, roomHeadSeq, listMemberships, getPrefs, listPins, listRooms, moderate, muteSecondsLeft, pin, setOp, setPrefs, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
+  clearRoom, deleteRoom, doorRoster, markRead, roomHeadSeq, listMemberships, getPrefs, listPins, listRooms, moderate, muteSecondsLeft, pin, setOp, setPrefs, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
   search, setMode, setPresence, setRoomMotd, setTopic, setTyping, threadHistory, unreact, getDiscordMirror, setDiscordMirror,
 } from '../chat/store';
 import { SurfaceError } from '../achievements/errors';
@@ -121,12 +121,12 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         const id = row ? row.id : createRoom(db, ctx, name.startsWith('art:') ? { name, kind: 'art' } : { ...made, name }).id;
         const j = joinRoom(db, ctx, id);
         markRead(db, ctx, id, { seq: roomHeadSeq(db, id) }); // viewing it reads it; plain recent history, no replay
-        return { j, history: roomHistory(db, ctx, id, { limit: 50 }) };
+        return { j, history: roomHistory(db, ctx, id, { limit: 50 }), roster: doorRoster(db, id, short) };
       });
       joined.set(r.j.id, r.j.name);
       room = { id: r.j.id, name: r.j.name };
       reply('room:joined', {
-        channel: r.j.name, roomId: r.j.id, roomName: r.j.name, topic: r.j.topic, memberCount: r.j.members,
+        channel: r.j.name, roomId: r.j.id, roomName: r.j.name, topic: r.j.topic, memberCount: r.j.members, members: r.roster,
         history: r.history.map((h) => ({ id: h.id, channelId: r.j.id, username: h.user, userId: h.user, content: h.text, type: 'message', createdAt: new Date(h.at * 1000) })),
       });
     };
