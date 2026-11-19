@@ -325,6 +325,7 @@ itself hold `!`-escaped sub-fields):
 | `edit` | room id | author | message id | new content |
 | `delete` | room id | author | message id | empty |
 | `react`, `unreact` | room id | reactor | message id | `emoji!count` |
+| `pin` | room id | who pinned or unpinned it | message id | `1` pinned, `0` unpinned |
 | `joined`, `left` | room id | who | empty | empty |
 | `topic` | room id | who set it | empty | the topic |
 | `room_motd` | room id | who set it | empty | the room's message of the day (empty = cleared) |
