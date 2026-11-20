@@ -56,6 +56,21 @@ ARG GIT_SHA=unknown
 RUN echo "$GIT_SHA" > /app/.git-sha
 COPY --from=amiexpress-bbs /usr/local/bin/lha /usr/local/bin/lha
 COPY --from=unlzx-build /usr/local/bin/unlzx /usr/local/bin/unlzx
+# Partyline hosts the board's LIVECHAT door per caller (src/partyline/
+# livechat-host.ts, PARTYLINE_ENGINE=livechat in docker-compose.yml). The door
+# and its SDK come from the BBS image the same way lha does above, so the hub
+# runs the door the board ships, with no second copy in this repo. The door
+# resolves @amiexpress/bbs-door-sdk from its own node_modules, as it does in
+# the board checkout. The image is only as fresh as the last hub deploy: a
+# door-only change on the board reaches Partyline on the next hub build.
+COPY --from=amiexpress-bbs /app/default-data/Doors/livechat /app/livechat
+COPY --from=amiexpress-bbs /app/sdk /app/livechat/node_modules/@amiexpress/bbs-door-sdk
+# Load the two files the LIVECHAT child requires plus its SDK media modules,
+# so a missing or node-20-incompatible door fails the BUILD, not a caller.
+RUN cd /app/livechat && node -e "require('./dist/ui/screen.js'); require('./dist/server.js'); \
+    const sdk = require('path').dirname(require.resolve('@amiexpress/bbs-door-sdk')); \
+    require(sdk + '/media/Audio.js'); require(sdk + '/media/Video.js'); \
+    console.log('[OK] LIVECHAT door loads')"
 # 7z handles LHA, LZH, ZIP and 7z in-place edits via `7z d archive.zip
 # member`. The `lha` CLI is lha/lzh only; 7z is the only path that lets
 # the stripper / file-delete UI work on zip doors. alpine's package is
