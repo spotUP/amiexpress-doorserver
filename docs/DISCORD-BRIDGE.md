@@ -106,18 +106,32 @@ What flows where:
 - Deleting a pre-upgrade Discord message in Discord no longer deletes its hub
   copy (the old map did not record which rows were Discord originals).
 
-Adding a server:
+Adding a server (self-service, no restart):
 
-1. Invite the bot with
-   `https://discord.com/oauth2/authorize?client_id=<application id>&scope=bot&permissions=536939520`
-   (View Channel, Send Messages, Read Message History, Manage Webhooks). The
-   invite must be accepted by someone with Manage Server in that server.
+1. As the board sysop, type `/discord join` on the Partyline hub. It prints
+   the bot invite link (the hub builds it from the application id the bridge
+   publishes at login, so no id is configured anywhere). The invite must be
+   accepted by someone with Manage Server in that server.
 2. Copy the channel id (Developer Mode, right-click the channel, Copy Channel
-   ID) and append `|<channel id>` to the room in the `DISCORD_BRIDGE_ROOMS`
-   secret (or the host `.env`).
-3. Redeploy, or restart the `discord-bridge` container. At start the bridge
-   creates its `LiveChat bridge` webhook in the new channel and logs the room
-   and channel count.
+   ID) and type `/discord join <channel id>`. The channel links to the
+   shared LiveChat room at once; the bridge picks it up within a minute
+   without a restart (a `discord_link` event plus a 60 second fallback poll;
+   overlapping refreshes are skipped).
+3. `/discord status` lists this board's links. A link the bridge cannot use
+   (it cannot see the channel or create a webhook) shows `failed` plus the
+   reason; fix the channel and send `/discord join` again for the same
+   channel id. A channel that is already linked answers 409, and a board
+   holds at most 5 linked channels.
+
+Unlinking is admin-only: `DELETE /achievements/v1/admin/discord/links/:id`
+(revoking a hub link removes only hub-sourced channels; the env seed below
+is never touched).
+
+The old env-seed way still works and always wins: `DISCORD_BRIDGE_ROOMS`
+(`roomId=channelId`, several guilds per room as `roomId=channelA|channelB`)
+seeds links that a refresh never removes, and a hub channel that duplicates
+an env channel stays only in its env room. Prefer the self-service flow;
+keep the secret for the rooms the hub operator mirrors itself.
 
 The Message Content and Server Members intents are privileged. A bot in 100
 or more servers needs Discord's verification before they stay switched on.
