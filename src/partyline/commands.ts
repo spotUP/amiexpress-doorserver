@@ -120,12 +120,15 @@ const firstWord = (s: string): string => s.trim().split(/ +/)[0] ?? '';
 const afterWord = (s: string): string => s.trim().replace(/^\S+ */, '');
 const nickOf = (s: string): string => s.replace(/^@/, '');
 
-/** help_for: one command's description and usage. */
+/** help_for: one command's description and usage. The hub's /discord also
+ * takes join|status (the doors only offer on|off), so say so here; the
+ * CMD_HELP row itself stays byte-identical to the C door (grid test). */
 function helpFor(s: HubScreen, want: string): void {
   const row = CMD_HELP.find(([name, aliases]) => name === want || aliases.split(',').includes(want));
   if (!row) { s.systemLine(`Unknown: ${want.slice(0, 60)}`); return; }
   s.systemLine(`/${row[0]} - ${row[2].slice(0, 100)}`);
   s.systemLine(row[3]);
+  if (row[0] === 'discord') s.systemLine('/discord join <channel id> | /discord status  (sysop links a channel)');
 }
 
 const usage = (s: HubScreen, text: string): void => s.systemLine(`Error: Usage: ${text}`);

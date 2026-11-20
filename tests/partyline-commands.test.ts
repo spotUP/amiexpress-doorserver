@@ -56,6 +56,10 @@ describe('hub screen commands', () => {
   it('help, nick, unknown, not-on-Amiga', () => {
     type('/help nick');
     expect(screen.model.lines.some((l) => l.text.startsWith('/nick - '))).toBe(true);
+    type('/help discord');
+    const help = screen.model.lines.slice(-3).map((l) => l.text);
+    expect(help[1]).toBe('/discord [on|off]');
+    expect(help[2]).toBe('/discord join <channel id> | /discord status  (sysop links a channel)');
     type('/help zzz'); expect(last()).toBe('Unknown: zzz');
     type('/help'); expect(screen.over.help).toBe(true);
     screen.input(Buffer.from('q')); expect(screen.over.help).toBe(false);

@@ -1203,11 +1203,18 @@ gated by the door server's existing ADMIN TOKEN
 | POST | `/admin/boards/<id>/resume` |
 | POST | `/admin/boards/<id>/relay` |
 | POST | `/admin/boards/<id>/unrelay` |
+| DELETE | `/admin/discord/links/:id` |
 
 `relay` / `unrelay` set or clear the board's chat relay flag (the Discord
 bridge's board): a relay board's chat requests may carry `as` to act as
 `<as>@<that board>`, never as another board's user (docs/CHAT-API.md).
 Board summaries carry `chatRelay` and `discordMirror`.
+
+Unlinking a Discord channel is curation too, with no admin page:
+`DELETE /admin/discord/links/:id` removes the link at once and answers
+`{ok}`; a channel id the bridge mirrors from the `DISCORD_BRIDGE_ROOMS`
+env seed is never touched, and a hub link the bridge already picked up
+drops out of the live map on the next refresh (docs/DISCORD-BRIDGE.md).
 
 `POST /admin/boards` takes `{"id": "uprough", "name": "Up Rough",
 "contact": "sysop@example.com"}` and answers `{"id": "uprough", "key":

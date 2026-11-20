@@ -268,5 +268,6 @@ export const ADMIN_ENDPOINTS = [
   'POST /admin/boards/<id>/resume',
   'POST /admin/boards/<id>/relay',
   'POST /admin/boards/<id>/unrelay',
+  'DELETE /admin/discord/links/:id',
 ] as const;
 export type AdminEndpoint = (typeof ADMIN_ENDPOINTS)[number];
