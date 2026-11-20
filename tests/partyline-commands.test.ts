@@ -330,7 +330,7 @@ describe('hub screen commands', () => {
   it('discord: show, usage, sysop switch on and off', () => {
     type('/discord'); expect(last()).toBe('Discord mirror is ON for this board.'); // the fixture board starts mirrored
     type('/discord off'); type('/discord'); expect(last()).toBe('Discord mirror is OFF for this board.');
-    type('/discord maybe'); expect(last()).toBe('Usage: /discord [on|off]');
+    type('/discord maybe'); expect(last()).toBe('Usage: /discord [on|off|join|status]');
     type('/discord on'); expect(last()).toBe('Discord mirror is ON for this board.');
     type('/discord'); expect(last()).toBe('Discord mirror is ON for this board.');
     type('/discord off'); expect(last()).toBe('Discord mirror is OFF for this board.');
@@ -346,6 +346,45 @@ describe('hub screen commands', () => {
       expect(say('/discord')).toBe('Discord mirror is ON for this board.');
       expect(say('/discord off')).toBe('Only the sysop can change the Discord mirror.');
       expect(say('/discord')).toBe('Discord mirror is ON for this board.');
+    } finally { amy.close(); }
+  });
+
+  it('discord join: invite link, bad id, link, duplicate, status with error', () => {
+    screen.run(true, (db) => {
+      db.prepare("INSERT INTO discord_app (id, application_id, at) VALUES (1, '987654321098765432', 1)").run();
+    });
+    screen.run(true, (db, ctx) => {
+      createRoom(db, ctx, { name: 'Lobby' });
+    });
+    const inviteLines = type('/discord join');
+    expect(inviteLines.some((l) => l.includes('client_id=987654321098765432'))).toBe(true);
+    expect(last()).toBe('Usage: /discord join <channel id>  (15 to 22 digits)');
+    type('/discord join abc');
+    expect(last()).toBe('Usage: /discord join <channel id>  (15 to 22 digits)');
+    type('/discord join 123456789012345678');
+    expect(last()).toBe('Channel 123456789012345678 linked to the shared room.');
+    type('/discord join 123456789012345678');
+    expect(last()).toBe('channel already linked');
+    type('/discord status');
+    expect(last()).toBe('Channel 123456789012345678: linked');
+    screen.run(true, (db) => {
+      db.prepare("UPDATE discord_links SET status = 'failed', error = 'bot cannot see it' WHERE channel_id = '123456789012345678'").run();
+    });
+    type('/discord status');
+    expect(last()).toBe('Channel 123456789012345678: failed - bot cannot see it');
+  });
+
+  it('discord join: bridge offline and non-sysop are refused', () => {
+    type('/discord join');
+    expect(last()).toBe('The Discord bridge is not online yet. Try /discord later.');
+    const chat = loadChatConfig();
+    const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'amy', sysop: false, client: 'test' }).sid);
+    const hello = { cols: 80, rows: 25 } as ScreenInfo['hello'];
+    const amy = chatScreen(fx.ach, chat)({ sid, user: 'amy', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined }) as HubScreen;
+    const say = (l: string): string => { amy.input(Buffer.from(`${l}\r`, 'latin1')); amy.take(); return amy.model.lines[amy.model.lines.length - 1].text; };
+    try {
+      expect(say('/discord join 123456789012345678')).toBe('Only the sysop can link Discord channels.');
+      expect(say('/discord status')).toBe('Only the sysop can link Discord channels.');
     } finally { amy.close(); }
   });
 });

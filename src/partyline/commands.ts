@@ -8,10 +8,11 @@
  * table lists as aliases (users, channels, +1, -1, heart, fire): C_ALIAS and
  * C_DROP keep run_command's behaviour on both sides.
  */
-import { addIgnore, clearPresence, clearRoom, createRoom, getDiscordMirror, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
+import { addIgnore, clearPresence, clearRoom, createRoom, discordInvite, getDiscordMirror, listOwnDiscordJoins, requestDiscordJoin, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
 import { openPreview } from '../chat/files';
 import fs from 'fs';
+import { SurfaceError } from '../achievements/errors';
 import { CMD_HELP } from './ui/slash';
 import { EMOJI, emojiBuiltin } from './ui/model';
 import { stamp } from './ui/screen';
@@ -58,12 +59,52 @@ function drawViewTyped(s: HubScreen, cmd: string, rest: string): void {
 /** livechat.c discord_typed: show the board's Discord mirror, or (sysop only) switch it. */
 function discordTyped(s: HubScreen, rest: string): void {
   const arg = firstWord(rest);
-  if (arg !== '' && arg !== 'on' && arg !== 'off') { s.systemLine('Usage: /discord [on|off]'); return; }
+  if (arg === 'join' || arg === 'status') { discordJoinTyped(s, arg, afterWord(rest)); return; }
+  if (arg !== '' && arg !== 'on' && arg !== 'off') { s.systemLine('Usage: /discord [on|off|join|status]'); return; }
   const sysop = s.tryRun(false, (_db, ctx) => ctx.sysop);
   if (sysop === undefined) return;
   if (arg !== '' && !sysop) { s.systemLine('Only the sysop can change the Discord mirror.'); return; }
   const on = s.tryRun(arg !== '', (db, ctx) => (arg === '' ? getDiscordMirror(db, ctx) : setDiscordMirror(db, ctx, { on: arg === 'on' })));
   if (on !== undefined) s.systemLine(on ? 'Discord mirror is ON for this board.' : 'Discord mirror is OFF for this board.');
+}
+
+/**
+ * /discord join <channel id> (sysop): link a Discord channel to the shared
+ * room at once; the bridge picks it up without a restart. /discord status
+ * lists this board's links. With no (or a bad) channel id, show the bot
+ * invite link so the sysop can add the bot first.
+ */
+function discordJoinTyped(s: HubScreen, cmd: string, rest: string): void {
+  const sysop = s.tryRun(false, (_db, ctx) => ctx.sysop);
+  if (sysop === undefined) return;
+  if (!sysop) { s.systemLine('Only the sysop can link Discord channels.'); return; }
+  if (cmd === 'status') {
+    const rows = s.tryRun(false, (db, ctx) => listOwnDiscordJoins(db, ctx));
+    if (rows === undefined) return;
+    if (rows.length === 0) { s.systemLine('No Discord channel links from this board yet. Invite the bot with /discord join, then send the channel id.'); return; }
+    for (const r of rows) s.systemLine(`Channel ${r.channelId}: ${r.status}${r.error !== '' ? ` - ${r.error}` : ''}`);
+    return;
+  }
+  const channelId = firstWord(rest);
+  if (!/^\d{15,22}$/.test(channelId)) {
+    try {
+      const invite = s.run(false, (db, ctx) => discordInvite(db, ctx));
+      s.systemLine(`Invite the bridge bot first: ${invite.url}`);
+    } catch (err) {
+      if (!(err instanceof SurfaceError)) throw err;
+      s.systemLine(err.status === 404 ? 'The Discord bridge is not online yet. Try /discord later.' : err.message);
+      return;
+    }
+    s.systemLine('Usage: /discord join <channel id>  (15 to 22 digits)');
+    return;
+  }
+  try {
+    s.run(true, (db, ctx) => requestDiscordJoin(db, ctx, { channelId }));
+    s.systemLine(`Channel ${channelId} linked to the shared room.`);
+  } catch (err) {
+    if (!(err instanceof SurfaceError)) throw err;
+    s.systemLine(err.message);
+  }
 }
 
 /** The CMD_HELP name a typed command word means, or null (C: "Unknown command"). */
