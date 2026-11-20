@@ -78,7 +78,7 @@ export const CHAT_EVENT_TYPES = [
   'bbs',
   /** A board's sysop switched the Discord mirror; ref = the board id upper-cased, text = '1' on / '0' off. Seen by every session. */
   'discord_mirror',
-  /** A Discord channel link was requested (linked) or failed; ref = the link id, text = `linked` or `failed`. Seen by every session so the bridge refreshes at once. */
+  /** A Discord channel link changed state; ref = the link id, text = `linked`, `failed`, or `removed` (admin unlinked). Seen by every session so the bridge refreshes at once. */
   'discord_link',
   /** One edit of an art room's shared canvas; ref = the new revision, text = the ops (canvas wire encoding). Never relayed to Discord. */
   'canvas',

@@ -123,11 +123,10 @@ Adding a server (self-service, no restart):
    channel id. A channel that is already linked answers 409, and a board
    holds at most 5 linked channels.
 
-These commands run on the hub's own chat screen. Under
-`PARTYLINE_ENGINE=livechat` (what `docker-compose.yml` sets) the hosted
-LIVECHAT door only offers `/discord [on|off]` and answers `join` with a
-usage error, so run the link step from a chat-screen session with the
-variable unset.
+These commands run on the hub's own chat screen, which is what Partyline
+serves by default. Under the opt-in `PARTYLINE_ENGINE=livechat` engine the
+hosted LIVECHAT door only offers `/discord [on|off]` and answers `join`
+with a usage error, so run the link step from a chat-screen session.
 
 Unlinking is admin-only: `DELETE /achievements/v1/admin/discord/links/:id`
 (revoking a hub link removes only hub-sourced channels; the env seed below
