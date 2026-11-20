@@ -54,11 +54,8 @@ services:
       # importer fills it offline via scripts/import-bbs-filelist.ts), and
       # everything else serves as before either way.
       RELEASES_DB: ${RELEASES_DB:-/data/releases.db}
-      # Partyline runs the board's LIVECHAT door per caller instead of the
-      # hub's own chat screen, whose sidebar is never filled. The Dockerfile
-      # copies the door (with its SDK) from the BBS image to /app/livechat.
-      PARTYLINE_ENGINE: livechat
-      LIVECHAT_DOOR_DIR: /app/livechat
+      # Partyline serves the hub's own chat screen (LiveChat is deprecated).
+      # /discord join|status lives there, so every thin client gets it.
       # PLP/1 over TLS on the published 6400 (see ports above). Without both
       # paths the hub drops TLS callers and only plain PLP works; the native
       # Partyline door defaults to Tls=1, so TLS must be on for boards to
