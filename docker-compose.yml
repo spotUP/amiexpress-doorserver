@@ -13,8 +13,17 @@ services:
     # the moment phase 3 adds /admin/*.
     ports:
       - "127.0.0.1:3010:3010"
+      # Partyline PLP/1 (docs/PARTYLINE-PROTOCOL.md) lives on its own port,
+      # default 6400, on purpose: Caddy owns 443 for HTTPS and cannot carry
+      # raw PLP, so the hub's chat port is published directly. The loopback
+      # warning above is about the HTTP surface only.
+      - "0.0.0.0:6400:6400"
     volumes:
       - doorserver-data:/data
+      # Caddy's Let's Encrypt certificate for doors.uprough.net, read-only.
+      # Gives the PLP listener TLS on 6400 (PARTYLINE_TLS_CERT/KEY below);
+      # Caddy renews the files in place, no container change needed.
+      - /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/doors.uprough.net:/certs:ro
     networks:
       - default
       - doorserver-net
@@ -50,6 +59,12 @@ services:
       # copies the door (with its SDK) from the BBS image to /app/livechat.
       PARTYLINE_ENGINE: livechat
       LIVECHAT_DOOR_DIR: /app/livechat
+      # PLP/1 over TLS on the published 6400 (see ports above). Without both
+      # paths the hub drops TLS callers and only plain PLP works; the native
+      # Partyline door defaults to Tls=1, so TLS must be on for boards to
+      # connect with a stock PARTYLINE.cfg.
+      PARTYLINE_TLS_CERT: /certs/doors.uprough.net.crt
+      PARTYLINE_TLS_KEY: /certs/doors.uprough.net.key
       # Uploads wait in /data/quarantine (beside the database, never inside
       # the archive root); the server creates it at startup.
     healthcheck:
