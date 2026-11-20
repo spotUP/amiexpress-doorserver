@@ -829,10 +829,26 @@ export function setTopic(db: Database.Database, ctx: ChatCtx, id: string, b: Bod
 
 /** POST /rooms/:id/typing {text}: the caller's whole input buffer ('' = stopped). Members only; text is trimmed to 200 characters. */
 export const TYPING_TEXT_MAX = 200;
+/** Minimum ms between typing previews from one caller: a preview per keystroke fans a repaint out to every room member, so the hub forwards at most one while typing is ongoing. Start (first text) and stop ('') always go through at once. */
+export const TYPING_PREVIEW_MIN_MS = 2000;
+/** Last typing preview per room+user, so repeats inside the window are dropped. */
+const typingLast = new Map<string, { text: string; at: number }>();
 export function setTyping(db: Database.Database, ctx: ChatCtx, id: string, b: Body): void {
   const room = getRoom(db, id);
   requireMemberOf(db, room.id, ctx);
   const text = str(b, 'text', Number.MAX_SAFE_INTEGER, { empty: true }).slice(0, TYPING_TEXT_MAX);
+  if (text !== '') {
+    const prev = typingLast.get(`${room.id}\n${ctx.user}`);
+    const now = Date.now();
+    if (prev && prev.text !== '' && now - prev.at < TYPING_PREVIEW_MIN_MS) return;
+    typingLast.set(`${room.id}\n${ctx.user}`, { text, at: now });
+    if (typingLast.size > 2000) {
+      const cutoff = now - 5 * 60 * 1000;
+      for (const [k, v] of typingLast) if (v.at < cutoff) typingLast.delete(k);
+    }
+  } else {
+    typingLast.delete(`${room.id}\n${ctx.user}`);
+  }
   emitEvent(db, { type: 'typing', roomId: id, user: ctx.user, text });
 }
 
