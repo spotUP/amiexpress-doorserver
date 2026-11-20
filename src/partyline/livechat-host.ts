@@ -31,6 +31,7 @@ import {
 import { SurfaceError } from '../achievements/errors';
 import type { PartylineScreen, RenderPart, ScreenFactory, ScreenInfo } from './session';
 import type { FromChild, ToChild } from './livechat-child';
+import { SgrDedupe } from './livechat-wire';
 import { filesAndDrawing } from './livechat-files';
 import { joinVoiceHub } from './livechat-voice';
 
@@ -87,7 +88,10 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     let rows = info.hello.rows;
     // Door output in order: text and kitty APC alternate, and a picture must land where the text before it put the cursor.
     let out: RenderPart[] = [];
+    // The door re-asserts the same SGR per fragment (~1 KB/keystroke); drop the no-ops, keep every visible byte.
+    const wire = new SgrDedupe();
     const push = (type: RenderPart['type'], s: string): void => {
+      if (type === 'D') s = wire.filter(s);
       const last = out[out.length - 1];
       if (last?.type === type) last.bytes = Buffer.concat([last.bytes, Buffer.from(s, type === 'G' ? 'latin1' : enc)]);
       else out.push({ type, bytes: Buffer.from(s, type === 'G' ? 'latin1' : enc) });
