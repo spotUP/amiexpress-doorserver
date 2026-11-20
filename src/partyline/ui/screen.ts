@@ -9,6 +9,7 @@
  * the way livechat.c take_events reads a poll reply.
  */
 import type Database from 'better-sqlite3';
+import { StringDecoder } from 'string_decoder';
 import { withAchievementsDb } from '../../achievements/db';
 import type { AchievementsConfig } from '../../achievements/config';
 import { SurfaceError } from '../../achievements/errors';
@@ -17,11 +18,11 @@ import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
 import { newId, resolveSession } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { joinRoom, listMemberships, listRooms, postMessage, roomHistory } from '../../chat/store';
+import { joinRoom, listMemberships, listRooms, postMessage, roomHistory, roomMembers } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_DROPDOWN, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
-import { ACTIVITY_LINE, FOCUS_INPUT, FOCUS_MENU, HISTORY, LIVE, Model, newLine, SIDE_HEAD, SIDE_BLANK, SYSTEM, TEXT_MAX } from './model';
+import { ACTIVITY_LINE, FOCUS_INPUT, FOCUS_MENU, HISTORY, LIVE, Model, newLine, newSide, SIDE_BLANK, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, OverlayState, PICK_CATS, pickList, pickMove } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
@@ -56,14 +57,20 @@ export class HubScreen implements PartylineScreen {
 
   /** Pictures and files the hub announced this session (livechat.c shared_files[], 1-based /view N). */
   readonly shared: { id: string; name: string; kind: string }[] = [];
+  /** The caller's bytes are UTF-8 (hello charset); latin1 callers keep the byte path. */
+  private readonly utf8: boolean;
+  /** A UTF-8 glyph can straddle two K frames; the decoder holds the half glyph. */
+  private readonly decoder = new StringDecoder('utf8');
 
   constructor(private readonly ach: AchievementsConfig, private readonly chat: ChatConfig, readonly info: ScreenInfo, readonly filesDir: string | null = null) {
     this.model = new Model(info.hello.cols, info.hello.rows);
     this.cells = new Cells(info.hello.cols, info.hello.rows);
     this.model.handle = info.user;
     this.model.setSelf(info.user);
+    this.utf8 = info.hello.charset === 'utf8';
     this.cursor = withAchievementsDb(ach, (db) => headSeq(db));
     this.firstRoom();
+    this.fillSidebar();
     this.off = onEvents(() => this.take());
   }
 
@@ -116,7 +123,45 @@ export class HubScreen implements PartylineScreen {
     this.systemLine(`Joined #${r.name.slice(0, 40)} (${r.members} users)`);
     this.note(ACTIVITY_LINE, `Joined #${r.name.slice(0, 40)}`);
     this.takeHistory(r.id);
+    this.fillSidebar();
     return true;
+  }
+
+  /**
+   * The sidebar the livechat engine used to fill: joined rooms with unreads,
+   * then the users in this room. Only marks dirty when something changed,
+   * so an unrelated event does not repaint anyone.
+   */
+  private fillSidebar(): void {
+    const m = this.model;
+    const data = this.tryRun(false, (db, ctx) => ({
+      rooms: listMemberships(db, ctx),
+      users: this.roomId !== '' ? roomMembers(db, ctx, this.roomId) : [],
+    }));
+    if (!data) return;
+    const sel = m.side[m.sideSel];
+    const selKey = sel !== undefined ? `${sel.kind}:${sel.label}` : '';
+    const side = [newSide(SIDE_HEAD, false, 'TEXT CHANNELS')];
+    for (const r of data.rooms) {
+      const it = newSide(SIDE_ROOM, r.roomId === this.roomId, r.name.slice(0, 36));
+      it.unread = r.unread;
+      side.push(it);
+    }
+    if (data.users.length > 0) {
+      side.push(newSide(SIDE_HEAD, false, 'USERS'));
+      for (const u of data.users) {
+        const it = newSide(SIDE_USER, false, u.user.split('@')[0].slice(0, 38));
+        it.note = (u.statusText ?? '').slice(0, 14);
+        it.status = u.status === 'online' ? 1 : 0;
+        side.push(it);
+      }
+    }
+    const same = (a: typeof side, b: typeof m.side): boolean =>
+      a.length === b.length && a.every((s, i) => s.kind === b[i].kind && s.label === b[i].label && s.unread === b[i].unread && s.joined === b[i].joined && s.note === b[i].note && s.status === b[i].status);
+    if (same(side, m.side)) return;
+    m.side = side;
+    m.sideSel = Math.max(0, side.findIndex((s) => `${s.kind}:${s.label}` === selKey));
+    this.info.markDirty();
   }
 
   /** livechat.c take_history: the newest HISTORY_LIMIT (30) messages, numbered like live lines so /reply, /edit and /react reach them. */
@@ -148,10 +193,14 @@ export class HubScreen implements PartylineScreen {
       return; // the database is closing (shutdown): the next commit retries
     }
     if (rows.length === 0) return;
+    let side = false;
     for (const e of rows) {
       this.cursor = e.seq;
       this.event(e);
+      if (e.type === 'message' || e.type === 'joined' || e.type === 'left' || e.type === 'presence' ||
+        e.type === 'room_created' || e.type === 'room_deleted' || e.type === 'dm') side = true;
     }
+    if (side) this.fillSidebar();
     this.info.markDirty();
     if (rows.length > 0) this.take();
   }
@@ -196,27 +245,84 @@ export class HubScreen implements PartylineScreen {
 
   /** Bytes to keys (ui_key.h codes): ESC [ A..D, ESC [5~ / [6~, H / F, CR, BS/DEL, Tab, printable latin1. */
   input(bytes: Buffer): void {
-    for (const b of bytes) {
-      if (this.esc !== '') {
-        this.esc += String.fromCharCode(b);
-        if (this.esc.startsWith('\x1b[<')) { // SGR mouse report ESC [ < button ; col ; row M|m
-          if (b === 0x4d || b === 0x6d) { const e = this.esc; this.esc = ''; this.mouse(e, b === 0x4d); } else if (this.esc.length > 24) this.esc = '';
-          continue;
-        }
-        const k = KEY_SEQ[this.esc];
-        if (k !== undefined) { this.esc = ''; this.key(k); } else if (this.esc.length >= 4 || (this.esc.length >= 2 && this.esc[1] !== '[' && this.esc[1] !== 'O')) {
-          // shortcut: an unknown sequence is dropped whole; a lone Esc is seen only when the next byte is not '['.
-          const lone = this.esc.length === 2 && this.esc[1] !== '[' && this.esc[1] !== 'O';
-          this.esc = '';
-          if (lone) { this.key(K_ESC); this.input(Buffer.from([b])); }
-        }
-        continue;
+    if (this.utf8) {
+      // UTF-8 text: ASCII (including every ESC and mouse byte) goes through
+      // the byte path; wider glyphs insert directly (0x1b never appears
+      // inside a multibyte sequence, so the ESC machine cannot misfire).
+      for (const ch of this.decoder.write(bytes)) {
+        const cp = ch.codePointAt(0) as number;
+        if (cp < 0x80) this.inputByte(cp);
+        else this.insertChar(ch);
       }
-      if (b === 0x1b) { this.esc = '\x1b'; continue; }
-      this.key(b === 0x0d ? K_ENTER : b === 0x7f ? 8 : b);
+      this.info.markDirty();
+      return;
+    }
+    this.inputBytes(bytes);
+  }
+
+  /** One non-ASCII glyph straight into the input line (no ESC decoding up here). */
+  private insertChar(ch: string): void {
+    const m = this.model;
+    if (m.input.length + ch.length < TEXT_MAX) {
+      m.input = m.input.slice(0, m.inputCur) + ch + m.input.slice(m.inputCur);
+      m.inputCur += ch.length;
+      this.over.slashOff = false;
+    }
+  }
+
+  private inputBytes(bytes: Buffer): void {
+    for (const b of bytes) {
+      this.inputByte(b);
       if (this.quitting) return;
     }
     this.info.markDirty();
+  }
+
+  /** One byte through the ESC machine and into key(). */
+  private inputByte(b: number): void {
+    if (this.esc !== '') {
+      // X10 mouse (\x1b[M Cb Cx Cy): old terminals answer without SGR even
+      // after ?1006h; swallow the report as a click instead of typing it.
+      if (this.esc[1] === '[' && this.esc[2] === 'M') {
+        if (b === 0x1b) { this.esc = '\x1b'; return; }
+        this.esc += String.fromCharCode(b);
+        if (this.esc.length < 6) return;
+        const [cb, cx, cy] = [...this.esc].map((c) => c.charCodeAt(0)).slice(-3);
+        const button = cb - 32;
+        this.esc = '';
+        this.mouse(`\x1b[<${button};${cx - 32};${cy - 32}${button === 3 ? 'm' : 'M'}`, button !== 3);
+        return;
+      }
+      // urxvt mouse (\x1b[Cb;Cx;Cy M|m): same treatment on the M terminator.
+      if (b === 0x4d || b === 0x6d) {
+        const m = /^\x1b\[(\d+);(\d+);(\d+)$/.exec(this.esc);
+        if (m) {
+          const button = Number(m[1]);
+          this.esc = '';
+          this.mouse(`\x1b[<${button};${m[2]};${m[3]}${b === 0x4d && button !== 3 ? 'M' : 'm'}`, b === 0x4d && button !== 3);
+          return;
+        }
+      }
+      this.esc += String.fromCharCode(b);
+      if (this.esc.startsWith('\x1b[<')) { // SGR mouse report ESC [ < button ; col ; row M|m
+        if (b === 0x4d || b === 0x6d) { const e = this.esc; this.esc = ''; this.mouse(e, b === 0x4d); } else if (this.esc.length > 24) this.esc = '';
+        return;
+      }
+      const k = KEY_SEQ[this.esc];
+      // A urxvt mouse report (\x1b[Cb;Cx;Cy M) is longer than the key
+      // sequences the drop below assumes; while it still parses as digits
+      // and semicolons, wait for its M terminator instead of dropping it.
+      if (k === undefined && /^\x1b\[\d+(;\d*){0,2}$/.test(this.esc) && this.esc.length <= 16) return;
+      if (k !== undefined) { this.esc = ''; this.key(k); } else if (this.esc.length >= 4 || (this.esc.length >= 2 && this.esc[1] !== '[' && this.esc[1] !== 'O')) {
+        // shortcut: an unknown sequence is dropped whole; a lone Esc is seen only when the next byte is not '['.
+        const lone = this.esc.length === 2 && this.esc[1] !== '[' && this.esc[1] !== 'O';
+        this.esc = '';
+        if (lone) { this.key(K_ESC); this.input(Buffer.from([b])); }
+      }
+      return;
+    }
+    if (b === 0x1b) { this.esc = '\x1b'; return; }
+    this.key(b === 0x0d ? K_ENTER : b === 0x7f ? 8 : b);
   }
 
   private quitting = false;
@@ -417,7 +523,9 @@ export class HubScreen implements PartylineScreen {
     const { cr, cc } = draw(this.cells, this.model, this.drawState, this.over);
     // A full frame (first paint, resize, redraw) re-arms SGR mouse reports; input() parses them.
     const mouseOn = full && this.info.hello.mouse ? '\x1b[?1000h\x1b[?1006h' : '';
-    return Buffer.from(mouseOn + this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), 'latin1');
+    // The terminal bytes are in the caller's own charset (hello charset=):
+    // UTF-8 for the web and modern doors, latin1 for the Amiga and kin.
+    return Buffer.from(mouseOn + this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), this.utf8 ? 'utf8' : 'latin1');
   }
 
   close(): void { this.off(); }
