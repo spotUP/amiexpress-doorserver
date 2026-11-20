@@ -20,6 +20,7 @@ import { RestDiscordOut, WEBHOOK_NAME } from '../src/discord-bridge/discord-out'
 import { boardOf, createOutbound } from '../src/discord-bridge/outbound';
 import { composeContent, composeMessage, escapeDiscord, pickMember, quoteLine, webhookName } from '../src/discord-bridge/text';
 import type { BridgeConfig } from '../src/discord-bridge/config';
+import { asLookup } from '../src/discord-bridge/rooms';
 import type { BridgeEvent } from '../src/discord-bridge/wire';
 
 jest.setTimeout(30000);
@@ -140,7 +141,7 @@ describe('hub -> Discord through the bridge', () => {
     const members = [{ id: '4242', username: 'bob.smith', globalName: 'Bob Smith', nickname: null }];
     const bridge = await startBridge(config, (hub, state) => ({
       onEvent: createOutbound({
-        rooms: config.rooms,
+        rooms: asLookup(config.rooms),
         state,
         out,
         fetchBoards: () => hub.mirrorBoards(),
@@ -234,7 +235,7 @@ describe('createOutbound without a hub', () => {
     let boards = new Set(['B']);
     let t = 0;
     const handler = createOutbound({
-      rooms: new Map([['r', 'c']]),
+      rooms: asLookup(new Map([['r', 'c']])),
       state,
       out: {
         prepare: async () => undefined,
@@ -351,7 +352,7 @@ describe('createOutbound edit of a reply (H5)', () => {
     const state = new BridgeState(path.join(dir, 's.db'));
     const bodies: string[] = [];
     const handler = createOutbound({
-      rooms: new Map([['r', 'c']]),
+      rooms: asLookup(new Map([['r', 'c']])),
       state,
       out: {
         prepare: async () => undefined,

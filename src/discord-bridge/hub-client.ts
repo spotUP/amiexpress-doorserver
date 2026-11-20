@@ -22,6 +22,8 @@ export interface EventBatch {
 export class HubClient {
   private sid: string | null = null;
   private readonly rooms: string[];
+  /** Rooms this session has joined (seed at open, more on refresh); join is idempotent. */
+  private readonly joined = new Set<string>();
 
   constructor(
     private readonly hubUrl: string,
@@ -52,19 +54,21 @@ export class HubClient {
     return buf;
   }
 
-  /** Open a fresh session and join every mapped room. */
+  /** Open a fresh session and join every mapped room (seed plus refresh-added). */
   async open(signal?: AbortSignal): Promise<void> {
     this.sid = null;
     const created = JSON.parse((await this.send('POST', '/sessions', { handle: this.handle }, signal)).toString('utf8')) as { sid: string };
     this.sid = created.sid;
-    for (const room of this.rooms) await this.send('POST', `/rooms/${encodeURIComponent(room)}/join`, {}, signal);
+    const rooms = [...new Set([...this.rooms, ...this.joined])];
+    this.joined.clear();
+    for (const room of rooms) await this.joinRoom(room, signal);
   }
 
   /** One request that retries once on a 401 (expired session) after opening a new one. */
-  private async call(method: string, path: string, body?: unknown): Promise<Buffer> {
-    if (!this.sid) await this.open();
+  private async call(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Buffer> {
+    if (!this.sid) await this.open(signal);
     try {
-      return await this.send(method, path, body);
+      return await this.send(method, path, body, signal);
     } catch (err) {
       if (!(err instanceof HubError) || err.status !== 401) throw err;
       await this.open();
@@ -124,12 +128,38 @@ export class HubClient {
     }
   }
 
+  /** Join one more room after open (a hub link to a new room); a repeat join is a no-op. */
+  async joinRoom(room: string, signal?: AbortSignal): Promise<void> {
+    if (!this.sid) await this.open(signal);
+    if (this.joined.has(room)) return;
+    await this.send('POST', `/rooms/${encodeURIComponent(room)}/join`, {}, signal);
+    this.joined.add(room);
+  }
+
   /** Upper-cased ids of the boards whose chat may be mirrored (discord_mirror on), with the list's rev. */
   async mirrorBoards(signal?: AbortSignal): Promise<{ rev: number; boards: Set<string> }> {
     if (!this.sid) await this.open(signal);
     const t = parseTextTable(decodeBody(await this.send('GET', '/discord/boards.txt', undefined, signal)));
     if (t.name !== 'DISCORD') throw new Error(`expected DISCORD, got ${t.name}`);
     return { rev: t.revision, boards: new Set(t.rows.map((r) => r[0].toUpperCase())) };
+  }
+
+  /** The approved hub links: [{ id, room, channelId }] from GET /discord/links.txt. */
+  async discordLinks(signal?: AbortSignal): Promise<{ id: number; room: string; channelId: string }[]> {
+    if (!this.sid) await this.open(signal);
+    const t = parseTextTable(decodeBody(await this.send('GET', '/discord/links.txt', undefined, signal)));
+    if (t.name !== 'DISCORD_LINKS') throw new Error(`expected DISCORD_LINKS, got ${t.name}`);
+    return t.rows.map((r) => ({ id: Number(r[0]), room: String(r[1]), channelId: String(r[2]) }));
+  }
+
+  /** Publish this bridge's Discord application id at login (idempotent on the hub). */
+  async setDiscordApp(applicationId: string, signal?: AbortSignal): Promise<void> {
+    await this.call('PUT', '/discord/app', { applicationId }, signal);
+  }
+
+  /** Mark a link failed with the reason the door's `/discord status` shows. */
+  async reportLinkError(id: number, error: string, signal?: AbortSignal): Promise<void> {
+    await this.call('POST', `/discord/links/${id}/error`, { error }, signal);
   }
 
   /** Long-poll. `since` undefined asks the hub for its head (no replay on first run). */

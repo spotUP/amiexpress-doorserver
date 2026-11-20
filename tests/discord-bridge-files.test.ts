@@ -22,6 +22,7 @@ import type { InboundSink } from '../src/discord-bridge/inbound';
 import { createOutbound } from '../src/discord-bridge/outbound';
 import type { DiscordOut } from '../src/discord-bridge/discord-out';
 import type { BridgeConfig } from '../src/discord-bridge/config';
+import { asLookup } from '../src/discord-bridge/rooms';
 
 jest.setTimeout(30000);
 
@@ -88,8 +89,8 @@ describe('Discord attachment copy', () => {
     const logs: string[] = [];
     let sink!: InboundSink;
     const bridge = await startBridge(config, (hub, state) => {
-      sink = createInbound({ rooms: config.rooms, hub, state, log: (l) => logs.push(l) });
-      return { onEvent: createOutbound({ rooms: config.rooms, state, out, fetchBoards: () => hub.mirrorBoards(), log: (l) => logs.push(l) }) };
+      sink = createInbound({ rooms: asLookup(config.rooms), hub, state, log: (l) => logs.push(l) });
+      return { onEvent: createOutbound({ rooms: asLookup(config.rooms), state, out, fetchBoards: () => hub.mirrorBoards(), log: (l) => logs.push(l) }) };
     }, { log: (l) => logs.push(l), eventAttempts: 2, eventBackoffMs: 5 });
 
     const small = Buffer.alloc(70 * 1024, 7);

@@ -10,8 +10,7 @@
  * guild to the room's other guilds (never back to its own channel).
  */
 import { CHAT_DISCORD_BOARD } from '../../contract/chat-types';
-import { channelsOf } from './config';
-import type { RoomChannels } from './config';
+import type { RoomLookup } from './rooms';
 import { composeMessage, webhookName } from './text';
 import type { MentionResolver, ReplyQuote } from './text';
 import type { DiscordOut, WebhookAttachment } from './discord-out';
@@ -26,8 +25,8 @@ export interface MirrorBoards {
 }
 
 export interface FanoutDeps {
-  /** Hub room id -> its linked Discord channel(s). */
-  rooms: RoomChannels;
+  /** Hub room id -> its linked Discord channel(s); read live on every event. */
+  rooms: RoomLookup;
   state: BridgeState;
   out: DiscordOut;
   /** Discord channel id + hub `@name` -> Discord user id (gateway member cache). Absent: no pings. */
@@ -99,7 +98,7 @@ export function createFanout(deps: FanoutDeps): Fanout {
   return {
     async post(m, skipChannel) {
       const failed = new Failures();
-      for (const channel of channelsOf(deps.rooms, m.room)) {
+      for (const channel of deps.rooms.get(m.room)) {
         if (channel === skipChannel) continue; // never echo to the channel it came from
         if (deps.state.byHubIn(m.hubMessageId, channel)) continue; // replayed or retried: already posted here
         try {
@@ -194,7 +193,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
     // Loop guard: a Discord-origin message was already copied guild-to-guild by inbound.ts.
     if (fromDiscord(ev)) return;
     // Every linked channel has its twin: replayed after a restart, nothing to fetch.
-    if (channelsOf(deps.rooms, ev.room).every((c) => deps.state.byHubIn(ev.ref, c))) return;
+    if (deps.rooms.get(ev.room).every((c) => deps.state.byHubIn(ev.ref, c))) return;
     if (!(await mirrored(boardOf(ev.user)))) return;
     await fanout.post({ hubMessageId: ev.ref, room: ev.room, label: ev.label || ev.user, text: ev.text, replyTo: ev.replyTo });
   }
@@ -218,7 +217,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
   /** A shared picture goes up as an attachment; any other file (or a picture too big / unreadable) as a text line with no link, the hub download needs a session. */
   async function onFileShared(ev: BridgeEvent): Promise<void> {
     if (fromDiscord(ev)) return; // an attachment copied in from Discord already sits in its own channel
-    if (channelsOf(deps.rooms, ev.room).every((c) => deps.state.byHubIn(ev.ref, c))) return;
+    if (deps.rooms.get(ev.room).every((c) => deps.state.byHubIn(ev.ref, c))) return;
     if (!(await mirrored(boardOf(ev.user)))) return;
     const { name, size, kind } = parseShared(ev.text);
     const base = { hubMessageId: ev.ref, room: ev.room, label: ev.label || ev.user };
@@ -240,17 +239,17 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
       return;
     }
     if (ev.type === 'file_shared') {
-      if (channelsOf(deps.rooms, ev.room).length === 0) return;
+      if (deps.rooms.get(ev.room).length === 0) return;
       return onFileShared(ev);
     }
     if (ev.type === 'file_deleted') {
-      if (channelsOf(deps.rooms, ev.room).length === 0) return;
+      if (deps.rooms.get(ev.room).length === 0) return;
       await fanout.remove(ev.ref);
       deps.state.removeByHub(ev.ref);
       return;
     }
     if (ev.type !== 'message' && ev.type !== 'edit' && ev.type !== 'delete') return;
-    if (channelsOf(deps.rooms, ev.room).length === 0) return;
+    if (deps.rooms.get(ev.room).length === 0) return;
     if (ev.type === 'message') return onMessage(ev);
     // The actor's board says nothing about the author's: a BBS sysop can edit or delete a Discord-origin
     // message. Webhook copies follow; the original in its own server is the author's and stays (the bot cannot edit it).

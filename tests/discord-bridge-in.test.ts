@@ -21,6 +21,7 @@ import { createOutbound } from '../src/discord-bridge/outbound';
 import type { DiscordOut, WebhookPost } from '../src/discord-bridge/discord-out';
 import { discordToHub } from '../src/discord-bridge/text';
 import type { BridgeConfig } from '../src/discord-bridge/config';
+import { asLookup } from '../src/discord-bridge/rooms';
 
 jest.setTimeout(30000);
 
@@ -155,8 +156,8 @@ describe('Discord -> hub through the bridge', () => {
     const logs: string[] = [];
     let sink!: InboundSink;
     const bridge = await startBridge(config, (hub, state) => {
-      sink = createInbound({ rooms: config.rooms, hub, state, log: (l) => logs.push(l) });
-      return { onEvent: createOutbound({ rooms: config.rooms, state, out, fetchBoards: () => hub.mirrorBoards(), log: (l) => logs.push(l) }) };
+      sink = createInbound({ rooms: asLookup(config.rooms), hub, state, log: (l) => logs.push(l) });
+      return { onEvent: createOutbound({ rooms: asLookup(config.rooms), state, out, fetchBoards: () => hub.mirrorBoards(), log: (l) => logs.push(l) }) };
     }, { log: (l) => logs.push(l), eventAttempts: 2, eventBackoffMs: 5 });
     try {
       // create: sentinel is the history row, authored Bob_Smith@DISCORD.
@@ -208,7 +209,7 @@ describe('Discord -> hub through the bridge', () => {
   it('logs and drops a hub refusal without retrying', async () => {
     const posts: string[] = [];
     const sink = createInbound({
-      rooms: new Map([['r1', '777']]),
+      rooms: asLookup(new Map([['r1', '777']])),
       hub: {
         postAs: async () => { posts.push('x'); throw new (await import('../src/discord-bridge/hub-client')).HubError('POST -> 403 muted', 403); },
         editAs: async () => undefined,

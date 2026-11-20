@@ -10,6 +10,7 @@ import * as os from 'os';
 import * as path from 'path';
 import Database from 'better-sqlite3';
 import { parseRoomMap } from '../src/discord-bridge/config';
+import { asLookup } from '../src/discord-bridge/rooms';
 import { BridgeState } from '../src/discord-bridge/state';
 import { createFanout, createOutbound } from '../src/discord-bridge/outbound';
 import { createInbound } from '../src/discord-bridge/inbound';
@@ -54,7 +55,7 @@ describe('hub -> every linked guild', () => {
     const { state } = tmpState();
     const { out, calls } = fakeOut();
     const handler = createOutbound({
-      rooms: new Map([['r', ['A', 'B']]]), state, out,
+      rooms: asLookup(new Map([['r', ['A', 'B']]])), state, out,
       fetchBoards: async () => ({ rev: 1, boards: new Set(['B']) }), log: () => undefined,
     });
     await handler(ev({}));
@@ -86,8 +87,8 @@ describe('guild -> hub and the other guilds', () => {
       deleteAs: async (id: string) => { hubCalls.push(`delete ${id}`); },
       uploadFileAs: async () => { throw new Error('no files in this test'); },
     } as never;
-    const fanout = createFanout({ rooms, state, out, log: () => undefined });
-    const sink = createInbound({ rooms, hub, state, fanout, log: () => undefined });
+    const fanout = createFanout({ rooms: asLookup(rooms), state, out, log: () => undefined });
+    const sink = createInbound({ rooms: asLookup(rooms), hub, state, fanout, log: () => undefined });
     return { state, calls, hubCalls, sink };
   }
 
@@ -163,7 +164,7 @@ describe('multi-guild review fixes (2026-11-12)', () => {
     const realFetch = global.fetch;
     global.fetch = (async () => ({ ok: false, status: 500 })) as unknown as typeof fetch;
     try {
-      const sink = createInbound({ rooms, hub, state, fanout: createFanout({ rooms, state, out, log: nolog }), log: nolog });
+      const sink = createInbound({ rooms: asLookup(rooms), hub, state, fanout: createFanout({ rooms: asLookup(rooms), state, out, log: nolog }), log: nolog });
       await sink.create({
         id: 'd1', channelId: 'B', authorName: 'bob', authorId: '1234', authorBot: false, content: '', guildName: 'Guild B',
         attachmentUrls: ['https://cdn.example/a.png'], attachments: [{ id: 'a1', name: 'a.png', size: 10, url: 'https://cdn.example/a.png' }],
@@ -183,7 +184,7 @@ describe('multi-guild review fixes (2026-11-12)', () => {
       post: async (c) => { if (c === 'A' && broken) throw new Error('boom'); calls.push(`post ${c}`); n++; return `w${n}`; },
       edit: async () => undefined, remove: async () => undefined, jumpLink: () => undefined,
     };
-    const fanout = createFanout({ rooms, state, out, log: nolog });
+    const fanout = createFanout({ rooms: asLookup(rooms), state, out, log: nolog });
     const m = { hubMessageId: 'h1', room: 'r', label: 'amy', text: 'hi' };
     await expect(fanout.post(m)).rejects.toThrow(/post h1 in A: boom/);
     expect(calls).toEqual(['post B', 'post C']);
@@ -202,7 +203,7 @@ describe('multi-guild review fixes (2026-11-12)', () => {
       edit: async (c, id) => { calls.push(`edit ${c}`); if (c === 'A') throw gone(); if (c === 'C') throw new Error('boom'); void id; },
       remove: async (c) => { calls.push(`remove ${c}`); if (c === 'A') throw gone(); if (c === 'C') throw new Error('boom'); },
     };
-    const fanout = createFanout({ rooms, state, out, log: nolog });
+    const fanout = createFanout({ rooms: asLookup(rooms), state, out, log: nolog });
     await expect(fanout.edit('h1', 'new')).rejects.toThrow(/in C: boom/);
     expect(calls).toEqual(['edit A', 'edit C']); // legacy row with no channel: no call
     expect(state.byDiscord('w1')).toBeUndefined();
@@ -220,7 +221,7 @@ describe('multi-guild review fixes (2026-11-12)', () => {
     const { state } = tmpState();
     const { out, calls } = fakeOut();
     seed(state);
-    const handler = createOutbound({ rooms, state, out, fetchBoards: async () => ({ rev: 1, boards: new Set<string>() }), log: nolog });
+    const handler = createOutbound({ rooms: asLookup(rooms), state, out, fetchBoards: async () => ({ rev: 1, boards: new Set<string>() }), log: nolog });
     // Echo of the bridge's own edit (hub text equals the source row): nothing to do.
     await handler(ev({ type: 'edit', user: 'bob@DISCORD', text: 'hello' }));
     expect(calls).toEqual([]);

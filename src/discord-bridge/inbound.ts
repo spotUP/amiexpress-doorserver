@@ -12,8 +12,7 @@ import { HubError } from './hub-client';
 import type { HubClient } from './hub-client';
 import { discordToHub, guildLabel, pickMember, type MentionNames } from './text';
 import type { BridgeState } from './state';
-import { roomOfChannel } from './config';
-import type { RoomChannels } from './config';
+import type { RoomLookup } from './rooms';
 import type { Fanout } from './outbound';
 
 export interface InboundMessage {
@@ -67,7 +66,8 @@ export function toHandle(username: string, authorId: string): string {
 }
 
 export interface InboundDeps {
-  rooms: RoomChannels;
+  /** Live room map: read on every message, so a refreshed link works at once. */
+  rooms: RoomLookup;
   hub: Pick<HubClient, 'postAs' | 'editAs' | 'deleteAs' | 'uploadFileAs'>;
   /**
    * Multi-guild: copies a message posted in one linked channel to the room's
@@ -82,7 +82,11 @@ export interface InboundDeps {
 export function createInbound(deps: InboundDeps): InboundSink {
   const log = deps.log ?? ((l: string) => console.log(l));
   const now = deps.now ?? Date.now;
-  const roomOf = roomOfChannel(deps.rooms);
+  /** The room a channel is linked to right now (live: a refresh may have added it). */
+  const roomOfChannel = (channelId: string): string | undefined => {
+    for (const [room, channels] of deps.rooms.entries()) if (channels.includes(channelId)) return room;
+    return undefined;
+  };
 
   /** The hub id of the message `m` replies to, when its parent has a twin. */
   const parentOf = (m: InboundMessage): string | undefined => (m.referenceId ? deps.state.byDiscord(m.referenceId)?.hubMessageId : undefined);
@@ -97,7 +101,7 @@ export function createInbound(deps: InboundDeps): InboundSink {
 
   /** Mapped channel, not a webhook post (the bridge's own), not a bot. */
   const accepted = (m: InboundMessage): string | null => {
-    const room = roomOf.get(m.channelId);
+    const room = roomOfChannel(m.channelId);
     if (!room || m.webhookId || m.authorBot) return null;
     return room;
   };
@@ -199,7 +203,7 @@ export function createInbound(deps: InboundDeps): InboundSink {
       }
     },
     async remove(m) {
-      if (!roomOf.has(m.channelId)) return;
+      if (!roomOfChannel(m.channelId)) return;
       const link = deps.state.byDiscord(m.id);
       if (!link) return log(`[INFO] delete ${m.id}: no hub twin, skipped`);
       if (deps.fanout && !link.source) {
@@ -292,6 +296,20 @@ export class GatewayDiscordIn implements DiscordIn {
   /** True once the gateway session is up (discord.js resumes on its own after drops). */
   get ready(): boolean {
     return this.client.isReady();
+  }
+
+  /** The bot application id for invite links; undefined until the gateway is ready. */
+  get applicationId(): string | undefined {
+    return this.client.application?.id;
+  }
+
+  /** The application id, fetching it when the cache is empty; undefined when unreachable. */
+  async fetchApplicationId(): Promise<string | undefined> {
+    try {
+      return this.client.application?.id ?? (await this.client.application?.fetch())?.id;
+    } catch {
+      return this.client.application?.id;
+    }
   }
 
   async close(): Promise<void> {

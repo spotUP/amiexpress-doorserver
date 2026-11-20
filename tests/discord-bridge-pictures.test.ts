@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { BridgeState } from '../src/discord-bridge/state';
+import { asLookup } from '../src/discord-bridge/rooms';
 import { createOutbound, PICTURE_UPLOAD_MAX } from '../src/discord-bridge/outbound';
 import type { DiscordOut, WebhookPost } from '../src/discord-bridge/discord-out';
 import { parseEvents, decodeBody, type BridgeEvent } from '../src/discord-bridge/wire';
@@ -29,7 +30,7 @@ function setup(opts: { fetchFile?: (id: string) => Promise<Buffer>; boards?: str
     jumpLink: () => undefined,
   };
   const handler = createOutbound({
-    rooms: new Map<string, readonly string[]>([['r', ['c1', 'c2']]]),
+    rooms: asLookup(new Map<string, readonly string[]>([['r', ['c1', 'c2']]])),
     state,
     out,
     fetchBoards: async () => ({ rev: 1, boards: new Set(opts.boards ?? ['B']) }),
