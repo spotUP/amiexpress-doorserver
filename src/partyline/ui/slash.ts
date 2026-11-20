@@ -52,7 +52,7 @@ export const CMD_HELP: ReadonlyArray<readonly [string, string, string, string]> 
   ['customemoji', '', "Add, remove or list the board's custom emoji (sysop adds)", '/customemoji add <name> <display> <ascii> | remove <name> | list'],
   ['events', '', 'Manage BBS event display preferences', '/events [on|off|logins|files|doors|messages|announcements]'],
   ['mic', '', 'List microphones, or switch to one', '/mic [number]'],
-  ['discord', '', "Discord mirror (sysop switches) and channel links: join links a channel to the shared room, status lists them", '/discord [on|off|join <channel id>|status]'],
+  ['discord', '', "Show or switch the Discord mirror of this board's chat (sysop switches)", '/discord [on|off]'],
   ['motd', '', 'Set channel MOTD (moderator only; --clear to clear; no args = show current)', '/motd [text]  (use /motd --clear to clear)'],
   ['mode', '', 'Set channel or user modes (+i/+m/+o/+v/-X). Moderator only.', '/mode <modes> [param]'],
   ['me', '', 'Send an action message', '/me does something'],
