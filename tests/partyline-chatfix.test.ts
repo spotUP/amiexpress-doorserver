@@ -8,7 +8,7 @@ import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, joinRoom, postMessage } from '../src/chat/store';
-import { chatScreen, HubScreen } from '../src/partyline/ui/screen';
+import { chatScreen, HubScreen, K_F1, K_F4 } from '../src/partyline/ui/screen';
 import { MENU_COL } from '../src/partyline/ui/draw';
 import type { ScreenInfo } from '../src/partyline/session';
 
@@ -62,6 +62,33 @@ describe('hub screen charset', () => {
       screen.close();
     }
   });
+
+  it.each([['help', K_F1], ['emoji picker', K_F4]] as const)('utf8 caller: %s owns non-ASCII glyphs', (_name, key) => {
+    const screen = openScreen('bob', true, { charset: 'utf8', handle: 'bob' });
+    try {
+      screen.key(key);
+      screen.input(Buffer.from('ä', 'utf8'));
+      expect(screen.model.input).toBe('');
+    } finally {
+      screen.close();
+    }
+  });
+
+  it('utf8 caller: x10 mouse with high coordinates stays raw, not text', () => {
+    const screen = openScreen('bob', true, { charset: 'utf8', handle: 'bob', cols: 120, rows: 40 });
+    try {
+      screen.render(true);
+      // col 101 -> coordinate byte 133 (>= 0x80): must not enter the UTF-8 decoder.
+      screen.input(Buffer.from([0x1b, 0x5b, 0x4d, 32, 32 + 101, 32 + 11]));
+      screen.render(true);
+      expect(screen.model.input).toBe('');
+      expect(screen.model.menu).toBe(-1);
+      screen.input(Buffer.from('ä', 'utf8'));
+      expect(screen.model.input).toBe('ä');
+    } finally {
+      screen.close();
+    }
+  });
 });
 
 describe('hub screen sidebar', () => {
@@ -101,7 +128,7 @@ describe('hub screen mouse formats', () => {
   const x10 = (b: number, x: number, y: number): string =>
     `\x1b[M${String.fromCharCode(32 + b, 32 + x + 1, 32 + y + 1)}`;
   const urxvt = (b: number, x: number, y: number, end = 'M'): string =>
-    `\x1b[${b};${x + 1};${y + 1}${end}`;
+    `\x1b[${32 + b};${x + 1};${y + 1}${end}`; // rxvt-unicode sends Cb + 32, like X10
 
   it.each([['x10', x10], ['urxvt', urxvt]] as const)('%s click opens the menu, types nothing', (_name, enc) => {
     const screen = openScreen('bob', true, { handle: 'bob' });
@@ -110,6 +137,18 @@ describe('hub screen mouse formats', () => {
       screen.input(Buffer.from(enc(0, MENU_COL[2], 0), 'latin1'));
       screen.render(true);
       expect(screen.model.menu).toBe(2);
+      expect(screen.model.input).toBe('');
+    } finally {
+      screen.close();
+    }
+  });
+
+  it.each([['x10', x10], ['urxvt', urxvt]] as const)('%s shift+release over the menu is not a click', (_name, enc) => {
+    const screen = openScreen('bob', true, { handle: 'bob' });
+    try {
+      screen.render(true);
+      screen.input(Buffer.from(enc(3 | 4, MENU_COL[2], 0), 'latin1'));
+      expect(screen.model.menu).toBe(-1);
       expect(screen.model.input).toBe('');
     } finally {
       screen.close();

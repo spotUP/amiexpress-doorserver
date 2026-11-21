@@ -246,13 +246,24 @@ export class HubScreen implements PartylineScreen {
   /** Bytes to keys (ui_key.h codes): ESC [ A..D, ESC [5~ / [6~, H / F, CR, BS/DEL, Tab, printable latin1. */
   input(bytes: Buffer): void {
     if (this.utf8) {
-      // UTF-8 text: ASCII (including every ESC and mouse byte) goes through
-      // the byte path; wider glyphs insert directly (0x1b never appears
-      // inside a multibyte sequence, so the ESC machine cannot misfire).
-      for (const ch of this.decoder.write(bytes)) {
-        const cp = ch.codePointAt(0) as number;
-        if (cp < 0x80) this.inputByte(cp);
-        else this.insertChar(ch);
+      // Text goes through the UTF-8 decoder; ESC and any bytes while an ESC
+      // sequence is open stay raw so legacy X10 mouse coordinates (which can
+      // carry high bytes) still reach the byte-level mouse parser.
+      let at = 0;
+      while (at < bytes.length && !this.quitting) {
+        if (this.esc !== '' || bytes[at] === 0x1b) {
+          this.inputByte(bytes[at++]);
+          continue;
+        }
+        let end = at;
+        while (end < bytes.length && bytes[end] !== 0x1b) end++;
+        for (const ch of this.decoder.write(bytes.subarray(at, end))) {
+          const cp = ch.codePointAt(0) as number;
+          if (cp < 0x80) this.inputByte(cp);
+          else this.insertChar(ch);
+          if (this.quitting) break;
+        }
+        at = end;
       }
       this.info.markDirty();
       return;
@@ -262,11 +273,13 @@ export class HubScreen implements PartylineScreen {
 
   /** One non-ASCII glyph straight into the input line (no ESC decoding up here). */
   private insertChar(ch: string): void {
-    const m = this.model;
+    const m = this.model, o = this.over;
+    if (o.modal !== MODAL_NONE || o.fmt || o.help) return;
+    if (m.focus === FOCUS_INPUT) this.slashKey(ch.codePointAt(0) as number);
     if (m.input.length + ch.length < TEXT_MAX) {
       m.input = m.input.slice(0, m.inputCur) + ch + m.input.slice(m.inputCur);
       m.inputCur += ch.length;
-      this.over.slashOff = false;
+      o.slashOff = false;
     }
   }
 
@@ -288,18 +301,16 @@ export class HubScreen implements PartylineScreen {
         this.esc += String.fromCharCode(b);
         if (this.esc.length < 6) return;
         const [cb, cx, cy] = [...this.esc].map((c) => c.charCodeAt(0)).slice(-3);
-        const button = cb - 32;
         this.esc = '';
-        this.mouse(`\x1b[<${button};${cx - 32};${cy - 32}${button === 3 ? 'm' : 'M'}`, button !== 3);
+        this.legacyMouse(cb, cx - 32, cy - 32, false);
         return;
       }
       // urxvt mouse (\x1b[Cb;Cx;Cy M|m): same treatment on the M terminator.
       if (b === 0x4d || b === 0x6d) {
         const m = /^\x1b\[(\d+);(\d+);(\d+)$/.exec(this.esc);
         if (m) {
-          const button = Number(m[1]);
           this.esc = '';
-          this.mouse(`\x1b[<${button};${m[2]};${m[3]}${b === 0x4d && button !== 3 ? 'M' : 'm'}`, b === 0x4d && button !== 3);
+          this.legacyMouse(Number(m[1]), Number(m[2]), Number(m[3]), b === 0x6d);
           return;
         }
       }
@@ -323,6 +334,16 @@ export class HubScreen implements PartylineScreen {
     }
     if (b === 0x1b) { this.esc = '\x1b'; return; }
     this.key(b === 0x0d ? K_ENTER : b === 0x7f ? 8 : b);
+  }
+
+  /**
+   * X10 and urxvt both carry Cb = 32 + button (+ modifier/motion bits); low bits 3 without
+   * the motion bit is a release. Re-spelled as the SGR report mouse() reads.
+   */
+  private legacyMouse(cb: number, col: number, row: number, release: boolean): void {
+    const button = cb - 32;
+    const up = release || (button & 0x63) === 3;
+    this.mouse(`\x1b[<${button};${col};${row}${up ? 'm' : 'M'}`, !up);
   }
 
   private quitting = false;
