@@ -357,6 +357,9 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.post('/rooms/:id/files', (req: Request, res: Response) => {
     res.json(runAs(req, (db, ctx) => files.beginUpload(db, filesDir, ctx, p(req, 'id'), body(req))));
   });
+  router.post('/dm/:threadId/files', (req: Request, res: Response) => {
+    res.json(runAs(req, (db, ctx) => files.beginDmUpload(db, filesDir, ctx, p(req, 'threadId'), body(req))));
+  });
   router.put('/files/:id/chunk', (req: Request, res: Response) => {
     const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     const offset = req.query.offset === undefined ? undefined : Number(req.query.offset);

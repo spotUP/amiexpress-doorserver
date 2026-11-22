@@ -27,7 +27,7 @@ import { getRoom, isMember, requireMod } from './permissions';
 import { displayLabels } from './render';
 import type { ChatCtx } from './sessions';
 import { newId } from './sessions';
-import { clientId, requireMemberOf, requireNotMuted, requireSession, requireVoice, str } from './store';
+import { clientId, dmParticipants, requireMemberOf, requireNotMuted, requireSession, requireVoice, str } from './store';
 import type { Body } from './store';
 
 const DAY = 86400;
@@ -39,7 +39,9 @@ export const fileStats = { chunkCalls: 0 };
 
 export interface FileRow {
   id: string;
-  room_id: string;
+  room_id: string | null;
+  /** Set (and room_id NULL) for a file shared in a direct-message thread. */
+  dm_thread: string | null;
   board_id: string;
   uploader: string;
   name: string;
@@ -112,9 +114,9 @@ export function rebuildFileName(submitted: string): string {
   return base;
 }
 
-function uniqueName(db: Database.Database, roomId: string, name: string): string {
+function uniqueName(db: Database.Database, roomId: string | null, dmThread: string | null, name: string): string {
   const taken = (n: string): boolean =>
-    db.prepare("SELECT 1 FROM chat_files WHERE room_id = ? AND name = ? COLLATE NOCASE AND status <> 'deleted'").get(roomId, n) !== undefined;
+    db.prepare("SELECT 1 FROM chat_files WHERE room_id IS ? AND dm_thread IS ? AND name = ? COLLATE NOCASE AND status <> 'deleted'").get(roomId, dmThread, n) !== undefined;
   if (!taken(name)) return name;
   const ext = path.extname(name);
   const stem = name.slice(0, name.length - ext.length);
@@ -168,6 +170,18 @@ export function beginUpload(db: Database.Database, dir: string | null, ctx: Chat
   requireMemberOf(db, room.id, ctx);
   requireNotMuted(db, room.id, ctx.user);
   requireVoice(db, room, ctx);
+  return beginIn(db, d, ctx, room.id, null, b);
+}
+
+/** Begin an upload into a direct-message thread; the caller must be a participant (same rule as the thread's history). */
+export function beginDmUpload(db: Database.Database, dir: string | null, ctx: ChatCtx, threadId: string, b: Body): BeginReply {
+  const d = needDir(dir);
+  requireSession(ctx);
+  dmParticipants(db, ctx, threadId);
+  return beginIn(db, d, ctx, null, threadId, b);
+}
+
+function beginIn(db: Database.Database, d: string, ctx: ChatCtx, roomId: string | null, dmThread: string | null, b: Body): BeginReply {
   const cid = clientId(b);
   const orig = str(b, 'name', 255);
   const size = b.size;
@@ -175,12 +189,12 @@ export function beginUpload(db: Database.Database, dir: string | null, ctx: Chat
   if (size > CHAT_LIMITS.fileMaxBytes) throw new SurfaceError('too_large', 413, `files are limited to ${CHAT_LIMITS.fileMaxBytes} bytes`);
 
   const again = db
-    .prepare("SELECT * FROM chat_files WHERE room_id = ? AND uploader = ? AND client_id = ? AND status <> 'deleted'")
-    .get(room.id, ctx.user, cid) as FileRow | undefined;
+    .prepare("SELECT * FROM chat_files WHERE room_id IS ? AND dm_thread IS ? AND uploader = ? AND client_id = ? AND status <> 'deleted'")
+    .get(roomId, dmThread, ctx.user, cid) as FileRow | undefined;
   if (again) return { id: again.id, chunkMax: CHAT_LIMITS.fileChunkMax, received: again.received, name: again.name };
 
-  if (db.prepare("SELECT 1 FROM chat_files WHERE room_id = ? AND uploader = ? AND status = 'uploading'").get(room.id, ctx.user)) {
-    throw new SurfaceError('conflict', 409, 'finish or cancel your current upload in this room first');
+  if (db.prepare("SELECT 1 FROM chat_files WHERE room_id IS ? AND dm_thread IS ? AND uploader = ? AND status = 'uploading'").get(roomId, dmThread, ctx.user)) {
+    throw new SurfaceError('conflict', 409, 'finish or cancel your current upload in this room or thread first');
   }
   const used = (db.prepare("SELECT COALESCE(SUM(size), 0) AS n FROM chat_files WHERE status IN ('uploading','ready')").get() as { n: number }).n;
   if (used + size > CHAT_LIMITS.hubFileBytesMax) throw new SurfaceError('quota', 507, 'the hub file store is full');
@@ -196,7 +210,7 @@ export function beginUpload(db: Database.Database, dir: string | null, ctx: Chat
 
   const id = newId('f');
   const now = nowSec();
-  const name = uniqueName(db, room.id, rebuildFileName(orig));
+  const name = uniqueName(db, roomId, dmThread, rebuildFileName(orig));
   try {
     fs.writeFileSync(partPath(d, id), Buffer.alloc(0));
   } catch (err) {
@@ -204,9 +218,9 @@ export function beginUpload(db: Database.Database, dir: string | null, ctx: Chat
     throw new SurfaceError('quota', 507, `cannot store the file: ${(err as Error).message}`);
   }
   db.prepare(
-    `INSERT INTO chat_files (id, room_id, board_id, uploader, name, orig_name, size, received, status, client_id, relay, created_at, updated_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'uploading', ?, ?, ?, ?, ?)`
-  ).run(id, room.id, ctx.boardId, ctx.user, name, orig, size, cid, ctx.relayOf ? 1 : 0, now, now, now + CHAT_LIMITS.fileUploadIdleSeconds);
+    `INSERT INTO chat_files (id, room_id, dm_thread, board_id, uploader, name, orig_name, size, received, status, client_id, relay, created_at, updated_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'uploading', ?, ?, ?, ?, ?)`
+  ).run(id, roomId, dmThread, ctx.boardId, ctx.user, name, orig, size, cid, ctx.relayOf ? 1 : 0, now, now, now + CHAT_LIMITS.fileUploadIdleSeconds);
   return { id, chunkMax: CHAT_LIMITS.fileChunkMax, received: 0, name };
 }
 
@@ -290,8 +304,8 @@ export function finishUpload(db: Database.Database, dir: string | null, ctx: Cha
     if (!pic || pic.w * pic.h > MAX_PIXELS) kind = 'binary';
   }
   const same = db
-    .prepare("SELECT blob_id FROM chat_files WHERE room_id = ? AND sha256 = ? AND status = 'ready' AND blob_id IS NOT NULL LIMIT 1")
-    .get(row.room_id, sha256) as { blob_id: string } | undefined;
+    .prepare("SELECT blob_id FROM chat_files WHERE room_id IS ? AND dm_thread IS ? AND sha256 = ? AND status = 'ready' AND blob_id IS NOT NULL LIMIT 1")
+    .get(row.room_id, row.dm_thread, sha256) as { blob_id: string } | undefined;
   let blobId = id;
   if (same && fs.existsSync(binPath(d, same.blob_id))) {
     blobId = same.blob_id;
@@ -303,9 +317,16 @@ export function finishUpload(db: Database.Database, dir: string | null, ctx: Cha
   db.prepare("UPDATE chat_files SET status = 'ready', sha256 = ?, kind = ?, img_w = ?, img_h = ?, blob_id = ?, updated_at = ?, expires_at = ? WHERE id = ?").run(
     sha256, kind, pic && kind === 'image' ? pic.w : null, pic && kind === 'image' ? pic.h : null, blobId, now, now + CHAT_LIMITS.fileRetentionDays * DAY, id
   );
-  emitEvent(db, { type: 'file_shared', roomId: row.room_id, user: row.uploader, ref: id, text: `${row.name}|${row.size}|${kind}` });
-  trimRoom(db, d, row.room_id);
+  emitEvent(db, { type: 'file_shared', ...eventScope(db, row), user: row.uploader, ref: id, text: `${row.name}|${row.size}|${kind}` });
+  if (row.room_id) trimRoom(db, d, row.room_id);
   return { id, sha256, kind, name: row.name, size: row.size };
+}
+
+/** Where a file's events go: its room, or for a DM file the thread label (plus dmA/dmB for a 1:1 thread, as postDm does). */
+function eventScope(db: Database.Database, row: FileRow): { roomId: string | null; label?: string; dmA?: string; dmB?: string } {
+  if (!row.dm_thread) return { roomId: row.room_id };
+  const one = db.prepare('SELECT dm_a, dm_b FROM chat_dm_messages WHERE thread_id = ? AND dm_a <> \'\' LIMIT 1').get(row.dm_thread) as { dm_a: string; dm_b: string } | undefined;
+  return { roomId: null, label: row.dm_thread, ...(one ? { dmA: one.dm_a, dmB: one.dm_b } : {}) };
 }
 
 function trimRoom(db: Database.Database, dir: string, roomId: string): void {
@@ -322,7 +343,7 @@ function removeReady(db: Database.Database, dir: string, row: FileRow, by: strin
   const blob = row.blob_id ?? row.id;
   const still = db.prepare("SELECT 1 FROM chat_files WHERE blob_id = ? AND status = 'ready' AND id <> ?").get(blob, row.id);
   if (!still) removeBlob(dir, blob);
-  if (announce) emitEvent(db, { type: 'file_deleted', roomId: row.room_id, user: by, ref: row.id, text: `${row.name}|${why}` });
+  if (announce) emitEvent(db, { type: 'file_deleted', ...eventScope(db, row), user: by, ref: row.id, text: `${row.name}|${why}` });
 }
 
 export function deleteFile(db: Database.Database, dir: string | null, ctx: ChatCtx, id: string): void {
@@ -334,8 +355,9 @@ export function deleteFile(db: Database.Database, dir: string | null, ctx: ChatC
   let why = 'uploader';
   if (!own) {
     if (ctx.admin) why = 'sysop';
+    else if (row.dm_thread) throw new SurfaceError('forbidden', 403, 'only the uploader may delete a file in a direct message');
     else {
-      requireMod(db, getRoom(db, row.room_id), ctx, 'kick', row.uploader);
+      requireMod(db, getRoom(db, row.room_id as string), ctx, 'kick', row.uploader);
       why = ctx.sysop ? 'sysop' : 'op';
     }
   }
@@ -382,7 +404,9 @@ export interface Download {
 export function openDownload(db: Database.Database, dir: string | null, ctx: ChatCtx, id: string): Download {
   const d = needDir(dir);
   const row = getFile(db, id);
-  if (!ctx.admin && !isMember(db, row.room_id, ctx.relayOf ?? ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
+  if (row.dm_thread) {
+    if (!ctx.admin) dmParticipants(db, ctx, row.dm_thread);
+  } else if (!ctx.admin && !isMember(db, row.room_id as string, ctx.relayOf ?? ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
   if (row.status !== 'ready') throw new SurfaceError('file_gone', 404, 'that file is gone');
   const p = binPath(d, row.blob_id ?? row.id);
   if (!fs.existsSync(p)) throw new SurfaceError('file_gone', 404, 'that file is gone');

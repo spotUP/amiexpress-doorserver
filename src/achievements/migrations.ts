@@ -431,4 +431,42 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('CREATE TABLE IF NOT EXISTS discord_app (id INTEGER PRIMARY KEY CHECK (id = 1), application_id TEXT NOT NULL, at INTEGER NOT NULL)');
     },
   },
+  {
+    version: 18,
+    name: 'chat: chat_files may belong to a direct-message thread (room_id NULL, dm_thread set)',
+    // room_id was NOT NULL, so the table is rebuilt. Room files copy over unchanged.
+    up: (db) => {
+      db.exec(`CREATE TABLE chat_files_new (
+          id          TEXT PRIMARY KEY,
+          room_id     TEXT REFERENCES chat_rooms(id),
+          dm_thread   TEXT,
+          board_id    TEXT NOT NULL,
+          uploader    TEXT NOT NULL COLLATE NOCASE,
+          name        TEXT NOT NULL,
+          orig_name   TEXT NOT NULL,
+          size        INTEGER NOT NULL,
+          received    INTEGER NOT NULL DEFAULT 0,
+          sha256      TEXT,
+          kind        TEXT,
+          status      TEXT NOT NULL,
+          client_id   TEXT NOT NULL DEFAULT '',
+          blob_id     TEXT,
+          relay       INTEGER NOT NULL DEFAULT 0,
+          img_w       INTEGER,
+          img_h       INTEGER,
+          created_at  INTEGER NOT NULL,
+          updated_at  INTEGER NOT NULL,
+          expires_at  INTEGER NOT NULL,
+          deleted_at  INTEGER,
+          deleted_by  TEXT,
+          deleted_why TEXT)`);
+      db.exec(`INSERT INTO chat_files_new (id, room_id, board_id, uploader, name, orig_name, size, received, sha256, kind, status, client_id, blob_id, relay, img_w, img_h, created_at, updated_at, expires_at, deleted_at, deleted_by, deleted_why)
+               SELECT id, room_id, board_id, uploader, name, orig_name, size, received, sha256, kind, status, client_id, blob_id, relay, img_w, img_h, created_at, updated_at, expires_at, deleted_at, deleted_by, deleted_why FROM chat_files`);
+      db.exec('DROP TABLE chat_files');
+      db.exec('ALTER TABLE chat_files_new RENAME TO chat_files');
+      db.exec('CREATE INDEX IF NOT EXISTS chat_files_room ON chat_files(room_id, status, created_at)');
+      db.exec('CREATE INDEX IF NOT EXISTS chat_files_dm ON chat_files(dm_thread, status, created_at)');
+      db.exec('CREATE INDEX IF NOT EXISTS chat_files_expiry ON chat_files(status, expires_at)');
+    },
+  },
 ];

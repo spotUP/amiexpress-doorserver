@@ -206,4 +206,63 @@ describe('chat files', () => {
     ];
     for (const [input, want] of table) expect(rebuildFileName(input)).toBe(want);
   });
+
+  describe('direct-message threads', () => {
+    async function who(handle: string): Promise<{ sid: string; user: string }> {
+      const r = await request(fx.app).post('/chat/v1/sessions').set('Authorization', fx.auth).send({ handle });
+      return { sid: r.body.sid as string, user: r.body.user as string };
+    }
+    const dmUp = async (sid: string, thread: string, name: string, data: Buffer, clientId = 'd1'): Promise<request.Response> => {
+      const b = await call('post', `/dm/${thread}/files`, sid).send({ name, size: data.length, clientId });
+      if (b.status !== 200) return b;
+      const id = b.body.id as string;
+      expect((await call('put', `/files/${id}/chunk?offset=0`, sid).set('Content-Type', 'application/octet-stream').send(data)).status).toBe(200);
+      const f = await call('post', `/files/${id}/finish`, sid).send({});
+      expect(f.status).toBe(200);
+      return f;
+    };
+    const fileEvents = async (sid: string): Promise<string[]> => lines((await call('get', '/events.txt?since=0&wait=0', sid)).text).filter((l) => l.includes('file_shared'));
+
+    it('1:1 file is visible to both peers, not a third user; download and delete rules', async () => {
+      const [a, b, c] = [await who('alice'), await who('bob'), await who('carol')];
+      const thread = (await call('post', `/dm/${b.user}`, a.sid).send({ content: 'hi', clientId: 'm1' })).body.threadId as string;
+      const up = await dmUp(a.sid, thread, 'pic.txt', Buffer.from('hello'));
+      const id = up.body.id as string;
+      expect((await fileEvents(a.sid)).length).toBe(1);
+      const seen = await fileEvents(b.sid);
+      expect(seen.length).toBe(1);
+      expect(seen[0]).toContain(thread);
+      expect(seen[0]).toContain(`pic.txt!5!`);
+      expect(await fileEvents(c.sid)).toEqual([]);
+      expect((await bin(call('get', `/files/${id}`, b.sid))).status).toBe(200);
+      expect((await call('get', `/files/${id}`, c.sid)).status).toBe(403);
+      expect((await call('delete', `/files/${id}`, b.sid)).status).toBe(403);
+      expect((await call('delete', `/files/${id}`, a.sid)).status).toBe(200);
+      expect((await call('get', `/files/${id}`, b.sid)).status).toBe(404);
+    });
+
+    it('group file is visible to members only; non-participant upload is refused', async () => {
+      const [a, b, c, d] = [await who('alice'), await who('bob'), await who('carol'), await who('dave')];
+      const thread = (await call('post', '/dm-group', a.sid).send({ participants: [b.user, c.user], content: 'yo', clientId: 'g1' })).body.threadId as string;
+      const id = (await dmUp(b.sid, thread, 'g.bin', Buffer.from('xyz'))).body.id as string;
+      expect((await fileEvents(a.sid)).length).toBe(1);
+      expect((await fileEvents(c.sid)).length).toBe(1);
+      expect(await fileEvents(d.sid)).toEqual([]);
+      expect((await bin(call('get', `/files/${id}`, c.sid))).status).toBe(200);
+      expect((await call('get', `/files/${id}`, d.sid)).status).toBe(403);
+      expect((await call('post', `/dm/${thread}/files`, d.sid).send({ name: 'x', size: 1, clientId: 'z' })).status).toBe(403);
+    });
+
+    it('room uploads still work beside DM files with the same name', async () => {
+      const a = await who('alice');
+      const b = await who('bob');
+      const thread = (await call('post', `/dm/${b.user}`, a.sid).send({ content: 'hi', clientId: 'm1' })).body.threadId as string;
+      await dmUp(a.sid, thread, 'same.bin', Buffer.from('1'));
+      const r = await room(a.sid);
+      const id = await upload(a.sid, r, 'same.bin', Buffer.from('2'));
+      expect((await call('get', `/rooms/${r}/files.txt`, a.sid)).text).toContain('same.bin');
+      expect((await call('get', `/rooms/${r}/files.txt`, a.sid)).text).not.toContain('same_2.bin');
+      expect(id).toBeDefined();
+    });
+  });
 });
