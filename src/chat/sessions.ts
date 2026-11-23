@@ -163,6 +163,18 @@ export function sweepSessions(db: Database.Database, cfg: ChatConfig): number {
   return stale.length;
 }
 
+/** A timed mute that ran out is deleted and announced as `unmuted` (ref 'system'), like a manual unmute. */
+export function sweepMutes(db: Database.Database): number {
+  return db.transaction(() => {
+    const done = db.prepare('SELECT room_id, user FROM chat_mutes WHERE until IS NOT NULL AND until <= ?').all(nowSec()) as { room_id: string; user: string }[];
+    for (const m of done) {
+      db.prepare('DELETE FROM chat_mutes WHERE room_id = ? AND user = ?').run(m.room_id, m.user);
+      emitEvent(db, { type: 'unmuted', roomId: m.room_id, user: m.user, ref: 'system' });
+    }
+    return done.length;
+  }).immediate();
+}
+
 // ---- the sweeper: one timer per database file ----
 
 const sweepers = new Map<string, NodeJS.Timeout>();
@@ -176,6 +188,7 @@ export function startSweeper(ach: AchievementsConfig, cfg: ChatConfig, filesDir:
     try {
       withAchievementsDb(ach, (db) => {
         sweepSessions(db, cfg);
+        sweepMutes(db);
         sweepFiles(db, filesDir);
         ticks += 1;
         if (ticks % PRUNE_EVERY === 1) pruneEvents(db, cfg.eventsKept ?? CHAT_LIMITS.eventsKept);
