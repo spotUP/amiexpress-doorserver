@@ -83,7 +83,7 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
                  lower(substr(e.dm_a, -length(@suffix))) = @suffix OR lower(substr(e.dm_b, -length(@suffix))) = @suffix
               OR (e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE lower(substr(user, -length(@suffix))) = @suffix))))
            OR e.user = @user
-           OR (e.type IN ('room_created','room_deleted','topic')
+           OR (e.type IN ('room_created','room_deleted','room_renamed','topic')
                AND e.room_id IN (SELECT id FROM chat_rooms WHERE visibility = 'public'))
         )))
         ORDER BY e.seq LIMIT @limit`

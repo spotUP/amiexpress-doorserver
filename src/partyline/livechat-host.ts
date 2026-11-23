@@ -379,6 +379,12 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
           case 'pin': if (here) pinList(e.room_id!, 'chat:pin:updated'); break;
           case 'joined': case 'left': if (here && !mine) reply(`room:user-${e.type}`, { ...ch, userId: e.user, username: short(e.user) }); break;
           case 'op': case 'deop': if (here) reply('room:op-changed', { ...ch, username: short(e.user), op: e.type === 'op', by: short(e.ref) }); break;
+          case 'room_renamed':
+            reply('room:renamed', { ...ch, roomId: e.room_id, roomName: e.text, by: short(e.user) });
+            if (active && room) room = { id: room.id, name: e.text };
+            if (e.room_id && joined.has(e.room_id)) joined.set(e.room_id, e.text);
+            handlers['room:list']({});
+            break;
           // Every user is a member of every public room: join a room created after entry (membership only, active room unchanged).
           case 'room_created':
             if (e.room_id && !joined.has(e.room_id)) {

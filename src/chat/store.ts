@@ -77,10 +77,16 @@ export function listRooms(db: Database.Database, ctx: ChatCtx): RoomRow[] {
   return rows.map((r) => ({ id: r.id, name: r.name, topic: r.topic, visibility: r.visibility, members: countMembers(db, r.id), owner: r.owner_user, kind: r.kind }));
 }
 
-export function createRoom(db: Database.Database, ctx: ChatCtx, b: Body): CreateRoomReply {
-  requireSession(ctx);
+/** The validated room name from a create or rename body. */
+function roomNameOf(b: Body): string {
   const name = str(b, 'name', CHAT_LIMITS.roomNameMax).trim();
   if (/[|\r\n\t]/.test(name)) throw new SurfaceError('bad_request', 400, 'name must not contain | or line breaks');
+  return name;
+}
+
+export function createRoom(db: Database.Database, ctx: ChatCtx, b: Body): CreateRoomReply {
+  requireSession(ctx);
+  const name = roomNameOf(b);
   const topic = b.topic === undefined ? '' : str(b, 'topic', CHAT_LIMITS.topicMax, { empty: true });
   const vis = b.visibility === undefined ? 'public' : b.visibility;
   if (vis !== 'public' && vis !== 'private') throw new SurfaceError('bad_request', 400, 'visibility must be public or private');
@@ -825,6 +831,17 @@ export function setTopic(db: Database.Database, ctx: ChatCtx, id: string, b: Bod
   const topic = str(b, 'topic', CHAT_LIMITS.topicMax, { empty: true });
   db.prepare('UPDATE chat_rooms SET topic = ? WHERE id = ?').run(topic, id);
   emitEvent(db, { type: 'topic', roomId: id, user: ctx.user || 'admin', text: topic });
+}
+
+/** PUT /rooms/:id/name {name}: a moderator renames the room; the name stays unique. */
+export function renameRoom(db: Database.Database, ctx: ChatCtx, id: string, b: Body): void {
+  const room = getRoom(db, id);
+  requireMod(db, room, ctx, 'topic');
+  const name = roomNameOf(b);
+  const key = name.toLowerCase();
+  if (db.prepare('SELECT 1 FROM chat_rooms WHERE name_key = ? AND id <> ?').get(key, id)) throw new SurfaceError('conflict', 409, 'a room with that name exists');
+  db.prepare('UPDATE chat_rooms SET name = ?, name_key = ? WHERE id = ?').run(name, key, id);
+  emitEvent(db, { type: 'room_renamed', roomId: id, user: ctx.user || 'admin', text: name });
 }
 
 /** POST /rooms/:id/typing {text}: the caller's whole input buffer ('' = stopped). Members only; text is trimmed to 200 characters. */

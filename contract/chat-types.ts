@@ -57,6 +57,7 @@ export const CHAT_EVENT_TYPES = [
   'room_motd',
   'room_created',
   'room_deleted',
+  'room_renamed',
   'kicked',
   'banned',
   'muted',
