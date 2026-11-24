@@ -1058,6 +1058,8 @@ export class HubScreen implements PartylineScreen {
         return;
       case 'Clear History': this.runLine(`/clear-room ${roomId ?? ''}`); return;
       case 'Delete Channel': this.runLine(`/delete ${roomId ?? ''}`); return;
+      case 'Archive': this.runLine(`/archive-room ${roomId ?? ''}`); return;
+      case 'Mark Unread': this.runLine('/mark-unread'); this.fillSidebar(); return;
       case 'Kick User': this.runLine(`/kick ${user}`); return;
       case 'Ban User': this.runLine(`/ban ${user}`); return;
       case 'Join': if (roomId !== undefined && roomId !== this.roomId) this.joinRoom(roomId); return;

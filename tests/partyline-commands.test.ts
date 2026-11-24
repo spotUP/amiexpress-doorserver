@@ -8,7 +8,7 @@ import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { emitEvent } from '../src/chat/events';
-import { createRoom, joinRoom, postMessage } from '../src/chat/store';
+import { createRoom, joinRoom, listMemberships, listRooms, postMessage } from '../src/chat/store';
 import { canonical } from '../src/partyline/commands';
 import { cellFg, cellBg, cellFlags, BG_DEFAULT } from '../src/partyline/ui/cells';
 import { chatScreen } from '../src/partyline/ui/screen';
@@ -157,6 +157,20 @@ describe('hub screen commands', () => {
     type('first'); type('/clear-room'); expect(last()).toBe('Clear history requested for lab');
     type(`/whois @${screen.run(false, (_db, ctx) => ctx.user)}`); expect(screen.model.lines.some((l) => /^Board .*last seen \d\d:\d\d, idle \d+s$/.test(l.text))).toBe(true);
     expect(last()).toBe('Shared rooms: #lab');
+  });
+
+  it('mark-unread steps the read marker back; archive-room drops the channel (LIVECHAT menus)', () => {
+    type('/mark-unread'); expect(last()).toBe('No channel to mark unread.');
+    type('/create #lab');
+    type('/mark-unread'); expect(last()).toBe('No channel to mark unread.');
+    type('first');
+    screen.run(true, (db, ctx) => db.prepare('UPDATE chat_memberships SET last_read_seq = 999 WHERE user = ?').run(ctx.user));
+    type('/mark-unread'); expect(last()).toBe('Marked lab as unread');
+    expect(screen.run(false, (db, ctx) => listMemberships(db, ctx))?.find((r) => r.name === 'lab')?.unread).toBe(1);
+    type('/archive-room #nope'); expect(last()).toBe('Channel nope not found');
+    type('/archive-room #lab'); expect(last()).toBe('Archive requested for lab');
+    expect(screen.model.room).toBe('');
+    expect(screen.run(false, (db, ctx) => listRooms(db, ctx))?.some((r) => r.name === 'lab')).toBe(false);
   });
 
   it('emoji picker: F4 and Ctrl+E open it, keys move, Enter inserts the code, Escape closes', () => {

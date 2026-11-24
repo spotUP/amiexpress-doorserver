@@ -8,7 +8,7 @@
  * table lists as aliases (users, channels, +1, -1, heart, fire): C_ALIAS and
  * C_DROP keep run_command's behaviour on both sides.
  */
-import { addIgnore, clearPresence, clearRoom, createRoom, discordInvite, getDiscordMirror, listOwnDiscordJoins, requestDiscordJoin, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
+import { addIgnore, archiveRoom, clearPresence, clearRoom, markUnread, createRoom, discordInvite, getDiscordMirror, listOwnDiscordJoins, requestDiscordJoin, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
 import { openPreview } from '../chat/files';
 import fs from 'fs';
@@ -18,7 +18,7 @@ import { EMOJI, emojiBuiltin } from './ui/model';
 import { stamp } from './ui/screen';
 import type { HubScreen } from './ui/screen';
 
-const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg', 'clear-room': 'clear-room', clearroom: 'clear-room' };
+const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg', 'clear-room': 'clear-room', clearroom: 'clear-room', 'archive-room': 'archive-room', 'mark-unread': 'mark-unread' };
 const C_DROP = new Set(['users', 'channels', '+1', '-1', 'heart', 'fire']);
 
 const RAMP = ' .:-=+*#%@';
@@ -491,6 +491,23 @@ function clearRoomTyped(s: HubScreen, rest: string): void {
   if (s.tryRun(true, (db, ctx) => { clearRoom(db, ctx, id); return true; })) s.systemLine(`Clear history requested for ${(hit?.name ?? s.model.room).slice(0, 36)}`);
 }
 
+/** The sidebar "Archive" action (LIVECHAT admin:archive-channel), sysop only; the store checks the owner level. */
+function archiveRoomTyped(s: HubScreen, rest: string): void {
+  const a = firstWord(rest).replace(/^#/, '');
+  const hit = (s.tryRun(false, (db, ctx) => listRooms(db, ctx)) ?? []).find((r) => r.name.toLowerCase() === a.toLowerCase() || r.id === a);
+  if (!hit) { s.systemLine(a === '' ? 'Usage: /archive-room #channel' : `Channel ${a.slice(0, 40)} not found`); return; }
+  if (s.tryRun(true, (db, ctx) => { archiveRoom(db, ctx, hit.id); return true; })) {
+    if (hit.id === s.roomId) { s.roomId = ''; s.model.room = ''; s.model.paneLabel = ''; s.model.lines = []; s.model.linesChanged(); }
+    s.systemLine(`Archive requested for ${hit.name.slice(0, 40)}`);
+  }
+}
+
+/** The message menu's Mark Unread (LIVECHAT context-menus.ts): the current room shows at least one unread. */
+function markUnreadTyped(s: HubScreen): void {
+  const ok = s.roomId !== '' && s.tryRun(true, (db, ctx) => markUnread(db, ctx, s.roomId));
+  s.systemLine(ok ? `Marked ${s.model.room.slice(0, 36)} as unread` : 'No channel to mark unread.');
+}
+
 // ---- emoji, emojis, customemoji (livechat.c emoji_search_typed, emojis_typed, customemoji_typed) ----
 /** livechat_ui.c emoji_table: category (0 Emotions, 1 Actions, 2 Symbols, 3 Special) and keywords per ui/model EMOJI code. */
 const EMOJI_META: Record<string, [number, string]> = {
@@ -652,6 +669,8 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'files': case 'upload': case 'voice': case 'mic': case 'deafen': case 'undeafen': s.av.command(cmd, rest); return false;
     case 'discord': discordTyped(s, rest); return false;
     case 'clear-room': clearRoomTyped(s, rest); return false;
+    case 'archive-room': archiveRoomTyped(s, rest); return false;
+    case 'mark-unread': markUnreadTyped(s); return false;
     case null:
       s.systemLine('Unknown command. Type /help for help.');
       return false;

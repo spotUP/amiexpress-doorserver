@@ -168,6 +168,21 @@ export function markRead(db: Database.Database, ctx: ChatCtx, id: string, b: Bod
   return { lastRead: (db.prepare('SELECT last_read_seq AS n FROM chat_memberships WHERE user = ? AND room_id = ?').get(ctx.user, id) as { n: number }).n };
 }
 
+/**
+ * LIVECHAT Mark Unread (core/state.ts markChannelUnread: unread = max(1, unread)):
+ * the marker steps back just below the newest message, never forward.
+ * False when the room has no message to leave unread.
+ */
+export function markUnread(db: Database.Database, ctx: ChatCtx, id: string): boolean {
+  requireSession(ctx);
+  getRoom(db, id);
+  const top = (db.prepare('SELECT MAX(seq) AS n FROM chat_messages WHERE room_id = ? AND thread_id IS NULL AND deleted_at IS NULL').get(id) as { n: number | null }).n;
+  if (top === null) return false;
+  const r = db.prepare('UPDATE chat_memberships SET last_read_seq = MIN(last_read_seq, ?) WHERE user = ? AND room_id = ?').run(top - 1, ctx.user, id);
+  if (r.changes === 0) throw new SurfaceError('not_member', 403, 'join the room first');
+  return true;
+}
+
 export function leaveRoom(db: Database.Database, ctx: ChatCtx, id: string): void {
   requireSession(ctx);
   getRoom(db, id);
