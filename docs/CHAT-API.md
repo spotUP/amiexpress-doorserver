@@ -79,6 +79,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/op` | `{user}` |
 | POST | `/rooms/:id/deop` | `{user}` |
 | PUT | `/rooms/:id/topic` | `{topic}` |
+| PUT | `/rooms/:id/name` | `{name}`: a room moderator renames the room; the name stays unique (else 409 `conflict`). Emits `room_renamed` |
 | POST | `/rooms/:id/mode` | `{modes, params?}` (TS `/mode`): modes like `+i`, `-m`, `+ov`; params is the space-separated `handle@BOARD` list the `o`, `v`, `b` flags take in order. `i` = invite-only (private visibility), `m` = moderated (only staff and voiced users speak, else `moderated`), `o` = op, `v` = voice, `b` = mute until unmuted. Room staff only. Reply `{applied, errors}`: applied modes space-separated, per-flag errors `\|`-separated; flags after a bad one still apply |
 | POST | `/rooms/:id/typing` | `{text}`: the caller's whole input buffer, empty = stopped typing; trimmed to 200 characters, no error. Room members only (no +m check). Emits a `typing` event; senders throttle to one per 400 ms and always send the final empty text |
 | GET | `/rooms/:id/canvas.txt` | `?from=0&count=24&maxBytes=7680`; the shared 80x24 canvas of an **art** room as CANVAS rows, one per canvas row. Members only. Stops before the reply passes `maxBytes` (never above 7680) and reports the rows sent in the header count; ask again from the next row. A room that is not `kind` `art`: 403 `forbidden`. The row is created blank on first use |
@@ -342,6 +343,7 @@ itself hold `!`-escaped sub-fields):
 | `topic` | room id | who set it | empty | the topic |
 | `room_motd` | room id | who set it | empty | the room's message of the day (empty = cleared) |
 | `room_created`, `room_deleted` | room id | creator or deleter | empty | room name |
+| `room_renamed` | room id | the moderator who renamed it | empty | the new room name |
 | `kicked`, `unmuted`, `op`, `deop` | room id | the target | empty | the acting user |
 | `mode` | room id | who set it | empty | the applied modes, e.g. `+i +o alice@BOARD` |
 | `typing` | room id | the typer | empty | the typer's whole input buffer (empty = stopped); receivers expire it after 5 s |
@@ -360,7 +362,7 @@ itself hold `!`-escaped sub-fields):
 | `bbs` | the node id | the BBS user | the BBS event type (`user_login`, `user_logout`, `upload`, `download`, `door_activity`, `custom_door_event`, `command`, `system_notice`) | the whitelisted `data` keys, urlencoded (`location`, `duration`, `fileName`, `fileSize`, `conferenceName`, `action`, `doorName`, `eventType`, `message`, `isPersonalBest`) |
 
 A session sees: events in rooms it has joined, direct messages to or from its
-user, events about its user, `room_created`, `room_deleted` and `topic` of
+user, events about its user, `room_created`, `room_deleted`, `room_renamed` and `topic` of
 public rooms, `motd`, `board_joined` and `discord_mirror`, and `bbs` events of its own board only (another board never sees them). `board_joined` is an event only (no room message is stored), is emitted once per board, never on admin mint or reconnect, and is not emitted for boards that had chatted before it was introduced. The pipe inside the `react`, `banned`, `muted` and
 `role` text is shown as `!` because `|` is escaped on the wire.
 
