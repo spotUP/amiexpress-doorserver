@@ -70,6 +70,10 @@ export const CHAT_EVENT_TYPES = [
   'mode',
   /** A member's whole input buffer while typing; text empty = stopped. Trimmed to 200 characters. */
   'typing',
+  /** A voice-room call roster change; ref = joined|left|state, text = two digits: muted, camera on (e.g. `01`). */
+  'voice',
+  /** One WebRTC offer/answer/ICE signal between two members of a call; label = room id, ref = kind, text = base64 of the data. Seen only by sender and target. */
+  'voice_signal',
   'dm',
   'role',
   'motd',
@@ -426,6 +430,11 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/op',
   'POST /rooms/:id/mode',
   'POST /rooms/:id/typing',
+  'GET /rooms/:id/voice',
+  'POST /rooms/:id/voice/join',
+  'POST /rooms/:id/voice/leave',
+  'PUT /rooms/:id/voice',
+  'POST /rooms/:id/voice/signal',
   'GET /rooms/:id/canvas.txt',
   'POST /rooms/:id/canvas',
   'POST /rooms/:id/deop',

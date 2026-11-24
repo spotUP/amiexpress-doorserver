@@ -1,0 +1,118 @@
+/**
+ * Voice and video calls in voice rooms: who is in a room's call, their microphone and
+ * camera state, and the WebRTC offer/answer/ICE relay between them.
+ *
+ * The roster model and its rules copy src/partyline/livechat-voice.ts (LIVECHAT's
+ * voice:join-channel / voice:leave-channel / voice:mute / voice:video-toggle): joining one
+ * call leaves the one you were in, every change fans out to the others in the call.
+ * LIVECHAT streams audio through its server; here media goes browser to browser and the
+ * hub only relays the signals. The roster lives in memory, like LIVECHAT's: a hub restart
+ * empties every call and the browsers rejoin on their next heartbeat.
+ */
+import type Database from 'better-sqlite3';
+import { SurfaceError } from '../achievements/errors';
+import { emitEvent } from './events';
+import { getRoom } from './permissions';
+import type { RoomRec } from './permissions';
+import type { ChatCtx } from './sessions';
+import { requireMemberOf, str } from './store';
+import type { Body } from './store';
+
+interface CallMember { isMuted: boolean; hasVideo: boolean; at: number }
+
+/** room id -> user -> state. */
+const calls = new Map<string, Map<string, CallMember>>();
+
+/** A member who sent no join, state or signal for this long has left (closed tab, lost network). */
+export const VOICE_STALE_MS = 90_000;
+const SIGNAL_KINDS = new Set(['offer', 'answer', 'ice']);
+/** An SDP offer with video is a few KB; anything far larger is not a signal. */
+const SIGNAL_MAX = 32_768;
+
+export interface VoiceView { user: string; isMuted: boolean; hasVideo: boolean }
+
+const flags = (m: CallMember): string => `${m.isMuted ? 1 : 0}${m.hasVideo ? 1 : 0}`;
+
+function voiceRoom(db: Database.Database, ctx: ChatCtx, id: string): RoomRec {
+  const room = getRoom(db, id);
+  requireMemberOf(db, room.id, ctx);
+  if (room.kind !== 'voice') throw new SurfaceError('forbidden', 403, 'only a voice room has a call');
+  return room;
+}
+
+function drop(db: Database.Database, roomId: string, user: string): boolean {
+  const call = calls.get(roomId);
+  if (!call?.delete(user)) return false;
+  if (call.size === 0) calls.delete(roomId);
+  emitEvent(db, { type: 'voice', roomId, user, ref: 'left', text: '00' });
+  return true;
+}
+
+/** Drop members gone quiet past VOICE_STALE_MS, each with a `left` event. */
+function sweep(db: Database.Database, roomId: string, now: number): void {
+  for (const [user, m] of calls.get(roomId) ?? []) if (now - m.at > VOICE_STALE_MS) drop(db, roomId, user);
+}
+
+const view = (roomId: string): VoiceView[] =>
+  [...(calls.get(roomId) ?? [])].map(([user, m]) => ({ user, isMuted: m.isMuted, hasVideo: m.hasVideo }));
+
+/** GET /rooms/:id/voice */
+export function voiceMembers(db: Database.Database, ctx: ChatCtx, id: string): { members: VoiceView[] } {
+  const room = voiceRoom(db, ctx, id);
+  sweep(db, room.id, Date.now());
+  return { members: view(room.id) };
+}
+
+/** POST /rooms/:id/voice/join: leaves any other call first, as LIVECHAT's join does. */
+export function joinVoice(db: Database.Database, ctx: ChatCtx, id: string, b: Body): { members: VoiceView[] } {
+  const room = voiceRoom(db, ctx, id);
+  const now = Date.now();
+  for (const [other, call] of calls) if (other !== room.id && call.has(ctx.user)) drop(db, other, ctx.user);
+  sweep(db, room.id, now);
+  const call = calls.get(room.id) ?? new Map<string, CallMember>();
+  calls.set(room.id, call);
+  const m: CallMember = { isMuted: b.isMuted === true, hasVideo: b.hasVideo === true, at: now };
+  call.set(ctx.user, m);
+  emitEvent(db, { type: 'voice', roomId: room.id, user: ctx.user, ref: 'joined', text: flags(m) });
+  return { members: view(room.id) };
+}
+
+/** POST /rooms/:id/voice/leave */
+export function leaveVoice(db: Database.Database, ctx: ChatCtx, id: string): { left: boolean } {
+  const room = getRoom(db, id);
+  return { left: drop(db, room.id, ctx.user) };
+}
+
+/** PUT /rooms/:id/voice: microphone/camera change, and the heartbeat that keeps the caller in the call. */
+export function setVoiceState(db: Database.Database, ctx: ChatCtx, id: string, b: Body): { ok: true } {
+  const room = voiceRoom(db, ctx, id);
+  const m = calls.get(room.id)?.get(ctx.user);
+  if (!m) throw new SurfaceError('not_found', 404, 'you are not in this call');
+  m.at = Date.now();
+  const before = flags(m);
+  if (typeof b.isMuted === 'boolean') m.isMuted = b.isMuted;
+  if (typeof b.hasVideo === 'boolean') m.hasVideo = b.hasVideo;
+  if (flags(m) !== before) emitEvent(db, { type: 'voice', roomId: room.id, user: ctx.user, ref: 'state', text: flags(m) });
+  sweep(db, room.id, m.at);
+  return { ok: true };
+}
+
+/** POST /rooms/:id/voice/signal: one WebRTC offer, answer or ICE candidate to one other member of the call. */
+export function relaySignal(db: Database.Database, ctx: ChatCtx, id: string, b: Body): { ok: true } {
+  const room = voiceRoom(db, ctx, id);
+  const call = calls.get(room.id);
+  const me = call?.get(ctx.user);
+  if (!me) throw new SurfaceError('not_found', 404, 'you are not in this call');
+  me.at = Date.now();
+  const to = str(b, 'to', 200);
+  if (!call?.has(to) || to === ctx.user) throw new SurfaceError('not_found', 404, 'that user is not in this call');
+  const kind = str(b, 'kind', 10);
+  if (!SIGNAL_KINDS.has(kind)) throw new SurfaceError('bad_request', 400, 'kind is offer, answer or ice');
+  const data = str(b, 'data', SIGNAL_MAX);
+  // base64: the events.txt escaper turns '|' into '!' and newlines into spaces, which would corrupt SDP.
+  emitEvent(db, { type: 'voice_signal', label: room.id, user: ctx.user, ref: kind, text: Buffer.from(data, 'utf8').toString('base64'), dmA: ctx.user, dmB: to });
+  return { ok: true };
+}
+
+/** Tests only. */
+export function _resetVoiceForTests(): void { calls.clear(); }

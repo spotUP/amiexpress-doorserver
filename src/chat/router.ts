@@ -27,6 +27,7 @@ import type { ChatCtx } from './sessions';
 import * as files from './files';
 import * as fs from 'fs';
 import * as store from './store';
+import * as voice from './voice';
 import type { Body } from './store';
 import { requireSysop } from './permissions';
 
@@ -324,6 +325,21 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.post('/rooms/:id/typing', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.setTyping(db, ctx, p(req, 'id'), body(req)));
     res.json({ ok: true });
+  });
+  router.get('/rooms/:id/voice', (req: Request, res: Response) => {
+    res.json(run(req, false, (db, ctx) => voice.voiceMembers(db, ctx, p(req, 'id'))));
+  });
+  router.post('/rooms/:id/voice/join', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => voice.joinVoice(db, ctx, p(req, 'id'), body(req))));
+  });
+  router.post('/rooms/:id/voice/leave', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => voice.leaveVoice(db, ctx, p(req, 'id'))));
+  });
+  router.put('/rooms/:id/voice', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => voice.setVoiceState(db, ctx, p(req, 'id'), body(req))));
+  });
+  router.post('/rooms/:id/voice/signal', (req: Request, res: Response) => {
+    res.json(run(req, true, (db, ctx) => voice.relaySignal(db, ctx, p(req, 'id'), body(req))));
   });
   router.get('/rooms/:id/canvas.txt', (req: Request, res: Response) => {
     const out = run(req, false, (db, ctx) => store.getCanvas(db, ctx, p(req, 'id'), req.query));
