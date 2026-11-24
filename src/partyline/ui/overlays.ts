@@ -56,7 +56,9 @@ export class OverlayState {
   /** The format/emoji picker is shown (lc_model fmt). */
   fmt = false;
   /** The emoji picker (lc_model fmt_*): its entries, category, selected item, first visible item, and which pane has the keys. */
-  pickItems: { code: string; face: string; cat: number }[] = [];
+  pickItems: { code: string; face: string; cat: number; wrap?: (t: string) => string }[] = [];
+  /** The picker shows the formats (LIVECHAT format-picker.ts) for the snapshotted input selection, not the emoji. */
+  pickFmt = false; pickSel = { start: 0, end: 0, text: '' };
   pickCat = 0; pickItem = 0; pickTop = 0; pickPane = 0;
   /** The last frame's settings interior row -> SET_* (-1 a gap); lc_hit reads it. */
   setItemAt = new Int8Array(64).fill(-1);
@@ -265,16 +267,30 @@ function drawSettings(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
 }
 
 export const PICK_CATS = ['Emotions', 'Actions', 'Symbols', 'Special'];
+export const FMT_CATS = ['Colors', 'Effects', 'Markdown'];
+export const pickCats = (o: OverlayState): string[] => (o.pickFmt ? FMT_CATS : PICK_CATS);
+/** LIVECHAT ui/format-picker.ts FORMATS: the same names and the same wraps, in the same order. */
+const FMT_COLORS: Array<[string, string]> = [['Red', 'red'], ['Green', 'green'], ['Blue', 'lightblue'], ['Yellow', 'yellow'],
+  ['Cyan', 'cyan'], ['Magenta', 'magenta'], ['White', 'white'], ['Gray', 'gray']];
+const fx = (n: string, open = n): (t: string) => string => (t) => `~${open}~${t}~/${n}~`;
+const FMT_LIST: Array<[number, string, (t: string) => string]> = [
+  ...FMT_COLORS.map(([n, c]): [number, string, (t: string) => string] => [0, n, (t) => `{${c}-fg}${t}{/${c}-fg}`]),
+  [1, 'Rainbow', fx('rainbow')], [1, 'Pulse', fx('pulse')], [1, 'Sparkle', fx('sparkle')], [1, 'Shake', fx('shake')],
+  [1, 'Wave', fx('wave')], [1, 'Gradient', fx('gradient', 'gradient from=red to=blue')],
+  [2, 'Bold', (t) => `**${t}**`], [2, 'Italic', (t) => `*${t}*`], [2, 'Underline', (t) => `{underline}${t}{/underline}`],
+  [2, 'Strike', (t) => `~~${t}~~`], [2, 'Code', (t) => `\`${t}\``],
+];
+export const formatItems = (): OverlayState['pickItems'] => FMT_LIST.map(([cat, face, wrap]) => ({ cat, face, code: wrap('text'), wrap }));
 const PICK_H = 14;
 /** The C lc_hit numbers of the picker rects. */
 export const HIT_FMT = 13, HIT_FMT_CAT = 14, HIT_FMT_ITEM = 15, HIT_FMT_CLOSE = 16;
 export const pickRows = (): number => PICK_H - 4;
-export const pickList = (o: OverlayState): { code: string; face: string }[] => o.pickItems.filter((e) => e.cat === o.pickCat);
+export const pickList = (o: OverlayState): OverlayState['pickItems'] => o.pickItems.filter((e) => e.cat === o.pickCat);
 
 /** lc_fmt_move: Up/Down walk the focused pane; a new category starts at the top. */
 export function pickMove(o: OverlayState, delta: number): void {
   if (o.pickPane === 0) {
-    const k = Math.max(0, Math.min(PICK_CATS.length - 1, o.pickCat + delta));
+    const k = Math.max(0, Math.min(pickCats(o).length - 1, o.pickCat + delta));
     if (k !== o.pickCat) { o.pickCat = k; o.pickItem = o.pickTop = 0; }
     return;
   }
@@ -294,17 +310,17 @@ function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
   const items = pickList(o);
   c.pen(p.ink, DEFAULT, 0);
   c.fill(top + 1, left + 1, H - 2, w - 2, 0x20);
-  c.box(top, left, H, w, p.accent, ' Emoji Picker [Tab | Enter] ', p.ink);
+  c.box(top, left, H, w, p.accent, o.pickFmt ? ' Format Picker [Tab | Enter] ' : ' Emoji Picker [Tab | Enter] ', p.ink);
   cover(d, top, left, H, w);
   c.box(top + 1, left + 1, H - 4, catw, p.ok, ' Category ', p.ink);
-  PICK_CATS.forEach((n, i) => {
+  pickCats(o).forEach((n, i) => {
     const sel = i === o.pickCat;
     c.pen(sel ? p.barInk : p.ink, sel ? p.ok : DEFAULT, 0);
     c.fill(top + 2 + i, left + 2, 1, catw - 2, 0x20);
     c.text(top + 2 + i, left + 3, n, catw - 3);
   });
   c.pen(p.ink, DEFAULT, 0);
-  c.box(top + 1, ix, H - 2, iw, p.accent, ` ${PICK_CATS[o.pickCat]} `, p.ink);
+  c.box(top + 1, ix, H - 2, iw, p.accent, ` ${pickCats(o)[o.pickCat]} `, p.ink);
   for (let i = 0; i < rows && o.pickTop + i < items.length; i++) {
     const k = o.pickTop + i;
     c.pen(k === o.pickItem ? p.barInk : p.ink, k === o.pickItem ? p.accent : DEFAULT, 0);
@@ -313,7 +329,7 @@ function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
     c.text(top + 2 + i, ix + 2, iw - 3 <= 16 ? e.face : e.face.padEnd(16) + e.code, iw - 3);
   }
   d.hits.add(HIT_FMT, top, left, H, w);
-  d.hits.add(HIT_FMT_CAT, top + 2, left + 2, PICK_CATS.length, catw - 2);
+  d.hits.add(HIT_FMT_CAT, top + 2, left + 2, pickCats(o).length, catw - 2);
   d.hits.add(HIT_FMT_ITEM, top + 2, ix + 1, Math.min(rows, items.length - o.pickTop), iw - 2);
   d.hits.add(HIT_FMT_CLOSE, top + 1, left + w - 5, 1, 3);
   c.pen(p.alert, 0, 0); // the close button is red on black, as in draw_fmt

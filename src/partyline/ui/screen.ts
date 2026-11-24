@@ -23,16 +23,21 @@ import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_DROPDOWN, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
 import { ACTIVITY_LINE, FOCUS_INPUT, FOCUS_MENU, HISTORY, LIVE, Model, newLine, newSide, SIDE_BLANK, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX } from './model';
-import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, OverlayState, PICK_CATS, pickList, pickMove } from './overlays';
+import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
 
 /** ui_key.h codes. */
 export const K_UP = 1000, K_DOWN = 1001, K_PGUP = 1002, K_PGDN = 1003, K_HOME = 1004, K_END = 1005, K_ENTER = 1006, K_ESC = 1007,
-  K_LEFT = 1008, K_RIGHT = 1009, K_BACKTAB = 1010, K_F1 = 1011, K_F4 = 1014;
+  K_LEFT = 1008, K_RIGHT = 1009, K_BACKTAB = 1010, K_F1 = 1011, K_F4 = 1014, K_F5 = 1015, K_DEL = 1020,
+  K_SLEFT = 1021, K_SRIGHT = 1022, K_SHOME = 1023, K_SEND = 1024, K_SUP = 1025, K_SDOWN = 1026;
 const KEY_SEQ: Record<string, number> = {
   '\x1b[A': K_UP, '\x1b[B': K_DOWN, '\x1b[C': K_RIGHT, '\x1b[D': K_LEFT, '\x1b[H': K_HOME, '\x1b[F': K_END,
   '\x1b[5~': K_PGUP, '\x1b[6~': K_PGDN, '\x1bOP': K_F1, '\x1bOS': K_F4, '\x1b[14~': K_F4, '\x1b[Z': K_BACKTAB, '\x1b[1~': K_HOME, '\x1b[4~': K_END,
+  '\x1b[3~': K_DEL, '\x1b[15~': K_F5,
+  // xterm shift forms (CSI 1;2X, the board's composed-key.ts) and rxvt's lower-case ones: the input selection (textbox.ts).
+  '\x1b[1;2D': K_SLEFT, '\x1b[d': K_SLEFT, '\x1b[1;2C': K_SRIGHT, '\x1b[c': K_SRIGHT, '\x1b[1;2H': K_SHOME, '\x1b[1;2F': K_SEND,
+  '\x1b[1;2A': K_SUP, '\x1b[a': K_SUP, '\x1b[1;2B': K_SDOWN, '\x1b[b': K_SDOWN,
 };
 
 export type ChatRun = <T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T) => T;
@@ -144,6 +149,7 @@ export class HubScreen implements PartylineScreen {
     const side = [newSide(SIDE_HEAD, false, 'TEXT CHANNELS')];
     for (const r of data.rooms) {
       const it = newSide(SIDE_ROOM, r.roomId === this.roomId, r.name.slice(0, 36));
+      it.id = r.roomId;
       it.unread = r.unread;
       side.push(it);
     }
@@ -276,6 +282,7 @@ export class HubScreen implements PartylineScreen {
     const m = this.model, o = this.over;
     if (o.modal !== MODAL_NONE || o.fmt || o.help) return;
     if (m.focus === FOCUS_INPUT) this.slashKey(ch.codePointAt(0) as number);
+    this.cutSelection();
     if (m.input.length + ch.length < TEXT_MAX) {
       m.input = m.input.slice(0, m.inputCur) + ch + m.input.slice(m.inputCur);
       m.inputCur += ch.length;
@@ -370,15 +377,28 @@ export class HubScreen implements PartylineScreen {
     if (k === K_PGUP) { m.scroll += 10; return; }
     if (k === K_PGDN) { m.scroll = Math.max(0, m.scroll - 10); return; }
     if (k === K_ENTER) { this.submit(); return; }
+    if (k >= K_SLEFT && k <= K_SDOWN) { // textbox.ts: shift extends the selection from where the cursor stood
+      if (m.inputAnchor < 0) m.inputAnchor = m.inputCur;
+      if (k === K_SLEFT) m.inputCur = Math.max(0, m.inputCur - 1);
+      else if (k === K_SRIGHT) m.inputCur = Math.min(m.input.length, m.inputCur + 1);
+      else m.inputCur = k === K_SHOME || k === K_SUP ? 0 : m.input.length; // one line: up/down reach its ends
+      this.selectSoon();
+      return;
+    }
+    if (k === K_F5) { this.openFormat(); return; }
+    if (k === K_LEFT || k === K_RIGHT || k === K_HOME || k === K_END || k === K_ESC) this.clearSelection();
     if (k === K_LEFT) { if (m.inputCur > 0) m.inputCur--; return; }
     if (k === K_RIGHT) { if (m.inputCur < m.input.length) m.inputCur++; return; }
     if (k === K_HOME) { m.inputCur = 0; return; }
     if (k === K_END) { m.inputCur = m.input.length; return; }
-    if (k === 8) {
-      if (m.inputCur > 0) { m.input = m.input.slice(0, m.inputCur - 1) + m.input.slice(m.inputCur); m.inputCur--; }
+    if (k === 8 || k === K_DEL) {
+      if (this.cutSelection()) { o.slashOff = false; return; }
+      if (k === K_DEL) { if (m.inputCur < m.input.length) m.input = m.input.slice(0, m.inputCur) + m.input.slice(m.inputCur + 1); }
+      else if (m.inputCur > 0) { m.input = m.input.slice(0, m.inputCur - 1) + m.input.slice(m.inputCur); m.inputCur--; }
       o.slashOff = false;
       return;
     }
+    if (k >= 0x20 && k < 0x100) this.cutSelection();
     if (k >= 0x20 && k < 0x100 && m.input.length < TEXT_MAX) {
       m.input = m.input.slice(0, m.inputCur) + String.fromCharCode(k) + m.input.slice(m.inputCur);
       m.inputCur++;
@@ -389,7 +409,43 @@ export class HubScreen implements PartylineScreen {
   /** emoji_show: the picker over the chat, on the first category. */
   openPicker(): void {
     const o = this.over;
-    o.fmt = true; o.pickItems = allEmoji(this); o.pickCat = o.pickItem = o.pickTop = o.pickPane = 0;
+    o.fmt = true; o.pickFmt = false; o.pickItems = allEmoji(this); o.pickCat = o.pickItem = o.pickTop = o.pickPane = 0;
+  }
+
+  /** LIVECHAT openFormatPicker: with text selected, the format picker over the chat; the selection is kept to wrap on apply. */
+  openFormat(): void {
+    const m = this.model, o = this.over;
+    this.selectTimer = clearTimeout(this.selectTimer) as undefined;
+    if (m.inputAnchor < 0 || m.inputAnchor === m.inputCur || o.fmt) return;
+    const start = Math.min(m.inputAnchor, m.inputCur), end = Math.max(m.inputAnchor, m.inputCur);
+    o.pickSel = { start, end, text: m.input.slice(start, end) };
+    o.fmt = true; o.pickFmt = true; o.pickItems = formatItems(); o.pickCat = o.pickItem = o.pickTop = o.pickPane = 0;
+  }
+
+  /** textbox.ts: a keyboard selection opens the format picker once the keys rest (LIVECHAT inputBox 'select'). */
+  private selectSoon(): void {
+    clearTimeout(this.selectTimer);
+    this.selectTimer = setTimeout(() => { this.selectTimer = undefined; this.openFormat(); this.info.markDirty(); }, 500);
+    this.selectTimer.unref?.();
+  }
+
+  private selectTimer: ReturnType<typeof setTimeout> | undefined;
+  private inputDrag = false;
+
+  private clearSelection(): void {
+    this.model.inputAnchor = -1;
+    this.selectTimer = clearTimeout(this.selectTimer) as undefined;
+  }
+
+  /** Deletes the selected text, the cursor at its start; false with nothing selected. */
+  private cutSelection(): boolean {
+    const m = this.model, a = m.inputAnchor;
+    if (a < 0 || a === m.inputCur) { this.clearSelection(); return false; }
+    const start = Math.min(a, m.inputCur), end = Math.max(a, m.inputCur);
+    m.input = m.input.slice(0, start) + m.input.slice(end);
+    m.inputCur = start;
+    this.clearSelection();
+    return true;
   }
 
   /** fmt_key: the picker owns every key while it is shown; Enter on an item inserts its code and a space (emoji_apply). */
@@ -411,6 +467,16 @@ export class HubScreen implements PartylineScreen {
     o.fmt = false;
     const e = pickList(o)[o.pickItem];
     if (!e) return;
+    if (o.pickFmt && e.wrap) { // LIVECHAT applyFormat: the snapshot if the input still holds it there, else the first match
+      const { start: s0, end, text } = o.pickSel;
+      const start = m.input.slice(s0, end) === text ? s0 : m.input.indexOf(text);
+      if (start < 0) return;
+      const wrapped = e.wrap(text);
+      m.input = m.input.slice(0, start) + wrapped + m.input.slice(start + text.length);
+      m.inputCur = start + wrapped.length;
+      this.clearSelection();
+      return;
+    }
     if (m.input.length + e.code.length + 1 >= TEXT_MAX) { this.systemLine('The emoji does not fit the input'); return; }
     m.input = `${m.input}${e.code} `;
     m.inputCur = m.input.length;
@@ -426,7 +492,7 @@ export class HubScreen implements PartylineScreen {
     if (b >= 64) {
       if (b >= 66) return;
       const up = b === 64;
-      if (d.hits.at(row, col).id === HIT_SIDEBAR) this.sideMove(up ? -2 : 2);
+      if (d.hits.at(row, col).id === HIT_SIDEBAR) { this.sideMove(up ? -2 : 2); this.sideJoin(); }
       else m.scroll = Math.max(0, Math.min(d.barRows > 0 ? d.barSpan : 0, m.scroll + (up ? 3 : -3)));
       return;
     }
@@ -436,11 +502,21 @@ export class HubScreen implements PartylineScreen {
       if (!(press && b < 32)) return;
       this.barDrag = false;
     }
+    if (this.inputDrag) { // textbox.ts mousemove/mouseup: the drag extends the selection; a release with text selected opens the format picker
+      if (b >= 32 && press) { m.inputCur = this.inputAt(col); return; }
+      if (!press) {
+        this.inputDrag = false;
+        m.inputCur = this.inputAt(col);
+        if (m.inputAnchor === m.inputCur) m.inputAnchor = -1; else this.openFormat();
+        return;
+      }
+      this.inputDrag = false;
+    }
     if (!press || b >= 32) return;
     if (!o.fmt) { this.mousePress(row, col, b & 3); return; }
     const h = d.hits.at(row, col), button = b & 3;
     if (h.id === HIT_FMT_CLOSE) { o.fmt = false; return; }
-    if (h.id === HIT_FMT_CAT && h.dr < PICK_CATS.length) {
+    if (h.id === HIT_FMT_CAT && h.dr < pickCats(o).length) {
       if (h.dr === o.pickCat) { o.pickPane = 1; return; }
       o.pickPane = 0; pickMove(o, h.dr - o.pickCat);
     } else if (h.id === HIT_FMT_ITEM) {
@@ -480,14 +556,35 @@ export class HubScreen implements PartylineScreen {
     }
     if (m.focus === FOCUS_MENU) { m.menu = -1; m.focus = FOCUS_INPUT; }
     if (h.id === HIT_STATUS) m.sidebarHidden = false;
-    else if (h.id === HIT_INPUT) m.focus = FOCUS_INPUT;
+    else if (h.id === HIT_INPUT) {
+      m.focus = FOCUS_INPUT;
+      const d = this.drawState;
+      if (button === 2) { this.openFormat(); return; } // LIVECHAT: right-click with text selected
+      if (button !== 0) return;
+      if (d.inputW < this.cells.cols && col >= d.inputW) { this.openPicker(); return; } // the :D button
+      this.clearSelection();
+      m.inputCur = m.inputAnchor = this.inputAt(col); // textbox.ts mousedown: cursor and selection start at the click
+      this.inputDrag = true;
+    }
     else if (h.id === HIT_SCROLLBAR) {
       const sc = this.drawState.scrollAt(row);
       if (sc >= 0) m.scroll = sc;
       this.barDrag = button === 0;
     } else if (h.id === HIT_SIDEBAR && h.dr < m.side.length && m.side[h.dr].kind !== SIDE_HEAD && m.side[h.dr].kind !== SIDE_BLANK) {
       m.sideSel = h.dr;
+      this.sideJoin();
     }
+  }
+
+  /** LIVECHAT: a click (or a wheel step) on a channel row switches to that channel. */
+  private sideJoin(): void {
+    const it = this.model.side[this.model.sideSel];
+    if (it?.kind === SIDE_ROOM && it.id !== undefined && it.id !== this.roomId) this.joinRoom(it.id);
+  }
+
+  /** The input character under a column, clamped to the text. */
+  private inputAt(col: number): number {
+    return Math.max(0, Math.min(this.model.input.length, this.drawState.inputFrom + col - 1));
   }
 
   /** slash_key: true when the "/" menu used the key. */
@@ -520,6 +617,7 @@ export class HubScreen implements PartylineScreen {
     const m = this.model;
     m.input = `/${CMD_HELP[cmd][0]} `;
     m.inputCur = m.input.length;
+    this.clearSelection();
     this.over.slashOff = true;
   }
 
@@ -528,6 +626,7 @@ export class HubScreen implements PartylineScreen {
     const m = this.model;
     const line = m.input;
     m.input = ''; m.inputCur = 0;
+    this.clearSelection();
     this.over.slashSel = 0; this.over.slashTop = 0; this.over.slashOff = false;
     if (line === '') return;
     if (line[0] === '/') { if (runCommand(this, line)) this.quit(); return; }
@@ -543,17 +642,17 @@ export class HubScreen implements PartylineScreen {
 
   render(full: boolean): Buffer {
     // Leaving: hand the board a clean screen, as LIVECHAT's cleanup and every door exit do.
-    if (this.quitting) return Buffer.from((this.info.hello.mouse ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[0m\x1b[2J\x1b[H\x1b[?25h', 'latin1');
+    if (this.quitting) return Buffer.from((this.info.hello.mouse ? '\x1b[?1002l\x1b[?1000l\x1b[?1006l' : '') + '\x1b[0m\x1b[2J\x1b[H\x1b[?25h', 'latin1');
     if (full) this.cells.invalidate();
     const { cr, cc } = draw(this.cells, this.model, this.drawState, this.over);
-    // A full frame (first paint, resize, redraw) re-arms SGR mouse reports; input() parses them.
-    const mouseOn = full && this.info.hello.mouse ? '\x1b[?1000h\x1b[?1006h' : '';
+    // A full frame (first paint, resize, redraw) re-arms SGR mouse reports; input() parses them. ?1002h adds drag motion (the input selection).
+    const mouseOn = full && this.info.hello.mouse ? '\x1b[?1000h\x1b[?1006h\x1b[?1002h' : '';
     // The terminal bytes are in the caller's own charset (hello charset=):
     // UTF-8 for the web and modern doors, latin1 for the Amiga and kin.
     return Buffer.from(mouseOn + this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), this.utf8 ? 'utf8' : 'latin1');
   }
 
-  close(): void { this.off(); }
+  close(): void { clearTimeout(this.selectTimer); this.off(); }
 }
 
 export const chatScreen = (ach: AchievementsConfig, chat: ChatConfig, filesDir: string | null = null): ScreenFactory => (info) => new HubScreen(ach, chat, info, filesDir);

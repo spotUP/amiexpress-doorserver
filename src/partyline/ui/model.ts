@@ -86,6 +86,8 @@ export interface Line {
 export interface Side {
   kind: number; label: string; shown: string; note: string; joined: boolean; open: boolean; art: boolean;
   unread: number; status: number;
+  /** The room a SIDE_ROOM row stands for (a click joins it). */
+  id?: string;
 }
 export interface Typing { nick: string; text: string }
 

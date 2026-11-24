@@ -29,6 +29,8 @@ export class DrawState {
   chatBody = 0; chatLeft = 0; chatRows = 0; chatWidth = 0;
   chatRowLine = new Int16Array(CHAT_ROWS_MAX).fill(-1);
   barBody = 0; barRows = 0; barThumb = 0; barSpan = 0;
+  /** The input's first shown character and box width (a click or drag maps a column to a character). */
+  inputFrom = 0; inputW = 0;
   rewraps = 0;
   /** lc_scroll_at: the scroll (rows from the bottom) that puts the thumb under a pointer row; -1 with no scrollbar. */
   scrollAt(row: number): number {
@@ -166,9 +168,10 @@ function drawChat(c: Cells, m: Model, d: DrawState, top: number, h: number, left
 }
 
 /** draw_input: the message box, its selection, the emoji button. Returns the caret cell. */
-function drawInput(c: Cells, m: Model): { cr: number; cc: number } {
+function drawInput(c: Cells, m: Model, d: DrawState): { cr: number; cc: number } {
   const p = m.pal, W = c.cols, row = c.rows - 4;
   const iw = W - 6 >= 24 ? W - 6 : W, room = iw - 3, from = m.inputCur > room ? m.inputCur - room : 0;
+  d.inputFrom = from; d.inputW = iw;
   c.pen(p.ink, DEFAULT, 0);
   c.fill(row + 1, 1, 1, iw - 2, 0x20);
   c.box(row, 0, 3, iw, m.focus === FOCUS_INPUT ? p.borderFocus : p.accent,
@@ -194,7 +197,7 @@ export function draw(c: Cells, m: Model, d: DrawState, o?: OverlayState): { cr: 
   d.hits.add(HIT_INPUT, H - 4, 0, 3, W);
   if (sw > 0) { drawSidebar(c, m, 1, h, sw); d.hits.add(HIT_SIDEBAR, 2, 1, h - 2, sw - 2); }
   drawChat(c, m, d, 1, h, sw, W - sw);
-  const caret = drawInput(c, m);
+  const caret = drawInput(c, m, d);
   c.bar(H - 1, 0, W, `@${m.handle.slice(0, 30)} | Node ${m.node} | #${m.room.slice(0, 40)} | [L] [*] | F1:Help F4:Emoji`, p.ink, DEFAULT, 0);
   if (m.menu >= 0) {
     c.pen(p.ink, DEFAULT, 0);
