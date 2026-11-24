@@ -8,7 +8,7 @@
  * table lists as aliases (users, channels, +1, -1, heart, fire): C_ALIAS and
  * C_DROP keep run_command's behaviour on both sides.
  */
-import { addIgnore, clearPresence, clearRoom, createRoom, discordInvite, getDiscordMirror, listOwnDiscordJoins, requestDiscordJoin, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, search, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
+import { addIgnore, clearPresence, clearRoom, createRoom, discordInvite, getDiscordMirror, listOwnDiscordJoins, requestDiscordJoin, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
 import { openPreview } from '../chat/files';
 import fs from 'fs';
@@ -435,15 +435,8 @@ function pinnedTyped(s: HubScreen): void {
   rows.slice(0, 8).forEach((r, i) => s.systemLine(`${i + 1}. ${r.user.slice(0, 24)}: ${r.content.slice(0, 60)} (pinned by ${r.pinnedBy.slice(0, 20)})`));
 }
 
-/** search_run with the query typed after /search (no modal): room-scoped, 2 characters minimum. */
-function searchTyped(s: HubScreen, rest: string): void {
-  if (rest.length < 2) { s.systemLine('Search query must be at least 2 characters'); return; }
-  const room = s.roomId;
-  const rows = s.tryRun(false, (db, ctx) => search(db, ctx, { q: rest, room, limit: 20 }));
-  if (!rows) return;
-  rows.forEach((r, i) => s.systemLine(`${i + 1}. ${r.user.slice(0, 20)} @ ${stamp(r.at)}: ${r.content.slice(0, 60)}`));
-  s.systemLine(`Found ${rows.length} results for "${rest.slice(0, 100)}"`);
-}
+/** livechat.c /search, /find: search_open (the query is typed in the overlay). */
+function searchTyped(s: HubScreen): void { s.searchOpen(); }
 
 const onOff = (v: boolean): string => (v ? 'ON' : 'OFF');
 const EVENT_KEYS: [string, string[], string, string][] = [
@@ -454,7 +447,7 @@ const EVENT_KEYS: [string, string[], string, string][] = [
   ['announcements', ['announcement', 'system'], 'System announcements', 'System Announcements:   '],
 ];
 
-/** events_typed: the preferences live on the screen for the session (the hub stores no prefs). */
+/** events_typed: the event toggles; prefs_save keeps them across visits. */
 function eventsTyped(s: HubScreen, rest: string): void {
   const sub = firstWord(rest).toLowerCase(), ev = s.prefs.events;
   if (sub === '') {
@@ -466,12 +459,14 @@ function eventsTyped(s: HubScreen, rest: string): void {
   if (['on', 'enable', 'off', 'disable'].includes(sub)) {
     const on = sub[1] === 'n';
     for (const [k] of EVENT_KEYS) ev[k] = on;
+    s.prefsSave();
     s.systemLine(on ? 'All BBS events enabled' : 'All BBS events disabled');
     return;
   }
   const row = EVENT_KEYS.find(([k, alt]) => k === sub || alt.includes(sub));
   if (!row) { s.systemLine(`Unknown event type: ${sub.slice(0, 30)}`); s.systemLine('Valid types: logins, files, doors, messages, announcements, on, off'); return; }
   ev[row[0]] = !ev[row[0]];
+  s.prefsSave();
   s.systemLine(`${row[2]}: ${onOff(ev[row[0]])}`);
 }
 
@@ -480,17 +475,12 @@ function soundsTyped(s: HubScreen, rest: string): void {
   const w = firstWord(rest).toLowerCase();
   if (w !== 'on' && w !== 'off') { s.systemLine('Error: Usage: /sounds on|off'); return; }
   s.prefs.sounds = w === 'on';
+  s.prefsSave();
   s.systemLine(s.prefs.sounds ? 'Sounds enabled' : 'Sounds disabled');
 }
 
-/** settings_open without the overlay: the current values as system lines. */
-function settingsTyped(s: HubScreen): void {
-  s.systemLine('Settings:');
-  s.systemLine(`  Timestamps: ${onOff(s.model.timestamps)}  (/timestamps)`);
-  s.systemLine(`  Compact mode: ${onOff(s.model.compact)}  (/compact)`);
-  s.systemLine(`  Sounds: ${onOff(s.prefs.sounds)}  (/sounds on|off)`);
-  s.systemLine('  BBS events: see /events');
-}
+/** livechat.c /settings: settings_open. */
+function settingsTyped(s: HubScreen): void { s.settingsOpen(); }
 
 /** The sidebar "Clear History" action, sysop only; the store checks the owner level. */
 function clearRoomTyped(s: HubScreen, rest: string): void {
@@ -592,8 +582,8 @@ export function runCommand(s: HubScreen, line: string): boolean {
       else { s.over.help = true; s.over.helpTop = 0; s.info.markDirty(); }
       return false;
     }
-    case 'compact': m.compact = !m.compact; m.linesChanged(); s.systemLine(m.compact ? 'Compact mode on' : 'Compact mode off'); return false;
-    case 'timestamps': m.timestamps = !m.timestamps; m.linesChanged(); s.systemLine(m.timestamps ? 'Timestamps on' : 'Timestamps off'); return false;
+    case 'compact': m.compact = !m.compact; m.linesChanged(); s.prefsSave(); s.systemLine(m.compact ? 'Compact mode on' : 'Compact mode off'); return false;
+    case 'timestamps': m.timestamps = !m.timestamps; m.linesChanged(); s.prefsSave(); s.systemLine(m.timestamps ? 'Timestamps on' : 'Timestamps off'); return false;
     case 'rooms': listRoomsTyped(s); return false;
     case 'who': listWho(s); return false;
     case 'join': joinTyped(s, rest); return false;
@@ -651,7 +641,7 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'pin': pinTyped(s, true, rest); return false;
     case 'unpin': pinTyped(s, false, rest); return false;
     case 'pinned': pinnedTyped(s); return false;
-    case 'search': searchTyped(s, rest); return false;
+    case 'search': searchTyped(s); return false;
     case 'events': eventsTyped(s, rest); return false;
     case 'sounds': soundsTyped(s, rest); return false;
     case 'settings': settingsTyped(s); return false;

@@ -63,11 +63,14 @@ describe('hub screen lane 1: LIVECHAT input, menus, sidebar and function keys', 
 
   it('F6, F7, Ctrl+S and Ctrl+F route to files, pins, settings and search', () => {
     send('\x06');
-    expect(screen.model.input).toBe('/search ');
+    expect(screen.over.search).toBe(true); // livechat.c Ctrl+F: search_open
+    send('\x1b\x1b');
+    expect(screen.over.search).toBe(false);
     fill('');
     const before = screen.model.lines.length;
     send('\x1b[17~'); send('\x1b[18~'); send('\x13');
     expect(screen.model.lines.length).toBeGreaterThan(before);
+    expect(screen.over.settings).toBe(true); // Ctrl+S: settings_open
   });
 
   it('Ctrl+A selects the whole input', () => {

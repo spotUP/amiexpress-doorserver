@@ -16,14 +16,16 @@ import { SurfaceError } from '../../achievements/errors';
 import type { ChatConfig } from '../../chat/config';
 import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
+import { displayLabels } from '../../chat/render';
 import { newId, resolveSession } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { joinRoom, listMemberships, listRooms, postMessage, roomHistory, roomMembers } from '../../chat/store';
+import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listRooms, memberUsers, postMessage, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
-import { ACTIVITY_LINE, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, HISTORY, LIVE, Model, newLine, newSide, SIDE_BLANK, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX } from './model';
-import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove } from './overlays';
+import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
+import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
+  SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
 import { completeAtMention } from './at-complete';
@@ -35,6 +37,9 @@ import { HubMedia } from '../media';
 export const K_UP = 1000, K_DOWN = 1001, K_PGUP = 1002, K_PGDN = 1003, K_HOME = 1004, K_END = 1005, K_ENTER = 1006, K_ESC = 1007,
   K_LEFT = 1008, K_RIGHT = 1009, K_BACKTAB = 1010, K_F1 = 1011, K_F2 = 1012, K_F3 = 1013, K_F4 = 1014, K_F5 = 1015, K_F6 = 1016, K_F7 = 1017, K_DEL = 1020,
   K_SLEFT = 1021, K_SRIGHT = 1022, K_SHOME = 1023, K_SEND = 1024, K_SUP = 1025, K_SDOWN = 1026;
+/** livechat.c typing clock (50 ticks/s there): idle tick, TS 400 ms throttle, TYPING_STALE_MS, cursor blink. */
+const TICK_MS = 50, TYPING_THROTTLE_MS = 400, TYPING_STALE_MS = 5000, TYPING_BLINK_MS = 530;
+
 const KEY_SEQ: Record<string, number> = {
   '\x1b[A': K_UP, '\x1b[B': K_DOWN, '\x1b[C': K_RIGHT, '\x1b[D': K_LEFT, '\x1b[H': K_HOME, '\x1b[F': K_END,
   '\x1b[5~': K_PGUP, '\x1b[6~': K_PGDN, '\x1bOP': K_F1, '\x1bOS': K_F4, '\x1b[14~': K_F4, '\x1b[Z': K_BACKTAB, '\x1b[1~': K_HOME, '\x1b[4~': K_END,
@@ -82,9 +87,15 @@ export class HubScreen implements PartylineScreen {
     this.utf8 = info.hello.charset === 'utf8';
     this.cursor = withAchievementsDb(ach, (db) => headSeq(db));
     this.firstRoom();
+    this.prefsLoad();
     this.fillSidebar();
     this.off = onEvents(() => this.take());
+    this.tick = setInterval(() => { if (this.typingTick()) this.info.markDirty(); }, TICK_MS);
+    this.tick.unref?.();
   }
+
+  /** livechat.c main loop idle clock (typing_tick). */
+  private readonly tick: ReturnType<typeof setInterval>;
 
   /** One store call as this session, in a transaction when it writes (router.ts run). */
   run: ChatRun = (write, fn) => withAchievementsDb(this.ach, (db) => {
@@ -107,6 +118,180 @@ export class HubScreen implements PartylineScreen {
   msgNumber = 0;
   /** /events and /sounds, kept for the session (livechat.c ev_* and snd_on; the hub stores no prefs). */
   readonly prefs = { sounds: true, events: { logins: true, files: true, doors: true, messages: true, announcements: true } as Record<string, boolean> };
+  /** livechat.c show_typing (TS showTypingIndicators): never stored, as in the TS door. */
+  showTyping = true;
+
+  /** livechat.c prefs_save + pins_save: the TS door's stored keys, merged so other keys (web) survive. */
+  prefsSave(): void {
+    const ev = this.prefs.events, names = new Map((this.tryRun(false, (db, ctx) => listMemberships(db, ctx)) ?? []).map((r) => [r.roomId, r.name]));
+    this.tryRun(true, (db, ctx) => setPrefs(db, ctx, {
+      ...getPrefs(db, ctx),
+      showLogins: ev.logins, showFileActivity: ev.files, showDoorActivity: ev.doors, showMessages: ev.messages,
+      showSystemAnnouncements: ev.announcements, notificationSound: this.prefs.sounds, mentionSound: this.prefs.sounds,
+      showTimestamps: this.model.timestamps, compactMode: this.model.compact,
+      muteAllEvents: !(ev.logins || ev.files || ev.doors || ev.messages || ev.announcements),
+      pinnedChannels: [...this.pinned].map((id) => names.get(id)).filter((n): n is string => n !== undefined),
+    }));
+  }
+
+  /** livechat.c prefs_load: the stored booleans, then the pinned names mapped to room ids. */
+  private prefsLoad(): void {
+    const p = this.tryRun(false, (db, ctx) => getPrefs(db, ctx));
+    if (!p) return;
+    const flag = (k: string, d: boolean): boolean => (typeof p[k] === 'boolean' ? p[k] as boolean : p[k] === '1' ? true : p[k] === '0' ? false : d);
+    const ev = this.prefs.events;
+    ev.logins = flag('showLogins', ev.logins); ev.files = flag('showFileActivity', ev.files); ev.doors = flag('showDoorActivity', ev.doors);
+    ev.messages = flag('showMessages', ev.messages); ev.announcements = flag('showSystemAnnouncements', ev.announcements);
+    this.prefs.sounds = flag('notificationSound', this.prefs.sounds);
+    this.model.timestamps = flag('showTimestamps', this.model.timestamps);
+    this.model.compact = flag('compactMode', this.model.compact);
+    const pins = Array.isArray(p.pinnedChannels) ? p.pinnedChannels : typeof p.pinnedChannels === 'string' ? p.pinnedChannels.split(',') : [];
+    for (const r of this.tryRun(false, (db, ctx) => listMemberships(db, ctx)) ?? []) if (pins.includes(r.name)) this.pinned.add(r.roomId);
+  }
+
+  // ---- livechat.c settings overlay (TS overlays/settings.ts) ----
+  settingsOpen(): void {
+    const o = this.over, ev = this.prefs.events;
+    o.settings = true; o.settingsSel = 0;
+    o.settingsVal[SET_LOGINS] = ev.logins; o.settingsVal[SET_FILES] = ev.files; o.settingsVal[SET_DOORS] = ev.doors;
+    o.settingsVal[SET_MESSAGES] = ev.messages; o.settingsVal[SET_ANNOUNCE] = ev.announcements;
+    o.settingsVal[SET_MUTE] = !this.prefs.sounds; o.settingsVal[SET_TYPING] = this.showTyping; o.settingsVal[SET_STAMPS] = this.model.timestamps;
+    const room = this.roomId, self = room !== '' ? this.tryRun(false, (db, ctx) => roomMembers(db, ctx, room).find((u) => this.model.isSelf(u.user))) : undefined;
+    o.settingsStatus = Math.max(0, ['online', 'away', 'busy', 'dnd'].indexOf(self?.status ?? 'online'));
+  }
+
+  /** settings_close: the boxes become the prefs, then prefs_save. */
+  private settingsClose(): void {
+    const o = this.over, ev = this.prefs.events, v = o.settingsVal;
+    o.settings = false;
+    ev.logins = v[SET_LOGINS]; ev.files = v[SET_FILES]; ev.doors = v[SET_DOORS]; ev.messages = v[SET_MESSAGES]; ev.announcements = v[SET_ANNOUNCE];
+    this.prefs.sounds = !v[SET_MUTE];
+    this.showTyping = v[SET_TYPING];
+    if (!this.showTyping) { this.model.typing = []; this.typingAge.clear(); }
+    if (this.model.timestamps !== v[SET_STAMPS]) { this.model.timestamps = v[SET_STAMPS]; this.model.linesChanged(); }
+    this.prefsSave();
+  }
+
+  /** settings_pick: a box toggles, a status applies at once, Close saves and closes. */
+  settingsPick(item: number): void {
+    const o = this.over;
+    if (item < 0 || item >= SET_ITEMS) return;
+    o.settingsSel = item;
+    if (item <= SET_STAMPS) o.settingsVal[item] = !o.settingsVal[item];
+    else if (item <= SET_DND) {
+      const status = ['online', 'away', 'busy', 'dnd'][item - SET_ONLINE];
+      if (this.tryRun(true, (db, ctx) => setPresence(db, ctx, { status, text: '' })) === undefined) return;
+      o.settingsStatus = item - SET_ONLINE;
+      this.fillSidebar();
+    } else this.settingsClose();
+  }
+
+  private settingsKey(k: number): void {
+    const o = this.over;
+    if (k === K_ESC) this.settingsClose();
+    else if (k === K_UP || k === K_BACKTAB) o.settingsSel = (o.settingsSel + SET_ITEMS - 1) % SET_ITEMS;
+    else if (k === K_DOWN || k === 9) o.settingsSel = (o.settingsSel + 1) % SET_ITEMS;
+    else if (k === 0x20 || k === K_ENTER) this.settingsPick(o.settingsSel);
+  }
+
+  // ---- livechat.c search overlay (TS overlays/search.ts) ----
+  searchOpen(): void {
+    const o = this.over;
+    o.search = true; o.searchField = 0; o.searchQ = ''; o.searchUser = ''; o.searchRows = []; o.searchSel = 0; o.searchTop = 0;
+  }
+
+  /** search_run: under 2 characters is a system line, else the Results list and "Found N results for ...". */
+  private searchRun(): void {
+    const o = this.over, room = this.roomId;
+    if (o.searchQ.length < 2) { this.systemLine('Search query must be at least 2 characters'); return; }
+    const rows = this.tryRun(false, (db, ctx) => search(db, ctx, { q: o.searchQ, room, user: o.searchUser !== '' ? o.searchUser : undefined, limit: SEARCH_MAX }));
+    if (!rows) return;
+    o.searchRows = rows.slice(0, SEARCH_MAX).map((r, i) => `${i + 1}. ${r.user.slice(0, 20)} @ ${stamp(r.at).slice(0, 24)}: ${r.content.slice(0, 60)}`);
+    o.searchSel = 0; o.searchTop = 0;
+    this.systemLine(`Found ${o.searchRows.length} results for "${o.searchQ.slice(0, 100)}"`);
+  }
+
+  /** search_key: Esc closes, Tab switches field, Enter in Query searches, arrows move the Results, text edits the field. */
+  private searchKey(k: number, ch = String.fromCharCode(k)): void {
+    const o = this.over, n = o.searchRows.length, field = o.searchField === 0 ? o.searchQ : o.searchUser;
+    const put = (t: string): void => { if (o.searchField === 0) o.searchQ = t; else o.searchUser = t; };
+    if (k === K_ESC) o.search = false;
+    else if (k === 9 || k === K_BACKTAB) o.searchField = o.searchField === 0 ? 1 : 0;
+    else if (k === K_ENTER) { if (o.searchField === 0) this.searchRun(); }
+    else if (k === K_DOWN && o.searchSel < n - 1) o.searchSel++;
+    else if (k === K_UP && o.searchSel > 0) o.searchSel--;
+    else if (k === K_PGDN) o.searchSel = Math.max(0, Math.min(o.searchSel + 10, n - 1));
+    else if (k === K_PGUP) o.searchSel = Math.max(0, o.searchSel - 10);
+    else if ((k === 8 || k === 127) && field.length > 0) put(field.slice(0, -1));
+    else if (k >= 0x20 && k < K_UP && k !== 127 && field.length + 1 < (o.searchField === 0 ? TEXT_MAX : 40)) put(field + ch);
+    if (o.searchSel < o.searchTop) o.searchTop = o.searchSel;
+  }
+
+  // ---- livechat.c D3 typing: the input buffer goes to the hub (leading + trailing edge, 400 ms); others' rows go stale after 5 s ----
+  private typingSent = ''; private typingRoom = ''; private typingSeen = '';
+  private typingWait = 0; private typingPending = false; private typingBlinkT = 0;
+  private readonly typingAge = new Map<string, number>();
+
+  /** livechat.c typing_set: '' removes the row, else the row is set (or added) and its age restarts. */
+  typingSet(nick: string, text: string): void {
+    const m = this.model;
+    nick = nick.slice(0, 24);
+    m.typing = m.typing.filter((t) => t.nick !== nick);
+    this.typingAge.delete(nick);
+    if (text === '') return;
+    m.typing.push({ nick, text: text.slice(0, TEXT_MAX) });
+    this.typingAge.set(nick, 0);
+  }
+
+  private typingSend(text: string): void {
+    const room = this.roomId;
+    this.tryRun(true, (db, ctx) => setTyping(db, ctx, room, { text }));
+    this.typingSent = text; this.typingRoom = room;
+    this.typingWait = TYPING_THROTTLE_MS; this.typingPending = false;
+  }
+
+  /** livechat.c typing_sync: after each key, the own echo row, then send now (leading edge) or hold (trailing). */
+  private typingSync(): void {
+    const input = this.model.input;
+    if (input === this.typingSeen) return;
+    this.typingSeen = input;
+    if (this.showTyping) this.typingSet(this.model.handle, input);
+    if (this.roomId === '') return;
+    if (input === this.typingSent) { this.typingPending = false; return; }
+    if (input === '' || this.typingWait <= 0) this.typingSend(input); else this.typingPending = true;
+  }
+
+  /** livechat.c typing_tick: trailing edge, stale rows, the cursor blink. True when the frame changed. */
+  private typingTick(): boolean {
+    let changed = false;
+    if (this.typingWait > 0) this.typingWait -= TICK_MS;
+    if (this.typingPending && this.typingWait <= 0 && this.roomId !== '') this.typingSend(this.model.input);
+    for (const t of [...this.model.typing]) {
+      if (this.model.isSelf(t.nick)) continue;
+      const age = (this.typingAge.get(t.nick) ?? 0) + TICK_MS;
+      this.typingAge.set(t.nick, age);
+      if (age >= TYPING_STALE_MS) { this.typingSet(t.nick, ''); changed = true; }
+    }
+    if (this.model.typing.length > 0 && (this.typingBlinkT += TICK_MS) >= TYPING_BLINK_MS) {
+      this.typingBlinkT = 0;
+      this.model.typingBlink = !this.model.typingBlink;
+      changed = true;
+    }
+    return changed;
+  }
+
+  /** livechat.c typing_stop: the hub hears "stopped" if it still holds a buffer. */
+  private typingStop(): void {
+    const room = this.typingRoom;
+    if (this.typingSent !== '' && room !== '') this.tryRun(true, (db, ctx) => setTyping(db, ctx, room, { text: '' }));
+  }
+
+  /** livechat.c typing_reset: room switch. */
+  private typingReset(): void {
+    this.typingStop();
+    this.typingSent = ''; this.typingSeen = ''; this.typingPending = false;
+    this.model.typing = []; this.typingAge.clear();
+  }
 
   systemLine(text: string): void { this.note(SYSTEM, text); }
   note(kind: number, text: string): void {
@@ -129,6 +314,7 @@ export class HubScreen implements PartylineScreen {
     this.model.room = r.name;
     this.model.paneLabel = r.topic ? `${r.name.slice(0, 40)} - ${r.topic.slice(0, 50)}` : r.name;
     this.model.lines = [];
+    this.typingReset();
     this.model.linesChanged();
     this.msgNumber = 0;
     this.cursor = Math.max(this.cursor, r.since);
@@ -149,33 +335,50 @@ export class HubScreen implements PartylineScreen {
     const data = this.tryRun(false, (db, ctx) => ({
       rooms: listMemberships(db, ctx),
       users: this.roomId !== '' ? roomMembers(db, ctx, this.roomId) : [],
+      dms: dmThreads(db, ctx),
     }));
     if (!data) return;
     const sel = m.side[m.sideSel];
     const selKey = sel !== undefined ? `${sel.kind}:${sel.label}` : '';
     const side = [newSide(SIDE_HEAD, false, 'TEXT CHANNELS')];
-    for (const r of data.rooms) {
+    // LIVECHAT Pin Channel: pinned channels list first, in their joined order.
+    const rooms = [...data.rooms.filter((r) => this.pinned.has(r.roomId)), ...data.rooms.filter((r) => !this.pinned.has(r.roomId))];
+    for (const r of rooms) {
       const it = newSide(SIDE_ROOM, r.roomId === this.roomId, r.name.slice(0, 36));
       it.id = r.roomId;
       it.unread = r.unread;
+      it.open = this.expanded.get(r.roomId) ?? it.open;
       side.push(it);
+    }
+    if (data.dms.length > 0) {
+      side.push(newSide(SIDE_HEAD, false, 'DIRECT MESSAGES'));
+      for (const d of data.dms) {
+        const it = newSide(SIDE_DM, false, d.peer.slice(0, 38));
+        it.id = d.threadId;
+        it.unread = d.unread;
+        side.push(it);
+      }
     }
     if (data.users.length > 0) {
       side.push(newSide(SIDE_HEAD, false, 'USERS'));
       for (const u of data.users) {
         const it = newSide(SIDE_USER, false, u.user.split('@')[0].slice(0, 38));
         it.note = (u.statusText ?? '').slice(0, 14);
-        it.status = u.status === 'online' ? 1 : 0;
+        it.status = u.status === 'online' && u.active ? 0 : 1; // LIVECHAT: a green O only when online and active, else red
         side.push(it);
       }
     }
     const same = (a: typeof side, b: typeof m.side): boolean =>
-      a.length === b.length && a.every((s, i) => s.kind === b[i].kind && s.label === b[i].label && s.unread === b[i].unread && s.joined === b[i].joined && s.note === b[i].note && s.status === b[i].status);
+      a.length === b.length && a.every((s, i) => s.kind === b[i].kind && s.label === b[i].label && s.unread === b[i].unread && s.joined === b[i].joined && s.note === b[i].note && s.status === b[i].status && s.open === b[i].open);
     if (same(side, m.side)) return;
     m.side = side;
     m.sideSel = Math.max(0, side.findIndex((s) => `${s.kind}:${s.label}` === selKey));
     this.info.markDirty();
   }
+
+  /** Session-only channel pins and expand/collapse state (LIVECHAT keeps them in client prefs; the hub stores none). */
+  readonly pinned = new Set<string>();
+  readonly expanded = new Map<string, boolean>();
 
   /** livechat.c take_history: the newest HISTORY_LIMIT (30) messages, numbered like live lines so /reply, /edit and /react reach them. */
   private takeHistory(id: string): void {
@@ -192,9 +395,9 @@ export class HubScreen implements PartylineScreen {
   }
 
   /** livechat.c send_room_line: the line goes to the store; the event brings it back on screen. */
-  sendRoomLine(text: string, replyTo?: string): void {
-    if (!this.roomId) { this.systemLine('Join a channel first: /join room'); return; }
-    this.tryRun(true, (db, ctx) => postMessage(db, ctx, this.roomId, { content: text, clientId: newId('pl'), ...(replyTo ? { replyTo } : {}) }));
+  sendRoomLine(text: string, replyTo?: string): string | undefined {
+    if (!this.roomId) { this.systemLine('Join a channel first: /join room'); return undefined; }
+    return this.tryRun(true, (db, ctx) => postMessage(db, ctx, this.roomId, { content: text, clientId: newId('pl'), ...(replyTo ? { replyTo } : {}) }))?.id;
   }
 
   /** take_events: the events this session may see since the cursor. */
@@ -227,10 +430,30 @@ export class HubScreen implements PartylineScreen {
       l.id = e.ref;
       l.number = ++this.msgNumber; // livechat.c msg_number: the number a user types in /reply, /react ...
       m.addLine(l);
+      m.typing = m.typing.filter((t) => t.nick !== e.user);
+      if (!m.isSelf(e.user) && mentionsSelf(m, l)) this.sound('mention');
+    } else if ((e.type === 'react' || e.type === 'unreact') && inRoom) {
+      // livechat.c take_events: a note line, an activity line, then the counts reloaded from the store.
+      const who = this.shown(e).slice(0, 24), emoji = e.text.slice(0, 16);
+      m.addLine(newLine(NOTE, '', '', e.type === 'react' ? `[${who} reacted ${emoji}]` : `[${who} removed ${emoji}]`));
+      m.addLine(newLine(ACTIVITY_LINE, '', '', `${who}: ${emoji}`));
+      const l = m.lines.find((x) => x.id === e.ref);
+      const rows = l ? this.tryRun(false, (db, ctx) => reactionRows(db, ctx, e.ref)) : undefined;
+      if (l && rows) { l.react = rows.filter((r) => r.count > 0).map((r) => ({ emoji: r.emoji, count: r.count })); m.linesChanged(); }
+    } else if (e.type === 'typing' && inRoom && !m.isSelf(e.user)) {
+      // livechat.c typing_set: the buffer replaces the row, an empty buffer removes it.
+      if (this.showTyping) this.typingSet(e.user, e.text);
+    } else if (e.type === 'dm' && !m.isSelf(e.user)) {
+      const group = e.label.startsWith('dg'), who = this.shown(e).slice(0, 24);
+      m.addLine(newLine(NOTE, '', '', `[${group ? 'Group DM' : 'DM'} from ${who}]: ${e.text.slice(0, 200)}`));
+      m.addLine(newLine(ACTIVITY_LINE, '', '', `${group ? 'Group DM' : 'DM'} from ${who}`));
+      this.sound('dm');
+    } else if (e.type === 'bbs') {
+      this.takeBbsEvent(e);
     } else if ((e.type === 'joined' || e.type === 'left') && inRoom) {
-      const joined = e.type === 'joined';
-      m.addLine(newLine(SYSTEM, '', '', `${e.user.slice(0, 24)} ${joined ? 'joined' : 'left'} the room`));
-      m.addLine(newLine(ACTIVITY_LINE, '', '', `${e.user.slice(0, 24)} ${joined ? 'joined' : 'left'}`));
+      const joined = e.type === 'joined', who = this.shown(e).slice(0, 24);
+      m.addLine(newLine(SYSTEM, '', '', `${who} ${joined ? 'joined' : 'left'} the room`));
+      m.addLine(newLine(ACTIVITY_LINE, '', '', `${who} ${joined ? 'joined' : 'left'}`));
     } else if (e.type === 'edit') {
       const l = m.lines.find((x) => x.id === e.ref);
       if (l) { l.text = e.text; l.edited = true; m.linesChanged(); }
@@ -248,6 +471,59 @@ export class HubScreen implements PartylineScreen {
       m.paneLabel = `${m.room.slice(0, 40)} - ${e.text.slice(0, 50)}`;
       m.addLine(newLine(SYSTEM, '', '', `${(e.user || 'Someone').slice(0, 24)} set the topic: ${e.text.slice(0, 200)}`));
     }
+  }
+
+  /** livechat.c `shown` (EVENTS index 9): the D7 display label, the bare handle unless two users in the room share it. */
+  private shown(e: EventRec): string {
+    const users = this.tryRun(false, (db) => memberUsers(db, [e.room_id ?? ''])) ?? [];
+    return displayLabels([e.user, ...users]).get(e.user) ?? e.user;
+  }
+
+  /** LIVECHAT sounds.ts: a cue when /sounds is on. */
+  private sound(cue: string): void { if (this.prefs.sounds) this.info.sound?.(cue); }
+
+  /** livechat.c take_bbs_event: the board's login, file, door and notice events, gated by /events. */
+  private takeBbsEvent(e: EventRec): void {
+    const type = e.ref, user = e.user, node = e.label.slice(0, 6), q = new URLSearchParams(e.text), m = this.model;
+    if (user === 'Guest') return;
+    const pref = type === 'user_login' || type === 'user_logout' ? 'logins' : type === 'upload' || type === 'download' ? 'files'
+      : type === 'door_activity' || type === 'custom_door_event' ? 'doors' : type === 'system_notice' ? 'announcements' : '';
+    if (pref !== '' && !this.prefs.events[pref]) return;
+    const add = (time: string, tone: number, head: string, bodyTone: number, body: string, pb = false): void => {
+      const l = newLine(EVENT, time, '', body);
+      l.head = head; l.tone = tone; l.bodyTone = bodyTone; l.pb = pb;
+      m.addLine(l);
+    };
+    const login = type === 'user_login', at = stamp(e.at), head = `* ${user.slice(0, 40)}`;
+    if (login || type === 'user_logout') {
+      const body = login ? `${user.slice(0, 30)} has logged in (Node ${node})` : `${user.slice(0, 30)} has logged off`;
+      add('', TK_DIM, '[EVENT] ', login ? EV_GREEN : EV_RED, body);
+      m.addLine(newLine(SYSTEM, '', '', body));
+    }
+    if (login) add(at, TK_OK, head, 0, ` logged in from ${(q.get('location') || 'Unknown').slice(0, 120)} (Node ${node})`);
+    else if (type === 'user_logout') {
+      const d = parseInt(q.get('duration') ?? '0', 10) || 0;
+      add(at, TK_ACCENT_ALT, head, 0, ` logged out${d !== 0 ? ` after ${Math.trunc(d / 60)}m ${d % 60}s` : ''} (Node ${node})`);
+    } else if (type === 'upload' || type === 'download') {
+      const up = type === 'upload', n = parseInt(q.get('fileSize') ?? '0', 10) || 0, c = (q.get('conferenceName') ?? '').slice(0, 80);
+      const t = Math.trunc((n * 10 + 512) / 1024), kb = n > 0 ? ` (${Math.trunc(t / 10)}.${t % 10}KB)` : '';
+      add(at, up ? TK_BAR : TK_ACCENT_ALT, head, 0, ` ${up ? 'uploaded' : 'downloaded'} ${(q.get('fileName') ?? '').slice(0, 100)}${kb}${c === '' ? '' : up ? ' to ' : ' from '}${c}`);
+    } else if (type === 'system_notice') {
+      const msg = q.get('message') ?? '';
+      if (msg !== '') { m.addLine(newLine(SYSTEM, '', '', `*** ${msg.slice(0, 180)} ***`)); this.sound('notification'); }
+    } else if (type === 'door_activity') {
+      const entered = q.get('action') === 'entered';
+      add(at, entered ? EV_GREEN : EV_YELLOW, head, 0, ` ${entered ? 'entered' : 'exited'} door ${(q.get('doorName') ?? '').slice(0, 120)}`);
+    } else if (type === 'custom_door_event') {
+      const door = q.get('doorName') ?? '', ev = q.get('eventType') || 'event', msg = q.get('message') ?? '';
+      const score = ev === 'score' || ev === 'score_submitted', has = (...w: string[]): boolean => w.some((x) => ev.includes(x));
+      // livechat_ui.h LC_EV_BLUE 4, LC_EV_CYAN 6, LC_EV_WHITE 7: raw colour numbers the palette passes through.
+      let tone = score ? EV_YELLOW : has('create', 'add', 'new') ? EV_GREEN : has('delete', 'remove') ? EV_RED : has('complete', 'done', 'finish') ? 4
+        : has('achievement', 'unlock') ? EV_YELLOW : has('update', 'edit', 'move') ? 6 : 7;
+      if (ev === 'match_result') tone = TK_ACCENT_ALT;
+      add(at, tone, `[${(door || 'Unknown').slice(0, 40)}]`, 0, ` ${user.slice(0, 30)}${ev === 'match_result' ? ' ' : ': '}${(msg || 'No message').slice(0, 150)}`,
+        score && q.get('isPersonalBest') === 'true');
+    } else add(at, TK_DIM, `* Unknown event: ${type.slice(0, 20)}`, 0, '');
   }
 
   resize(cols: number, rows: number): void {
@@ -279,16 +555,16 @@ export class HubScreen implements PartylineScreen {
         }
         at = end;
       }
-      this.info.markDirty();
-      return;
-    }
-    this.inputBytes(bytes);
+    } else this.inputBytes(bytes);
+    if (!this.quitting) this.typingSync();
+    this.info.markDirty();
   }
 
   /** One non-ASCII glyph straight into the input line (no ESC decoding up here). */
   private insertChar(ch: string): void {
     const m = this.model, o = this.over;
-    if (o.modal !== MODAL_NONE || o.fmt || o.help) return;
+    if (o.search) { this.searchKey(ch.codePointAt(0) as number, ch); return; }
+    if (o.modal !== MODAL_NONE || o.fmt || o.help || o.settings) return;
     if (m.focus === FOCUS_INPUT) this.slashKey(ch.codePointAt(0) as number);
     this.cutSelection();
     if (m.input.length + ch.length < TEXT_MAX) {
@@ -373,6 +649,8 @@ export class HubScreen implements PartylineScreen {
     }
     if (k === 17) { o.modal = MODAL_QUIT; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
     if (o.fmt) { this.pickKey(k); return; }
+    if (o.settings) { this.settingsKey(k); return; }
+    if (o.search) { this.searchKey(k); return; }
     if (o.help) {
       if (k === K_ESC || k === 0x71) o.help = false;
       else if (k === K_DOWN) o.helpTop++;
@@ -627,7 +905,8 @@ export class HubScreen implements PartylineScreen {
     }
   }
 
-  private history: string[] = [];
+  /** Sent lines; a room line keeps its message id so a recalled line edits that message (LIVECHAT Up-arrow edit). */
+  private history: { text: string; id?: string }[] = [];
   private histPos = -1;
   private histSaved = '';
   private atCycle: AtCycle | null = null;
@@ -645,10 +924,10 @@ export class HubScreen implements PartylineScreen {
       if (this.history.length === 0) return;
       if (this.histPos < 0) { this.histSaved = m.input; this.histPos = this.history.length; }
       if (this.histPos > 0) this.histPos--;
-      m.input = this.history[this.histPos]; m.editing = true;
+      m.input = this.history[this.histPos].text; m.editing = true;
     } else {
       if (this.histPos < 0) return;
-      if (++this.histPos >= this.history.length) { this.histPos = -1; m.input = this.histSaved; m.editing = false; } else m.input = this.history[this.histPos];
+      if (++this.histPos >= this.history.length) { this.histPos = -1; m.input = this.histSaved; m.editing = false; } else m.input = this.history[this.histPos].text;
     }
     m.inputCur = m.input.length;
     this.clearSelection();
@@ -717,7 +996,7 @@ export class HubScreen implements PartylineScreen {
       const items = ['View Profile', 'Send Message', 'Whois', '---', 'Mention', 'Add Note', 'View History', '---', 'Mute User', 'Ignore', 'Block'];
       this.popupOpen(sysop ? [...items, '---', 'Kick User', 'Ban User'] : items, row, col, { user: it.label });
     } else if (it.kind === SIDE_ROOM) {
-      const items = ['Join', 'Leave', 'Info', 'Expand/Collapse', '---', 'Pin Channel'];
+      const items = ['Join', 'Leave', 'Info', 'Expand/Collapse', '---', it.id !== undefined && this.pinned.has(it.id) ? 'Unpin Channel' : 'Pin Channel'];
       this.popupOpen(sysop ? [...items, 'Clear History', 'Archive', 'Delete Channel'] : items, row, col, { roomId: it.id, user: it.label });
     }
   }
@@ -764,7 +1043,21 @@ export class HubScreen implements PartylineScreen {
         return;
       }
       case 'Mute User': this.runLine(`/mute ${user}`); return;
-      case 'Ignore': this.runLine(`/ignore ${user}`); return;
+      case 'Ignore': case 'Block': this.runLine(`/ignore ${user}`); return; // LIVECHAT Block is the server-side ignore
+      case 'Info': this.systemLine(`Channel: ${user}`); return;
+      case 'Expand/Collapse': {
+        const it = m.side.find((s) => s.kind === SIDE_ROOM && s.id === roomId);
+        if (it && roomId !== undefined) { it.open = !it.open; this.expanded.set(roomId, it.open); }
+        return;
+      }
+      case 'Pin Channel': case 'Unpin Channel':
+        if (roomId === undefined) return;
+        if (this.pinned.delete(roomId)) this.systemLine(`Unpinned ${user}`); else { this.pinned.add(roomId); this.systemLine(`Pinned ${user}`); }
+        this.prefsSave();
+        this.fillSidebar();
+        return;
+      case 'Clear History': this.runLine(`/clear-room ${roomId ?? ''}`); return;
+      case 'Delete Channel': this.runLine(`/delete ${roomId ?? ''}`); return;
       case 'Kick User': this.runLine(`/kick ${user}`); return;
       case 'Ban User': this.runLine(`/ban ${user}`); return;
       case 'Join': if (roomId !== undefined && roomId !== this.roomId) this.joinRoom(roomId); return;
@@ -785,7 +1078,7 @@ export class HubScreen implements PartylineScreen {
       case 'Emoji': this.openPicker(); return;
       case 'Files': this.runLine('/files'); return;
       case 'Pins': this.runLine('/pinned'); return;
-      case 'Search': this.fillInput('/search '); return;
+      case 'Search': this.searchOpen(); return;
       case 'Threads': this.runLine('/threads'); return;
       case 'Settings': this.runLine('/settings'); return;
       case 'Theme': this.runLine('/theme'); return;
@@ -880,11 +1173,25 @@ export class HubScreen implements PartylineScreen {
     m.input = ''; m.inputCur = 0;
     this.clearSelection();
     this.over.slashSel = 0; this.over.slashTop = 0; this.over.slashOff = false;
+    const editId = m.editing && this.histPos >= 0 ? this.history[this.histPos]?.id : undefined;
     m.editing = false; this.histPos = -1;
     if (line === '') return;
-    if (this.history[this.history.length - 1] !== line) { this.history.push(line); if (this.history.length > 100) this.history.shift(); }
-    if (line[0] === '/') { if (runCommand(this, line)) this.quit(); return; }
-    this.sendRoomLine(line);
+    if (line[0] === '/') { this.remember(line); if (runCommand(this, line)) this.quit(); return; }
+    if (editId !== undefined) { // LIVECHAT: a recalled message sent again edits the original, it does not post a new one
+      if (this.tryRun(true, (db, ctx) => editMessage(db, ctx, editId, { content: line })) !== undefined) {
+        const h = this.history.find((x) => x.id === editId);
+        if (h) h.text = line;
+      }
+      return;
+    }
+    const id = this.sendRoomLine(line);
+    this.remember(line, id);
+  }
+
+  private remember(text: string, id?: string): void {
+    if (this.history[this.history.length - 1]?.text === text) return;
+    this.history.push({ text, id });
+    if (this.history.length > 100) this.history.shift();
   }
 
   private quit(): void {
@@ -915,7 +1222,7 @@ export class HubScreen implements PartylineScreen {
   upload(payload: Buffer): void { this.av.uploadResult(payload); }
   media(payload: Buffer): void { this.av.media(payload); }
 
-  close(): void { clearTimeout(this.selectTimer); this.off(); this.av.close(); }
+  close(): void { clearTimeout(this.selectTimer); clearInterval(this.tick); this.typingStop(); this.off(); this.av.close(); }
 }
 
 export const chatScreen = (ach: AchievementsConfig, chat: ChatConfig, filesDir: string | null = null): ScreenFactory => (info) => new HubScreen(ach, chat, info, filesDir);

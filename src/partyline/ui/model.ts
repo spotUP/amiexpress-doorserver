@@ -125,6 +125,8 @@ export class Model {
   }
   resize(cols: number, rows: number): void { this.cols = cols; this.rows = rows; this.scroll = 0; this.linesChanged(); }
   setSelf(handle: string): void { const at = handle.indexOf('@'); this.selfNick = (at >= 0 ? handle.slice(0, at) : handle).slice(0, 31); }
+  /** Events carry the full handle (bob@BOARD); the screen knows only the nick. */
+  isSelf(user: string): boolean { const at = user.indexOf('@'); return sameWord(at >= 0 ? user.slice(0, at) : user, this.selfNick); }
   sidebarWidth(): number {
     if (this.sidebarHidden || this.cols <= 40) return 0;
     const w = Math.min(this.cols - 24, 21);
@@ -292,8 +294,7 @@ const MARKS = '*_`~{@[:';
  */
 export function mentionsSelf(m: Model, l: Line): boolean {
   if ((l.kind !== HISTORY && l.kind !== LIVE) || m.selfNick === '') return false;
-  const at = l.nick.indexOf('@');
-  if (sameWord(at >= 0 ? l.nick.slice(0, at) : l.nick, m.selfNick)) return false;
+  if (m.isSelf(l.nick)) return false;
   const t = l.text;
   for (let i = t.indexOf('@'); i >= 0; i = t.indexOf('@', i + 1)) {
     if (isWord(t[i - 1])) continue;
