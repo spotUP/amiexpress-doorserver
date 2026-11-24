@@ -1135,6 +1135,7 @@ export class HubScreen implements PartylineScreen {
       case 'View Profile': this.profileOverlay(user); return;
       case 'Whois': this.runLine(`/whois ${user}`); return;
       case 'Send Message': this.fillInput(`/msg ${user} `); return;
+      case 'Add Note': this.fillInput(`/note ${user} `); this.systemLine(`Note about ${user}: type it after /note ${user} and press Enter.`); return;
       case 'Mention': m.input = `@${user} ${m.input}`; m.inputCur = m.input.length; return;
       case 'View History': {
         const mine = m.lines.filter((l) => l.number > 0 && l.nick === user).slice(-15);
@@ -1320,8 +1321,13 @@ export class HubScreen implements PartylineScreen {
     return Buffer.from(mouseOn + this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), this.utf8 ? 'utf8' : 'latin1');
   }
 
-  /** session.ts `U` and `M` frames: upload results and voice media. */
-  upload(payload: Buffer): void { this.av.uploadResult(payload); }
+  /** session.ts `U` and `M` frames: upload results, the board's Add Note answer, and voice media. */
+  upload(payload: Buffer): void {
+    const note = /^note (ok|fail) (.*)$/.exec(payload.toString('latin1').trim());
+    if (!note) { this.av.uploadResult(payload); return; }
+    this.systemLine(note[1] === 'ok' ? `Note saved for ${note[2]}.` : `Could not save note for ${note[2]}.`);
+    this.info.markDirty();
+  }
   media(payload: Buffer): void { this.av.media(payload); }
 
   close(): void { clearTimeout(this.selectTimer); clearInterval(this.tick); this.typingStop(); this.off(); this.av.close(); }

@@ -363,6 +363,26 @@ describe('hub screen commands', () => {
     type('/discord off'); expect(last()).toBe('Discord mirror is OFF for this board.');
   });
 
+  it('note: Add Note asks the caller\'s board over PLP T and prints its U answer', () => {
+    const chat = loadChatConfig();
+    const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'amy', sysop: false, client: 'test' }).sid);
+    const hello = { cols: 80, rows: 25 } as ScreenInfo['hello'];
+    const sent: string[] = [];
+    const amy = chatScreen(fx.ach, chat)({ sid, user: 'amy@HOME', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined, ctrl: (t) => sent.push(t) }) as HubScreen;
+    const say = (l: string): string => { amy.input(Buffer.from(`${l}\r`, 'latin1')); amy.take(); return amy.model.lines[amy.model.lines.length - 1]?.text ?? ''; };
+    try {
+      say('/note bob pays in rare mods');
+      say('/note bob@home second');
+      expect(say('/note eve@AWAY hi')).toBe('eve@AWAY is not a user of this board.');
+      expect(say('/note bob')).toBe('Error: Usage: /note @user <text>');
+      expect(sent).toEqual(['note bob\tpays in rare mods', 'note bob\tsecond']);
+      amy.upload(Buffer.from('note ok bob', 'latin1'));
+      expect(amy.model.lines[amy.model.lines.length - 1].text).toBe('Note saved for bob.');
+      amy.upload(Buffer.from('note fail bob', 'latin1'));
+      expect(amy.model.lines[amy.model.lines.length - 1].text).toBe('Could not save note for bob.');
+    } finally { amy.close(); }
+  });
+
   it('discord: a caller who is not the sysop may look but not switch', () => {
     const chat = loadChatConfig();
     const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'amy', sysop: false, client: 'test' }).sid);

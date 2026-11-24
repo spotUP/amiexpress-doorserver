@@ -240,6 +240,23 @@ function whoisTyped(s: HubScreen, rest: string): void {
   if (names.length > 0) s.systemLine(`Shared rooms: ${names.map((n) => `#${n}`).join(', ').slice(0, 100)}`);
 }
 
+/**
+ * LIVECHAT context-menus.ts Add Note: the note goes on the board's user record, so the hub only
+ * asks the caller's board (PLP T `note <user>\t<text>`); the relay answers U `note ok|fail <user>`.
+ * shortcut: the name is the first word, so a handle with a space cannot be noted; take the rest after a known name if that matters.
+ */
+function noteTyped(s: HubScreen, rest: string): void {
+  const a = firstWord(rest);
+  const text = rest.slice(rest.indexOf(a) + a.length).replace(/[\x00-\x1f\x7f]/g, '').trim();
+  if (a === '' || text === '') { usage(s, '/note @user <text>'); return; }
+  if (!s.info.ctrl) { s.systemLine('Notes are unavailable.'); return; }
+  const { user, shown } = targetOf(s, a);
+  const own = s.info.user.includes('@') ? s.info.user.slice(s.info.user.indexOf('@')) : '';
+  // Only users of the caller's own board have a record there (web chat's /api/chat/notes rule).
+  if (user.includes('@') && user.slice(user.indexOf('@')).toLowerCase() !== own.toLowerCase()) { s.systemLine(`${shown.slice(0, 30)} is not a user of this board.`); return; }
+  s.info.ctrl(`note ${user.split('@')[0]}\t${text.slice(0, 1000)}`);
+}
+
 /** msg_typed: every leading @word is a target; one is a DM, two or more a group DM. */
 function msgTyped(s: HubScreen, rest: string): void {
   const targets: { user: string; shown: string }[] = [];
@@ -644,6 +661,7 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'invite': inviteTyped(s, true, rest); return false;
     case 'uninvite': inviteTyped(s, false, rest); return false;
     case 'whois': whoisTyped(s, rest); return false;
+    case 'note': noteTyped(s, rest); return false;
     case 'msg': msgTyped(s, rest); return false;
     case 'motd': motdTyped(s, rest); return false;
     case 'mode': modeTyped(s, rest); return false;

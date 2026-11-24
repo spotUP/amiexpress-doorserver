@@ -43,6 +43,7 @@ export const CMD_HELP: ReadonlyArray<readonly [string, string, string, string]> 
   ['unmute', '', 'Unmute user in channel', '/unmute @user'],
   ['unreact', '', 'Remove reaction', '/unreact [emoji] [msg-id]'],
   ['whois', 'info', 'Show user info', '/whois @user'],
+  ['note', '', 'Add a note about a user', '/note @user <text>'],
   ['who', 'users,list', 'List users in channel', '/who'],
   ['compact', '', 'Toggle compact mode', '/compact'],
   ['timestamps', 'time', 'Toggle timestamps', '/timestamps'],
