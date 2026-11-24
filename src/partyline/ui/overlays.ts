@@ -4,11 +4,12 @@
  * lc_progress_bar/bytes, lc_settings_layout). Grid-tested against the C in tests/partyline-ui-overlays.test.ts.
  */
 import { Cells, DEFAULT, wrap } from './cells';
-import { Model, TK_BASE, T_BAR } from './model';
+import { Model, THEMES, TK_BASE, T_BAR, T_CHROME, T_SELECTION_BG, T_SELECTION_INK } from './model';
 import type { DrawState } from './draw';
 
 export const HIT_YES = 8, HIT_NO = 9, HIT_OK = 10, HIT_MODAL = 11,
-  HIT_SEARCH = 17, HIT_SEARCH_Q = 18, HIT_SEARCH_USER = 19, HIT_SEARCH_ROW = 20, HIT_SETTINGS = 21, HIT_SETTINGS_ROW = 22;
+  HIT_SEARCH = 17, HIT_SEARCH_Q = 18, HIT_SEARCH_USER = 19, HIT_SEARCH_ROW = 20, HIT_SETTINGS = 21, HIT_SETTINGS_ROW = 22,
+  HIT_THEME = 23, HIT_THEME_ROW = 24;
 
 export const MODAL_NONE = 0, MODAL_MESSAGE = 1, MODAL_QUIT = 2, MODAL_PROMPT = 3, MODAL_RECONNECT = 4, MODAL_PROGRESS = 5;
 export const SEARCH_MAX = 20, VIEW_MAX = 40;
@@ -50,6 +51,10 @@ export class OverlayState {
   upReceived = 0; upTotal = 0;
   prompt = '';
   search = false; searchField = 0; searchQ = ''; searchUser = ''; searchSel = 0; searchTop = 0; searchRows: string[] = [];
+  /** Each result row's message id, and the query + user the rows answer (Enter on an unchanged query jumps). */
+  searchIds: string[] = []; searchRan = '';
+  /** The theme panel (lc_model theme, theme_sel, theme_opened) and the first row the last frame showed. */
+  theme = false; themeSel = 0; themeOpened = 0; themeFirst = 0;
   settings = false; settingsSel = 0; settingsVal = [false, false, false, false, false, false, false, false]; settingsStatus = 0;
   /** The "/" menu (lc_model slash_*): selected match, first visible, Esc hid it until the next key. */
   slashSel = 0; slashTop = 0; slashOff = false;
@@ -338,10 +343,33 @@ function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
 }
 
 /** The overlays lc_draw paints last, in the C order (help, view, search, settings, modal). */
+/** draw_theme: the themes, the highlight on theme_sel, and the hint line. */
+function drawTheme(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
+  const p = m.pal, n = THEMES.length, h = Math.min(n + 6, 20), w = 54;
+  const namew = Math.max(...THEMES.map((t) => t.name.length)) + 1;
+  c.pen(p.ink, DEFAULT, 0);
+  let { top, left } = modal(c, d, h, w, p.col[T_CHROME], ' Theme ', p.ink);
+  d.hits.add(HIT_THEME, top, left, h, w);
+  top++; left++;
+  const vis = Math.min(n, h - 3);
+  o.themeFirst = o.themeSel >= vis ? o.themeSel - vis + 1 : 0;
+  for (let i = 0; i < vis; i++) {
+    const th = THEMES[o.themeFirst + i], sel = o.themeFirst + i === o.themeSel;
+    c.pen(sel ? p.col[T_SELECTION_INK] : p.ink, sel ? p.col[T_SELECTION_BG] : DEFAULT, 0);
+    c.fill(top + i, left, 1, w - 2, 0x20);
+    c.text(top + i, left, ` ${th.name.padEnd(namew)}${th.blurb}`, w - 2);
+  }
+  d.hits.add(HIT_THEME_ROW, top, left, vis, w - 2);
+  c.pen(p.dim, DEFAULT, 0);
+  c.text(top + h - 3, left + 1, 'UP/DOWN previews.  ENTER keeps it.  ESC puts it back.', w - 4);
+  c.pen(p.ink, DEFAULT, 0);
+}
+
 export function drawOverlays(c: Cells, m: Model, d: DrawState, o: OverlayState, caret: { cr: number; cc: number }): void {
   if (o.help) drawText(c, m, d, 'Help', HELP_TEXT, o.helpTop, false);
   if (o.view) drawText(c, m, d, o.viewTitle, o.viewText, o.viewTop, true);
   if (o.search) drawSearch(c, m, d, o, caret);
+  if (o.theme) drawTheme(c, m, d, o);
   if (o.settings) drawSettings(c, m, d, o);
   if (o.modal !== MODAL_NONE) drawModal(c, m, d, o, caret);
   if (o.fmt) drawPicker(c, m, d, o);

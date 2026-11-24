@@ -19,12 +19,13 @@ import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
 import { newId, resolveSession } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listRooms, memberUsers, postMessage, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping } from '../../chat/store';
+import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
-import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
-import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
+import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
+import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_OK, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
+  HIT_THEME_ROW, MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
   SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
@@ -53,6 +54,9 @@ const KEY_SEQ: Record<string, number> = {
 export type ChatRun = <T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T) => T;
 
 /** "HH:MM" of a unix second, the C line stamp. */
+/** datetime_of: the full local date and time of a unix-seconds stamp. */
+function datetime(at: number): string { return new Date(at * 1000).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); }
+
 export function stamp(at: number): string {
   const d = new Date(at * 1000);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -197,7 +201,7 @@ export class HubScreen implements PartylineScreen {
   // ---- livechat.c search overlay (TS overlays/search.ts) ----
   searchOpen(): void {
     const o = this.over;
-    o.search = true; o.searchField = 0; o.searchQ = ''; o.searchUser = ''; o.searchRows = []; o.searchSel = 0; o.searchTop = 0;
+    o.search = true; o.searchField = 0; o.searchQ = ''; o.searchUser = ''; o.searchRows = []; o.searchSel = 0; o.searchTop = 0; o.searchIds = []; o.searchRan = '';
   }
 
   /** search_run: under 2 characters is a system line, else the Results list and "Found N results for ...". */
@@ -207,6 +211,7 @@ export class HubScreen implements PartylineScreen {
     const rows = this.tryRun(false, (db, ctx) => search(db, ctx, { q: o.searchQ, room, user: o.searchUser !== '' ? o.searchUser : undefined, limit: SEARCH_MAX }));
     if (!rows) return;
     o.searchRows = rows.slice(0, SEARCH_MAX).map((r, i) => `${i + 1}. ${r.user.slice(0, 20)} @ ${stamp(r.at).slice(0, 24)}: ${r.content.slice(0, 60)}`);
+    o.searchIds = rows.slice(0, SEARCH_MAX).map((r) => r.id); o.searchRan = `${o.searchQ}\n${o.searchUser}`;
     o.searchSel = 0; o.searchTop = 0;
     this.systemLine(`Found ${o.searchRows.length} results for "${o.searchQ.slice(0, 100)}"`);
   }
@@ -217,7 +222,7 @@ export class HubScreen implements PartylineScreen {
     const put = (t: string): void => { if (o.searchField === 0) o.searchQ = t; else o.searchUser = t; };
     if (k === K_ESC) o.search = false;
     else if (k === 9 || k === K_BACKTAB) o.searchField = o.searchField === 0 ? 1 : 0;
-    else if (k === K_ENTER) { if (o.searchField === 0) this.searchRun(); }
+    else if (k === K_ENTER) { if (n > 0 && o.searchRan === `${o.searchQ}\n${o.searchUser}`) this.searchJump(); else if (o.searchField === 0) this.searchRun(); }
     else if (k === K_DOWN && o.searchSel < n - 1) o.searchSel++;
     else if (k === K_UP && o.searchSel > 0) o.searchSel--;
     else if (k === K_PGDN) o.searchSel = Math.max(0, Math.min(o.searchSel + 10, n - 1));
@@ -225,6 +230,82 @@ export class HubScreen implements PartylineScreen {
     else if ((k === 8 || k === 127) && field.length > 0) put(field.slice(0, -1));
     else if (k >= 0x20 && k < K_UP && k !== 127 && field.length + 1 < (o.searchField === 0 ? TEXT_MAX : 40)) put(field + ch);
     if (o.searchSel < o.searchTop) o.searchTop = o.searchSel;
+  }
+
+  /** Enter on a result of the query on screen (or a second click on it) closes the panel and picks that message. */
+  private searchJump(): void {
+    const o = this.over, m = this.model, id = o.searchIds[o.searchSel] ?? '';
+    if (id === '' || !m.lines.some((l) => l.id === id && l.number !== 0)) { this.systemLine('That message is not in the loaded history.'); return; }
+    o.search = false; m.pick = id; m.focus = FOCUS_INPUT;
+  }
+
+  // ---- livechat.c theme panel (theme_open/theme_show/theme_close/theme_key; TS overlays/theme-menu.ts) ----
+  // shortcut: the pick lives for this session only (the hub has no ae_set_user_theme store yet); add it to the prefs once the store carries a theme.
+  private themeId = THEMES[0].id;
+  themeOpen(): void {
+    const o = this.over, at = Math.max(0, THEMES.findIndex((t) => t.id === this.themeId));
+    o.theme = true; o.themeOpened = at; o.themeSel = at;
+  }
+  /** theme_show: the highlight is the preview, every move re-themes the screen. */
+  private themeShow(i: number): void { this.over.themeSel = i; this.model.pal.set(THEMES[i].rgb); this.themeId = THEMES[i].id; }
+  private themeClose(keep: boolean): void { if (!keep) this.themeShow(this.over.themeOpened); this.over.theme = false; }
+  private themeKey(k: number): void {
+    const o = this.over, n = THEMES.length;
+    if (k === K_ESC || k === 0x71) this.themeClose(false);
+    else if (k === K_ENTER) this.themeClose(true);
+    else if (k === K_UP) { if (o.themeSel > 0) this.themeShow(o.themeSel - 1); }
+    else if (k === K_DOWN) { if (o.themeSel < n - 1) this.themeShow(o.themeSel + 1); }
+    else if (k === K_PGUP) this.themeShow(Math.max(0, o.themeSel - 10));
+    else if (k === K_PGDN) this.themeShow(Math.min(n - 1, o.themeSel + 10));
+  }
+
+  // ---- livechat.c view window (view_open/view_add): pinned_typed, thread_view; profile_overlay is a message modal ----
+  viewOpen(title: string, lines: string[]): void { const o = this.over; o.view = true; o.viewTop = 0; o.viewTitle = title; o.viewText = lines.slice(0, 40); }
+
+  /** pinned_typed: up to 8 pins in the view window. */
+  private pinnedView(): void {
+    if (!this.roomId) { this.systemLine('Join a room first.'); return; }
+    const room = this.roomId, rows = this.tryRun(false, (db, ctx) => listPins(db, ctx, room));
+    if (!rows) return;
+    if (rows.length === 0) { this.viewOpen('Pinned Messages', ['No pinned messages in this room.', '', '', 'Press ESC to close']); return; }
+    const pins = rows.slice(0, 8), t = [`=Pinned Messages (${pins.length}):`, ''];
+    pins.forEach((r, i) => t.push(`${i + 1}. ${r.user.slice(0, 24)}: ${r.content.slice(0, 60)}`, `   Sent: ${datetime(r.messageAt)}`,
+      `   Pinned by ${r.pinnedBy.slice(0, 20)} on ${datetime(r.at)}`, ''));
+    this.viewOpen('Pinned Messages', [...t, '', 'Press ESC to close']);
+  }
+
+  /** thread_view: the original message, its time, then the replies. */
+  private threadView(id: string): void {
+    const rows = this.tryRun(false, (db, ctx) => threadHistory(db, ctx, id));
+    if (!rows) return;
+    if (rows.length === 0) { this.systemLine('Not found.'); return; }
+    const [first, ...replies] = rows, row = (r: typeof first): string => `${r.user.slice(0, 24)}: ${r.text.slice(0, 60)}`;
+    const t = ['=Original Message:', row(first), stamp(first.at), ''];
+    if (replies.length === 0) t.push('No replies yet. Be the first to reply!');
+    else { t.push(`=Replies (${replies.length}):`); replies.slice(0, 20).forEach((r, i) => t.push(`${i + 1}. ${row(r)}`)); }
+    this.viewOpen('Thread', [...t, '', 'Press ESC to close']);
+  }
+
+  /** profile_overlay: "status: text, online|offline, idle Ns" in a message modal titled with the nick. */
+  private profileOverlay(user: string): void {
+    const o = this.over, p = this.tryRun(false, (db, ctx) => { try { return profileOf(db, ctx, user); } catch { return null; } });
+    if (p === undefined) return;
+    o.modal = MODAL_MESSAGE;
+    if (p === null) { o.modalTitle = 'Profile'; o.modalText = `User ${user.split('@')[0].slice(0, 40)} not found.`; return; }
+    o.modalTitle = p.nick;
+    o.modalText = `${p.status.slice(0, 16)}${p.statusText !== '' ? ': ' : ''}${p.statusText.slice(0, 30)}, ${p.online ? 'online' : 'offline'}, idle ${p.idle === '' ? 0 : p.idle}s`;
+  }
+
+  /** The slash lines whose LIVECHAT answer is a panel, not chat lines: /theme, /pinned, /thread <id> with no text. */
+  private overlayCommand(line: string): boolean {
+    const [word, ...rest] = line.trim().split(/\s+/), cmd = word.toLowerCase();
+    if (cmd === '/theme' && rest.length === 0) { this.themeOpen(); return true; }
+    if (cmd === '/pinned' && rest.length === 0) { this.pinnedView(); return true; }
+    if ((cmd === '/thread' || cmd === '/t') && rest.length === 1 && /^\d+$/.test(rest[0])) {
+      const l = this.model.lines.find((x) => x.number === Number(rest[0]) && x.id !== '');
+      if (l) { this.threadView(l.id); return true; }
+    }
+    return false;
   }
 
   // ---- livechat.c D3 typing: the input buffer goes to the hub (leading + trailing edge, 400 ms); others' rows go stale after 5 s ----
@@ -564,7 +645,7 @@ export class HubScreen implements PartylineScreen {
   private insertChar(ch: string): void {
     const m = this.model, o = this.over;
     if (o.search) { this.searchKey(ch.codePointAt(0) as number, ch); return; }
-    if (o.modal !== MODAL_NONE || o.fmt || o.help || o.settings) return;
+    if (o.modal !== MODAL_NONE || o.fmt || o.help || o.settings || o.theme || o.view) return;
     if (m.focus === FOCUS_INPUT) this.slashKey(ch.codePointAt(0) as number);
     this.cutSelection();
     if (m.input.length + ch.length < TEXT_MAX) {
@@ -649,8 +730,16 @@ export class HubScreen implements PartylineScreen {
     }
     if (k === 17) { o.modal = MODAL_QUIT; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
     if (o.fmt) { this.pickKey(k); return; }
+    if (o.modal === MODAL_MESSAGE) { if (k === K_ENTER || k === K_ESC || k === 0x20) o.modal = MODAL_NONE; return; }
+    if (o.theme) { this.themeKey(k); return; }
     if (o.settings) { this.settingsKey(k); return; }
     if (o.search) { this.searchKey(k); return; }
+    if (o.view) {
+      if (k === K_ESC || k === 0x71) o.view = false;
+      else if (k === K_DOWN && o.viewTop < o.viewText.length - 1) o.viewTop++;
+      else if (k === K_UP && o.viewTop > 0) o.viewTop--;
+      return;
+    }
     if (o.help) {
       if (k === K_ESC || k === 0x71) o.help = false;
       else if (k === K_DOWN) o.helpTop++;
@@ -861,7 +950,17 @@ export class HubScreen implements PartylineScreen {
    *  chat (right-click menu) and sidebar (rooms join, users open their menu, right-click opens either menu). */
   private mousePress(row: number, col: number, button: number): void {
     const m = this.model, o = this.over, h = this.drawState.hits.at(row, col);
-    if (o.modal !== MODAL_NONE || o.help) return;
+    if (o.modal === MODAL_MESSAGE) { if (h.id === HIT_OK || h.id !== HIT_MODAL) o.modal = MODAL_NONE; return; }
+    if (o.theme) { if (h.id === HIT_THEME_ROW && o.themeFirst + h.dr < THEMES.length) this.themeShow(o.themeFirst + h.dr); return; }
+    if (o.settings) { if (h.id === HIT_SETTINGS_ROW && h.dr < 64 && o.setItemAt[h.dr] >= 0) this.settingsPick(o.setItemAt[h.dr]); return; }
+    if (o.search) { // a click on a field focuses it; a click on a result selects it, a second click on the selected one jumps
+      const k = o.searchTop + h.dr;
+      if (h.id === HIT_SEARCH_Q) o.searchField = 0;
+      else if (h.id === HIT_SEARCH_USER) o.searchField = 1;
+      else if (h.id === HIT_SEARCH_ROW && k < o.searchRows.length) { if (k === o.searchSel) this.searchJump(); else o.searchSel = k; }
+      return;
+    }
+    if (o.modal !== MODAL_NONE || o.help || o.view) return;
     if (m.popup) { // LIVECHAT context menu: a click on a row picks it, a click elsewhere closes it
       if (h.id === HIT_POPUP) this.popupPick(h.dr); else this.popupClose();
       return;
@@ -1033,7 +1132,8 @@ export class HubScreen implements PartylineScreen {
       case 'Pin Message': this.runLine(`/pin ${n}`); return;
       case 'Edit': this.fillInput(`/edit ${n} ${line?.text ?? ''}`); return;
       case 'Delete': this.runLine(`/deletemsg ${n}`); return;
-      case 'View Profile': case 'Whois': this.runLine(`/whois ${user}`); return;
+      case 'View Profile': this.profileOverlay(user); return;
+      case 'Whois': this.runLine(`/whois ${user}`); return;
       case 'Send Message': this.fillInput(`/msg ${user} `); return;
       case 'Mention': m.input = `@${user} ${m.input}`; m.inputCur = m.input.length; return;
       case 'View History': {
@@ -1121,7 +1221,7 @@ export class HubScreen implements PartylineScreen {
     this.over.slashOff = true;
   }
 
-  private runLine(cmd: string): void { if (runCommand(this, cmd)) this.quit(); }
+  private runLine(cmd: string): void { if (!this.overlayCommand(cmd) && runCommand(this, cmd)) this.quit(); }
 
   /** LIVECHAT: a click (or a wheel step) on a channel row switches to that channel. */
   private sideJoin(): void {
@@ -1178,7 +1278,7 @@ export class HubScreen implements PartylineScreen {
     const editId = m.editing && this.histPos >= 0 ? this.history[this.histPos]?.id : undefined;
     m.editing = false; this.histPos = -1;
     if (line === '') return;
-    if (line[0] === '/') { this.remember(line); if (runCommand(this, line)) this.quit(); return; }
+    if (line[0] === '/') { this.remember(line); if (!this.overlayCommand(line) && runCommand(this, line)) this.quit(); return; }
     if (editId !== undefined) { // LIVECHAT: a recalled message sent again edits the original, it does not post a new one
       if (this.tryRun(true, (db, ctx) => editMessage(db, ctx, editId, { content: line })) !== undefined) {
         const h = this.history.find((x) => x.id === editId);

@@ -16,6 +16,21 @@ export const TOKEN_COUNT = 13;
 /** ui_theme.c entry 0, Uprough Neon: the default (ui_theme_by_id("")). */
 export const THEME_DEFAULT_RGB: readonly number[] = [0x000000, 0xe4ecfa, 0x4de0f0, 0x48566e, 0x000000, 0xff3d9a,
   0xff3d9a, 0xf5c451, 0xaa00aa, 0x000000, 0x57e389, 0xf5c451, 0xff5c7a];
+/** ui_theme.c table (sdk/c/include/theme_tables.h, generated from sdk/engines/ui/theme/tokens.ts): id, name, blurb, rgb. */
+export interface Theme { id: string; name: string; blurb: string; rgb: readonly number[] }
+export const THEMES: readonly Theme[] = [
+  { id: 'uprough-neon', name: 'Uprough Neon', blurb: 'Demoscene magenta and cyan, double-ruled, masthead slashes.', rgb: THEME_DEFAULT_RGB },
+  { id: 'neon-muted', name: 'Uprough Neon (muted)', blurb: 'The neon frame, but the colour spent only where it counts.',
+    rgb: [0x000000, 0xa8b4c8, 0x2e6e7a, 0x5a6474, 0x000000, 0xff3d9a, 0xff3d9a, 0x5a6474, 0xaa00aa, 0x000000, 0xa8b4c8, 0xa8b4c8, 0xff3d9a] },
+  { id: 'slate-slash', name: 'Slate & Slash', blurb: 'Quiet slate chrome, one magenta accent, room to breathe.',
+    rgb: [0x000000, 0xc9d4e8, 0x48566e, 0x48566e, 0x000000, 0xc9d4e8, 0xff3d9a, 0x4de0f0, 0xaa00aa, 0x000000, 0x57e389, 0xf5c451, 0xff5c7a] },
+  { id: 'slate-muted', name: 'Slate & Slash (muted)', blurb: 'Near-monochrome. One accent, spent on the selection.',
+    rgb: [0x000000, 0x95a0b4, 0x3a4354, 0x5a6474, 0x000000, 0xff3d9a, 0xff3d9a, 0x5a6474, 0xaa00aa, 0x000000, 0x95a0b4, 0x95a0b4, 0xff3d9a] },
+  { id: 'quiet-phosphor', name: 'Quiet Phosphor', blurb: 'One phosphor hue, no borders, hierarchy by brightness alone.',
+    rgb: [0x000000, 0x57e389, 0x2e4a3c, 0x2e4a3c, 0x000000, 0x57e389, 0x8cffb4, 0xf5c451, 0x00aa00, 0x000000, 0x57e389, 0xf5c451, 0xff8b6b] },
+  { id: 'phosphor-muted', name: 'Quiet Phosphor (muted)', blurb: 'One hue and nothing else. Brightness alone carries the hierarchy.',
+    rgb: [0x000000, 0x57e389, 0x1e3a28, 0x2e4a3c, 0x000000, 0x8cffb4, 0x8cffb4, 0x2e4a3c, 0x000000, 0xc8ffdc, 0x57e389, 0x8cffb4, 0xc8ffdc] },
+];
 
 export const TK_BASE = 1000;
 export const TK_INK = TK_BASE + T_INK, TK_ACCENT = TK_BASE + T_ACCENT, TK_ACCENT_ALT = TK_BASE + T_ACCENT_ALT,
