@@ -51,6 +51,8 @@ describe('hub screen input selection and mouse', () => {
   });
 
   it('shift+home, shift+end, shift+up and shift+down select to the ends of the line', () => {
+    let now = 0;
+    jest.spyOn(Date, 'now').mockImplementation(() => (now += 1000)); // past the LIVECHAT 150ms dropped-shift window
     fill('hello world');
     send('\x1b[1;2H'); expect(sel()).toBe('hello world');
     send('\x1b[C'); // a plain arrow clears the selection
@@ -63,6 +65,7 @@ describe('hub screen input selection and mouse', () => {
     expect(screen.model.inputAnchor).toBe(-1);
     screen.model.inputCur = 0;
     send('\x1b[1;2B'); expect(sel()).toBe('xhello world');
+    jest.restoreAllMocks();
   });
 
   it('the selection is drawn inverse', () => {

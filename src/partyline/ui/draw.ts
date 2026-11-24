@@ -1,12 +1,13 @@
 /**
  * Partyline hub engine: lc_draw ported 1:1 from amiexpress-web sdk/c/examples/livechat/livechat_ui.c.
  * The C keeps its draw state in statics; the hub runs many sessions in one process, so it lives in DrawState.
- * Overlays (help, view, search, settings, modal) live in overlays.ts. The slash menu is slash.ts. Not ported yet: context popup,
+ * Overlays (help, view, search, settings, modal) live in overlays.ts. The slash menu is slash.ts. Not ported yet:
  * format picker, theme and the canvas/pen picker.
  */
 import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, REVERSE, wrap } from './cells';
 import { cover, drawOverlays, OverlayState, Rect } from './overlays';
 import { drawSlash } from './slash';
+import { atGhostTail } from './at-complete';
 import { Model, Line, Side, lineMarked, mentionsSelf, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
 
 export const HIT_NONE = 0, HIT_MENU = 1, HIT_DROPDOWN = 2, HIT_SIDEBAR = 3, HIT_CHAT = 4, HIT_INPUT = 5,
@@ -181,6 +182,11 @@ function drawInput(c: Cells, m: Model, d: DrawState): { cr: number; cc: number }
     const a = Math.max(Math.min(m.inputAnchor, m.inputCur), from), b = Math.min(Math.max(m.inputAnchor, m.inputCur), from + room);
     if (b > a) { c.pen(p.barInk, p.ink, 0); c.text(row + 1, 1 + a - from, m.input.slice(a, b), b - a); c.pen(p.ink, DEFAULT, 0); }
   }
+  if (m.focus === FOCUS_INPUT && m.inputCur === m.input.length && m.input[0] !== '/' && m.input.length - from < room) {
+    // LIVECHAT atGhostTail: the rest of the first @name match, dim after the cursor; Tab takes it.
+    const ghost = atGhostTail(m.input, m.side.filter((s) => s.kind === SIDE_USER).map((s) => s.label));
+    if (ghost !== '') { c.pen(p.grey, DEFAULT, 0); c.text(row + 1, 1 + m.input.length - from, ghost, room - (m.input.length - from)); c.pen(p.ink, DEFAULT, 0); }
+  }
   if (iw < W) c.button(row, iw, 6, ':D', p.grey, p.activity);
   return { cr: row + 1, cc: 1 + m.inputCur - from };
 }
@@ -204,6 +210,14 @@ export function draw(c: Cells, m: Model, d: DrawState, o?: OverlayState): { cr: 
     const mw = c.menu(1, MENU_COL[m.menu] - 1, MENU_ITEMS[m.menu], m.menuSel, p.accent, p.ink, p.accent);
     d.hits.add(HIT_DROPDOWN, 2, MENU_COL[m.menu], MENU_ITEMS[m.menu].length, mw - 2);
     cover(d, 1, MENU_COL[m.menu] - 1, MENU_ITEMS[m.menu].length + 2, mw);
+  }
+  if (m.popup) { // LIVECHAT showContextMenu: clamped on screen like scm's mx/my
+    const pu = m.popup, wd = Math.max(...pu.items.map((s) => s.length)) + 4;
+    const top = Math.max(0, Math.min(pu.row, H - pu.items.length - 2)), left = Math.max(0, Math.min(pu.col, W - wd));
+    c.pen(p.ink, DEFAULT, 0);
+    const pw = c.menu(top, left, pu.items, pu.sel, p.accent, p.ink, p.accent);
+    d.hits.add(HIT_POPUP, top + 1, left + 1, pu.items.length, pw - 2);
+    cover(d, top, left, pu.items.length + 2, pw);
   }
   if (o) { drawSlash(c, m, d, o); drawOverlays(c, m, d, o, caret); }
   return caret;

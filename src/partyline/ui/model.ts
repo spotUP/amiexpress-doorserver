@@ -109,6 +109,8 @@ export class Model {
   side: Side[] = []; sideSel = 0; sidebarHidden = false;
   typing: Typing[] = []; typingTime = ''; typingBlink = false;
   input = ''; inputCur = 0; inputAnchor = -1; editing = false; pick = '';
+  /** The open right-click menu (LIVECHAT context-menus.ts): its rows, where it opens, the selected row; null when shut. */
+  popup: { items: string[]; row: number; col: number; sel: number } | null = null;
   scroll = 0; timestamps = true; compact = false;
   /** lc_set_self: the caller's nick for @mention highlight (C keeps it global). */
   selfNick = '';
