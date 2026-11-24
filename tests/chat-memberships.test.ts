@@ -6,7 +6,8 @@ import request from 'supertest';
 import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
-import { _setChatClockForTests } from '../src/chat/config';
+import { _setChatClockForTests, setActiveWindowSeconds } from '../src/chat/config';
+import { withAchievementsDb } from '../src/achievements/db';
 
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });
@@ -165,5 +166,30 @@ describe('active / inactive in the member list', () => {
     expect(await activeOf(a, id, 'bob@UPROUGH')).toEqual(['1', String(now)]);
     expect((await api('delete', '/sessions/current', b)).status).toBe(200);
     expect(await activeOf(a, id, 'bob@UPROUGH')).toEqual(['0', String(now)]);
+  });
+  it('uses the admin panel window over CHAT_ACTIVE_WINDOW and hands it to clients at login', async () => {
+    let now = 1_800_000_000;
+    _setChatClockForTests(() => now);
+    process.env.CHAT_ACTIVE_WINDOW = '60';
+    withAchievementsDb(fx.ach, (db) => setActiveWindowSeconds(db, 300));
+    try {
+      const a = await login('alice');
+      const id = await lobby(a);
+      const r = await request(fx.app).post('/chat/v1/sessions').set('Authorization', fx.auth).send({ handle: 'bob' });
+      expect(r.body.activeWindow).toBe(300);
+      const b = r.body.sid as string;
+      await api('post', `/rooms/${id}/join`, b);
+      await api('post', `/rooms/${id}/typing`, b).send({ text: 'hel' });
+      // Steps stay under the 90 s session TTL; both sessions read the list so neither expires.
+      for (const step of [61, 80, 80]) {
+        now += step;
+        expect((await activeOf(a, id, 'bob@UPROUGH'))?.[0]).toBe('1');
+        await activeOf(b, id, 'bob@UPROUGH');
+      }
+      now += 80; // 301 s after typing: past the admin window
+      expect((await activeOf(a, id, 'bob@UPROUGH'))?.[0]).toBe('0');
+    } finally {
+      withAchievementsDb(fx.ach, (db) => setActiveWindowSeconds(db, null));
+    }
   });
 });

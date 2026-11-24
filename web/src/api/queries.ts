@@ -693,6 +693,7 @@ const integrationKeys = {
   health: ['integrations', 'health'] as const,
   demozooImport: ['integrations', 'demozoo-import'] as const,
   releases: ['integrations', 'releases'] as const,
+  chatSettings: ['integrations', 'chat-settings'] as const,
 };
 
 export function useIntegrations(enabled: boolean) {
@@ -792,6 +793,24 @@ export function useDemozooImportCard(enabled: boolean) {
     queryKey: integrationKeys.demozooImport,
     queryFn: () => api.get<{ processed: number; lastImportAt: number | null; rowsEnriched: number; rerun: string }>('/admin/integrations/demozoo-import'),
     enabled,
+  });
+}
+
+export function useChatSettings(enabled: boolean) {
+  return useQuery({
+    queryKey: integrationKeys.chatSettings,
+    queryFn: () => api.get<{ activeWindowSeconds: number }>('/admin/integrations/chat-settings'),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useChatSettingsSave() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { activeWindowSeconds: number | null }) =>
+      api.post<{ activeWindowSeconds: number }>('/admin/integrations/chat-settings', body),
+    onSuccess: () => client.invalidateQueries({ queryKey: integrationKeys.chatSettings }),
   });
 }
 

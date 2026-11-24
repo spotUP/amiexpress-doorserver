@@ -27,6 +27,8 @@ import {
 } from './custom';
 import { getReleasesRevision, getReleasesCount, getReleasesStats } from '../releases/store';
 import { createFetchJson, createFetchText, createHeadStatus } from './fetch';
+import { withAchievementsDb } from '../achievements/db';
+import { activeWindowSeconds, setActiveWindowSeconds } from '../chat/config';
 
 const SECRET_WINDOW_MS = 60 * 1000;
 const SECRET_MAX = 10;
@@ -314,6 +316,42 @@ export function createIntegrationsAdminRouter(cfg: ServerConfig): Router {
     } finally {
       db.close();
     }
+  });
+
+  /** Hub-wide chat settings (achievements.db): the active window behind the member list's active dot. */
+  router.get('/chat-settings', requireAdmin(cfg), (_req: AuthedRequest, res: Response) => {
+    const ach = cfg.achievements;
+    if (!ach) {
+      res.status(404).json({ error: 'chat surface is not configured' });
+      return;
+    }
+    res.json({ activeWindowSeconds: withAchievementsDb(ach, (db) => activeWindowSeconds(db), { readonly: true }) });
+  });
+
+  /** `activeWindowSeconds`: a positive whole number, or null to fall back to CHAT_ACTIVE_WINDOW / the default. */
+  // POST, not PATCH: PATCH /:id above would take this path as a source id.
+  router.post('/chat-settings', requireAdmin(cfg), (req: AuthedRequest, res: Response) => {
+    const ach = cfg.achievements;
+    if (!ach) {
+      res.status(404).json({ error: 'chat surface is not configured' });
+      return;
+    }
+    const raw = (req.body ?? {}).activeWindowSeconds as unknown;
+    if (raw !== null && !(Number.isInteger(raw) && (raw as number) > 0 && (raw as number) <= 86400)) {
+      res.status(400).json({ error: 'activeWindowSeconds must be a whole number from 1 to 86400, or null' });
+      return;
+    }
+    const seconds = withAchievementsDb(ach, (db) => {
+      setActiveWindowSeconds(db, raw as number | null);
+      return activeWindowSeconds(db);
+    });
+    const db = openDb(cfg);
+    try {
+      recordAudit(db, req.admin?.id ?? null, 'chat.settings', `activeWindowSeconds=${seconds}`);
+    } finally {
+      db.close();
+    }
+    res.json({ activeWindowSeconds: seconds });
   });
 
   /** Prior integration: the releases listing as health signals. */

@@ -37,7 +37,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/health` | no key; counts only |
-| POST | `/sessions` | body `{handle, sysop?, client?}`; reply `{sid, user, expiresIn}` |
+| POST | `/sessions` | body `{handle, sysop?, client?}`; reply `{sid, user, expiresIn, activeWindow}` (`activeWindow`: seconds a member stays active, the hub admin's Chat integrations setting, else `CHAT_ACTIVE_WINDOW`) |
 | DELETE | `/sessions/current` | 204 |
 | GET | `/rooms.txt` | `?mine=1` optional; ROOMS rows |
 | GET | `/rooms` | the same as a JSON array |
@@ -162,7 +162,7 @@ field is only ever appended and the `1` never moves.
 Formats and their fields, in order:
 
 - ROOMS: `id|name|topic|visibility|members|owner|kind` (kind: `text`, `voice` or `art`)
-- MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText|label|active|lastActive` (`active` is `1` when the member holds a live session and typed or sent within the last 10 minutes, `CHAT_ACTIVE_WINDOW` seconds on the hub; `lastActive` the epoch second of that last typing or message, `0` never)
+- MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText|label|active|lastActive` (`active` is `1` when the member holds a live session and typed or sent within the last 10 minutes, the hub's active window: admin panel setting, else `CHAT_ACTIVE_WINDOW` seconds; `lastActive` the epoch second of that last typing or message, `0` never)
 - HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text|label`
 - EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo|label` (`replyTo` is the
   message id a `message` event answers, empty otherwise)

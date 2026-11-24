@@ -476,4 +476,11 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('ALTER TABLE chat_memberships ADD COLUMN last_active INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 20,
+    name: 'chat: chat_settings, hub-wide chat settings the admin panel sets (active window)',
+    up: (db) => {
+      db.exec('CREATE TABLE IF NOT EXISTS chat_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+    },
+  },
 ];

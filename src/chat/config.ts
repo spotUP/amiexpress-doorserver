@@ -6,6 +6,7 @@
  * CHAT_LIMITS from the contract; only a handful are tunable from the
  * environment, which is also what lets a test run a short poll.
  */
+import type Database from 'better-sqlite3';
 import { CHAT_LIMITS } from '../../contract/chat-types';
 
 export interface ChatConfig {
@@ -43,4 +44,16 @@ export function nowSec(): number {
 
 export function _setChatClockForTests(fn: (() => number) | null): void {
   clock = fn ?? (() => Math.floor(Date.now() / 1000));
+}
+
+/** Seconds a member stays active after typing or sending: the admin panel's setting, else CHAT_ACTIVE_WINDOW, else the contract default. */
+export function activeWindowSeconds(db: Database.Database): number {
+  const row = db.prepare("SELECT value FROM chat_settings WHERE key = 'active_window_seconds'").get() as { value: string } | undefined;
+  return positiveInt(row?.value, positiveInt(process.env.CHAT_ACTIVE_WINDOW, CHAT_LIMITS.activeWindowSeconds));
+}
+
+/** Store the admin panel's active window; null clears it back to CHAT_ACTIVE_WINDOW or the default. */
+export function setActiveWindowSeconds(db: Database.Database, seconds: number | null): void {
+  if (seconds === null) db.prepare("DELETE FROM chat_settings WHERE key = 'active_window_seconds'").run();
+  else db.prepare("INSERT INTO chat_settings (key, value) VALUES ('active_window_seconds', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(seconds));
 }

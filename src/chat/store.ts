@@ -12,7 +12,7 @@ import type {
 } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
-import { nowSec } from './config';
+import { activeWindowSeconds, nowSec } from './config';
 import { emitEvent, headSeq } from './events';
 import { getRoom, isMember, isOp, isOwnerLevel, isRoomStaff, requireCanvasClear, requireMod, requireOwner, requireSysop } from './permissions';
 import { applyParsed, blankCanvas, CANVAS_ROWS, CanvasGrammarError, encodeRow, parseOps } from './canvas-codec';
@@ -181,12 +181,6 @@ function touchActivity(db: Database.Database, user: string): void {
   db.prepare('UPDATE chat_memberships SET last_active = ? WHERE user = ?').run(nowSec(), user);
 }
 
-/** Seconds a member stays active after typing or sending (CHAT_ACTIVE_WINDOW overrides the contract default). */
-export function activeWindowSeconds(): number {
-  const n = Number(process.env.CHAT_ACTIVE_WINDOW);
-  return Number.isInteger(n) && n > 0 ? n : CHAT_LIMITS.activeWindowSeconds;
-}
-
 export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { user: string; sysop: boolean; op: boolean; status: string; statusText: string; active: boolean; lastActive: number }[] {
   const room = getRoom(db, id);
   if (room.visibility === 'private' && !ctx.admin && !isMember(db, id, ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
@@ -205,7 +199,7 @@ export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { 
   const pres = presenceMap(db);
   const lastActiveOf = db.prepare('SELECT last_active FROM chat_memberships WHERE user = ? AND room_id = ?');
   const now = nowSec();
-  const windowSec = activeWindowSeconds();
+  const windowSec = activeWindowSeconds(db);
   return [...rows, ...extra].sort((a, b) => a.user.localeCompare(b.user)).map((r) => {
     const connected = inRoom.has(r.user.toLowerCase()) || hasSession(r.user);
     const lastActive = (lastActiveOf.get(r.user, id) as { last_active: number } | undefined)?.last_active ?? 0;

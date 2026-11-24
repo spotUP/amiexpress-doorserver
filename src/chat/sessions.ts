@@ -13,7 +13,7 @@ import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
 import { withAchievementsDb } from '../achievements/db';
 import type { AchievementsConfig } from '../achievements/config';
-import { nowSec } from './config';
+import { activeWindowSeconds, nowSec } from './config';
 import type { ChatConfig } from './config';
 import { emitEvent, pruneEvents } from './events';
 import { sweepFiles } from './files';
@@ -102,7 +102,7 @@ export function createSession(
     const b = db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined;
     emitEvent(db, { type: 'board_joined', roomId: null, user: '', text: b?.name ?? boardId });
   }
-  return { sid, user, expiresIn: cfg.sessionTtlSeconds };
+  return { sid, user, expiresIn: cfg.sessionTtlSeconds, activeWindow: activeWindowSeconds(db) };
 }
 
 /** Remove a session and say `left` for every room that no other session of the user keeps. */

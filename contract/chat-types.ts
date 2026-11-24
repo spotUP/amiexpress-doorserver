@@ -226,6 +226,8 @@ export interface SessionReply {
   sid: string;
   user: string;
   expiresIn: number;
+  /** Seconds a member counts as active after typing or sending (members' `active` uses the same window). */
+  activeWindow: number;
 }
 
 export interface RoomRow {

@@ -6,7 +6,7 @@ import {
   useIntegrations, useIntegrationHealth, useIntegrationToggle,
   useIntegrationSettings, useIntegrationCreate, useIntegrationDelete,
   useSecretStore, useSecretDelete, useIntegrationTest,
-  useDemozooImportCard, useReleasesCard,
+  useDemozooImportCard, useReleasesCard, useChatSettings, useChatSettingsSave,
   type IntegrationSource,
 } from '../api/queries';
 import { Button, Input, Textarea } from '../components/ui';
@@ -157,6 +157,43 @@ function SourceCard({ source, health }: {
   );
 }
 
+/** The hub's active window in minutes; empty saves null (back to CHAT_ACTIVE_WINDOW or 10 minutes). */
+function ActiveWindowCard({ enabled }: { enabled: boolean }) {
+  const current = useChatSettings(enabled);
+  const save = useChatSettingsSave();
+  const [minutes, setMinutes] = useState<string | null>(null);
+  const shown = minutes ?? (current.data ? String(current.data.activeWindowSeconds / 60) : '');
+  const submit = () => {
+    const n = Number(shown);
+    if (shown.trim() !== '' && !(n > 0)) return;
+    save.mutate(
+      { activeWindowSeconds: shown.trim() === '' ? null : Math.round(n * 60) },
+      { onSuccess: () => setMinutes(null) },
+    );
+  };
+  return (
+    <div className="rounded-md border border-line bg-bg px-3 py-2">
+      <p className="font-medium">Active Window (minutes)</p>
+      <p className="mt-1 text-xs text-muted">
+        How long a chat member shows as active after typing or sending. Empty resets to the server default.
+      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <Input
+          aria-label="Active Window (minutes)"
+          inputMode="decimal"
+          value={shown}
+          disabled={current.isError}
+          onChange={(e) => setMinutes(e.target.value)}
+          className="w-24 text-xs"
+        />
+        <Button variant="default" disabled={save.isPending || current.isError} onClick={submit}>Save</Button>
+        {current.isError && <span className="text-xs text-muted">chat surface not configured</span>}
+        {save.isError && <span className="text-xs text-danger">{(save.error as Error).message}</span>}
+      </div>
+    </div>
+  );
+}
+
 function AddSourceForm({ onDone }: { onDone: () => void }) {
   const create = useIntegrationCreate();
   const remove = useIntegrationDelete();
@@ -256,6 +293,7 @@ export function IntegrationsPanel({
                 <SourceCard key={s.id} source={s} health={healthById.get(s.id)} />
               ))}
             </ul>
+            <ActiveWindowCard enabled={enabled && open} />
             <AddSourceForm onDone={() => undefined} />
             <div className="rounded-md border border-line bg-bg px-3 py-2">
               <p className="font-medium">Demozoo enrichment (offline import)</p>
