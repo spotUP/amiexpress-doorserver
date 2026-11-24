@@ -8,7 +8,7 @@ import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import type { ChatCtx } from '../src/chat/sessions';
-import { createRoom, joinRoom, listMemberships, listRooms, postMessage } from '../src/chat/store';
+import { createRoom, joinRoom, listMemberships, listRooms, postDm, postMessage } from '../src/chat/store';
 import { livechatScreen } from '../src/partyline/livechat-host';
 import type { PartylineScreen, ScreenInfo } from '../src/partyline/session';
 import { makeAchievementsFixture } from './achievements/helpers';
@@ -96,4 +96,21 @@ test('a public room created after entry is joined automatically, active room unc
   await until(() => ((evs('room:list').pop()?.rooms ?? []) as { room_name: string }[]).some((r) => r.room_name === 'late'));
   expect(peek(aliceSid, (db, ctx) => listMemberships(db, ctx)).map((m) => m.name)).toContain('late');
   expect(evs('room:joined').pop()?.channel).toBe('general');
+});
+
+test('chat:dm replies carry the same threadId as chat:dm-threads and chat:dm-history', async () => {
+  door('chat:dm', { to: 'bob', message: 'dm out' });
+  await until(() => evs('chat:dm').some((d) => d.message === 'dm out'));
+  const sent = evs('chat:dm').find((d) => d.message === 'dm out')!;
+  expect(typeof sent.threadId).toBe('string');
+  await until(() => evs('chat:dm-threads').length > 0);
+  expect((evs('chat:dm-threads').pop()?.threads as { threadId: string }[]).map((t) => t.threadId)).toContain(sent.threadId);
+  door('chat:dm-history', { threadId: sent.threadId });
+  await until(() => evs('chat:dm-history').length > 0);
+  expect(evs('chat:dm-history').pop()?.threadId).toBe(sent.threadId);
+
+  const aliceFull = peek(aliceSid, (_db, ctx) => ctx.user);
+  peek(bobSid, (db, ctx) => postDm(db, ctx, aliceFull, { content: 'dm in', clientId: `c${Math.random()}` }));
+  await until(() => evs('chat:dm').some((d) => d.message === 'dm in'));
+  expect(evs('chat:dm').find((d) => d.message === 'dm in')?.threadId).toBe(sent.threadId);
 });

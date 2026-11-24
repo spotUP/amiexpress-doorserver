@@ -223,15 +223,15 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
       'chat:dm': (d) => {
         const to = full(str(d, 'to', 'username', 'user'));
         const message = str(d, 'message', 'content');
-        store(true, (db, ctx) => postDm(db, ctx, to, { content: message, clientId: newId('pl') }));
-        reply('chat:dm', { direction: 'sent', from: short(me), to: short(to), message, isGroup: false });
+        const { threadId } = store(true, (db, ctx) => postDm(db, ctx, to, { content: message, clientId: newId('pl') }));
+        reply('chat:dm', { direction: 'sent', threadId, from: short(me), to: short(to), message, isGroup: false });
         sendThreads();
       },
       'chat:group-dm': (d) => {
         const people = (Array.isArray(d.participants) ? d.participants : []).filter((x): x is string => typeof x === 'string').map(full);
         const message = str(d, 'message', 'content');
-        store(true, (db, ctx) => postDmGroup(db, ctx, { participants: people, content: message, clientId: newId('pl') }));
-        reply('chat:dm', { direction: 'sent', from: short(me), message, isGroup: true, participants: people.map(short) });
+        const { threadId } = store(true, (db, ctx) => postDmGroup(db, ctx, { participants: people, content: message, clientId: newId('pl') }));
+        reply('chat:dm', { direction: 'sent', threadId, from: short(me), message, isGroup: true, participants: people.map(short) });
         sendThreads();
       },
       'chat:dm-threads:list': () => sendThreads(),
@@ -411,7 +411,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
           case 'dm': if (!mine) {
             const isGroup = e.label.startsWith('dg');
             const people = isGroup ? store(false, (db, ctx) => dmParticipants(db, ctx, e.label)) : [];
-            reply('chat:dm', { direction: 'received', from: short(e.user), message: e.text, isGroup, ...(isGroup ? { participants: people.map(short) } : {}) });
+            reply('chat:dm', { direction: 'received', threadId: e.label, from: short(e.user), message: e.text, isGroup, ...(isGroup ? { participants: people.map(short) } : {}) });
             sendThreads();
           } break;
           default: break;
