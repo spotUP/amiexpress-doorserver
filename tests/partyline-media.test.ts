@@ -89,12 +89,12 @@ describe('Partyline media commands', () => {
     type(bob, '/join #talk'); type(bob, '/voice join #talk');
     expect(last(bob)).toBe('Joined the call (1 in call)');
     const talk = bob.av.call;
-    expect(bob.run(false, (db, ctx) => voiceMembers(db, ctx, talk).members.map((m) => m.user))).toEqual(['bob']);
+    expect(bob.run(false, (db, ctx) => voiceMembers(db, ctx, talk).members.map((m) => m.user))).toEqual(['bob@UPROUGH']);
     expect(media.some((p) => p.toString('latin1').startsWith('audio:start-streaming\0'))).toBe(true);
 
     type(ann, '/join #talk'); type(ann, '/voice join');
     type(bob, '/nick'); // take() pulls ann's store event into bob's pane
-    expect(texts(bob)).toContain('ann joined the call');
+    expect(texts(bob)).toContain('ann@UPROUGH joined the call');
 
     // Peer audio reaches bob's board, and stops when he deafens.
     const audio = Buffer.concat(encodeMedia('audio:data', Buffer.from([1, 2, 3])));
@@ -107,13 +107,13 @@ describe('Partyline media commands', () => {
     type(bob, '/undeafen'); expect(last(bob)).toBe('Undeafened - can hear others');
 
     type(bob, '/voice mute'); expect(last(bob)).toBe('Microphone muted');
-    expect(bob.run(false, (db, ctx) => voiceMembers(db, ctx, talk).members.find((m) => m.user === 'bob')?.isMuted)).toBe(true);
-    type(ann, '/nick'); expect(texts(ann)).toContain('bob muted the microphone');
+    expect(bob.run(false, (db, ctx) => voiceMembers(db, ctx, talk).members.find((m) => m.user === 'bob@UPROUGH')?.isMuted)).toBe(true);
+    type(ann, '/nick'); expect(texts(ann)).toContain('bob@UPROUGH muted the microphone');
 
-    type(bob, '/voice'); expect(texts(bob)).toContain('In a call: ann, bob (muted)');
+    type(bob, '/voice'); expect(texts(bob)).toContain('In a call: bob@UPROUGH (muted), ann@UPROUGH');
     type(bob, '/voice zap'); expect(last(bob)).toBe('Usage: /voice [join <channel> | leave]');
     type(bob, '/voice leave'); expect(last(bob)).toBe('Left the call');
-    expect(bob.run(false, (db, ctx) => voiceMembers(db, ctx, talk).members.map((m) => m.user))).toEqual(['ann']);
+    expect(bob.run(false, (db, ctx) => voiceMembers(db, ctx, talk).members.map((m) => m.user))).toEqual(['ann@UPROUGH']);
     type(bob, '/voice leave'); expect(last(bob)).toBe('Not in a voice call.');
   });
 
