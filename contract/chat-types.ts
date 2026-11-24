@@ -400,6 +400,7 @@ export const CHAT_ENDPOINTS = [
   'GET /rooms/:id/history.txt',
   'GET /memberships.txt',
   'PUT /rooms/:id/read',
+  'PUT /rooms/:id/name',
   'POST /rooms/:id/messages',
   'PUT /messages/:id',
   'DELETE /messages/:id',
