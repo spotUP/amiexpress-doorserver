@@ -925,6 +925,21 @@ export function deleteRoom(db: Database.Database, ctx: ChatCtx, id: string, file
   removeRoomFiles(db, filesDir, id, ctx.user || 'admin', false);
 }
 
+/**
+ * LiveChat's Archive Channel: the room leaves every list and cannot be joined,
+ * but its messages, pins, canvas and files stay on the hub. Members hear
+ * `room_deleted` (ref `archived`) so every client drops it like a delete.
+ */
+export function archiveRoom(db: Database.Database, ctx: ChatCtx, id: string): void {
+  const room = getRoom(db, id);
+  requireOwner(room, ctx);
+  emitEvent(db, { type: 'room_deleted', roomId: id, user: ctx.user || 'admin', ref: 'archived', text: room.name });
+  const now = nowSec();
+  db.prepare('UPDATE chat_rooms SET deleted_at = ?, archived_at = ?, name_key = ? WHERE id = ?').run(now, now, `${room.name.toLowerCase()}~archived~${id}`, id);
+  db.prepare('DELETE FROM chat_members WHERE room_id = ?').run(id);
+  db.prepare('DELETE FROM chat_memberships WHERE room_id = ?').run(id);
+}
+
 export function clearRoom(db: Database.Database, ctx: ChatCtx, id: string, filesDir: string | null = null): void {
   const room = getRoom(db, id);
   requireOwner(room, ctx);

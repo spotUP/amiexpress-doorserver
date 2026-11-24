@@ -103,6 +103,7 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | PUT | `/rooms/:id/motd` | `{motd}` (at most 500 characters, empty clears); room owner or moderator |
 | PUT | `/rooms/:id/visibility` | `{visibility}`; owner or owning-board sysop |
 | DELETE | `/rooms/:id` | owner, owning-board sysop, admin; 204 |
+| POST | `/rooms/:id/archive` | owner, owning-board sysop, admin (LiveChat's Archive Channel): the room leaves every list and refuses joins (404), its messages and files stay on the hub; members hear `room_deleted` with ref `archived`; no unarchive |
 | POST | `/rooms/:id/clear` | owning-board sysop or admin; emits `delete` per message; 204 |
 | GET | `/motd` | JSON `{text}` |
 | PUT | `/motd` | admin only; `{text}` |
@@ -347,7 +348,7 @@ itself hold `!`-escaped sub-fields):
 | `joined`, `left` | room id | who | empty | empty |
 | `topic` | room id | who set it | empty | the topic |
 | `room_motd` | room id | who set it | empty | the room's message of the day (empty = cleared) |
-| `room_created`, `room_deleted` | room id | creator or deleter | empty | room name |
+| `room_created`, `room_deleted` | room id | creator, deleter or archiver | empty; `archived` when the room was archived | room name |
 | `room_renamed` | room id | the moderator who renamed it | empty | the new room name |
 | `kicked`, `unmuted`, `op`, `deop` | room id | the target | empty | the acting user |
 | `mode` | room id | who set it | empty | the applied modes, e.g. `+i +o alice@BOARD` |

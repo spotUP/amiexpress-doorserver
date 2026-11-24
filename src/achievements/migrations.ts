@@ -483,4 +483,13 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('CREATE TABLE IF NOT EXISTS chat_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
     },
   },
+  {
+    version: 21,
+    name: 'chat: chat_rooms.archived_at, when a sysop archived the room (hidden, history kept)',
+    // LiveChat's Archive Channel hides a channel from every list but keeps its
+    // messages and files; deleted_at alone cannot tell an archive from a delete.
+    up: (db) => {
+      db.exec('ALTER TABLE chat_rooms ADD COLUMN archived_at INTEGER');
+    },
+  },
 ];

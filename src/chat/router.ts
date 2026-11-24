@@ -368,6 +368,10 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     run(req, true, (db, ctx) => store.deleteRoom(db, ctx, p(req, 'id'), filesDir));
     res.json({ ok: true });
   });
+  router.post('/rooms/:id/archive', (req: Request, res: Response) => {
+    run(req, true, (db, ctx) => store.archiveRoom(db, ctx, p(req, 'id')));
+    res.json({ ok: true });
+  });
   router.post('/rooms/:id/clear', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.clearRoom(db, ctx, p(req, 'id'), filesDir));
     res.json({ ok: true });
