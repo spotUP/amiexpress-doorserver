@@ -77,6 +77,18 @@ export function listRooms(db: Database.Database, ctx: ChatCtx): RoomRow[] {
   return rows.map((r) => ({ id: r.id, name: r.name, topic: r.topic, visibility: r.visibility, members: countMembers(db, r.id), owner: r.owner_user, kind: r.kind }));
 }
 
+/** A fresh achievements.db has no rooms: create the shared default room (idempotent, keyed by name_key). */
+export function ensureDefaultRoom(db: Database.Database): string {
+  const row = db.prepare('SELECT id FROM chat_rooms WHERE name_key = ?').get(CHAT_DEFAULT_ROOM_KEY) as { id: string } | undefined;
+  if (row) return row.id;
+  const id = newId('room');
+  db.prepare('INSERT INTO chat_rooms (id, name, name_key, owner_board, owner_user, topic, visibility, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    id, CHAT_DEFAULT_ROOM_KEY, CHAT_DEFAULT_ROOM_KEY, 'doorserver', 'system@DOORSERVER', 'Shared lobby for every board', 'public', 'text', nowSec()
+  );
+  emitEvent(db, { type: 'room_created', roomId: id, user: 'system@DOORSERVER', text: CHAT_DEFAULT_ROOM_KEY });
+  return id;
+}
+
 /** The validated room name from a create or rename body. */
 function roomNameOf(b: Body): string {
   const name = str(b, 'name', CHAT_LIMITS.roomNameMax).trim();

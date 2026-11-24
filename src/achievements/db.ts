@@ -17,6 +17,7 @@ import { ACHIEVEMENTS_MIGRATIONS } from './migrations';
 import type { AchievementsConfig } from './config';
 import { loadSeed, seedCatalog } from './catalog';
 import type { Seed } from './catalog';
+import { ensureDefaultRoom } from '../chat/store';
 
 export function openAchievementsDb(
   ach: AchievementsConfig,
@@ -78,6 +79,7 @@ export function initAchievementsDb(
     if (seed) {
       const r = seedCatalog(db, seed);
       if (r.inserted.length > 0) console.log(`[INFO] achievements: seeded ${r.inserted.length} achievements`);
+      ensureDefaultRoom(db);
     }
     return ran;
   } finally {
