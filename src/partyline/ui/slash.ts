@@ -12,7 +12,7 @@ import { cover, MODAL_NONE, OverlayState } from './overlays';
 export const CMD_HELP: ReadonlyArray<readonly [string, string, string, string]> = [
   ['ban', '', 'Ban user from channel', '/ban @user [reason]'],
   ['clear', 'cls', 'Clear chat display', '/clear'],
-  ['create', '', 'Create a new channel. --private and --invite-only make it members-only.', '/create #name [topic] [--private] [--invite-only] [--motd "text"]'],
+  ['create', 'n,np', 'Create a new channel. --private and --invite-only make it members-only.', '/create #name [topic] [--private] [--invite-only] [--motd "text"]'],
   ['deletemsg', 'delmsg', 'Delete a message (your last by default)', '/deletemsg [msg-id]'],
   ['edit', '', 'Edit one of your messages (your last by default)', '/edit [msg-id] new text'],
   ['away', 'afk', 'Set away status', '/away [message]'],
@@ -78,6 +78,19 @@ export const SLASH_MAX = 64, SLASH_ROWS = 8;
 const lower = (s: string): string => s.replace(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32));
 
 /** lc_slash_match: the commands for "/term", prefix matches first then description matches, each by name. */
+/**
+ * LIVECHAT server.ts typedPickListCommand: a bare /word whose command needs an argument (some usage argument is not
+ * `[optional]`) and whose first argument is @user or #channel opens a pick list. run: every later argument is optional,
+ * so a pick runs the command instead of filling the input. null: no pick list, the command's usage path follows.
+ */
+export function slashPickKind(word: string): { kind: 'user' | 'channel'; run: boolean } | null {
+  const w = word.toLowerCase(), e = CMD_HELP.find(([n, al]) => n === w || (al !== '' && al.split(',').includes(w)));
+  const args = e ? e[3].split(/\s+/).slice(1) : [];
+  if (args.length === 0 || args.every((a) => a.startsWith('['))) return null;
+  const kind = /^(@user|<user>)/.test(args[0]) ? 'user' : /^(#channel|<channel>)/.test(args[0]) ? 'channel' : null;
+  return kind ? { kind, run: args.slice(1).every((a) => a.startsWith('[')) } : null;
+}
+
 export function slashMatch(input: string): number[] {
   if (input[0] !== '/') return [];
   const term = lower(input.slice(1)), idx: number[] = [], pre: number[] = [];

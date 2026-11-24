@@ -102,8 +102,9 @@ describe('hub screen commands', () => {
     type('/motd hello all'); type('/motd'); expect(last()).toBe('[MOTD] hello all');
     type('/mode x'); expect(last()).toBe('Error: Mode string must start with + or -');
     const n = screen.model.lines.length; type('/mode +m'); expect(screen.model.lines.length).toBe(n);
-    type('/invite'); expect(last()).toBe('Error: Usage: /invite @user [#room]');
-    type('/whois'); expect(last()).toBe('Error: Usage: /whois @user');
+    type('/invite'); expect(screen.model.popup).not.toBeNull(); // LIVECHAT typedPickListCommand: bare /invite lists users
+    screen.input(Buffer.from('\x1b\x1b', 'latin1')); expect(screen.model.popup).toBeNull();
+    type('/whois'); expect(screen.model.popup?.items.length).toBeGreaterThan(0); screen.input(Buffer.from('\x1b\x1b', 'latin1'));
     type('/whois @nobody'); expect(last()).toBe('User nobody is not online.');
     type('/msg hi'); expect(last()).toBe('Usage: /msg @user [@user2 ...] message');
     type('/delete #lounge'); expect(last()).toBe('Deleted #lounge');
@@ -123,11 +124,13 @@ describe('hub screen commands', () => {
     type('/reply 1 answer'); expect(lines()).toEqual(['1:better', '2:answer']);
     type('/love 1'); type('/react 1 fire'); type('/reactions 1'); expect(last()).toMatch(/^Reactions on 1: (\[heart 1\] \[fire 1\]|\[fire 1\] \[heart 1\])$/);
     type('/unreact fire 1'); type('/reactions 1'); expect(last()).toBe('Reactions on 1: [heart 1]');
-    type('/thread 1'); expect(last()).toMatch(/: better$/); // threadHistory leads with the parent message
+    const view = (): string[] => screen.over.view ? screen.over.viewText : []; // LIVECHAT: /thread and /pinned open the view window
+    type('/thread 1'); expect(view()[1]).toMatch(/: better$/); screen.input(Buffer.from('\x1b\x1b', 'latin1')); // threadHistory leads with the parent message
     type('/pin 1'); expect(last()).toBe('Pin requested.');
-    type('/pinned'); expect(last()).toMatch(/^1\. bob.*: better/);
-    type('/search better'); expect(last()).toBe('Found 1 results for "better"');
-    type('/unpin 1'); type('/pinned'); expect(last()).toBe('No pinned messages in this room.');
+    type('/pinned'); expect(view()[2]).toMatch(/^1\. bob.*: better/); screen.input(Buffer.from('\x1b\x1b', 'latin1'));
+    type('/search better'); expect(screen.over.search).toBe(true); // LIVECHAT: /search opens the Search panel
+    screen.input(Buffer.from('\x1b\x1b', 'latin1')); expect(screen.over.search).toBe(false);
+    type('/unpin 1'); type('/pinned'); expect(view()[0]).toBe('No pinned messages in this room.'); screen.input(Buffer.from('\x1b\x1b', 'latin1'));
     type('/deletemsg 1'); expect(lines()).toEqual(['2:answer']);
     type('/deletemsg'); expect(lines()).toEqual([]);
   });
@@ -153,7 +156,8 @@ describe('hub screen commands', () => {
     for (const w of ['files', 'file', 'share']) { type('/' + w); expect(last()).toBe('file sharing is not enabled on this hub'); }
     type('/sounds'); expect(last()).toBe('Error: Usage: /sounds on|off');
     type('/sounds off'); expect(last()).toBe('Sounds disabled');
-    type('/settings'); expect(last()).toBe('  BBS events: see /events');
+    type('/settings'); expect(screen.over.settings).toBe(true); // LIVECHAT: /settings opens the Settings panel
+    screen.input(Buffer.from('\x1b\x1b', 'latin1')); expect(screen.over.settings).toBe(false);
     type('first'); type('/clear-room'); expect(last()).toBe('Clear history requested for lab');
     type(`/whois @${screen.run(false, (_db, ctx) => ctx.user)}`); expect(screen.model.lines.some((l) => /^Board .*last seen \d\d:\d\d, idle \d+s$/.test(l.text))).toBe(true);
     expect(last()).toBe('Shared rooms: #lab');

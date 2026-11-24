@@ -9,7 +9,13 @@ import type { DrawState } from './draw';
 
 export const HIT_YES = 8, HIT_NO = 9, HIT_OK = 10, HIT_MODAL = 11,
   HIT_SEARCH = 17, HIT_SEARCH_Q = 18, HIT_SEARCH_USER = 19, HIT_SEARCH_ROW = 20, HIT_SETTINGS = 21, HIT_SETTINGS_ROW = 22,
-  HIT_THEME = 23, HIT_THEME_ROW = 24;
+  HIT_THEME = 23, HIT_THEME_ROW = 24,
+  /** Create Channel form: the box, field 0..6 (HIT_CREATE_F + field) and the Text/Voice/Art choices (HIT_CREATE_KIND + kind). */
+  HIT_CREATE = 25, HIT_CREATE_F = 26, HIT_CREATE_KIND = 33;
+
+/** LIVECHAT chan-admin.ts ROOM_KINDS order and labels; the form's fields in Tab order. */
+export const CREATE_KINDS = ['text', 'voice', 'art'] as const, CREATE_KIND_LABELS = ['Text', 'Voice', 'Art'];
+export const CF_NAME = 0, CF_TOPIC = 1, CF_KIND = 2, CF_PRIVATE = 3, CF_INVITE = 4, CF_CREATE = 5, CF_CANCEL = 6, CF_COUNT = 7;
 
 export const MODAL_NONE = 0, MODAL_MESSAGE = 1, MODAL_QUIT = 2, MODAL_PROMPT = 3, MODAL_RECONNECT = 4, MODAL_PROGRESS = 5;
 export const SEARCH_MAX = 20, VIEW_MAX = 40;
@@ -56,6 +62,9 @@ export class OverlayState {
   /** The theme panel (lc_model theme, theme_sel, theme_opened) and the first row the last frame showed. */
   theme = false; themeSel = 0; themeOpened = 0; themeFirst = 0;
   settings = false; settingsSel = 0; settingsVal = [false, false, false, false, false, false, false, false]; settingsStatus = 0;
+  /** LIVECHAT create-channel-dialog.ts: shown, focused CF_* field, the values and the note line. */
+  create = false; createField = CF_NAME; createName = ''; createTopic = ''; createKind = 0;
+  createPriv = false; createInvite = false; createNote = '';
   /** The "/" menu (lc_model slash_*): selected match, first visible, Esc hid it until the next key. */
   slashSel = 0; slashTop = 0; slashOff = false;
   /** The format/emoji picker is shown (lc_model fmt). */
@@ -365,12 +374,52 @@ function drawTheme(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
   c.pen(p.ink, DEFAULT, 0);
 }
 
+/** LIVECHAT create-channel-dialog.ts: 17 rows, Name/Topic boxes, Type radios, Private/Invite Only boxes, note, Create/Cancel. */
+function drawCreate(c: Cells, m: Model, d: DrawState, o: OverlayState, caret: { cr: number; cc: number }): void {
+  const p = m.pal, h = 17, w = Math.min(48, Math.max(30, c.cols - 2)), fw = w - 4;
+  c.pen(p.ink, DEFAULT, 0);
+  const r = modal(c, d, h, w, p.col[T_CHROME], ' Create Channel ', p.ink), top = r.top + 1, left = r.left + 2;
+  d.hits.add(HIT_CREATE, r.top, r.left, h, w);
+  const lab = (f: number): void => c.pen(o.createField === f ? p.accent : p.ink, DEFAULT, 0);
+  const field = (row: number, f: number, label: string, text: string): void => {
+    lab(f); c.text(top + row, left, label, fw);
+    const shown = text.slice(Math.max(0, text.length - fw + 1));
+    c.pen(p.col[T_SELECTION_INK], p.col[T_SELECTION_BG], 0); c.fill(top + row + 1, left, 1, fw, 0x20); c.text(top + row + 1, left, shown, fw);
+    d.hits.add(HIT_CREATE_F + f, top + row, left, 2, fw);
+    if (o.createField === f) { caret.cr = top + row + 1; caret.cc = left + shown.length; }
+  };
+  field(0, CF_NAME, 'Name:', o.createName);
+  field(3, CF_TOPIC, 'Topic:', o.createTopic);
+  lab(CF_KIND); c.text(top + 6, left, o.createField === CF_KIND ? 'Type: (Left/Right)' : 'Type:', fw);
+  let x = left;
+  CREATE_KIND_LABELS.forEach((label, k) => {
+    const t = `(${o.createKind === k ? '*' : ' '}) ${label}`;
+    c.pen(o.createKind === k ? p.accent : p.ink, DEFAULT, 0); c.text(top + 7, x, t, t.length);
+    d.hits.add(HIT_CREATE_KIND + k, top + 7, x, 1, t.length);
+    x += t.length + 2;
+  });
+  const box = (row: number, f: number, label: string, on: boolean): void => {
+    lab(f); c.text(top + row, left, `[${on ? 'X' : ' '}] ${label}`, fw); d.hits.add(HIT_CREATE_F + f, top + row, left, 1, label.length + 4);
+  };
+  box(9, CF_PRIVATE, 'Private', o.createPriv);
+  box(10, CF_INVITE, 'Invite Only', o.createInvite);
+  if (o.createNote !== '') { c.pen(p.warn, DEFAULT, 0); c.text(top + 12, left, o.createNote, fw); }
+  const mid = r.left + (w >> 1);
+  for (const [f, label, at] of [[CF_CREATE, '  Create', mid - 11], [CF_CANCEL, '  Cancel', mid + 1]] as const) {
+    c.pen(o.createField === f ? p.col[T_SELECTION_INK] : p.barInk, o.createField === f ? p.col[T_SELECTION_BG] : p.col[T_BAR], 0);
+    c.fill(top + 13, at, 1, 10, 0x20); c.text(top + 13, at, label, 10);
+    d.hits.add(HIT_CREATE_F + f, top + 13, at, 1, 10);
+  }
+  c.pen(p.ink, DEFAULT, 0);
+}
+
 export function drawOverlays(c: Cells, m: Model, d: DrawState, o: OverlayState, caret: { cr: number; cc: number }): void {
   if (o.help) drawText(c, m, d, 'Help', HELP_TEXT, o.helpTop, false);
   if (o.view) drawText(c, m, d, o.viewTitle, o.viewText, o.viewTop, true);
   if (o.search) drawSearch(c, m, d, o, caret);
   if (o.theme) drawTheme(c, m, d, o);
   if (o.settings) drawSettings(c, m, d, o);
+  if (o.create) drawCreate(c, m, d, o, caret);
   if (o.modal !== MODAL_NONE) drawModal(c, m, d, o, caret);
   if (o.fmt) drawPicker(c, m, d, o);
 }

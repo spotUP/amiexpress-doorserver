@@ -25,9 +25,10 @@ import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
 import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_OK, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
-  HIT_THEME_ROW, MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
+  HIT_THEME_ROW, HIT_CREATE_F, HIT_CREATE_KIND, CREATE_KINDS, CF_NAME, CF_TOPIC, CF_KIND, CF_PRIVATE, CF_INVITE, CF_CREATE, CF_CANCEL, CF_COUNT,
+  MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
   SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
-import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashScroll } from './slash';
+import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashPickKind, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
 import { completeAtMention } from './at-complete';
 import type { Line } from './model';
@@ -61,6 +62,9 @@ export function stamp(at: number): string {
   const d = new Date(at * 1000);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+/** What a context popup acts on; pick: a typed pick list fills (or runs) `/cmd <sigil><item>`. */
+type PopupCtx = { line?: Line; user?: string; roomId?: string; pick?: { cmd: string; sigil: string; run: boolean } };
 
 export class HubScreen implements PartylineScreen {
   readonly model: Model;
@@ -132,7 +136,7 @@ export class HubScreen implements PartylineScreen {
       ...getPrefs(db, ctx),
       showLogins: ev.logins, showFileActivity: ev.files, showDoorActivity: ev.doors, showMessages: ev.messages,
       showSystemAnnouncements: ev.announcements, notificationSound: this.prefs.sounds, mentionSound: this.prefs.sounds,
-      showTimestamps: this.model.timestamps, compactMode: this.model.compact,
+      showTimestamps: this.model.timestamps, compactMode: this.model.compact, theme: this.themeId,
       muteAllEvents: !(ev.logins || ev.files || ev.doors || ev.messages || ev.announcements),
       pinnedChannels: [...this.pinned].map((id) => names.get(id)).filter((n): n is string => n !== undefined),
     }));
@@ -149,6 +153,8 @@ export class HubScreen implements PartylineScreen {
     this.prefs.sounds = flag('notificationSound', this.prefs.sounds);
     this.model.timestamps = flag('showTimestamps', this.model.timestamps);
     this.model.compact = flag('compactMode', this.model.compact);
+    const th = THEMES.find((t) => t.id === p.theme);
+    if (th) { this.model.pal.set(th.rgb); this.themeId = th.id; }
     const pins = Array.isArray(p.pinnedChannels) ? p.pinnedChannels : typeof p.pinnedChannels === 'string' ? p.pinnedChannels.split(',') : [];
     for (const r of this.tryRun(false, (db, ctx) => listMemberships(db, ctx)) ?? []) if (pins.includes(r.name)) this.pinned.add(r.roomId);
   }
@@ -240,7 +246,6 @@ export class HubScreen implements PartylineScreen {
   }
 
   // ---- livechat.c theme panel (theme_open/theme_show/theme_close/theme_key; TS overlays/theme-menu.ts) ----
-  // shortcut: the pick lives for this session only (the hub has no ae_set_user_theme store yet); add it to the prefs once the store carries a theme.
   private themeId = THEMES[0].id;
   themeOpen(): void {
     const o = this.over, at = Math.max(0, THEMES.findIndex((t) => t.id === this.themeId));
@@ -248,7 +253,8 @@ export class HubScreen implements PartylineScreen {
   }
   /** theme_show: the highlight is the preview, every move re-themes the screen. */
   private themeShow(i: number): void { this.over.themeSel = i; this.model.pal.set(THEMES[i].rgb); this.themeId = THEMES[i].id; }
-  private themeClose(keep: boolean): void { if (!keep) this.themeShow(this.over.themeOpened); this.over.theme = false; }
+  /** Enter keeps the pick and stores it in the prefs (the TS door's ae_set_user_theme), so the next PL start loads it. */
+  private themeClose(keep: boolean): void { if (keep) this.prefsSave(); else this.themeShow(this.over.themeOpened); this.over.theme = false; }
   private themeKey(k: number): void {
     const o = this.over, n = THEMES.length;
     if (k === K_ESC || k === 0x71) this.themeClose(false);
@@ -257,6 +263,51 @@ export class HubScreen implements PartylineScreen {
     else if (k === K_DOWN) { if (o.themeSel < n - 1) this.themeShow(o.themeSel + 1); }
     else if (k === K_PGUP) this.themeShow(Math.max(0, o.themeSel - 10));
     else if (k === K_PGDN) this.themeShow(Math.min(n - 1, o.themeSel + 10));
+  }
+
+  // ---- LIVECHAT overlays/create-channel-dialog.ts: the form; its submit is the /create line createTyped parses ----
+  createOpen(priv: boolean): void {
+    const o = this.over;
+    o.create = true; o.createField = CF_NAME; o.createName = o.createTopic = o.createNote = ''; o.createKind = 0; o.createPriv = priv; o.createInvite = false;
+  }
+  /** Tab/Shift+Tab cycle, Left/Right pick the Type, Enter or Space presses, Esc closes, text edits Name and Topic. */
+  private createKey(k: number, ch = String.fromCharCode(k)): void {
+    const o = this.over, f = o.createField;
+    if (k === K_ESC) o.create = false;
+    else if (k === 9) o.createField = (f + 1) % CF_COUNT;
+    else if (k === K_BACKTAB) o.createField = (f + CF_COUNT - 1) % CF_COUNT;
+    else if (f === CF_KIND && (k === K_LEFT || k === K_RIGHT)) o.createKind = (o.createKind + (k === K_LEFT ? CREATE_KINDS.length - 1 : 1)) % CREATE_KINDS.length;
+    else if (k === K_ENTER || (k === 0x20 && f >= CF_PRIVATE)) this.createPress(f);
+    else if (f === CF_NAME || f === CF_TOPIC) {
+      const t = f === CF_NAME ? o.createName : o.createTopic, put = (v: string): void => { if (f === CF_NAME) o.createName = v; else o.createTopic = v; };
+      if (k === 8 || k === 127) put(t.slice(0, -1));
+      else if (k >= 0x20 && k < K_UP && t.length + 1 < (f === CF_NAME ? 40 : 200)) put(t + ch);
+    }
+  }
+  private createPress(f: number): void {
+    const o = this.over;
+    if (f === CF_NAME) o.createField = CF_TOPIC;
+    else if (f === CF_TOPIC || f === CF_CREATE) this.createSubmit();
+    else if (f === CF_PRIVATE) o.createPriv = !o.createPriv;
+    else if (f === CF_INVITE) o.createInvite = !o.createInvite;
+    else if (f === CF_CANCEL) o.create = false;
+  }
+  private createSubmit(): void {
+    const o = this.over, name = o.createName.trim().replace(/^#+/, '').replace(/\s+/g, '-');
+    if (name === '') { o.createNote = 'The channel needs a name.'; o.createField = CF_NAME; return; }
+    o.create = false;
+    this.runLine([`/create #${name}`, o.createTopic.trim(), `--type ${CREATE_KINDS[o.createKind]}`, o.createPriv && '--private', o.createInvite && '--invite-only'].filter(Boolean).join(' '));
+  }
+
+  /** LIVECHAT typedPickListCommand: users or channels just above the input; an empty list returns false so the usage line follows. */
+  private pickListOpen(word: string): boolean {
+    const pk = slashPickKind(word), m = this.model;
+    if (!pk) return false;
+    const items = pk.kind === 'user' ? this.userNames()
+      : m.side.filter((s) => s.kind === SIDE_ROOM && !(word === 'join' && s.id === this.roomId)).map((s) => s.label.replace(/^#/, ''));
+    if (items.length === 0) return false;
+    this.popupOpen(items, Math.max(1, this.cells.rows - items.length - 6), 1, { pick: { cmd: word, sigil: pk.kind === 'user' ? '@' : '#', run: pk.run } });
+    return true;
   }
 
   // ---- livechat.c view window (view_open/view_add): pinned_typed, thread_view; profile_overlay is a message modal ----
@@ -300,6 +351,8 @@ export class HubScreen implements PartylineScreen {
   private overlayCommand(line: string): boolean {
     const [word, ...rest] = line.trim().split(/\s+/), cmd = word.toLowerCase();
     if (cmd === '/theme' && rest.length === 0) { this.themeOpen(); return true; }
+    if (rest.length === 0 && /^\/(create|n|np)$/.test(cmd)) { this.createOpen(cmd === '/np'); return true; } // LIVECHAT openCreateChannel
+    if (rest.length === 0 && cmd.length > 1 && this.pickListOpen(cmd.slice(1))) return true;
     if (cmd === '/pinned' && rest.length === 0) { this.pinnedView(); return true; }
     if ((cmd === '/thread' || cmd === '/t') && rest.length === 1 && /^\d+$/.test(rest[0])) {
       const l = this.model.lines.find((x) => x.number === Number(rest[0]) && x.id !== '');
@@ -645,6 +698,7 @@ export class HubScreen implements PartylineScreen {
   private insertChar(ch: string): void {
     const m = this.model, o = this.over;
     if (o.search) { this.searchKey(ch.codePointAt(0) as number, ch); return; }
+    if (o.create) { this.createKey(ch.codePointAt(0) as number, ch); return; }
     if (o.modal !== MODAL_NONE || o.fmt || o.help || o.settings || o.theme || o.view) return;
     if (m.focus === FOCUS_INPUT) this.slashKey(ch.codePointAt(0) as number);
     this.cutSelection();
@@ -731,6 +785,7 @@ export class HubScreen implements PartylineScreen {
     if (k === 17) { o.modal = MODAL_QUIT; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
     if (o.fmt) { this.pickKey(k); return; }
     if (o.modal === MODAL_MESSAGE) { if (k === K_ENTER || k === K_ESC || k === 0x20) o.modal = MODAL_NONE; return; }
+    if (o.create) { this.createKey(k); return; }
     if (o.theme) { this.themeKey(k); return; }
     if (o.settings) { this.settingsKey(k); return; }
     if (o.search) { this.searchKey(k); return; }
@@ -951,6 +1006,11 @@ export class HubScreen implements PartylineScreen {
   private mousePress(row: number, col: number, button: number): void {
     const m = this.model, o = this.over, h = this.drawState.hits.at(row, col);
     if (o.modal === MODAL_MESSAGE) { if (h.id === HIT_OK || h.id !== HIT_MODAL) o.modal = MODAL_NONE; return; }
+    if (o.create) { // a click focuses a field or a Type choice; a box toggles, a button presses
+      if (h.id >= HIT_CREATE_KIND && h.id < HIT_CREATE_KIND + CREATE_KINDS.length) { o.createField = CF_KIND; o.createKind = h.id - HIT_CREATE_KIND; }
+      else if (h.id >= HIT_CREATE_F && h.id < HIT_CREATE_F + CF_COUNT) { o.createField = h.id - HIT_CREATE_F; if (o.createField >= CF_PRIVATE) this.createPress(o.createField); }
+      return;
+    }
     if (o.theme) { if (h.id === HIT_THEME_ROW && o.themeFirst + h.dr < THEMES.length) this.themeShow(o.themeFirst + h.dr); return; }
     if (o.settings) { if (h.id === HIT_SETTINGS_ROW && h.dr < 64 && o.setItemAt[h.dr] >= 0) this.settingsPick(o.setItemAt[h.dr]); return; }
     if (o.search) { // a click on a field focuses it; a click on a result selects it, a second click on the selected one jumps
@@ -1013,7 +1073,7 @@ export class HubScreen implements PartylineScreen {
   private lastKeyTime = 0;
   private anyMotion = false;
   private osc = '';
-  private popupCtx: { line?: Line; user?: string; roomId?: string } = {};
+  private popupCtx: PopupCtx = {};
 
   /** LIVECHAT input history (100 lines): Up on an empty line picks a message, else Up/Down step through sent lines. */
   private historyKey(up: boolean): void {
@@ -1100,7 +1160,7 @@ export class HubScreen implements PartylineScreen {
     }
   }
 
-  private popupOpen(items: string[], row: number, col: number, ctx: { line?: Line; user?: string; roomId?: string }): void {
+  private popupOpen(items: string[], row: number, col: number, ctx: PopupCtx): void {
     this.model.popup = { items, row, col, sel: 0 };
     this.popupCtx = ctx;
   }
@@ -1121,9 +1181,10 @@ export class HubScreen implements PartylineScreen {
   private popupPick(i: number): void {
     const item = this.model.popup?.items[i];
     if (item === undefined || item === '---') return;
-    const { line, user = '', roomId } = this.popupCtx, m = this.model;
+    const { line, user = '', roomId, pick } = this.popupCtx, m = this.model;
     this.popupClose();
     m.focus = FOCUS_INPUT;
+    if (pick) { const t = `/${pick.cmd} ${pick.sigil}${item}`; if (pick.run) this.runLine(t); else this.fillInput(`${t} `); return; }
     const n = line?.number ?? 0;
     switch (item) {
       case 'Reply': this.fillInput(`/reply ${n} `); return;
