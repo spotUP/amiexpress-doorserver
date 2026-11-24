@@ -536,10 +536,14 @@ export class HubScreen implements PartylineScreen {
 
   private quit(): void {
     this.quitting = true;
+    // Dirty first: the session renders one last frame (the clear below) before it ends; without it PL's screen stayed on the board (sysop 2026-11-24).
+    this.info.markDirty();
     this.info.quit?.();
   }
 
   render(full: boolean): Buffer {
+    // Leaving: hand the board a clean screen, as LIVECHAT's cleanup and every door exit do.
+    if (this.quitting) return Buffer.from((this.info.hello.mouse ? '\x1b[?1000l\x1b[?1006l' : '') + '\x1b[0m\x1b[2J\x1b[H\x1b[?25h', 'latin1');
     if (full) this.cells.invalidate();
     const { cr, cc } = draw(this.cells, this.model, this.drawState, this.over);
     // A full frame (first paint, resize, redraw) re-arms SGR mouse reports; input() parses them.

@@ -35,13 +35,14 @@ describe('hub screen commands', () => {
   let fx: AchievementsFixture;
   let screen: HubScreen;
   let quits = 0;
+  let dirties = 0;
   beforeEach(() => {
     fx = makeAchievementsFixture();
     const chat = loadChatConfig();
     const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'bob', sysop: true, client: 'test' }).sid);
     const hello = { cols: 80, rows: 25 } as ScreenInfo['hello'];
-    quits = 0;
-    screen = chatScreen(fx.ach, chat)({ sid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => { quits++; } }) as HubScreen;
+    quits = 0; dirties = 0;
+    screen = chatScreen(fx.ach, chat)({ sid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => { dirties++; }, quit: () => { quits++; } }) as HubScreen;
   });
   afterEach(() => { screen.close(); _stopChatSweepersForTests(); fx.cleanup(); });
 
@@ -301,6 +302,14 @@ describe('hub screen commands', () => {
     screen.input(Buffer.from('\x08'.repeat(6)));
     type('/quit'); expect(quits).toBe(1);
     screen.input(Buffer.from([17])); screen.input(Buffer.from('y')); expect(quits).toBe(2);
+  });
+  it('quitting renders a clear, so the board gets a clean screen back', () => {
+    screen.render(true);
+    type('/quit'); expect(quits).toBe(1);
+    expect(dirties).toBeGreaterThan(0);
+    const out = screen.render(false).toString('latin1');
+    expect(out).toContain('\x1b[2J\x1b[H');
+    expect(out).not.toMatch(/bob|Partyline/i);
   });
   it('draw and art: usage, not an art channel, joining an art channel', () => {
     screen.run(true, (db, ctx) => { createRoom(db, ctx, { name: 'general' }); createRoom(db, ctx, { name: 'paint', kind: 'art' }); });
