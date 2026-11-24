@@ -66,7 +66,7 @@ describe('hub screen commands', () => {
     screen.input(Buffer.from('q')); expect(screen.over.help).toBe(false);
     type('/nick'); expect(last()).toBe('Your username: bob');
     type('/users'); expect(last()).toBe('Unknown command. Type /help for help.');
-    type('/voice'); expect(last()).toBe('Voice is not on Amiga yet.');
+    type('/voice'); expect(screen.model.lines.some((l) => l.text === 'Not in a voice call.')).toBe(true);
   });
 
   it('join, me, topic usage, leave', () => {
@@ -150,7 +150,7 @@ describe('hub screen commands', () => {
     type('/events doors'); expect(last()).toBe('Door activity events: OFF');
     type('/events off'); expect(last()).toBe('All BBS events disabled');
     type('/events nope'); expect(last()).toBe('Valid types: logins, files, doors, messages, announcements, on, off');
-    for (const w of ['files', 'file', 'share']) { type('/' + w); expect(last()).toBe('File sharing is not on Amiga yet.'); }
+    for (const w of ['files', 'file', 'share']) { type('/' + w); expect(last()).toBe('file sharing is not enabled on this hub'); }
     type('/sounds'); expect(last()).toBe('Error: Usage: /sounds on|off');
     type('/sounds off'); expect(last()).toBe('Sounds disabled');
     type('/settings'); expect(last()).toBe('  BBS events: see /events');
@@ -336,8 +336,8 @@ describe('hub screen commands', () => {
     type('/view 1'); expect(last()).toBe('File sharing is off on this hub');
   });
 
-  it('upload is not on Partyline yet', () => {
-    type('/upload'); expect(last()).toBe('/upload is not on Partyline yet.');
+  it('upload needs a room first (tests/partyline-media.test.ts covers the transfer)', () => {
+    type('/upload'); expect(last()).toBe('Join a chat room first.');
   });
 
   it('discord: show, usage, sysop switch on and off', () => {

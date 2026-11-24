@@ -20,15 +20,10 @@ import type { HubScreen } from './ui/screen';
 
 const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg', 'clear-room': 'clear-room', clearroom: 'clear-room' };
 const C_DROP = new Set(['users', 'channels', '+1', '-1', 'heart', 'fire']);
-/** run_command: these answer with a fixed line on Amiga, so they do on Partyline. */
-const NOT_ON_AMIGA: Record<string, string> = {
-  voice: 'Voice is not on Amiga yet.', deafen: 'Voice is not on Amiga yet.', undeafen: 'Voice is not on Amiga yet.', mic: 'Voice is not on Amiga yet.',
-  files: 'File sharing is not on Amiga yet.',
-};
 
 const RAMP = ' .:-=+*#%@';
 
-/** livechat.c draw_typed and view_typed. The canvas and kitty pictures need the full-screen client; /upload needs a transfer (ZModem or browser): not here. */
+/** livechat.c draw_typed and view_typed. The canvas and kitty pictures need the full-screen client; /upload lives in ../media.ts. */
 function drawViewTyped(s: HubScreen, cmd: string, rest: string): void {
   if (cmd === 'draw') {
     const kindOf = (id: string): string => s.tryRun(false, (db, ctx) => listRooms(db, ctx).find((r) => r.id === id || r.name.toLowerCase() === id.replace(/^#/, '').toLowerCase())?.kind ?? '') ?? '';
@@ -664,6 +659,7 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'emojis': emojisTyped(s, rest); return false;
     case 'customemoji': customEmojiTyped(s, rest); return false;
     case 'draw': case 'view': drawViewTyped(s, cmd, rest); return false;
+    case 'files': case 'upload': case 'voice': case 'mic': case 'deafen': case 'undeafen': s.av.command(cmd, rest); return false;
     case 'discord': discordTyped(s, rest); return false;
     case 'clear-room': clearRoomTyped(s, rest); return false;
     case null:
@@ -671,7 +667,7 @@ export function runCommand(s: HubScreen, line: string): boolean {
       return false;
     default:
       // shortcut: the remaining CMD_HELP commands (moderation, DMs, threads, pins, pickers) land with P3.
-      s.systemLine(NOT_ON_AMIGA[cmd] ?? `/${cmd} is not on Partyline yet.`);
+      s.systemLine(`/${cmd} is not on Partyline yet.`);
       return false;
   }
 }

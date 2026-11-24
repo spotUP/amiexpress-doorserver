@@ -29,6 +29,7 @@ import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
 import { completeAtMention } from './at-complete';
 import type { Line } from './model';
 import type { AtCycle } from './at-complete';
+import { HubMedia } from '../media';
 
 /** ui_key.h codes. */
 export const K_UP = 1000, K_DOWN = 1001, K_PGUP = 1002, K_PGDN = 1003, K_HOME = 1004, K_END = 1005, K_ENTER = 1006, K_ESC = 1007,
@@ -66,6 +67,8 @@ export class HubScreen implements PartylineScreen {
 
   /** Pictures and files the hub announced this session (livechat.c shared_files[], 1-based /view N). */
   readonly shared: { id: string; name: string; kind: string }[] = [];
+  /** /files, /upload and voice (../media.ts). */
+  readonly av: HubMedia = new HubMedia(this);
   /** The caller's bytes are UTF-8 (hello charset); latin1 callers keep the byte path. */
   private readonly utf8: boolean;
   /** A UTF-8 glyph can straddle two K frames; the decoder holds the half glyph. */
@@ -216,6 +219,7 @@ export class HubScreen implements PartylineScreen {
   }
 
   private event(e: EventRec): void {
+    if (this.av.event(e)) return;
     const inRoom = this.roomId !== '' && e.room_id === this.roomId;
     const m = this.model;
     if (e.type === 'message' && inRoom) {
@@ -907,7 +911,11 @@ export class HubScreen implements PartylineScreen {
     return Buffer.from(mouseOn + this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), this.utf8 ? 'utf8' : 'latin1');
   }
 
-  close(): void { clearTimeout(this.selectTimer); this.off(); }
+  /** session.ts `U` and `M` frames: upload results and voice media. */
+  upload(payload: Buffer): void { this.av.uploadResult(payload); }
+  media(payload: Buffer): void { this.av.media(payload); }
+
+  close(): void { clearTimeout(this.selectTimer); this.off(); this.av.close(); }
 }
 
 export const chatScreen = (ach: AchievementsConfig, chat: ChatConfig, filesDir: string | null = null): ScreenFactory => (info) => new HubScreen(ach, chat, info, filesDir);
