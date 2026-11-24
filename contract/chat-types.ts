@@ -23,7 +23,7 @@ export const CHAT_TEXT_VERSION = '1';
  */
 export const CHAT_TEXT_FORMATS = {
   ROOMS: ['id', 'name', 'topic', 'visibility', 'members', 'owner', 'kind'],
-  MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName', 'status', 'statusText', 'label'],
+  MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName', 'status', 'statusText', 'label', 'active', 'lastActive'],
   HISTORY: ['seq', 'id', 'user', 'at', 'replyTo', 'threadId', 'roleColor', 'text', 'label'],
   EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo', 'label'],
   REACTIONS: ['emoji', 'count', 'mine'],
@@ -155,6 +155,7 @@ export const CHAT_LIMITS = {
   pollMaxWaitSeconds: 25,
   pollDefaultWaitSeconds: 20,
   sessionTtlSeconds: 90,
+  activeWindowSeconds: 600,
   messagesPerSession: 20,
   messagesPerSessionWindowSeconds: 10,
   messagesPerBoardPerMinute: 300,

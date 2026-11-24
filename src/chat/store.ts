@@ -176,7 +176,18 @@ export function leaveRoom(db: Database.Database, ctx: ChatCtx, id: string): void
   if (!isMember(db, id, ctx.user)) emitEvent(db, { type: 'left', roomId: id, user: ctx.user });
 }
 
-export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { user: string; sysop: boolean; op: boolean; status: string; statusText: string }[] {
+/** Typing or sending marks the user active in every room they belong to. */
+function touchActivity(db: Database.Database, user: string): void {
+  db.prepare('UPDATE chat_memberships SET last_active = ? WHERE user = ?').run(nowSec(), user);
+}
+
+/** Seconds a member stays active after typing or sending (CHAT_ACTIVE_WINDOW overrides the contract default). */
+export function activeWindowSeconds(): number {
+  const n = Number(process.env.CHAT_ACTIVE_WINDOW);
+  return Number.isInteger(n) && n > 0 ? n : CHAT_LIMITS.activeWindowSeconds;
+}
+
+export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { user: string; sysop: boolean; op: boolean; status: string; statusText: string; active: boolean; lastActive: number }[] {
   const room = getRoom(db, id);
   if (room.visibility === 'private' && !ctx.admin && !isMember(db, id, ctx.user)) throw new SurfaceError('not_member', 403, 'join the room first');
   const rows = db
@@ -192,12 +203,21 @@ export function roomMembers(db: Database.Database, ctx: ChatCtx, id: string): { 
     .filter((r) => !inRoom.has(r.user.toLowerCase()))
     .map((r) => ({ user: r.user, sysop: 0 }));
   const pres = presenceMap(db);
-  return [...rows, ...extra].sort((a, b) => a.user.localeCompare(b.user)).map((r) => ({
-    user: r.user,
-    sysop: r.sysop === 1,
-    op: isOp(db, id, r.user) || room.owner_user.toLowerCase() === r.user.toLowerCase(),
-    ...(pres.get(r.user.toLowerCase()) ?? { status: inRoom.has(r.user.toLowerCase()) || hasSession(r.user) ? 'online' : 'away', statusText: '' }),
-  }));
+  const lastActiveOf = db.prepare('SELECT last_active FROM chat_memberships WHERE user = ? AND room_id = ?');
+  const now = nowSec();
+  const windowSec = activeWindowSeconds();
+  return [...rows, ...extra].sort((a, b) => a.user.localeCompare(b.user)).map((r) => {
+    const connected = inRoom.has(r.user.toLowerCase()) || hasSession(r.user);
+    const lastActive = (lastActiveOf.get(r.user, id) as { last_active: number } | undefined)?.last_active ?? 0;
+    return {
+      user: r.user,
+      sysop: r.sysop === 1,
+      op: isOp(db, id, r.user) || room.owner_user.toLowerCase() === r.user.toLowerCase(),
+      ...(pres.get(r.user.toLowerCase()) ?? { status: connected ? 'online' : 'away', statusText: '' }),
+      active: connected && lastActive > 0 && now - lastActive <= windowSec,
+      lastActive,
+    };
+  });
 }
 
 /** Who holds a socket in the room, in the LIVECHAT room:joined `members` shape (the door's ou map reads user_id / username / is_online). */
@@ -429,6 +449,7 @@ export function postMessage(db: Database.Database, ctx: ChatCtx, roomId: string,
     id, roomId, ctx.user, content, cid, replyTo, threadId, at
   );
   indexFts(db, id);
+  touchActivity(db, ctx.user);
   const seq = emitEvent(db, { type: 'message', roomId, label: threadId ? `thread:${threadId}` : room.id, user: ctx.user, ref: id, text: content });
   db.prepare('UPDATE chat_messages SET seq = ? WHERE id = ?').run(seq, id);
   return { id, seq, at };
@@ -869,6 +890,7 @@ export function setTyping(db: Database.Database, ctx: ChatCtx, id: string, b: Bo
   if (text !== '') {
     const prev = typingLast.get(`${room.id}\n${ctx.user}`);
     const now = Date.now();
+    touchActivity(db, ctx.user);
     if (prev && prev.text !== '' && now - prev.at < TYPING_PREVIEW_MIN_MS) return;
     typingLast.set(`${room.id}\n${ctx.user}`, { text, at: now });
     if (typingLast.size > 2000) {

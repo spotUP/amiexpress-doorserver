@@ -51,7 +51,7 @@ describe('presence', () => {
     const mb = mem.find((r) => r[0] === 'bob@UPROUGH')!;
     expect(mb).toHaveLength(CHAT_TEXT_FORMATS.MEMBERS.length);
     expect(mb.slice(0, 5)).toEqual(['bob@UPROUGH', '0', '0', '', '']);
-    expect(mb.slice(5)).toEqual(['away', 'at lunch', 'bob']);
+    expect(mb.slice(5)).toEqual(['away', 'at lunch', 'bob', '0', '0']);
 
     expect((await api('delete', '/presence', b)).body).toEqual({ status: 'online', statusText: '' });
     const after = rowsOf((await api('get', '/who.txt', a)).text).find((r) => r[0] === 'bob@UPROUGH')!;

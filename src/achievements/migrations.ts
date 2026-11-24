@@ -469,4 +469,11 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX IF NOT EXISTS chat_files_expiry ON chat_files(status, expires_at)');
     },
   },
+  {
+    version: 19,
+    name: 'chat: chat_memberships.last_active, when the user last typed or sent (active/inactive presence dot)',
+    up: (db) => {
+      db.exec('ALTER TABLE chat_memberships ADD COLUMN last_active INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];

@@ -161,7 +161,7 @@ field is only ever appended and the `1` never moves.
 Formats and their fields, in order:
 
 - ROOMS: `id|name|topic|visibility|members|owner|kind` (kind: `text`, `voice` or `art`)
-- MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText|label`
+- MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText|label|active|lastActive` (`active` is `1` when the member holds a live session and typed or sent within the last 10 minutes, `CHAT_ACTIVE_WINDOW` seconds on the hub; `lastActive` the epoch second of that last typing or message, `0` never)
 - HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text|label`
 - EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo|label` (`replyTo` is the
   message id a `message` event answers, empty otherwise)
@@ -239,8 +239,8 @@ a1b2c3d4e5f6|lobby|Welcome to the board|public|7|spot@UPROUGH|text
 
 ```text example MEMBERS
 MEMBERS|1|412|2
-spot@UPROUGH|1|1|11|Sysop|online||spot
-zed@FRIEND|0|0|||busy|deploying|zed
+spot@UPROUGH|1|1|11|Sysop|online||spot|1|1762500000
+zed@FRIEND|0|0|||busy|deploying|zed|0|0
 ```
 
 ```text example HISTORY

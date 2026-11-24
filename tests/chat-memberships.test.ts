@@ -6,6 +6,7 @@ import request from 'supertest';
 import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
+import { _setChatClockForTests } from '../src/chat/config';
 
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });
@@ -139,5 +140,30 @@ describe('offline members and auto-away', () => {
     expect(await statusOf(a, id, 'bob@UPROUGH')).toBe('dnd');
     await login('bob');
     expect(await statusOf(a, id, 'bob@UPROUGH')).toBe('dnd');
+  });
+});
+
+describe('active / inactive in the member list', () => {
+  const activeOf = async (viewer: string, room: string, user: string) =>
+    rowsOf((await api('get', `/rooms/${room}/members.txt`, viewer)).text).find((r) => r[0] === user)?.slice(8);
+  afterEach(() => { _setChatClockForTests(null); delete process.env.CHAT_ACTIVE_WINDOW; });
+
+  it('is active after typing or sending, inactive past the window and when gone', async () => {
+    let now = 1_800_000_000;
+    _setChatClockForTests(() => now);
+    process.env.CHAT_ACTIVE_WINDOW = '60';
+    const a = await login('alice');
+    const id = await lobby(a);
+    const b = await login('bob');
+    await api('post', `/rooms/${id}/join`, b);
+    expect(await activeOf(a, id, 'bob@UPROUGH')).toEqual(['0', '0']);
+    expect((await api('post', `/rooms/${id}/typing`, b).send({ text: 'hel' })).status).toBeLessThan(300);
+    expect(await activeOf(a, id, 'bob@UPROUGH')).toEqual(['1', String(now)]);
+    now += 61;
+    expect((await activeOf(a, id, 'bob@UPROUGH'))?.[0]).toBe('0');
+    await post(b, id, 'back');
+    expect(await activeOf(a, id, 'bob@UPROUGH')).toEqual(['1', String(now)]);
+    expect((await api('delete', '/sessions/current', b)).status).toBe(200);
+    expect(await activeOf(a, id, 'bob@UPROUGH')).toEqual(['0', String(now)]);
   });
 });

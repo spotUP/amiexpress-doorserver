@@ -154,7 +154,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
       const cache = new Map<string, string>();
       const members = store.roomMembers(db, ctx, p(req, 'id'));
       const labels = displayLabels(members.map((m) => m.user));
-      const rows = members.map((m) => [m.user, m.sysop ? 1 : 0, m.op ? 1 : 0, roleColor(db, cache, m.user), roleName(db, m.user), m.status, m.statusText, labels.get(m.user) ?? m.user]);
+      const rows = members.map((m) => [m.user, m.sysop ? 1 : 0, m.op ? 1 : 0, roleColor(db, cache, m.user), roleName(db, m.user), m.status, m.statusText, labels.get(m.user) ?? m.user, m.active ? 1 : 0, m.lastActive]);
       return { rev: headSeq(db), rows };
     });
     sendText(res, renderText('MEMBERS', out.rev, out.rows));
