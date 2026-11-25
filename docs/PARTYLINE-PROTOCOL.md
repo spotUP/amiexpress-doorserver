@@ -112,7 +112,8 @@ A client must send `C` after writing each `D`/`G`, or the screen stops updating.
   A stale or foreign token silently gets a fresh session.
 - The hub keeps live sessions fresh; a dropped session expires after the chat
   session TTL (90 seconds).
-- On SIGTERM the hub stops accepting, sends each caller `D` "Partyline is
-  restarting, reconnecting...", and closes without ending the chat session, so the
-  client can resume on the new process.
+- On SIGTERM the hub stops accepting, puts "Partyline is restarting, reconnecting..."
+  in each caller's chat log (a normal screen diff in `D`, never raw text over the
+  cells), and closes without ending the chat session, so the client can resume on
+  the new process.
 - `Q` (BYE) ends the chat session; no resume after it.

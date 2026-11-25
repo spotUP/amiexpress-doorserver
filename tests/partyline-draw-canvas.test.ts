@@ -8,7 +8,7 @@ import type { AchievementsFixture } from './achievements/helpers';
 import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
-import { createRoom } from '../src/chat/store';
+import { createRoom, ensureDefaultRoom } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
 import type { HubScreen } from '../src/partyline/ui/screen';
 import type { ScreenInfo } from '../src/partyline/session';
@@ -119,8 +119,26 @@ describe('Partyline /draw canvas', () => {
     type(a, '/draw');
     a = reopen(a);
     expect(a.canvas.on).toBe(true);
+    keys(a, '\x1b'); // Esc closes the canvas inside DrawCanvas.key: the close must be stored too
+    a = reopen(a);
+    expect(a.canvas.on).toBe(false);
+    type(a, '/draw');
     type(a, '/leave');
     a = reopen(a);
     expect(a.model.room).toBe('general'); // a left room is not rejoined
+  });
+
+  it('a fresh entry opens the default channel like LC, not the first membership or the last session (#artroom canvas)', () => {
+    const chat = loadChatConfig();
+    a.run(true, (db) => ensureDefaultRoom(db)); // the shared #lobby a seeded hub always has
+    type(a, '/join #paint');
+    type(a, '/draw');
+    a.close();
+    // Quit then PL again: a new chat session, no resume token.
+    const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'bob', sysop: true, client: 'test' }).sid);
+    const hello = { cols: 80, rows: 25, mouse: true } as ScreenInfo['hello'];
+    a = chatScreen(fx.ach, chat)({ sid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => {}, quit: () => {} }) as HubScreen;
+    expect(a.model.room).toBe('lobby');
+    expect(a.canvas.on).toBe(false);
   });
 });

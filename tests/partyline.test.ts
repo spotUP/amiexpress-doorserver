@@ -101,6 +101,8 @@ let fulls: boolean[];
 let state = 'v0';
 /** When set, render returns these parts (D text and G kitty bytes) instead of `state`. */
 let parts: RenderPart[] | null = null;
+/** When set, the screen draws notices itself (as HubScreen does): render then returns `log <text>`. */
+let noticed = false;
 /** Per session id: where an M frame from that caller goes. */
 const mediaIn = new Map<string, (p: Buffer) => void>();
 const testScreen: ScreenFactory = (info) => {
@@ -110,6 +112,7 @@ const testScreen: ScreenFactory = (info) => {
     input() { /* none */ },
     render(full) { renders.push(state); fulls.push(full); return parts ?? Buffer.from(state); },
     media: (p) => mediaIn.get(info.sid)?.(p),
+    ...(noticed ? { notice: (t: string) => { state = `log ${t}`; } } : {}),
   };
 };
 
@@ -128,6 +131,7 @@ beforeEach(async () => {
   fulls = [];
   state = 'v0';
   parts = null;
+  noticed = false;
   hub = createPartylineServer({ enabled: true, port: 0, host: '127.0.0.1', tlsCert: null, tlsKey: null }, fx.ach,
     { screen: testScreen, log: () => undefined, tlsContext: tlsCtx });
   port = await hub.listen();
@@ -307,6 +311,16 @@ describe('live loop', () => {
     await c.untilClosed();
     const res = await request(fx.app).get('/chat/v1/who.txt').set('Authorization', fx.auth).set('X-Chat-Session', sid);
     expect(res.status).toBe(200);
+  });
+
+  it('drains through the screen, not raw bytes over its cells (row 23 under the relay dialog)', async () => {
+    noticed = true;
+    const c = await dial(false);
+    await login(c);
+    await c.next('D');
+    await hub.drain();
+    expect(text(await c.next('D'))).toBe('log Partyline is restarting, reconnecting...');
+    await c.untilClosed();
   });
 
   it('shares one store with /chat/v1: the PLP session is a chat session', async () => {

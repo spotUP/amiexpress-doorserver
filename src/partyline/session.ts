@@ -31,6 +31,8 @@ export interface PartylineScreen {
   upload?(payload: Buffer): void;
   /** An `M` frame from the caller's board (voice/video); present only for media=1 callers' screens. */
   media?(payload: Buffer): void;
+  /** A status line drawn by the screen itself (the restart notice), not raw bytes over its cells. */
+  notice?(text: string): void;
   /** The connection is gone: drop subscriptions. */
   close?(): void;
 }
@@ -65,6 +67,8 @@ export interface ScreenInfo {
 export type ScreenFactory = (info: ScreenInfo) => PartylineScreen;
 
 export const OLD_CLIENT_SCREEN = 'This board runs an old Partyline client. Ask the sysop to update.';
+const DRAIN_TEXT = 'Partyline is restarting, reconnecting...';
+
 const REFUSAL_TEXT: Record<PlpRefusal, string> = {
   old_client: OLD_CLIENT_SCREEN,
   bad_hello: 'Partyline could not read this board\'s login. Ask the sysop to check the door setup.',
@@ -291,12 +295,7 @@ export class PartylineSession {
     if (this.inFlight !== null || this.state !== 'live') return;
     if (this.queue.length === 0 && this.dirty) {
       // Render only now, so everything that changed while waiting is one latest diff, never a backlog.
-      const out = this.screen!.render(this.full);
-      this.dirty = false;
-      this.full = false;
-      for (const { type, bytes } of renderParts(out)) {
-        for (let i = 0; i < bytes.length; i += PLP_MAX_PAYLOAD - 4) this.queue.push({ type, bytes: bytes.subarray(i, i + PLP_MAX_PAYLOAD - 4) });
-      }
+      this.queueRender();
     }
     const next = this.queue.shift();
     if (!next) { this.settleQuit(); return; }
@@ -304,6 +303,15 @@ export class PartylineSession {
     this.inFlight = this.seq;
     this.lastFlush = Date.now();
     this.send(next.type === 'G' ? PLP_HUB.GRAPHICS : PLP_HUB.OUTPUT, seqPayload(this.seq, next.bytes));
+  }
+
+  private queueRender(): void {
+    const out = this.screen!.render(this.full);
+    this.dirty = false;
+    this.full = false;
+    for (const { type, bytes } of renderParts(out)) {
+      for (let i = 0; i < bytes.length; i += PLP_MAX_PAYLOAD - 4) this.queue.push({ type, bytes: bytes.subarray(i, i + PLP_MAX_PAYLOAD - 4) });
+    }
   }
 
   /** One D with the refusal screen, then X; the chat session (if any) is untouched. */
@@ -341,9 +349,17 @@ export class PartylineSession {
     this.end();
   }
 
-  /** SIGTERM: one status line, then close; the chat session stays so the client can resume. */
+  /**
+   * SIGTERM: one status line, then close; the chat session stays so the client can resume.
+   * The line goes into the chat log through the screen, as LC's addSystemMessage: raw bytes landed at
+   * the cursor and stayed on row 23 under the relay's Connection Error dialog (telnet run 7).
+   */
   drain(): void {
-    if (this.state === 'live') this.send(PLP_HUB.OUTPUT, seqPayload(++this.seq, Buffer.from('\r\nPartyline is restarting, reconnecting...\r\n', 'latin1')));
+    if (this.state === 'live' && this.screen?.notice) {
+      this.screen.notice(DRAIN_TEXT);
+      this.queueRender(); // after any unsent parts of the last render, so the diff applies in order
+      for (const p of this.queue.splice(0)) this.send(p.type === 'G' ? PLP_HUB.GRAPHICS : PLP_HUB.OUTPUT, seqPayload(++this.seq, p.bytes));
+    } else if (this.state === 'live') this.send(PLP_HUB.OUTPUT, seqPayload(++this.seq, Buffer.from(`\r\n${DRAIN_TEXT}\r\n`, 'latin1')));
     this.end();
   }
 

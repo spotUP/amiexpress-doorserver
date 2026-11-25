@@ -477,7 +477,8 @@ export class HubScreen implements PartylineScreen {
   }
 
   /**
-   * livechat.c start: the first room the caller is a member of, else the first listed room.
+   * A fresh entry lands where LC's room:list auto-join does: the default channel (#lobby, listed
+   * first), else the first public room; never the first membership by name (#artroom's canvas).
    * A resumed session (hub restart, relay reconnect) goes back to the room and /draw mode it
    * was on, as LIVECHAT's screen survives a socket reconnect; the first membership was #artroom's canvas.
    */
@@ -488,7 +489,7 @@ export class HubScreen implements PartylineScreen {
       return listMemberships(db, ctx).some((r) => r.roomId === p.roomId) ? p : undefined;
     });
     if (!(place && this.joinRoom(place.roomId))) {
-      const id = this.tryRun(false, (db, ctx) => listMemberships(db, ctx)[0]?.roomId ?? listRooms(db, ctx)[0]?.id ?? '');
+      const id = this.tryRun(false, (db, ctx) => { const rs = listRooms(db, ctx); return (rs.find((r) => r.visibility === 'public') ?? rs[0])?.id ?? ''; });
       if (id) this.joinRoom(id);
     } else if (!place.canvas && this.canvas.on) this.canvasLeave();
     loadCustomEmoji(this);
@@ -918,6 +919,7 @@ export class HubScreen implements PartylineScreen {
     if (this.canvas.on && o.modal === MODAL_NONE) { // livechat.c handle_key: draw_key first; Ctrl+Q leaves the canvas, then the quit modal
       const r = this.canvas.key(k);
       if (r !== null) this.cells.invalidate();
+      if (r === 'left' || r === 'quit') this.savePlace(); // the canvas left itself (Esc, Ctrl+Q): a resume must not reopen it
       if (r !== 'quit') return;
     }
     if (k === 17) { o.modal = MODAL_QUIT; o.modalNo = false; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
@@ -1534,6 +1536,8 @@ export class HubScreen implements PartylineScreen {
   }
   media(payload: Buffer): void { this.av.media(payload); }
 
+  /** A status line in the chat log (LC's addSystemMessage), e.g. the hub's restart notice. */
+  notice(text: string): void { this.systemLine(text); }
   close(): void { clearTimeout(this.selectTimer); clearInterval(this.tick); this.typingStop(); this.off(); this.av.close(); }
 }
 
