@@ -385,7 +385,9 @@ describe('media (M frames)', () => {
     expect(got).toEqual({ ev: 'audio:data', body: Buffer.concat([Buffer.from('a@x\0'), pcm]) });
     a.c.send('P', 'x');
     await a.c.next('O');
-    await expect(a.c.next('M', 200)).rejects.toThrow();
+    // A gets its own audio:relay gate (chat-voice-relay.test.ts), never its own audio:data.
+    const toA = (a.c as unknown as { frames: PlpFrame[] }).frames.filter((f) => f.type === 'M').map((f) => new MediaDecoder().push(f.payload)?.ev);
+    expect(toA).not.toContain('audio:data');
     resetVoiceHub();
   });
 
