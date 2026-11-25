@@ -17,7 +17,7 @@ import type { ChatConfig } from '../../chat/config';
 import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
-import { createSession, newId, resolveSession } from '../../chat/sessions';
+import { createSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
 import { applyCanvasOps, dmThreads, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
@@ -476,11 +476,27 @@ export class HubScreen implements PartylineScreen {
     this.info.markDirty();
   }
 
-  /** livechat.c start: the first room the caller is a member of, else the first listed room. */
+  /**
+   * livechat.c start: the first room the caller is a member of, else the first listed room.
+   * A resumed session (hub restart, relay reconnect) goes back to the room and /draw mode it
+   * was on, as LIVECHAT's screen survives a socket reconnect; the first membership was #artroom's canvas.
+   */
   private firstRoom(): void {
-    const id = this.tryRun(false, (db, ctx) => listMemberships(db, ctx)[0]?.roomId ?? listRooms(db, ctx)[0]?.id ?? '');
-    if (id) this.joinRoom(id);
+    // Only a room still joined: a /leave, kick or delete after the save must not put the caller back in.
+    const place = this.tryRun(false, (db, ctx) => {
+      const p = getScreenPlace(db, ctx.sid as string);
+      return listMemberships(db, ctx).some((r) => r.roomId === p.roomId) ? p : undefined;
+    });
+    if (!(place && this.joinRoom(place.roomId))) {
+      const id = this.tryRun(false, (db, ctx) => listMemberships(db, ctx)[0]?.roomId ?? listRooms(db, ctx)[0]?.id ?? '');
+      if (id) this.joinRoom(id);
+    } else if (!place.canvas && this.canvas.on) this.canvasLeave();
     loadCustomEmoji(this);
+  }
+
+  /** Where a resume lands: this room and whether its canvas is open. */
+  private savePlace(): void {
+    this.tryRun(true, (db, ctx) => setScreenPlace(db, ctx.sid as string, this.roomId, this.canvas.on));
   }
 
   /** livechat.c join_room: switch rooms, clear the lines, say so. */
@@ -503,6 +519,7 @@ export class HubScreen implements PartylineScreen {
     // livechat.c join_room: an art room opens its canvas, any other room closes it
     if (this.canvas.on) this.canvasLeave();
     if (this.tryRun(false, (db, ctx) => listRooms(db, ctx).find((x) => x.id === r.id)?.kind) === 'art') this.canvasOpen();
+    this.savePlace();
     return true;
   }
 
@@ -514,9 +531,9 @@ export class HubScreen implements PartylineScreen {
   private canvasCall<T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T): T | string {
     try { return this.run(write, fn); } catch (err) { if (!(err instanceof SurfaceError)) throw err; return err.message; }
   }
-  canvasOpen(): void { this.canvas.enter(); this.cells.invalidate(); this.info.markDirty(); }
+  canvasOpen(): void { this.canvas.enter(); this.cells.invalidate(); this.info.markDirty(); this.savePlace(); }
   /** dr_leave, then the chat screen comes back as a full repaint. */
-  canvasLeave(): void { this.canvas.leave(); this.cells.invalidate(); this.info.markDirty(); }
+  canvasLeave(): void { this.canvas.leave(); this.cells.invalidate(); this.info.markDirty(); this.savePlace(); }
 
   /**
    * The sidebar the livechat engine used to fill: joined rooms with unreads,

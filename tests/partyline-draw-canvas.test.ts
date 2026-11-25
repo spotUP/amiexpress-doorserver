@@ -97,4 +97,30 @@ describe('Partyline /draw canvas', () => {
     expect(out).not.toContain('Space paint');
     expect(out).toContain('Joined #paint');
   });
+
+  it('a resumed session lands in the room and mode it was on, not the first membership (hub restart)', () => {
+    const chat = loadChatConfig();
+    const reopen = (s: HubScreen): HubScreen => {
+      s.close();
+      const hello = { cols: 80, rows: 25, mouse: true } as ScreenInfo['hello'];
+      // A new screen on the same sid is what a resume onto a restarted hub builds.
+      return chatScreen(fx.ach, chat)({ sid: s.info.sid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => {}, quit: () => {} }) as HubScreen;
+    };
+    type(a, '/join #paint');
+    type(a, '/join #general');
+    a = reopen(a);
+    expect(a.model.room).toBe('general'); // was 'paint', the first membership by name, with its canvas open
+    expect(a.canvas.on).toBe(false);
+    type(a, '/join #paint');
+    keys(a, '\x1b'); // chat view of the art room
+    a = reopen(a);
+    expect(a.model.room).toBe('paint');
+    expect(a.canvas.on).toBe(false);
+    type(a, '/draw');
+    a = reopen(a);
+    expect(a.canvas.on).toBe(true);
+    type(a, '/leave');
+    a = reopen(a);
+    expect(a.model.room).toBe('general'); // a left room is not rejoined
+  });
 });

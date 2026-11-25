@@ -492,4 +492,14 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('ALTER TABLE chat_rooms ADD COLUMN archived_at INTEGER');
     },
   },
+  {
+    version: 22,
+    name: 'chat: chat_sessions.pl_room and pl_canvas, the Partyline room and /draw mode a resume returns to',
+    // The screen lives in the hub process; a restart loses it while the session row stays.
+    // LIVECHAT keeps its room and canvas across a socket reconnect, so a resume must too.
+    up: (db) => {
+      db.exec("ALTER TABLE chat_sessions ADD COLUMN pl_room TEXT NOT NULL DEFAULT ''");
+      db.exec('ALTER TABLE chat_sessions ADD COLUMN pl_canvas INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];

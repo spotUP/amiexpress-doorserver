@@ -152,6 +152,16 @@ export function resolveSession(db: Database.Database, cfg: ChatConfig, sid: stri
   return { sid, boardId, handle: row.handle, user: row.user, sysop: row.sysop === 1, admin: false };
 }
 
+/** The Partyline room and /draw mode this session was on (migration 22), for a resume onto a new screen. */
+export function getScreenPlace(db: Database.Database, sid: string): { roomId: string; canvas: boolean } {
+  const r = db.prepare('SELECT pl_room, pl_canvas FROM chat_sessions WHERE sid = ?').get(sid) as { pl_room: string; pl_canvas: number } | undefined;
+  return { roomId: r?.pl_room ?? '', canvas: r?.pl_canvas === 1 };
+}
+
+export function setScreenPlace(db: Database.Database, sid: string, roomId: string, canvas: boolean): void {
+  db.prepare('UPDATE chat_sessions SET pl_room = ?, pl_canvas = ? WHERE sid = ?').run(roomId, canvas ? 1 : 0, sid);
+}
+
 export function sweepSessions(db: Database.Database, cfg: ChatConfig): number {
   const stale = db
     .prepare('SELECT sid FROM chat_sessions WHERE last_seen < ?')
