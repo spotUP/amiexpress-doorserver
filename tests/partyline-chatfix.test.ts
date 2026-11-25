@@ -96,24 +96,30 @@ describe('hub screen sidebar', () => {
     const chat = loadChatConfig();
     const screen = openScreen('bob', true, { handle: 'bob' });
     try {
-      let lobby = '';
+      let lobby = '', random = '';
       screen.run(true, (db, ctx) => {
         lobby = createRoom(db, ctx, { name: 'Lobby' }).id;
+        random = createRoom(db, ctx, { name: 'Random' }).id;
       });
+      expect(screen.joinRoom(random)).toBe(true);
       expect(screen.joinRoom(lobby)).toBe(true);
       const labels = (): string[] => screen.model.side.map((s) => s.label);
       expect(labels()[0]).toBe('TEXT CHANNELS');
       expect(labels()).toContain('Lobby');
-      // amy joins and writes: bob's sidebar shows unread 1 and amy below USERS.
+      // amy writes in both rooms. LIVECHAT core/state.ts: only the background room counts
+      // (noteBackgroundMessage); the room on screen stays read (setChannel zeroes it).
       const amySid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'amy', sysop: false, client: 'test' }).sid);
       withAchievementsDb(fx.ach, (db) => {
         const amy = resolveSession(db, chat, amySid, fx.boardId);
         joinRoom(db, amy, lobby);
+        joinRoom(db, amy, random);
         postMessage(db, amy, lobby, { content: 'hi bob', clientId: 'a1' });
+        postMessage(db, amy, random, { content: 'over here', clientId: 'a2' });
       });
       screen.take();
       const rooms = screen.model.side.filter((s) => s.kind === 1);
-      expect(rooms.find((s) => s.label === 'Lobby')?.unread).toBe(1);
+      expect(rooms.find((s) => s.label === 'Random')?.unread).toBe(1);
+      expect(rooms.find((s) => s.label === 'Lobby')?.unread).toBe(0);
       expect(labels()).toContain('USERS');
       expect(labels()).toContain('amy');
     } finally {
