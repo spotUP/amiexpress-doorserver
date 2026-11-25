@@ -17,6 +17,7 @@ import type { RoomRec } from './permissions';
 import type { ChatCtx } from './sessions';
 import { requireMemberOf, str } from './store';
 import type { Body } from './store';
+import { AudioRelay } from './voice-relay';
 
 interface CallMember { isMuted: boolean; hasVideo: boolean; at: number }
 
@@ -43,7 +44,7 @@ function voiceRoom(db: Database.Database, ctx: ChatCtx, id: string): RoomRec {
 function drop(db: Database.Database, roomId: string, user: string): boolean {
   const call = calls.get(roomId);
   if (!call?.delete(user)) return false;
-  if (call.size === 0) calls.delete(roomId);
+  if (call.size === 0) { calls.delete(roomId); relays.delete(roomId); }
   emitEvent(db, { type: 'voice', roomId, user, ref: 'left', text: '00' });
   return true;
 }
@@ -114,5 +115,24 @@ export function relaySignal(db: Database.Database, ctx: ChatCtx, id: string, b: 
   return { ok: true };
 }
 
+/** room id -> the call's audio relay for callers without WebRTC (voice-relay.ts). */
+const relays = new Map<string, AudioRelay>();
+
+/**
+ * PUT /rooms/:id/voice/audio: post the caller's mu-law microphone bytes, get back the mix of
+ * what the others sent since the caller's last exchange. Counts as the call heartbeat.
+ * A muted caller's bytes are dropped here, whatever the client sends.
+ */
+export function exchangeAudio(db: Database.Database, ctx: ChatCtx, id: string, ulaw: Buffer, mesh: boolean): Buffer {
+  const room = voiceRoom(db, ctx, id);
+  const call = calls.get(room.id);
+  const me = call?.get(ctx.user);
+  if (!call || !me) throw new SurfaceError('not_found', 404, 'you are not in this call');
+  me.at = Date.now();
+  const relay = relays.get(room.id) ?? new AudioRelay();
+  relays.set(room.id, relay);
+  return relay.exchange(ctx.user, ulaw, { mesh, muted: me.isMuted, inCall: (u) => call.has(u), now: me.at });
+}
+
 /** Tests only. */
-export function _resetVoiceForTests(): void { calls.clear(); }
+export function _resetVoiceForTests(): void { calls.clear(); relays.clear(); }

@@ -28,6 +28,7 @@ import * as files from './files';
 import * as fs from 'fs';
 import * as store from './store';
 import * as voice from './voice';
+import { RELAY_MAX_BYTES } from './voice-relay';
 import type { Body } from './store';
 import { requireSysop } from './permissions';
 
@@ -45,6 +46,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   });
   // File chunks are raw bytes, capped at one chunk; every JSON route stays at 32 KB.
   router.use('/files/:id/chunk', express.raw({ type: 'application/octet-stream', limit: CHAT_LIMITS.fileChunkMax }));
+  router.use('/rooms/:id/voice/audio', express.raw({ type: 'application/octet-stream', limit: RELAY_MAX_BYTES }));
   router.use(express.json({ limit: '32kb' }));
 
   router.get('/health', (_req: Request, res: Response) => {
@@ -340,6 +342,11 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   });
   router.put('/rooms/:id/voice', (req: Request, res: Response) => {
     res.json(run(req, true, (db, ctx) => voice.setVoiceState(db, ctx, p(req, 'id'), body(req))));
+  });
+  router.put('/rooms/:id/voice/audio', (req: Request, res: Response) => {
+    const ulaw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    const mix = run(req, false, (db, ctx) => voice.exchangeAudio(db, ctx, p(req, 'id'), ulaw, req.query.mesh === '1'));
+    res.type('application/octet-stream').set('Content-Length', String(mix.length)).end(mix);
   });
   router.post('/rooms/:id/voice/signal', (req: Request, res: Response) => {
     res.json(run(req, true, (db, ctx) => voice.relaySignal(db, ctx, p(req, 'id'), body(req))));
