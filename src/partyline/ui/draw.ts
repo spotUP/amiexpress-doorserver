@@ -2,7 +2,7 @@
  * Partyline hub engine: lc_draw ported 1:1 from amiexpress-web sdk/c/examples/livechat/livechat_ui.c.
  * The C keeps its draw state in statics; the hub runs many sessions in one process, so it lives in DrawState.
  * Overlays (help, view, search, settings, modal) live in overlays.ts. The slash menu is slash.ts. Not ported yet:
- * format picker, theme and the canvas/pen picker.
+ * format picker, theme and the pen picker. The /draw canvas is canvas.ts.
  */
 import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, REVERSE, menuWidth, wrap } from './cells';
 import { cover, drawOverlays, OverlayState, Rect } from './overlays';

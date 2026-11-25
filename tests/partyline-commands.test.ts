@@ -361,7 +361,9 @@ describe('hub screen commands', () => {
     type('/draw'); expect(last()).toBe('Usage: /draw <art channel>  (art channels are marked [A] in the sidebar)');
     type('/draw #general'); expect(last()).toBe('That is not an Art channel.');
     type('/art #paint'); expect(screen.model.room).toBe('paint');
-    type('/draw'); expect(last()).toBe('The drawing canvas is not on Partyline yet.');
+    expect(screen.canvas.on).toBe(true); // joining an art room opens its canvas (livechat.c join_room)
+    screen.key(1007); expect(screen.canvas.on).toBe(false);
+    type('/draw'); expect(screen.canvas.on).toBe(true);
   });
 
   it('view and picture: numbers, the picture announcement, non-pictures, files off', () => {

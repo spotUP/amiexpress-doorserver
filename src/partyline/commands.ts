@@ -23,11 +23,11 @@ const C_DROP = new Set(['users', 'channels', '+1', '-1', 'heart', 'fire']);
 
 const RAMP = ' .:-=+*#%@';
 
-/** livechat.c draw_typed and view_typed. The canvas and kitty pictures need the full-screen client; /upload lives in ../media.ts. */
+/** livechat.c draw_typed and view_typed. The canvas is ./ui/canvas.ts (joining an art room opens it); /upload lives in ../media.ts. */
 function drawViewTyped(s: HubScreen, cmd: string, rest: string): void {
   if (cmd === 'draw') {
     const kindOf = (id: string): string => s.tryRun(false, (db, ctx) => listRooms(db, ctx).find((r) => r.id === id || r.name.toLowerCase() === id.replace(/^#/, '').toLowerCase())?.kind ?? '') ?? '';
-    if (rest === '') { s.systemLine(kindOf(s.roomId) === 'art' ? 'The drawing canvas is not on Partyline yet.' : 'Usage: /draw <art channel>  (art channels are marked [A] in the sidebar)'); return; }
+    if (rest === '') { if (kindOf(s.roomId) === 'art') s.canvasOpen(); else s.systemLine('Usage: /draw <art channel>  (art channels are marked [A] in the sidebar)'); return; }
     if (kindOf(rest) !== 'art') { s.systemLine('That is not an Art channel.'); return; }
     joinTyped(s, rest);
     return;

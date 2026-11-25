@@ -19,9 +19,10 @@ import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
 import { createSession, newId, resolveSession } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
+import { applyCanvasOps, dmThreads, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
+import { DrawCanvas } from './canvas';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
 import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, inputSelRange, inputStep, inputVisible, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_ALERT, TK_BAR, TK_DIM, TK_OK } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, HIT_OK, HIT_YES, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
@@ -100,7 +101,7 @@ export class HubScreen implements PartylineScreen {
     this.prefsLoad();
     this.fillSidebar();
     this.off = onEvents(() => this.take());
-    this.tick = setInterval(() => { if (this.typingTick() || this.fxTick()) this.info.markDirty(); }, TICK_MS);
+    this.tick = setInterval(() => { if (this.typingTick() || this.fxTick() || this.canvas.idle()) this.info.markDirty(); }, TICK_MS);
     this.tick.unref?.();
   }
 
@@ -499,8 +500,23 @@ export class HubScreen implements PartylineScreen {
     this.takeHistory(r.id);
     this.readCurrent();
     this.fillSidebar();
+    // livechat.c join_room: an art room opens its canvas, any other room closes it
+    if (this.canvas.on) this.canvasLeave();
+    if (this.tryRun(false, (db, ctx) => listRooms(db, ctx).find((x) => x.id === r.id)?.kind) === 'art') this.canvasOpen();
     return true;
   }
+
+  /** The /draw canvas of an art room (livechat.c dr_*), on the hub's chat_canvas store and its canvas events. */
+  readonly canvas = new DrawCanvas({
+    fetch: () => this.canvasCall(false, (db, ctx) => getCanvas(db, ctx, this.roomId, {})),
+    post: (base, ops) => this.canvasCall(true, (db, ctx) => applyCanvasOps(db, ctx, this.roomId, { base, ops })),
+  });
+  private canvasCall<T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T): T | string {
+    try { return this.run(write, fn); } catch (err) { if (!(err instanceof SurfaceError)) throw err; return err.message; }
+  }
+  canvasOpen(): void { this.canvas.enter(); this.cells.invalidate(); this.info.markDirty(); }
+  /** dr_leave, then the chat screen comes back as a full repaint. */
+  canvasLeave(): void { this.canvas.leave(); this.cells.invalidate(); this.info.markDirty(); }
 
   /**
    * The sidebar the livechat engine used to fill: joined rooms with unreads,
@@ -649,6 +665,7 @@ export class HubScreen implements PartylineScreen {
     if (this.av.event(e)) return;
     const inRoom = this.roomId !== '' && e.room_id === this.roomId;
     const m = this.model;
+    if (e.type === 'canvas') { if (inRoom) this.canvas.event(e.ref, e.text); return; }
     if (e.type === 'message' && inRoom) {
       const l = newLine(LIVE, stamp(e.at), e.user, e.text);
       l.id = e.ref;
@@ -881,6 +898,11 @@ export class HubScreen implements PartylineScreen {
       else if (k === 0x63 || k === 0x43 || k === K_ESC) this.quit();
       return;
     }
+    if (this.canvas.on && o.modal === MODAL_NONE) { // livechat.c handle_key: draw_key first; Ctrl+Q leaves the canvas, then the quit modal
+      const r = this.canvas.key(k);
+      if (r !== null) this.cells.invalidate();
+      if (r !== 'quit') return;
+    }
     if (k === 17) { o.modal = MODAL_QUIT; o.modalNo = false; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
     if (o.fmt) { this.pickKey(k); return; }
     if (o.modal === MODAL_MESSAGE) { if (k === K_ENTER || k === K_ESC || k === 0x20) o.modal = MODAL_NONE; return; }
@@ -1041,6 +1063,7 @@ export class HubScreen implements PartylineScreen {
     if (!f) return;
     const b = Number(f[1]), m = this.model, o = this.over, d = this.drawState;
     const row = Number(f[3]) - 1, col = Number(f[2]) - 1;
+    if (this.canvas.on && o.modal === MODAL_NONE) { if (b < 64) this.canvas.mouse(b, row, col, press, d); return; }
     if (b >= 64) {
       if (b >= 66) return;
       const up = b === 64;
@@ -1471,7 +1494,8 @@ export class HubScreen implements PartylineScreen {
     if (full) this.cells.invalidate();
     // livechat.c present: the typing rows show the time of this frame (hhmm_now into typing_time).
     if (this.model.typing.length > 0) this.model.typingTime = stamp(Math.floor(Date.now() / 1000));
-    const { cr, cc } = draw(this.cells, this.model, this.drawState, this.over);
+    const onCanvas = this.canvas.on && this.over.modal === MODAL_NONE; // lc_draw: the canvas instead of the chat while drawing
+    const { cr, cc } = onCanvas ? this.canvas.render(this.cells, this.drawState) : draw(this.cells, this.model, this.drawState, this.over);
     // A full frame (first paint, resize, redraw) re-arms SGR mouse reports; input() parses them. ?1002h adds drag motion (the input selection).
     // ?1003h (any motion) only while a menu is open, for LIVECHAT hover; off again re-arms ?1002h, the same mode slot.
     const motion = !!this.info.hello.mouse && (this.model.menu >= 0 || this.model.popup !== null);
@@ -1481,7 +1505,7 @@ export class HubScreen implements PartylineScreen {
     this.osc = '';
     // The terminal bytes are in the caller's own charset (hello charset=):
     // UTF-8 for the web and modern doors, latin1 for the Amiga and kin.
-    return Buffer.from(mouseOn + this.cells.present(this.model.focus === FOCUS_INPUT && this.model.menu < 0, cr, cc), this.utf8 ? 'utf8' : 'latin1');
+    return Buffer.from(mouseOn + this.cells.present(onCanvas || (this.model.focus === FOCUS_INPUT && this.model.menu < 0), cr, cc), this.utf8 ? 'utf8' : 'latin1');
   }
 
   /** session.ts `U` and `M` frames: upload results, the board's Add Note answer, and voice media. */
