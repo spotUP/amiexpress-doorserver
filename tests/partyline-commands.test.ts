@@ -135,6 +135,16 @@ describe('hub screen commands', () => {
     type('/deletemsg'); expect(lines()).toEqual([]);
   });
 
+  it('a /thread reply shows in that thread view', () => {
+    screen.run(true, (db, ctx) => createRoom(db, ctx, { name: 'general' }));
+    type('/join #general');
+    type('first line');
+    type('/thread 1 in the thread');
+    type('/thread 1');
+    expect(screen.over.viewText).toContain('=Replies (1):');
+    expect(screen.over.viewText.some((l) => l.endsWith(': in the thread'))).toBe(true);
+  });
+
   it('join loads the backlog as numbered lines', () => {
     screen.run(true, (db, ctx) => { const r = createRoom(db, ctx, { name: 'old' }); joinRoom(db, ctx, r.id); postMessage(db, ctx, r.id, { content: 'older', clientId: 'a' }); postMessage(db, ctx, r.id, { content: 'newer', clientId: 'b' }); });
     type('/join #old');

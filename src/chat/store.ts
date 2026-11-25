@@ -532,7 +532,8 @@ export function threadHistory(db: Database.Database, ctx: ChatCtx, id: string): 
   const parent = getMessage(db, id);
   const room = getRoom(db, parent.room_id);
   if (room.visibility === 'private' && !ctx.admin) requireMemberOf(db, room.id, ctx);
-  const rows = db.prepare('SELECT * FROM chat_messages WHERE thread_id = ? AND deleted_at IS NULL ORDER BY seq').all(id) as MsgRow[];
+  // LIVECHAT /thread n text posts a room line with replyTo (msg-thread.ts, livechat.c reply_typed), so a reply is part of the thread too.
+  const rows = db.prepare('SELECT * FROM chat_messages WHERE (thread_id = ? OR reply_to = ?) AND deleted_at IS NULL ORDER BY seq').all(id, id) as MsgRow[];
   return [parent, ...rows].map(toHistory);
 }
 
