@@ -317,10 +317,13 @@ export function pickMove(o: OverlayState, delta: number): void {
 /** draw_fmt for the emoji picker: bottom right above the input, categories left, items right (face in a 16 column, then the code). */
 function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
   const p = m.pal, W = c.cols, H = PICK_H, rows = pickRows();
-  const w = Math.min(52, Math.max(20, W - 2)), y = c.rows - 7;
+  const w = Math.min(52, Math.max(20, W - 2));
+  // LIVECHAT: the emoji picker sits bottom right (emoji-picker.ts), the format picker over the selection
+  // (server.ts getSelectionPosition: input text row, column of the selection start; category-picker display clamps).
+  const y = o.pickFmt ? c.rows - 3 : c.rows - 7, x = o.pickFmt ? 1 + Math.max(0, o.pickSel.start - d.inputFrom) : W;
   let top = y - H - 1;
   if (top < 0) top = y + 1;
-  const left = Math.max(0, W - w), catw = Math.max(8, Math.min(14, w - 24)), ix = left + 1 + catw, iw = w - 2 - catw;
+  const left = Math.max(0, Math.min(x - 2, W - w)), catw = Math.max(8, Math.min(14, w - 24)), ix = left + 1 + catw, iw = w - 2 - catw;
   const items = pickList(o);
   c.pen(p.ink, DEFAULT, 0);
   c.fill(top + 1, left + 1, H - 2, w - 2, 0x20);

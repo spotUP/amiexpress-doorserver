@@ -121,6 +121,8 @@ export class Model {
   handle = ''; room = ''; paneLabel = ''; node = 1;
   focus = FOCUS_INPUT; menu = -1; menuSel = 0;
   lines: Line[] = []; linesGen = 0;
+  /** LIVECHAT's animation frame (createAnimationManager fps 10): the screen tick advances it while an effect is on screen. */
+  fxFrame = 0;
   side: Side[] = []; sideSel = 0; sidebarHidden = false;
   typing: Typing[] = []; typingTime = ''; typingBlink = false;
   input = ''; inputCur = 0; inputAnchor = -1; editing = false; pick = '';
@@ -235,7 +237,7 @@ function hexColor(s: string): number {
 }
 const FX: ReadonlyArray<readonly [string, number, number]> = [['rainbow', TK_ACCENT_ALT, 1], ['pulse', TK_ACCENT, 1],
   ['sparkle', TK_ACCENT_ALT, 1], ['shake', TK_ALERT, 1], ['wave', TK_INK, 1], ['gradient', TK_ACCENT, 0]];
-function effectTag(pal: Palette, s: string, at: number): { n: number; closing: boolean; fg: number; bold: number } | null {
+function effectTag(pal: Palette, s: string, at: number): { n: number; closing: boolean; fg: number; bold: number; name: string } | null {
   let p = at + 1;
   const closing = s[p] === '/';
   if (closing) p++;
@@ -243,13 +245,28 @@ function effectTag(pal: Palette, s: string, at: number): { n: number; closing: b
   if (end < 0) return null;
   for (const [name, fg, bold] of FX) {
     if (s.startsWith(name, p) && (p + name.length === end || (!closing && s[p + name.length] === ' ')))
-      return { n: end - at + 1, closing, fg: pal.tone(fg), bold };
+      return { n: end - at + 1, closing, fg: pal.tone(fg), bold, name };
   }
   return null;
 }
+/** A log line that carries an animated effect: the screen tick repaints while one is shown. */
+export const FX_ANIMATED = /~(rainbow|pulse|sparkle|wave|gradient)[~ ]/;
+// LIVECHAT renderers.ts colours (RAINBOW_COLORS, SPARKLE_COLORS, the red-blue GRADIENT_RAMP) as xterm indexes.
+const FX_RAINBOW = [9, 11, 10, 14, 12, 13], FX_SPARKLE = [15, 11, 15], FX_RAMP = [9, 13, 12];
+/** renderers.ts per character: the colour of visible char i of n at a frame, -1 for the effect's own tone. */
+function fxColor(name: string, frame: number, i: number, n: number, ch: string): { fg: number; bold: number } | null {
+  switch (name) {
+    case 'rainbow': return { fg: FX_RAINBOW[(i + frame) % FX_RAINBOW.length], bold: 0 };
+    case 'pulse': return { fg: Math.sin(frame * 0.3) * 0.5 + 0.5 > 0.5 ? 14 : 8, bold: 0 };
+    case 'sparkle': return ((frame * 7 + i * 13) % 100) / 100 < 0.15 && ch !== ' ' ? { fg: FX_SPARKLE[(frame + i) % FX_SPARKLE.length], bold: 1 } : { fg: -1, bold: 0 };
+    case 'wave': { const w = Math.sin((frame + i) * 0.5); return w > 0.5 ? { fg: 14, bold: 0 } : w < -0.5 ? { fg: 12, bold: 0 } : { fg: -1, bold: 0 }; }
+    case 'gradient': { const pos = n <= 1 ? 0 : ((i + frame % n) % n) / (n - 1); return { fg: FX_RAMP[Math.min(FX_RAMP.length - 1, Math.floor(pos * FX_RAMP.length))], bold: 0 }; }
+    default: return null;   // shake: LIVECHAT only moves it a column; static here so the line never rewraps
+  }
+}
 const hasCloser = (s: string, at: number, len: number, closer: string): boolean => s.indexOf(closer, at + len + 1) >= 0;
 
-interface Fmt { bold: boolean; italic: boolean; under: boolean; strike: boolean; inv: boolean; tagFg: number; effFg: number; effBold: number }
+interface Fmt { bold: boolean; italic: boolean; under: boolean; strike: boolean; inv: boolean; tagFg: number; effFg: number; effBold: number; eff: string; effI: number; effN: number }
 function fmtWant(pal: Palette, f: Fmt, want: Style): void {
   want.bold = f.bold || f.effBold ? 1 : 0;
   want.attr = (f.italic ? A_ITALIC : 0) | (f.under ? A_UNDERLINE : 0) | (f.inv ? A_REVERSE : 0);
@@ -324,13 +341,21 @@ export function mentionsSelf(m: Model, l: Line): boolean {
 function sbMarkdown(m: Model, b: Sb, text: string): void {
   const s = expandEmoji(m, text, TEXT_MAX * 2);
   const have: Style = { fg: -1, bold: 0, attr: 0 }, want: Style = { fg: -1, bold: 0, attr: 0 };
-  const f: Fmt = { bold: false, italic: false, under: false, strike: false, inv: false, tagFg: -1, effFg: -1, effBold: 0 };
+  const f: Fmt = { bold: false, italic: false, under: false, strike: false, inv: false, tagFg: -1, effFg: -1, effBold: 0, eff: '', effI: 0, effN: 0 };
   const pal = b.pal;
   let i = 0;
   while (i < s.length) {
     const run = i;
     while (i < s.length && !MARKS.includes(s[i])) i++;
-    if (i > run) { styleSet(b, have, want); b.run(s.slice(run, i)); }
+    if (i > run && f.eff !== '' && f.tagFg < 0 && !f.strike) {
+      // An effect paints per character and per frame, as LIVECHAT's renderers do; a colour tag or strike inside it wins.
+      for (const ch of s.slice(run, i)) {
+        const fx = fxColor(f.eff, m.fxFrame, f.effI++, f.effN, ch);
+        styleSet(b, have, fx === null ? want : { ...want, fg: fx.fg >= 0 ? fx.fg : want.fg, bold: want.bold | fx.bold });
+        b.run(ch);
+      }
+    }
+    else if (i > run) { styleSet(b, have, want); b.run(s.slice(run, i)); }
     if (i >= s.length) break;
     const c0 = s[i], c1 = s[i + 1];
     let tag: ReturnType<typeof effectTag>;
@@ -349,6 +374,9 @@ function sbMarkdown(m: Model, b: Sb, text: string): void {
     else if (c0 === '~' && (tag = effectTag(pal, s, i)) !== null) {
       f.effFg = tag.closing ? -1 : tag.fg;
       f.effBold = tag.closing ? 0 : tag.bold;
+      f.eff = tag.closing ? '' : tag.name; f.effI = 0;
+      const close = s.indexOf(`~/${tag.name}~`, i + tag.n);
+      f.effN = tag.closing ? 0 : (close < 0 ? s.length : close) - i - tag.n;
       i += tag.n;
     }
     else if (c0 === '{' && (brace = braceTag(s, i, f)).n > 0) {

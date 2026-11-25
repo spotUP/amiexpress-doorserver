@@ -23,7 +23,7 @@ import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listPins, 
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
-import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
+import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_OK, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
   HIT_THEME_ROW, HIT_CREATE_F, HIT_CREATE_KIND, CREATE_KINDS, CF_NAME, CF_TOPIC, CF_KIND, CF_PRIVATE, CF_INVITE, CF_CREATE, CF_CANCEL, CF_COUNT,
   MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
@@ -98,7 +98,7 @@ export class HubScreen implements PartylineScreen {
     this.prefsLoad();
     this.fillSidebar();
     this.off = onEvents(() => this.take());
-    this.tick = setInterval(() => { if (this.typingTick()) this.info.markDirty(); }, TICK_MS);
+    this.tick = setInterval(() => { if (this.typingTick() || this.fxTick()) this.info.markDirty(); }, TICK_MS);
     this.tick.unref?.();
   }
 
@@ -393,6 +393,16 @@ export class HubScreen implements PartylineScreen {
     if (this.roomId === '') return;
     if (input === this.typingSent) { this.typingPending = false; return; }
     if (input === '' || this.typingWait <= 0) this.typingSend(input); else this.typingPending = true;
+  }
+
+  private fxTicks = 0;
+  /** LIVECHAT's 10 fps animation clock: a new effect frame every 100 ms while a line with an effect is in the log. */
+  private fxTick(): boolean {
+    if (++this.fxTicks * TICK_MS < 100) return false;
+    this.fxTicks = 0;
+    if (!this.model.lines.some((l) => FX_ANIMATED.test(l.text))) return false;
+    this.model.fxFrame++;
+    return true;
   }
 
   /** livechat.c typing_tick: trailing edge, stale rows, the cursor blink. True when the frame changed. */
