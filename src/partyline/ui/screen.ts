@@ -24,7 +24,7 @@ import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { DrawCanvas } from './canvas';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
-import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, inputSelRange, inputStep, inputVisible, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_ALERT, TK_BAR, TK_DIM, TK_OK } from './model';
+import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, PANE_CHAT, PANE_SIDEBAR, HISTORY, inputSelRange, inputStep, inputVisible, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_ALERT, TK_BAR, TK_DIM, TK_OK } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, HIT_OK, HIT_YES, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
   HIT_THEME_ROW, HIT_CREATE_F, HIT_CREATE_KIND, CREATE_KINDS, CF_NAME, CF_TOPIC, CF_KIND, CF_PRIVATE, CF_INVITE, CF_CREATE, CF_CANCEL, CF_COUNT,
   MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, MODAL_RECONNECT, formatItems, OverlayState, pickCats, pickList, pickMove,
@@ -39,14 +39,15 @@ import { HubMedia } from '../media';
 /** ui_key.h codes. */
 export const K_UP = 1000, K_DOWN = 1001, K_PGUP = 1002, K_PGDN = 1003, K_HOME = 1004, K_END = 1005, K_ENTER = 1006, K_ESC = 1007,
   K_LEFT = 1008, K_RIGHT = 1009, K_BACKTAB = 1010, K_F1 = 1011, K_F2 = 1012, K_F3 = 1013, K_F4 = 1014, K_F5 = 1015, K_F6 = 1016, K_F7 = 1017, K_DEL = 1020,
-  K_SLEFT = 1021, K_SRIGHT = 1022, K_SHOME = 1023, K_SEND = 1024, K_SUP = 1025, K_SDOWN = 1026;
+  K_SLEFT = 1021, K_SRIGHT = 1022, K_SHOME = 1023, K_SEND = 1024, K_SUP = 1025, K_SDOWN = 1026,
+  K_ALT_R = 1027, K_ALT_F = 1028, K_ALT_L = 1029;
 /** livechat.c typing clock (50 ticks/s there): idle tick, TS 400 ms throttle, TYPING_STALE_MS, cursor blink. */
 const TICK_MS = 50, TYPING_THROTTLE_MS = 400, TYPING_STALE_MS = 5000, TYPING_BLINK_MS = 530;
 
 const KEY_SEQ: Record<string, number> = {
   '\x1b[A': K_UP, '\x1b[B': K_DOWN, '\x1b[C': K_RIGHT, '\x1b[D': K_LEFT, '\x1b[H': K_HOME, '\x1b[F': K_END,
   '\x1b[5~': K_PGUP, '\x1b[6~': K_PGDN, '\x1bOP': K_F1, '\x1bOS': K_F4, '\x1b[14~': K_F4, '\x1b[Z': K_BACKTAB, '\x1b[1~': K_HOME, '\x1b[4~': K_END,
-  '\x1b[3~': K_DEL, '\x1b[15~': K_F5,
+  '\x1b[3~': K_DEL, '\x1b[15~': K_F5, '\x1br': K_ALT_R, '\x1bf': K_ALT_F, '\x1bl': K_ALT_L, // blessed M-r / M-f / M-l
   '\x1bOQ': K_F2, '\x1b[12~': K_F2, '\x1bOR': K_F3, '\x1b[13~': K_F3, '\x1b[17~': K_F6, '\x1b[18~': K_F7,
   // xterm shift forms (CSI 1;2X, the board's composed-key.ts) and rxvt's lower-case ones: the input selection (textbox.ts).
   '\x1b[1;2D': K_SLEFT, '\x1b[d': K_SLEFT, '\x1b[1;2C': K_SRIGHT, '\x1b[c': K_SRIGHT, '\x1b[1;2H': K_SHOME, '\x1b[1;2F': K_SEND,
@@ -941,6 +942,7 @@ export class HubScreen implements PartylineScreen {
       else if (k === K_UP && o.helpTop > 0) o.helpTop--;
       return;
     }
+    if (k === K_ALT_R || k === K_ALT_F || k === K_ALT_L) { this.layoutKey(k); return; } // LIVECHAT screen keys: any focus
     if (m.popup) { this.popupKey(k); return; }
     if (m.focus === FOCUS_MENU && this.menuKey(k)) return;
     if (m.focus === FOCUS_SIDEBAR && this.sideKey(k)) return;
@@ -1390,6 +1392,25 @@ export class HubScreen implements PartylineScreen {
       case 'Clear Chat': this.runLine('/clear'); return;
       case 'About': this.runLine('/about'); return;
       case 'Quit': this.key(17); return;
+    }
+  }
+
+  /**
+   * LIVECHAT handlers/keyboard-shortcuts.ts M-r / M-f / M-l on the two Partyline panes. Alt+R: layout reset
+   * (sidebar left, chat beside it, no fullscreen). Alt+F: fullscreen the focused pane (sidebar when it has
+   * focus, else the chat), again to restore. Alt+L: cycle Standard, Wide Sidebar (40%), Vertical Split
+   * (sidebar 40% on top). Session-only like LIVECHAT (its DockablePanel storage is never set).
+   */
+  private layoutKey(k: number): void {
+    const m = this.model;
+    if (k === K_ALT_R) { m.layout = 0; m.maxPane = 0; this.systemLine('Layout reset to defaults'); }
+    else if (k === K_ALT_F) {
+      const pane = m.focus === FOCUS_SIDEBAR ? PANE_SIDEBAR : PANE_CHAT;
+      m.maxPane = m.maxPane === pane ? 0 : pane;
+      this.systemLine(`${pane === PANE_CHAT ? 'Chat ' : ''}Fullscreen ${m.maxPane !== 0 ? 'enabled' : 'disabled'}`);
+    } else {
+      m.layout = (m.layout + 1) % 3; m.maxPane = 0;
+      this.systemLine(`Layout: ${['Standard', 'Wide Sidebar', 'Vertical Split'][m.layout]}`);
     }
   }
 

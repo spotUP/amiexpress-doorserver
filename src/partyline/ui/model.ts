@@ -115,6 +115,8 @@ export function newSide(kind: number, joined: boolean, label: string): Side {
 }
 
 let linesClock = 0;
+export const PANE_CHAT = 1, PANE_SIDEBAR = 2;
+export interface Pane { top: number; h: number; left: number; w: number }
 export class Model {
   pal = new Palette();
   cols: number; rows: number;
@@ -124,6 +126,8 @@ export class Model {
   /** LIVECHAT's animation frame (createAnimationManager fps 10): the screen tick advances it while an effect is on screen. */
   fxFrame = 0;
   side: Side[] = []; sideSel = 0; sidebarHidden = false;
+  /** LIVECHAT Alt+L preset (0 Standard, 1 Wide Sidebar, 2 Vertical Split) and Alt+F maximized pane (0 none, PANE_CHAT, PANE_SIDEBAR); session-only, as in LIVECHAT. */
+  layout = 0; maxPane = 0;
   typing: Typing[] = []; typingTime = ''; typingBlink = false;
   input = ''; inputCur = 0; inputAnchor = -1; editing = false; pick = '';
   /** The open right-click menu (LIVECHAT context-menus.ts): its rows, where it opens, the selected row; null when shut. */
@@ -149,6 +153,17 @@ export class Model {
     if (this.sidebarHidden || this.cols <= 40) return 0;
     const w = Math.min(this.cols - 24, 21);
     return w < 8 ? 0 : w;
+  }
+  /** Sidebar and chat boxes (top, height, left, width) under the menubar for the layout and maximized pane; null side = not drawn, null chat = covered. */
+  panes(): { side: Pane | null; chat: Pane | null } {
+    const W = this.cols, h = this.rows - 5, sw = this.sidebarWidth();
+    if (sw > 0 && this.maxPane === PANE_SIDEBAR) return { side: { top: 1, h, left: 0, w: W }, chat: null };
+    if (sw === 0 || this.maxPane === PANE_CHAT) return { side: null, chat: { top: 1, h, left: 0, w: W } };
+    const sh = Math.floor(h * 0.4);
+    // keyboard-shortcuts.ts M-l case 2: sidebar 40% on top, chat below (the rest, so no row is left blank).
+    if (this.layout === 2 && sh >= 3 && h - sh >= 4) return { side: { top: 1, h: sh, left: 0, w: W }, chat: { top: 1 + sh, h: h - sh, left: 0, w: W } };
+    const side = this.layout === 1 ? Math.min(Math.floor(W * 0.4), W - 24) : sw;
+    return { side: { top: 1, h, left: 0, w: side }, chat: { top: 1, h, left: side, w: W - side } };
   }
   textRows(): number { return Math.max(1, this.rows - 8); }
   pickIndex(): number {

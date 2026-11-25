@@ -79,7 +79,7 @@ function drawMenubar(c: Cells, m: Model): void {
   c.text(0, w - 10, 'LIVE CHAT', 9);
 }
 
-function drawSideItem(c: Cells, m: Model, it: Side, row: number, width: number, sel: boolean): void {
+function drawSideItem(c: Cells, m: Model, it: Side, row: number, col: number, width: number, sel: boolean): void {
   const mark = sel ? '> ' : '  ', p = m.pal;
   let buf: string;
   if (it.kind === SIDE_HEAD) buf = '  \x01\xCC\x02' + it.label.slice(0, 38);
@@ -91,15 +91,15 @@ function drawSideItem(c: Cells, m: Model, it: Side, row: number, width: number, 
       + (it.note !== '' ? it.label.slice(0, 20) + ': ' + it.note.slice(0, 14) : it.label.slice(0, 38));
   else buf = mark + '@ ' + it.label;
   c.pen(p.ink, DEFAULT, 0);
-  c.marked(row, 1, buf, 0, 128, width);
+  c.marked(row, col, buf, 0, 128, width);
 }
 
-function drawSidebar(c: Cells, m: Model, top: number, h: number, w: number): void {
+function drawSidebar(c: Cells, m: Model, top: number, h: number, left: number, w: number): void {
   const p = m.pal;
   c.pen(p.ink, DEFAULT, 0);
-  c.fill(top + 1, 1, h - 2, w - 2, 0x20);
-  c.box(top, 0, h, w, m.focus === FOCUS_SIDEBAR ? p.borderFocus : p.accent, 'Sidebar', p.accent);
-  for (let i = 0; i < m.side.length && i < h - 2; i++) drawSideItem(c, m, m.side[i], top + 1 + i, w - 2, i === m.sideSel);
+  c.fill(top + 1, left + 1, h - 2, w - 2, 0x20);
+  c.box(top, left, h, w, m.focus === FOCUS_SIDEBAR ? p.borderFocus : p.accent, 'Sidebar', p.accent);
+  for (let i = 0; i < m.side.length && i < h - 2; i++) drawSideItem(c, m, m.side[i], top + 1 + i, left + 1, w - 2, i === m.sideSel);
 }
 
 /** One log row on a bar: barInk on bg. `flat` also drops reverse, so an inline @name spot does not punch a hole in the bar. */
@@ -195,7 +195,7 @@ function drawInput(c: Cells, m: Model, d: DrawState): { cr: number; cc: number }
 
 /** lc_draw: menubar, sidebar, chat pane, input, status bar, open menu, then the overlays in the C order. */
 export function draw(c: Cells, m: Model, d: DrawState, o?: OverlayState): { cr: number; cc: number } {
-  const p = m.pal, W = c.cols, H = c.rows, sw = m.sidebarWidth(), h = H - 5;
+  const p = m.pal, W = c.cols, H = c.rows, { side, chat } = m.panes();
   d.hits.reset();
   d.covers.length = 0;
   d.barRows = 0;
@@ -203,8 +203,9 @@ export function draw(c: Cells, m: Model, d: DrawState, o?: OverlayState): { cr: 
   for (let i = 0; i < 4; i++) d.hits.add(HIT_MENU, 0, MENU_COL[i], 1, MENU_LABELS[i].length);
   d.hits.add(HIT_STATUS, H - 1, 0, 1, W);
   d.hits.add(HIT_INPUT, H - 4, 0, 3, W);
-  if (sw > 0) { drawSidebar(c, m, 1, h, sw); d.hits.add(HIT_SIDEBAR, 2, 1, h - 2, sw - 2); }
-  drawChat(c, m, d, 1, h, sw, W - sw);
+  if (side) { drawSidebar(c, m, side.top, side.h, side.left, side.w); d.hits.add(HIT_SIDEBAR, side.top + 1, side.left + 1, side.h - 2, side.w - 2); }
+  if (chat) drawChat(c, m, d, chat.top, chat.h, chat.left, chat.w);
+  else d.chatRows = 0;
   const caret = drawInput(c, m, d);
   c.bar(H - 1, 0, W, `@${m.handle.slice(0, 30)} | Node ${m.node} | #${m.room.slice(0, 40)} | [L] [*] | F1:Help F4:Emoji`, p.ink, DEFAULT, 0);
   if (m.menu >= 0) {
