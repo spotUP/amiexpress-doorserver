@@ -59,6 +59,44 @@ describe('Partyline Quit dialog', () => {
     expect(quits).toBe(0);
   });
 
+  // the [ char inside each button: same glyph, so a different cell value means a different pen
+  const face = (id: number): number => { const [r, c] = cellOf(id); return screen.cells.back[(r + 1) * 80 + c + 1]; };
+
+  it('draws [ Yes ] highlighted at open, and Tab / Shift+Tab / arrows move the highlight', () => {
+    key('\x11');
+    const yesOn = face(HIT_YES), noOff = face(HIT_NO);
+    expect(yesOn).not.toBe(noOff);
+    key('\t');
+    expect(face(HIT_NO)).not.toBe(noOff);
+    expect(face(HIT_YES)).not.toBe(yesOn);
+    key('\x1b[Z');
+    expect(face(HIT_YES)).toBe(yesOn);
+    key('\x1b[C');
+    expect(face(HIT_YES)).not.toBe(yesOn);
+    key('\x1b[D');
+    expect(face(HIT_YES)).toBe(yesOn);
+  });
+
+  it('Enter on [ No ] closes the dialog and stays in the chat', () => {
+    key('\x11');
+    key('\t');
+    key('\r');
+    expect(screen.over.modal).toBe(MODAL_NONE);
+    expect(quits).toBe(0);
+  });
+
+  it('Enter on [ Yes ] (the initial focus) leaves the chat', () => {
+    key('\x11');
+    key('\r');
+    expect(quits).toBe(1);
+  });
+
+  it('the dialog reopens with [ Yes ] focused', () => {
+    key('\x11'); key('\t'); key('n');
+    key('\x11'); key('\r');
+    expect(quits).toBe(1);
+  });
+
   it('an arrow key in its own chunk is still an arrow, not Esc', () => {
     key('\x11');
     key('\x1b[C');

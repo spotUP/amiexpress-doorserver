@@ -53,7 +53,7 @@ export const HELP_TEXT: readonly string[] = [
 export class OverlayState {
   help = false; helpTop = 0;
   view = false; viewTop = 0; viewTitle = ''; viewText: string[] = [];
-  modal = MODAL_NONE; modalTitle = ''; modalText = ''; modalAttempt = 0; modalMax = 0;
+  modal = MODAL_NONE; modalTitle = ''; modalText = ''; modalAttempt = 0; modalMax = 0; modalNo = false;
   upReceived = 0; upTotal = 0;
   prompt = '';
   search = false; searchField = 0; searchQ = ''; searchUser = ''; searchSel = 0; searchTop = 0; searchRows: string[] = [];
@@ -181,6 +181,10 @@ function drawModal(c: Cells, m: Model, d: DrawState, o: OverlayState, caret: { c
   if (o.modal === MODAL_QUIT) {
     c.button(top + 7, left + 12, 9, '[ Yes ]', p.accent, p.ink);
     c.button(top + 7, left + 29, 8, '[ No ]', p.accent, p.ink);
+    // beyond livechat.c on purpose (sysop 2026-11-25): the focused button wears the selection colours, as in drawCreate
+    const [fl, fw, ft] = o.modalNo ? [left + 29, 8, '[ No ]'] as const : [left + 12, 9, '[ Yes ]'] as const;
+    c.pen(p.col[T_SELECTION_INK], p.col[T_SELECTION_BG], 0); c.fill(top + 8, fl + 1, 1, fw - 2, 0x20); c.text(top + 8, fl + 1, ft, fw - 2);
+    c.pen(p.ink, DEFAULT, 0);
     d.hits.add(HIT_MODAL, top, left, 12, w);
     d.hits.add(HIT_YES, top + 7, left + 12, 3, 9);
     d.hits.add(HIT_NO, top + 7, left + 29, 3, 8);

@@ -853,8 +853,10 @@ export class HubScreen implements PartylineScreen {
   key(k: number): void {
     const m = this.model, o = this.over;
     if (o.modal === MODAL_QUIT) {
-      if (k === 0x79 || k === 0x59 || k === K_ENTER) { this.quit(); return; }
-      if (k === 0x6e || k === 0x4e || k === K_ESC) o.modal = MODAL_NONE;
+      // Tab / Shift+Tab / Left / Right move the focus and Enter presses it: beyond livechat.c on purpose (sysop 2026-11-25)
+      if (k === 9 || k === K_BACKTAB || k === K_LEFT || k === K_RIGHT) { o.modalNo = !o.modalNo; return; }
+      if (k === 0x79 || k === 0x59 || (k === K_ENTER && !o.modalNo)) { this.quit(); return; }
+      if (k === 0x6e || k === 0x4e || k === K_ESC || k === K_ENTER) o.modal = MODAL_NONE;
       return;
     }
     if (o.modal === MODAL_RECONNECT) { // livechat.c handle_key: R/Enter retries, C/Esc leaves
@@ -862,7 +864,7 @@ export class HubScreen implements PartylineScreen {
       else if (k === 0x63 || k === 0x43 || k === K_ESC) this.quit();
       return;
     }
-    if (k === 17) { o.modal = MODAL_QUIT; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
+    if (k === 17) { o.modal = MODAL_QUIT; o.modalNo = false; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
     if (o.fmt) { this.pickKey(k); return; }
     if (o.modal === MODAL_MESSAGE) { if (k === K_ENTER || k === K_ESC || k === 0x20) o.modal = MODAL_NONE; return; }
     if (o.create) { this.createKey(k); return; }
