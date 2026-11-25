@@ -588,7 +588,7 @@ export function dmThreadId(a: string, b: string): string {
 
 /**
  * A DM target must be a real person: the board is registered and the user has
- * been seen in chat (a session, a room message or an earlier DM). Returns the
+ * been seen in chat (a session, a room membership, a room message or an earlier DM). Returns the
  * targets that fail, so the caller can name them. Board ids are stored
  * lower-case (splitUser lower-cases them); user columns are COLLATE NOCASE.
  */
@@ -598,7 +598,8 @@ function unknownDmTargets(db: Database.Database, ctx: ChatCtx, targets: string[]
     `SELECT 1 WHERE EXISTS (SELECT 1 FROM chat_sessions WHERE user = @u)
               OR EXISTS (SELECT 1 FROM chat_messages WHERE user = @u)
               OR EXISTS (SELECT 1 FROM chat_dm_messages WHERE sender = @u OR dm_a = @u OR dm_b = @u)
-              OR EXISTS (SELECT 1 FROM chat_dm_members WHERE user = @u)`
+              OR EXISTS (SELECT 1 FROM chat_dm_members WHERE user = @u)
+              OR EXISTS (SELECT 1 FROM chat_memberships WHERE user = @u)`
   );
   return targets.filter((t) => {
     if (t.toLowerCase() === ctx.user.toLowerCase()) return false;
