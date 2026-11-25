@@ -23,10 +23,10 @@ import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listPins, 
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
-import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
+import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_ALERT, TK_BAR, TK_DIM, TK_OK } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, HIT_OK, HIT_YES, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
   HIT_THEME_ROW, HIT_CREATE_F, HIT_CREATE_KIND, CREATE_KINDS, CF_NAME, CF_TOPIC, CF_KIND, CF_PRIVATE, CF_INVITE, CF_CREATE, CF_CANCEL, CF_COUNT,
-  MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
+  MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, MODAL_RECONNECT, formatItems, OverlayState, pickCats, pickList, pickMove,
   SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashPickKind, slashScroll } from './slash';
 import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
@@ -569,11 +569,16 @@ export class HubScreen implements PartylineScreen {
 
   /** take_events: the events this session may see since the cursor. */
   take(): void {
+    if (this.over.modal === MODAL_RECONNECT) return; // livechat.c do_poll: polling stays off while the dialog is open
     let rows: EventRec[];
     try {
-      rows = withAchievementsDb(this.ach, (db) => fetchVisibleEvents(db, this.info.sid, this.info.user, this.cursor, this.info.boardId));
+      rows = this.poll();
     } catch {
-      return; // the database is closing (shutdown): the next commit retries
+      // livechat.c do_poll: a failed poll (here the store is closing or unreadable) opens the disconnection dialog
+      const o = this.over;
+      if (o.modal === MODAL_NONE || o.modal === MODAL_MESSAGE) this.reconnectOpen('Cannot reach the chat server.', 1);
+      this.info.markDirty();
+      return;
     }
     if (rows.length === 0) return;
     let side = false;
@@ -586,6 +591,37 @@ export class HubScreen implements PartylineScreen {
     if (side) this.fillSidebar();
     this.info.markDirty();
     if (rows.length > 0) this.take();
+  }
+
+  private poll(): EventRec[] {
+    return withAchievementsDb(this.ach, (db) => fetchVisibleEvents(db, this.info.sid, this.info.user, this.cursor, this.info.boardId));
+  }
+
+  /** livechat.c reconnect_open; RECONNECT_MAX 3 as the C door. */
+  private reconnectOpen(reason: string, attempt: number): void {
+    const o = this.over;
+    o.modal = MODAL_RECONNECT; o.modalText = reason; o.modalAttempt = attempt; o.modalMax = 3;
+  }
+
+  /** livechat.c reconnect_retry: one poll; past the maximum the caller leaves. */
+  private reconnectRetry(): void {
+    const o = this.over;
+    this.systemLine('Attempting to reconnect...');
+    try {
+      this.poll();
+    } catch {
+      if (o.modalAttempt >= o.modalMax) {
+        o.modal = MODAL_NONE;
+        this.note(SYSTEM, 'Maximum reconnection attempts reached. Please restart Partyline.');
+        this.model.lines[this.model.lines.length - 1].tone = TK_ALERT;
+        this.quit();
+      } else this.reconnectOpen('Reconnection failed', o.modalAttempt + 1);
+      return;
+    }
+    o.modal = MODAL_NONE;
+    this.note(SYSTEM, 'Reconnected to server!');
+    this.model.lines[this.model.lines.length - 1].tone = TK_OK;
+    this.take();
   }
 
   private event(e: EventRec): void {
@@ -817,6 +853,11 @@ export class HubScreen implements PartylineScreen {
       if (k === 0x6e || k === 0x4e || k === K_ESC) o.modal = MODAL_NONE;
       return;
     }
+    if (o.modal === MODAL_RECONNECT) { // livechat.c handle_key: R/Enter retries, C/Esc leaves
+      if (k === 0x72 || k === 0x52 || k === K_ENTER) this.reconnectRetry();
+      else if (k === 0x63 || k === 0x43 || k === K_ESC) this.quit();
+      return;
+    }
     if (k === 17) { o.modal = MODAL_QUIT; o.modalTitle = 'Quit'; o.modalText = 'Leave the chat?'; return; }
     if (o.fmt) { this.pickKey(k); return; }
     if (o.modal === MODAL_MESSAGE) { if (k === K_ENTER || k === K_ESC || k === 0x20) o.modal = MODAL_NONE; return; }
@@ -1042,6 +1083,7 @@ export class HubScreen implements PartylineScreen {
     const m = this.model, o = this.over, h = this.drawState.hits.at(row, col);
     if (o.modal === MODAL_MESSAGE) { if (h.id === HIT_OK || h.id !== HIT_MODAL) o.modal = MODAL_NONE; return; }
     if (o.modal === MODAL_QUIT) { if (h.id === HIT_YES) this.quit(); else if (h.id === HIT_NO) o.modal = MODAL_NONE; return; }
+    if (o.modal === MODAL_RECONNECT) { if (h.id === HIT_YES) this.reconnectRetry(); else if (h.id === HIT_NO) this.quit(); return; }
     if (o.create) { // a click focuses a field or a Type choice; a box toggles, a button presses
       if (h.id >= HIT_CREATE_KIND && h.id < HIT_CREATE_KIND + CREATE_KINDS.length) { o.createField = CF_KIND; o.createKind = h.id - HIT_CREATE_KIND; }
       else if (h.id >= HIT_CREATE_F && h.id < HIT_CREATE_F + CF_COUNT) { o.createField = h.id - HIT_CREATE_F; if (o.createField >= CF_PRIVATE) this.createPress(o.createField); }
