@@ -120,6 +120,16 @@ describe('hub screen lane 1: LIVECHAT input, menus, sidebar and function keys', 
     expect(screen.model.input).toBe('hi @bob');
   });
 
+  it('Tab after "/msg @b" completes the nick; "/msg b" with no @ moves focus, as LIVECHAT _tryTabComplete does', () => {
+    fill('/msg @b');
+    send('\t');
+    expect(screen.model.input).toBe('/msg @bob');
+    fill('/msg b');
+    send('\t');
+    expect(screen.model.input).toBe('/msg b');
+    expect(screen.model.focus).toBe(FOCUS_SIDEBAR);
+  });
+
   it('Tab cycles focus input, sidebar, menu bar; Shift+Tab goes back; menu keys move and Esc closes', () => {
     send('\t');
     expect(screen.model.focus).toBe(FOCUS_SIDEBAR);
