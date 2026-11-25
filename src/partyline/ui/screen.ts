@@ -23,7 +23,7 @@ import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listPins, 
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
-import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_ALERT, TK_BAR, TK_DIM, TK_OK } from './model';
+import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, inputSelRange, inputStep, inputVisible, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_ALERT, TK_BAR, TK_DIM, TK_OK } from './model';
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, HIT_OK, HIT_YES, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
   HIT_THEME_ROW, HIT_CREATE_F, HIT_CREATE_KIND, CREATE_KINDS, CF_NAME, CF_TOPIC, CF_KIND, CF_PRIVATE, CF_INVITE, CF_CREATE, CF_CANCEL, CF_COUNT,
   MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, MODAL_RECONNECT, formatItems, OverlayState, pickCats, pickList, pickMove,
@@ -907,8 +907,7 @@ export class HubScreen implements PartylineScreen {
     if (k === K_ENTER) { this.submit(); return; }
     if (k >= K_SLEFT && k <= K_SDOWN) { // textbox.ts: shift extends the selection from where the cursor stood
       if (m.inputAnchor < 0) m.inputAnchor = m.inputCur;
-      if (k === K_SLEFT) m.inputCur = Math.max(0, m.inputCur - 1);
-      else if (k === K_SRIGHT) m.inputCur = Math.min(m.input.length, m.inputCur + 1);
+      if (k === K_SLEFT || k === K_SRIGHT) m.inputCur = inputStep(m.input, m.inputCur, k === K_SLEFT ? -1 : 1);
       else m.inputCur = k === K_SHOME || k === K_SUP ? 0 : m.input.length; // one line: up/down reach its ends
       this.keyboardSelecting = true; this.lastKeyTime = Date.now();
       this.selectSoon();
@@ -917,14 +916,13 @@ export class HubScreen implements PartylineScreen {
     if (k === K_F5) { this.openFormat(); return; }
     if ((k === K_LEFT || k === K_RIGHT) && this.keyboardSelecting && m.inputAnchor >= 0 && Date.now() - this.lastKeyTime < 150) {
       // textbox.ts _shouldClearSelection: a plain arrow inside 150ms of a shift arrow is a dropped shift, so it extends.
-      m.inputCur = Math.max(0, Math.min(m.input.length, m.inputCur + (k === K_LEFT ? -1 : 1)));
+      m.inputCur = inputStep(m.input, m.inputCur, k === K_LEFT ? -1 : 1);
       this.lastKeyTime = Date.now();
       this.selectSoon();
       return;
     }
     if (k === K_LEFT || k === K_RIGHT || k === K_HOME || k === K_END || k === K_ESC) this.clearSelection();
-    if (k === K_LEFT) { if (m.inputCur > 0) m.inputCur--; return; }
-    if (k === K_RIGHT) { if (m.inputCur < m.input.length) m.inputCur++; return; }
+    if (k === K_LEFT || k === K_RIGHT) { m.inputCur = inputStep(m.input, m.inputCur, k === K_LEFT ? -1 : 1); return; }
     if (k === K_HOME) { m.inputCur = 0; return; }
     if (k === K_END) { m.inputCur = m.input.length; return; }
     if (k === 8 || k === K_DEL) {
@@ -953,7 +951,7 @@ export class HubScreen implements PartylineScreen {
     const m = this.model, o = this.over;
     this.selectTimer = clearTimeout(this.selectTimer) as undefined;
     if (m.inputAnchor < 0 || m.inputAnchor === m.inputCur || o.fmt) return;
-    const start = Math.min(m.inputAnchor, m.inputCur), end = Math.max(m.inputAnchor, m.inputCur);
+    const { start, end } = inputSelRange(m.input, m.inputAnchor, m.inputCur); // textbox.ts getSelection: markers trimmed off
     o.pickSel = { start, end, text: m.input.slice(start, end) };
     o.fmt = true; o.pickFmt = true; o.pickItems = formatItems(); o.pickCat = o.pickItem = o.pickTop = o.pickPane = 0;
   }
@@ -1375,9 +1373,10 @@ export class HubScreen implements PartylineScreen {
     if (it?.kind === SIDE_ROOM && it.id !== undefined && it.id !== this.roomId) this.joinRoom(it.id);
   }
 
-  /** The input character under a column, clamped to the text. */
+  /** The input character under a column, clamped to the text; markup is zero-width on screen. */
   private inputAt(col: number): number {
-    return Math.max(0, Math.min(this.model.input.length, this.drawState.inputFrom + col - 1));
+    const vis = inputVisible(this.model.input), i = Math.max(0, this.drawState.inputFrom + col - 1);
+    return i < vis.length ? vis[i].at : this.model.input.length;
   }
 
   /** slash_key: true when the "/" menu used the key. */

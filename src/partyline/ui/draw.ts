@@ -8,7 +8,7 @@ import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, REVERSE, wrap } from './cells';
 import { cover, drawOverlays, OverlayState, Rect } from './overlays';
 import { drawSlash } from './slash';
 import { atGhostTail } from './at-complete';
-import { Model, Line, Side, lineMarked, mentionsSelf, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
+import { Model, Line, Side, inputCol, inputVisible, lineMarked, mentionsSelf, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
 
 export const HIT_NONE = 0, HIT_MENU = 1, HIT_DROPDOWN = 2, HIT_SIDEBAR = 3, HIT_CHAT = 4, HIT_INPUT = 5,
   HIT_STATUS = 6, HIT_POPUP = 7, HIT_SCROLLBAR = 12; // the C lc_hit numbers
@@ -171,24 +171,26 @@ function drawChat(c: Cells, m: Model, d: DrawState, top: number, h: number, left
 /** draw_input: the message box, its selection, the emoji button. Returns the caret cell. */
 function drawInput(c: Cells, m: Model, d: DrawState): { cr: number; cc: number } {
   const p = m.pal, W = c.cols, row = c.rows - 4;
-  const iw = W - 6 >= 24 ? W - 6 : W, room = iw - 3, from = m.inputCur > room ? m.inputCur - room : 0;
+  // textbox.ts preview: markup is zero-width, so every column below is a visible-unit index, not a raw offset.
+  const vis = inputVisible(m.input), col = (pos: number): number => inputCol(m.input, pos), cur = col(m.inputCur);
+  const iw = W - 6 >= 24 ? W - 6 : W, room = iw - 3, from = cur > room ? cur - room : 0, faces = (a: number, b: number): string => vis.slice(a, b).map((u) => u.face).join('');
   d.inputFrom = from; d.inputW = iw;
   c.pen(p.ink, DEFAULT, 0);
   c.fill(row + 1, 1, 1, iw - 2, 0x20);
   c.box(row, 0, 3, iw, m.focus === FOCUS_INPUT ? p.borderFocus : p.accent,
     m.pick !== '' ? '[PICK MESSAGE: Up/Down, Enter, Esc]' : m.editing ? '[EDITING]' : 'Message', p.ink);
-  c.text(row + 1, 1, m.input.slice(from), room);
+  c.text(row + 1, 1, faces(from, vis.length), room);
   if (m.inputAnchor >= 0 && m.inputAnchor !== m.inputCur) {
-    const a = Math.max(Math.min(m.inputAnchor, m.inputCur), from), b = Math.min(Math.max(m.inputAnchor, m.inputCur), from + room);
-    if (b > a) { c.pen(p.barInk, p.ink, 0); c.text(row + 1, 1 + a - from, m.input.slice(a, b), b - a); c.pen(p.ink, DEFAULT, 0); }
+    const a = Math.max(Math.min(col(m.inputAnchor), cur), from), b = Math.min(Math.max(col(m.inputAnchor), cur), from + room);
+    if (b > a) { c.pen(p.barInk, p.ink, 0); c.text(row + 1, 1 + a - from, faces(a, b), b - a); c.pen(p.ink, DEFAULT, 0); }
   }
-  if (m.focus === FOCUS_INPUT && m.inputCur === m.input.length && m.input[0] !== '/' && m.input.length - from < room) {
+  if (m.focus === FOCUS_INPUT && m.inputCur === m.input.length && m.input[0] !== '/' && vis.length - from < room) {
     // LIVECHAT atGhostTail: the rest of the first @name match, dim after the cursor; Tab takes it.
     const ghost = atGhostTail(m.input, m.side.filter((s) => s.kind === SIDE_USER).map((s) => s.label));
-    if (ghost !== '') { c.pen(p.grey, DEFAULT, 0); c.text(row + 1, 1 + m.input.length - from, ghost, room - (m.input.length - from)); c.pen(p.ink, DEFAULT, 0); }
+    if (ghost !== '') { c.pen(p.grey, DEFAULT, 0); c.text(row + 1, 1 + vis.length - from, ghost, room - (vis.length - from)); c.pen(p.ink, DEFAULT, 0); }
   }
   if (iw < W) c.button(row, iw, 6, ':D', p.grey, p.activity);
-  return { cr: row + 1, cc: 1 + m.inputCur - from };
+  return { cr: row + 1, cc: 1 + cur - from };
 }
 
 /** lc_draw: menubar, sidebar, chat pane, input, status bar, open menu, then the overlays in the C order. */

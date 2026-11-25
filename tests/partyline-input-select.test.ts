@@ -9,7 +9,7 @@ import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom } from '../src/chat/store';
-import { cellBg } from '../src/partyline/ui/cells';
+import { cellBg, cellCh } from '../src/partyline/ui/cells';
 import { chatScreen } from '../src/partyline/ui/screen';
 import { SIDE_ROOM } from '../src/partyline/ui/model';
 import type { HubScreen } from '../src/partyline/ui/screen';
@@ -172,5 +172,41 @@ describe('hub screen input selection and mouse', () => {
     expect(screen.model.side[screen.model.sideSel].kind).toBe(SIDE_ROOM);
     expect(screen.model.room).toBe(screen.model.side[screen.model.sideSel].label);
     expect(screen.model.room).not.toBe(label);
+  });
+
+  // textbox.ts _unitAt / _stepVisible / _selectedRange / preview: a format marker is one zero-width unit.
+  const inputRow = (): string => {
+    const c = screen.cells, row = c.rows - 3;
+    let out = '';
+    for (let x = 1; x < 60; x++) out += String.fromCharCode(cellCh(c.back[row * c.cols + x]));
+    return out.trimEnd();
+  };
+
+  it('format markers do not show in the input line', () => {
+    fill('say ~wave~hi~/wave~ {red-fg}yo{/red-fg}!');
+    expect(inputRow()).toBe('say hi yo!');
+  });
+
+  it('left and right step over a format marker whole', () => {
+    fill('a~wave~hi~/wave~');
+    send('\x1b[D'); expect(screen.model.inputCur).toBe('a~wave~h'.length);
+    send('\x1b[D'); expect(screen.model.inputCur).toBe('a~wave~'.length);
+    send('\x1b[D'); expect(screen.model.inputCur).toBe(0);
+    send('\x1b[C'); expect(screen.model.inputCur).toBe(1);
+    send('\x1b[C'); expect(screen.model.inputCur).toBe('a~wave~h'.length);
+  });
+
+  it('shift+arrows select visible characters and the format picker gets the word without its markers', () => {
+    fill('x {red-fg}hi{/red-fg}');
+    send('\x1b[1;2D\x1b[1;2D');
+    expect(screen.model.inputCur).toBe('x {red-fg}'.length);
+    send('\x1b[15~'); // the format picker wraps the visible word, not half a marker
+    expect(screen.over.pickSel.text).toBe('hi');
+  });
+
+  it('a click maps the screen column to the visible character', () => {
+    fill('~wave~abc~/wave~');
+    mouseAt(0, 2); mouseAt(0, 2, 'm');
+    expect(screen.model.inputCur).toBe('~wave~ab'.length);
   });
 });

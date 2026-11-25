@@ -4,7 +4,7 @@
  * lc_progress_bar/bytes, lc_settings_layout). Grid-tested against the C in tests/partyline-ui-overlays.test.ts.
  */
 import { Cells, DEFAULT, wrap } from './cells';
-import { Model, textMarked, THEMES, TK_BASE, T_BAR, T_CHROME, T_SELECTION_BG, T_SELECTION_INK } from './model';
+import { inputCol, Model, textMarked, THEMES, TK_BASE, T_BAR, T_CHROME, T_SELECTION_BG, T_SELECTION_INK } from './model';
 import type { DrawState } from './draw';
 
 export const HIT_YES = 8, HIT_NO = 9, HIT_OK = 10, HIT_MODAL = 11,
@@ -324,7 +324,7 @@ function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
   const w = Math.min(52, Math.max(20, W - 2));
   // LIVECHAT: the emoji picker sits bottom right (emoji-picker.ts), the format picker over the selection
   // (server.ts getSelectionPosition: input text row, column of the selection start; category-picker display clamps).
-  const y = o.pickFmt ? c.rows - 3 : c.rows - 7, x = o.pickFmt ? 1 + Math.max(0, o.pickSel.start - d.inputFrom) : W;
+  const y = o.pickFmt ? c.rows - 3 : c.rows - 7, x = o.pickFmt ? 1 + Math.max(0, inputCol(m.input, o.pickSel.start) - d.inputFrom) : W;
   let top = y - H - 1;
   if (top < 0) top = y + 1;
   const left = Math.max(0, Math.min(x - 2, W - w)), catw = Math.max(8, Math.min(14, w - 24)), ix = left + 1 + catw, iw = w - 2 - catw;

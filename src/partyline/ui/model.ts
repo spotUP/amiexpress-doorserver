@@ -250,6 +250,53 @@ function effectTag(pal: Palette, s: string, at: number): { n: number; closing: b
   }
   return null;
 }
+// ---- input units (LIVECHAT textbox.ts _unitAt / _stepVisible / _selectedRange) ----
+const INPUT_UNIT = /~\/?(?:rainbow|pulse|sparkle|shake|wave)~|~\/?gradient[^~]*~|(\{(?:open|close)\})|(\{[^{}]*\})|[\s\S]/y;
+/** The unit at raw offset c: an ~effect~ marker or {tag} (markup, zero-width in the input) or one visible character. */
+export function inputUnitAt(text: string, c: number): { len: number; markup: boolean; face: string } {
+  INPUT_UNIT.lastIndex = c;
+  const u = INPUT_UNIT.exec(text);
+  if (!u) return { len: 1, markup: false, face: text[c] ?? '' };
+  if (u[1] !== undefined) return { len: u[0].length, markup: false, face: u[1] === '{open}' ? '{' : '}' };
+  return { len: u[0].length, markup: u[0].length > 1 && !u[1], face: u[0] };
+}
+/** The visible units of the input: each one's raw offset and the text it shows. */
+export function inputVisible(text: string): Array<{ at: number; face: string }> {
+  const out: Array<{ at: number; face: string }> = [];
+  for (let c = 0; c < text.length;) {
+    const u = inputUnitAt(text, c);
+    if (!u.markup) out.push({ at: c, face: u.face });
+    c += u.len;
+  }
+  return out;
+}
+/** The visible column of raw offset pos: the visible units that start before it. */
+export const inputCol = (text: string, pos: number): number => inputVisible(text).filter((u) => u.at < pos).length;
+/** One visible character left (-1) or right (+1) of raw offset pos; markup is stepped over whole. */
+export function inputStep(text: string, pos: number, delta: number): number {
+  let prevStart = -1;
+  for (let c = 0; c < text.length;) {
+    const { len, markup } = inputUnitAt(text, c);
+    if (!markup) {
+      if (delta > 0 && c >= pos) return c + len;
+      if (delta < 0 && c >= pos) break;
+      prevStart = c;
+    }
+    c += len;
+  }
+  return delta > 0 ? text.length : Math.max(0, prevStart);
+}
+/** The selection a..b as raw offsets with markup trimmed off both edges, so a new format nests instead of crossing. */
+export function inputSelRange(text: string, a: number, b: number): { start: number; end: number } {
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  let start = -1, end = lo;
+  for (let c = lo; c < hi;) {
+    const { len, markup } = inputUnitAt(text, c);
+    if (!markup && c + len <= hi) { if (start < 0) start = c; end = c + len; }
+    c += len;
+  }
+  return start < 0 ? { start: lo, end: hi } : { start, end };
+}
 /** A log line that carries an animated effect: the screen tick repaints while one is shown. */
 export const FX_ANIMATED = /~(rainbow|pulse|sparkle|wave|gradient)[~ ]/;
 // LIVECHAT renderers.ts colours (RAINBOW_COLORS, SPARKLE_COLORS, the red-blue GRADIENT_RAMP) as xterm indexes.
