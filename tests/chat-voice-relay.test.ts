@@ -160,4 +160,23 @@ describe('PUT /rooms/:id/voice/audio', () => {
     expect((await audio(`/rooms/${id}/voice/audio?mesh=1`, owner, Buffer.alloc(0))).body.length).toBe(0);
     d1.voice.close(); d2.voice.close();
   });
+
+  it('tells the door audio:relay active only while the room has a /chat call', async () => {
+    resetVoiceHub();
+    const owner = await login('sys', true);
+    const id = (await call('post', '/rooms', owner).send({ name: 'lounge', kind: 'voice' })).body.id as string;
+    await call('post', `/rooms/${id}/join`, owner);
+    const told: boolean[] = [];
+    const dec = new MediaDecoder();
+    const voice = joinVoiceHub({ userId: 'alice', username: 'alice', room: () => id, event: () => undefined,
+      media: (p) => { const m = dec.push(p); if (m?.ev === 'audio:relay') told.push((JSON.parse(m.body.toString()) as { active: boolean }).active); } });
+    voice.onDoorEmit('audio:start-streaming', {});
+    expect(told).toEqual([false]);
+    await call('post', `/rooms/${id}/voice/join`, owner).send({});
+    expect(told).toEqual([false, true]);
+    voice.onDoorEmit('voice:mute', { isMuted: false }); // no change: nothing resent
+    await call('post', `/rooms/${id}/voice/leave`, owner);
+    expect(told).toEqual([false, true, false]);
+    voice.close();
+  });
 });

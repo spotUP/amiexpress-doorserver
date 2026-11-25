@@ -19,7 +19,8 @@ function caller(userId: string, username: string) {
     userId, username,
     room: () => 'main',
     event: (ev, data) => events.push({ ev, data }),
-    media: (p) => { const m = dec.push(p); if (m) media.push(m); },
+    // audio:relay (the chat-room bridge gate) has its own test in chat-voice-relay.test.ts.
+    media: (p) => { const m = dec.push(p); if (m && m.ev !== 'audio:relay') media.push(m); },
   };
   return { sink, events, media, voice: joinVoiceHub(sink) };
 }

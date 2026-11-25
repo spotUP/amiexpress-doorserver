@@ -41,10 +41,16 @@ function voiceRoom(db: Database.Database, ctx: ChatCtx, id: string): RoomRec {
   return room;
 }
 
+/** Told when a room's call starts (first member) or ends (last one leaves): the door bridge gates its mic on it. */
+const callWatchers = new Set<() => void>();
+export function onCallsChanged(fn: () => void): void { callWatchers.add(fn); }
+/** True while the room has a chat/v1 call (door callers never count: they are not in `calls`). */
+export const hasCall = (roomId: string): boolean => calls.has(roomId);
+
 function drop(db: Database.Database, roomId: string, user: string): boolean {
   const call = calls.get(roomId);
   if (!call?.delete(user)) return false;
-  if (call.size === 0) { calls.delete(roomId); relays.delete(roomId); }
+  if (call.size === 0) { calls.delete(roomId); relays.delete(roomId); for (const fn of callWatchers) fn(); }
   emitEvent(db, { type: 'voice', roomId, user, ref: 'left', text: '00' });
   return true;
 }
@@ -70,10 +76,12 @@ export function joinVoice(db: Database.Database, ctx: ChatCtx, id: string, b: Bo
   const now = Date.now();
   for (const [other, call] of calls) if (other !== room.id && call.has(ctx.user)) drop(db, other, ctx.user);
   sweep(db, room.id, now);
+  const started = !calls.has(room.id);
   const call = calls.get(room.id) ?? new Map<string, CallMember>();
   calls.set(room.id, call);
   const m: CallMember = { isMuted: b.isMuted === true, hasVideo: b.hasVideo === true, at: now };
   call.set(ctx.user, m);
+  if (started) for (const fn of callWatchers) fn();
   emitEvent(db, { type: 'voice', roomId: room.id, user: ctx.user, ref: 'joined', text: flags(m) });
   return { members: view(room.id) };
 }

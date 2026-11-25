@@ -8,7 +8,7 @@
  * trailing `~`. Design: amiexpress-web thoughts/shared/research/2026-11-15-partyline-voice-design.md
  */
 import { PLP_MAX_PAYLOAD } from '../../contract/partyline-types';
-import { exchangeDoorAudio } from '../chat/voice';
+import { exchangeDoorAudio, hasCall, onCallsChanged } from '../chat/voice';
 import { RELAY_MAX_BYTES } from '../chat/voice-relay';
 
 type Payload = Record<string, unknown>;
@@ -56,7 +56,7 @@ export interface VoiceSink {
   media(payload: Buffer): void;
 }
 
-interface Member { sink: VoiceSink; channel: string | null; isMuted: boolean; hasVideo: boolean }
+interface Member { sink: VoiceSink; channel: string | null; isMuted: boolean; hasVideo: boolean; relay: boolean | null }
 
 /** Every Partyline caller on this hub; one registry per hub process. */
 const members = new Set<Member>();
@@ -67,6 +67,19 @@ const peers = (m: Member, self: boolean): Member[] => {
   return c ? [...members].filter((o) => (self || o !== m) && where(o) === c) : [];
 };
 const send = (to: VoiceSink, ev: string, body: Buffer | Payload): void => { for (const p of encodeMedia(ev, body)) to.media(p); };
+/**
+ * audio:relay {active}: whether the caller's chat/v1 room has a call to bridge to. The browser
+ * sends audio:ulaw only while active, so an empty room costs no 8 KB/s upstream. Sent on change
+ * only; recomputed on every call start/end and on each event the caller sends (room switches).
+ */
+const tellRelay = (m: Member): void => {
+  const c = where(m);
+  const active = c !== null && hasCall(c);
+  if (m.relay === active) return;
+  m.relay = active;
+  send(m.sink, 'audio:relay', { active });
+};
+onCallsChanged(() => { for (const m of members) tellRelay(m); });
 const view = (m: Member): Payload => ({ userId: m.sink.userId, username: m.sink.username, isMuted: m.isMuted, hasVideo: m.hasVideo, hasScreenShare: false });
 
 /** Door -> browser commands: in LC a door emit goes server->client, so here it goes to the board. */
@@ -81,7 +94,7 @@ export interface VoiceSession {
 }
 
 export function joinVoiceHub(sink: VoiceSink): VoiceSession {
-  const me: Member = { sink, channel: null, isMuted: false, hasVideo: false };
+  const me: Member = { sink, channel: null, isMuted: false, hasVideo: false, relay: null };
   members.add(me);
   const dec = new MediaDecoder();
 
@@ -92,7 +105,7 @@ export function joinVoiceHub(sink: VoiceSink): VoiceSession {
     return was;
   };
 
-  return {
+  const session: VoiceSession = {
     onDoorEmit(ev, data, ack) {
       switch (ev) {
         case 'voice:join-channel': {
@@ -135,6 +148,7 @@ export function joinVoiceHub(sink: VoiceSink): VoiceSession {
         // mu-law every 500 ms next to its opus audio:data, and gets the room's relay mix back.
         const c = where(me);
         const mix = c && body.length <= RELAY_MAX_BYTES ? exchangeDoorAudio(c, sink.userId, body, me.isMuted) : null;
+        if (!mix) me.relay = null; // no call here: resend active:false in case the last one was lost
         if (mix && mix.length > 0) send(sink, 'audio:ulaw', mix);
         return;
       }
@@ -155,6 +169,12 @@ export function joinVoiceHub(sink: VoiceSink): VoiceSession {
     },
 
     close() { leave(); members.delete(me); },
+  };
+  // Every event from the caller rechecks the relay gate: it catches a room switch with no hook.
+  return {
+    onDoorEmit: (ev, data, ack) => { try { return session.onDoorEmit(ev, data, ack); } finally { tellRelay(me); } },
+    onMedia: (payload) => { session.onMedia(payload); tellRelay(me); },
+    close: () => session.close(),
   };
 }
 
