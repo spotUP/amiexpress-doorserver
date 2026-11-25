@@ -107,6 +107,7 @@ describe('Partyline /draw canvas', () => {
       return chatScreen(fx.ach, chat)({ sid: s.info.sid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => {}, quit: () => {} }) as HubScreen;
     };
     type(a, '/join #paint');
+    keys(a, '\x1b'); // the canvas takes every key: leave it before typing a command
     type(a, '/join #general');
     a = reopen(a);
     expect(a.model.room).toBe('general'); // was 'paint', the first membership by name, with its canvas open
@@ -122,7 +123,6 @@ describe('Partyline /draw canvas', () => {
     keys(a, '\x1b'); // Esc closes the canvas inside DrawCanvas.key: the close must be stored too
     a = reopen(a);
     expect(a.canvas.on).toBe(false);
-    type(a, '/draw');
     type(a, '/leave');
     a = reopen(a);
     expect(a.model.room).toBe('general'); // a left room is not rejoined
