@@ -94,6 +94,8 @@ let certDir: string;
 let tlsCtx: { cert: Buffer; key: Buffer };
 let screens: ScreenInfo[];
 let renders: string[];
+/** The full flag of each render, in order. */
+let fulls: boolean[];
 
 /** The model each test drives: render returns `state`. */
 let state = 'v0';
@@ -106,7 +108,7 @@ const testScreen: ScreenFactory = (info) => {
   return {
     resize() { /* the stub's job */ },
     input() { /* none */ },
-    render() { renders.push(state); return parts ?? Buffer.from(state); },
+    render(full) { renders.push(state); fulls.push(full); return parts ?? Buffer.from(state); },
     media: (p) => mediaIn.get(info.sid)?.(p),
   };
 };
@@ -123,6 +125,7 @@ beforeEach(async () => {
   fx = makeAchievementsFixture();
   screens = [];
   renders = [];
+  fulls = [];
   state = 'v0';
   parts = null;
   hub = createPartylineServer({ enabled: true, port: 0, host: '127.0.0.1', tlsCert: null, tlsKey: null }, fx.ach,
@@ -224,6 +227,17 @@ describe('live loop', () => {
     expect(text(second)).toBe('v2');
     expect(second.payload.readUInt32BE(0)).toBe(first.payload.readUInt32BE(0) + 1);
     expect(renders).toEqual(['v0', 'v2']);
+  });
+
+  it('repaints the whole screen after an upload result: the relay ZModem prompt and headers landed outside it', async () => {
+    const c = await dial(false);
+    await login(c);
+    const first = await c.next('D');
+    c.send('C', seqPayload(first.payload.readUInt32BE(0), Buffer.alloc(0)));
+    c.send('U', 'fail Transfer cancelled.');
+    await c.next('D');
+    expect(fulls).toEqual([true, true]);
+    c.sock.destroy();
   });
 
   it('a door quit sends its last screen and waits for its C before closing', async () => {

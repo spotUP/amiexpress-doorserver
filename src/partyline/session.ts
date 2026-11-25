@@ -198,6 +198,9 @@ export class PartylineSession {
       }
       case PLP_CLIENT.UPLOAD:
         this.screen!.upload?.(f.payload);
+        // The relay's ZModem receive wrote its prompt and headers straight to the caller's terminal, outside this
+        // screen (the scroll put them over the status bar): repaint every cell, as LIVECHAT68's upload_finished does.
+        this.markDirty(true);
         return;
       case PLP_CLIENT.MEDIA:
         if (this.hello?.media) this.screen!.media?.(f.payload);
