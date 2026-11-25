@@ -17,7 +17,7 @@ import type { ChatConfig } from '../../chat/config';
 import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
-import { newId, resolveSession } from '../../chat/sessions';
+import { createSession, newId, resolveSession } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
 import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
@@ -107,9 +107,32 @@ export class HubScreen implements PartylineScreen {
 
   /** One store call as this session, in a transaction when it writes (router.ts run). */
   run: ChatRun = (write, fn) => withAchievementsDb(this.ach, (db) => {
-    const ctx = resolveSession(db, this.chat, this.info.sid, this.info.boardId);
+    const ctx = this.liveCtx(db);
     return write ? db.transaction(() => fn(db, ctx))() : fn(db, ctx);
   });
+
+  /**
+   * The screen's session, renewed when its row is gone (swept after a hub restart, or
+   * expired elsewhere): the caller stays in Partyline on a fresh sid in the same room
+   * instead of every action saying "the session is gone".
+   */
+  private liveCtx(db: Database.Database): ChatCtx {
+    try {
+      return resolveSession(db, this.chat, this.info.sid, this.info.boardId);
+    } catch (err) {
+      if (!(err instanceof SurfaceError) || err.code !== 'session_expired') throw err;
+      const h = this.info.hello;
+      const ctx = db.transaction(() => {
+        const s = createSession(db, this.chat, this.info.boardId, { handle: h.handle, sysop: h.sysop, client: h.client });
+        this.info.sid = s.sid;
+        const fresh = resolveSession(db, this.chat, s.sid, this.info.boardId);
+        if (this.roomId) joinRoom(db, fresh, this.roomId);
+        return fresh;
+      })();
+      this.info.renewed?.(ctx.sid as string);
+      return ctx;
+    }
+  }
 
   /** A store refusal is a system line (livechat.c show_error), never a dropped caller. */
   tryRun<T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T): T | undefined {

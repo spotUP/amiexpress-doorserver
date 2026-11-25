@@ -49,6 +49,8 @@ export interface ScreenInfo {
   /** The authenticated board's id (resolveSession needs it). */
   boardId: string;
   hello: PlpHello;
+  /** The screen made a fresh chat session (its row was gone): keepalive and BYE follow the new sid. */
+  renewed?: (sid: string) => void;
   /** Call when the model changed; the session coalesces and flushes. */
   markDirty: () => void;
   /** /quit: end the connection the way a BYE does (no resume). */
@@ -248,7 +250,7 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, boardId, hello, markDirty: () => this.markDirty(), quit: () => this.quitAfterOutput(), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
+    this.screen = this.deps.screen({ sid, user, boardId, hello, renewed: (fresh) => { if (this.state === 'live') this.sid = fresh; }, markDirty: () => this.markDirty(), quit: () => this.quitAfterOutput(), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
     this.markDirty(true);
   }
 
