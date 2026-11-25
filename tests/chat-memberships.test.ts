@@ -193,3 +193,29 @@ describe('active / inactive in the member list', () => {
     }
   });
 });
+
+describe('POST /rooms/:id/unread', () => {
+  it('steps the marker back below the newest message, never forward', async () => {
+    const a = await login('alice');
+    const id = await lobby(a);
+    const b = await login('bob');
+    await api('post', `/rooms/${id}/join`, b);
+    expect((await api('post', `/rooms/${id}/unread`, b)).body).toEqual({ marked: false });
+    await post(a, id, 'one');
+    const s2 = await post(a, id, 'two');
+    await api('put', `/rooms/${id}/read`, b).send({ seq: s2 });
+    expect((await memberships(b))[0][3]).toBe('0');
+    expect((await api('post', `/rooms/${id}/unread`, b)).body).toEqual({ marked: true });
+    expect((await memberships(b))[0].slice(2)).toEqual([String(s2 - 1), '1']);
+    expect((await api('post', `/rooms/${id}/unread`, b)).body).toEqual({ marked: true });
+    expect((await memberships(b))[0][2]).toBe(String(s2 - 1));
+  });
+
+  it('refuses a caller without a membership', async () => {
+    const a = await login('alice');
+    const id = await lobby(a);
+    await post(a, id, 'one');
+    const b = await login('bob');
+    expect((await api('post', `/rooms/${id}/unread`, b)).status).toBe(403);
+  });
+});

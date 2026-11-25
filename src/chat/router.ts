@@ -322,6 +322,9 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.post('/rooms/:id/mode', (req: Request, res: Response) => {
     res.json(run(req, true, (db, ctx) => store.setMode(db, ctx, p(req, 'id'), body(req))));
   });
+  router.post('/rooms/:id/unread', (req: Request, res: Response) => {
+    res.json({ marked: run(req, true, (db, ctx) => store.markUnread(db, ctx, p(req, 'id'))) });
+  });
   router.post('/rooms/:id/typing', (req: Request, res: Response) => {
     run(req, true, (db, ctx) => store.setTyping(db, ctx, p(req, 'id'), body(req)));
     res.json({ ok: true });
