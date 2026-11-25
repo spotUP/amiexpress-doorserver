@@ -468,7 +468,8 @@ export class HubScreen implements PartylineScreen {
 
   systemLine(text: string): void { this.note(SYSTEM, text); }
   note(kind: number, text: string): void {
-    this.model.addLine(newLine(kind, '', '', text));
+    // livechat.c add_note: an activity line is stamped with the time it happened (hhmm_now).
+    this.model.addLine(newLine(kind, kind === ACTIVITY_LINE ? stamp(Math.floor(Date.now() / 1000)) : '', '', text));
     this.info.markDirty();
   }
 
@@ -645,7 +646,7 @@ export class HubScreen implements PartylineScreen {
       // livechat.c take_events: a note line, an activity line, then the counts reloaded from the store.
       const who = this.shown(e).slice(0, 24), emoji = e.text.slice(0, 16);
       m.addLine(newLine(NOTE, '', '', e.type === 'react' ? `[${who} reacted ${emoji}]` : `[${who} removed ${emoji}]`));
-      m.addLine(newLine(ACTIVITY_LINE, '', '', `${who}: ${emoji}`));
+      m.addLine(newLine(ACTIVITY_LINE, stamp(e.at), '', `${who}: ${emoji}`));
       const l = m.lines.find((x) => x.id === e.ref);
       const rows = l ? this.tryRun(false, (db, ctx) => reactionRows(db, ctx, e.ref)) : undefined;
       if (l && rows) { l.react = rows.filter((r) => r.count > 0).map((r) => ({ emoji: r.emoji, count: r.count })); m.linesChanged(); }
@@ -655,14 +656,14 @@ export class HubScreen implements PartylineScreen {
     } else if (e.type === 'dm' && !m.isSelf(e.user)) {
       const group = e.label.startsWith('dg'), who = this.shown(e).slice(0, 24);
       m.addLine(newLine(NOTE, '', '', `[${group ? 'Group DM' : 'DM'} from ${who}]: ${e.text.slice(0, 200)}`));
-      m.addLine(newLine(ACTIVITY_LINE, '', '', `${group ? 'Group DM' : 'DM'} from ${who}`));
+      m.addLine(newLine(ACTIVITY_LINE, stamp(e.at), '', `${group ? 'Group DM' : 'DM'} from ${who}`));
       this.sound('dm');
     } else if (e.type === 'bbs') {
       this.takeBbsEvent(e);
     } else if ((e.type === 'joined' || e.type === 'left') && inRoom) {
       const joined = e.type === 'joined', who = this.shown(e).slice(0, 24);
       m.addLine(newLine(SYSTEM, '', '', `${who} ${joined ? 'joined' : 'left'} the room`));
-      m.addLine(newLine(ACTIVITY_LINE, '', '', `${who} ${joined ? 'joined' : 'left'}`));
+      m.addLine(newLine(ACTIVITY_LINE, stamp(e.at), '', `${who} ${joined ? 'joined' : 'left'}`));
     } else if (e.type === 'edit') {
       const l = m.lines.find((x) => x.id === e.ref);
       if (l) { l.text = e.text; l.edited = true; m.linesChanged(); }

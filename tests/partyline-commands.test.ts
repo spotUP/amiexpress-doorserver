@@ -13,7 +13,7 @@ import { canonical } from '../src/partyline/commands';
 import { cellFg, cellBg, cellFlags, BG_DEFAULT } from '../src/partyline/ui/cells';
 import { chatScreen } from '../src/partyline/ui/screen';
 import { MENU_COL } from '../src/partyline/ui/draw';
-import { FOCUS_INPUT, FOCUS_MENU, LIVE, SIDE_HEAD, SIDE_ROOM, SIDE_USER, newLine, newSide } from '../src/partyline/ui/model';
+import { ACTIVITY_LINE, FOCUS_INPUT, FOCUS_MENU, LIVE, SIDE_HEAD, SIDE_ROOM, SIDE_USER, newLine, newSide } from '../src/partyline/ui/model';
 import type { HubScreen } from '../src/partyline/ui/screen';
 import type { ScreenInfo } from '../src/partyline/session';
 
@@ -150,6 +150,15 @@ describe('hub screen commands', () => {
     (screen as unknown as { profileOverlay(user: string): void }).profileOverlay('carol');
     expect(screen.over.modalText).not.toMatch(/not found/);
     expect(screen.over.modalText).toMatch(/online|offline/);
+  });
+
+  it('a reaction activity line carries the time, not an empty []', () => {
+    screen.run(true, (db, ctx) => createRoom(db, ctx, { name: 'general' }));
+    type('/join #general');
+    (screen as unknown as { event(e: object): void }).event({ type: 'react', room_id: screen.roomId, user: 'bob@x', text: '+1', at: Math.floor(Date.now() / 1000), ref: '' });
+    const act = screen.model.lines.filter((l) => l.kind === ACTIVITY_LINE);
+    expect(act.length).toBeGreaterThan(0);
+    expect(act[act.length - 1].time).toMatch(/^\d\d:\d\d$/);
   });
 
   it('join loads the backlog as numbered lines', () => {
