@@ -9,7 +9,7 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, getPrefs } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
-import { CF_CANCEL, CF_PRIVATE, CF_TOPIC, HIT_CREATE_F, HIT_CREATE_KIND } from '../src/partyline/ui/overlays';
+import { CF_CANCEL, CF_CREATE, CF_PRIVATE, CF_TOPIC, HIT_CREATE_F, HIT_CREATE_KIND } from '../src/partyline/ui/overlays';
 import { slashPickKind } from '../src/partyline/ui/slash';
 import { THEMES } from '../src/partyline/ui/model';
 import type { HubScreen } from '../src/partyline/ui/screen';
@@ -74,6 +74,30 @@ describe('hub screen lane 1f: Create Channel form, pick lists, stored theme', ()
     click(HIT_CREATE_F + CF_CANCEL);
     expect(screen.over.create).toBe(false);
     expect(screen.model.room).toBe('lobby');
+  });
+
+  it('Create and Cancel show at rest in every theme (ground on ok), the focused one in the selection colours', () => {
+    key('/create\r'); // focus on Name: neither button focused
+    const c = screen.cells, p = screen.model.pal;
+    const pens = (id: number): Array<[number, number]> => {
+      const out: Array<[number, number]> = [];
+      for (let r = 0; r < 25; r++) for (let k = 0; k < 80; k++) {
+        if (screen.drawState.hits.at(r, k).id === id) { const v = c.back[r * 80 + k]; out.push([(v >>> 8) & 0xff, (v >>> 16) & 0xff]); }
+      }
+      return out;
+    };
+    for (const t of THEMES) {
+      p.set(t.rgb); screen.render(true);
+      for (const f of [CF_CREATE, CF_CANCEL]) {
+        const at = pens(HIT_CREATE_F + f);
+        expect(at.length).toBe(10);
+        for (const [fg, bg] of at) { expect(`${t.id} ${fg}`).not.toBe(`${t.id} ${bg}`); expect(bg).toBe(p.ok); }
+      }
+    }
+    for (let i = 0; i < 6; i++) key('\t'); // Name -> Cancel
+    expect(screen.over.createField).toBe(CF_CANCEL);
+    screen.render(true);
+    for (const [fg, bg] of pens(HIT_CREATE_F + CF_CANCEL)) expect([fg, bg]).toEqual([p.col[9], p.col[8]]);
   });
 
   it('pick-list kinds follow the usage line', () => {

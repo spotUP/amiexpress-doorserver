@@ -406,7 +406,9 @@ function drawCreate(c: Cells, m: Model, d: DrawState, o: OverlayState, caret: { 
   if (o.createNote !== '') { c.pen(p.warn, DEFAULT, 0); c.text(top + 12, left, o.createNote, fw); }
   const mid = r.left + (w >> 1);
   for (const [f, label, at] of [[CF_CREATE, '  Create', mid - 11], [CF_CANCEL, '  Cancel', mid + 1]] as const) {
-    c.pen(o.createField === f ? p.col[T_SELECTION_INK] : p.barInk, o.createField === f ? p.col[T_SELECTION_BG] : p.col[T_BAR], 0);
+    // LIVECHAT createButton: an ok-coloured button at rest, selection colours when focused. Ground ink, not LIVECHAT's ink:
+    // ink == ok in three themes, and the old barInk on T_BAR was black on black in all of them.
+    c.pen(o.createField === f ? p.col[T_SELECTION_INK] : p.barInk, o.createField === f ? p.col[T_SELECTION_BG] : p.ok, 0);
     c.fill(top + 13, at, 1, 10, 0x20); c.text(top + 13, at, label, 10);
     d.hits.add(HIT_CREATE_F + f, top + 13, at, 1, 10);
   }
