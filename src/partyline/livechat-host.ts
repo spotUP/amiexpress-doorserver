@@ -114,7 +114,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
     child.channel?.ref();
     // 'advanced' IPC keeps Date objects: the door formats createdAt with getHours().
     const tell = (m: ToChild): void => { if (child.connected) child.send(m); };
-    tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8', kitty: info.hello.kitty, conn: info.hello.conn, wide: info.hello.wide, responsive: info.hello.responsive, chatOnly: info.hello.chatOnly });
+    tell({ t: 'init', doorDir, user: info.user, access: info.hello.access, sysop: info.hello.sysop, cols, rows, utf8: enc === 'utf8', kitty: info.hello.kitty, conn: info.hello.conn, wide: info.hello.wide, responsive: info.hello.responsive, chatOnly: info.hello.chatOnly, node: info.hello.node });
     // Hub replies go to the door's socket listeners in the child.
     const reply = (ev: string, data: Payload): void => { if (!closed) tell({ t: 'event', ev, data }); };
 

@@ -91,6 +91,8 @@ export class HubScreen implements PartylineScreen {
     this.model = new Model(info.hello.cols, info.hello.rows);
     this.cells = new Cells(info.hello.cols, info.hello.rows);
     this.model.handle = info.user;
+    // LIVECHAT core/initialization.ts: nodeId = bbsSession.nodeId || 1; the board sends its node in the hello.
+    this.model.node = info.hello.node || 1;
     this.model.setSelf(info.user);
     this.utf8 = info.hello.charset === 'utf8';
     this.cursor = withAchievementsDb(ach, (db) => headSeq(db));
