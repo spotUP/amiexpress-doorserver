@@ -9,7 +9,7 @@ import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom } from '../src/chat/store';
-import { cellBg, cellCh } from '../src/partyline/ui/cells';
+import { BOLD, cellBg, cellCh, cellFg, cellFlags } from '../src/partyline/ui/cells';
 import { chatScreen } from '../src/partyline/ui/screen';
 import { SIDE_ROOM } from '../src/partyline/ui/model';
 import type { HubScreen } from '../src/partyline/ui/screen';
@@ -185,6 +185,19 @@ describe('hub screen input selection and mouse', () => {
   it('format markers do not show in the input line', () => {
     fill('say ~wave~hi~/wave~ {red-fg}yo{/red-fg}!');
     expect(inputRow()).toBe('say hi yo!');
+  });
+
+  it('the input line previews colours and effects as LIVECHAT textbox.ts does', () => {
+    fill('a {red-fg}hi{/red-fg} ~rainbow~ab~/rainbow~ {bold}z{/bold} ~wave~w~/wave~');
+    expect(inputRow()).toBe('a hi ab z w');
+    const c = screen.cells, at = (i: number): number => c.back[(c.rows - 3) * c.cols + 1 + i], pal = screen.model.pal;
+    expect(cellFg(at(2))).toBe(pal.tone(1));               // {red-fg}
+    expect(cellFg(at(0))).not.toBe(pal.tone(1));
+    expect(cellFg(at(5))).toBe(pal.tone(1));               // rainbow: red, then yellow
+    expect(cellFg(at(6))).toBe(pal.tone(3));
+    expect(cellFlags(at(8)) & BOLD).toBe(BOLD);            // {bold}
+    expect(cellFlags(at(0)) & BOLD).toBe(0);
+    expect(cellFg(at(10))).toBe(pal.tone(4));              // wave previews blue
   });
 
   it('left and right step over a format marker whole', () => {

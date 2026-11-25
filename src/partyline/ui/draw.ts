@@ -8,7 +8,7 @@ import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, REVERSE, wrap } from './cells';
 import { cover, drawOverlays, OverlayState, Rect } from './overlays';
 import { drawSlash } from './slash';
 import { atGhostTail } from './at-complete';
-import { Model, Line, Side, inputCol, inputVisible, lineMarked, mentionsSelf, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
+import { Model, Line, Side, inputCol, inputMarked, inputVisible, lineMarked, mentionsSelf, typingMarked, SIDE_HEAD, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR } from './model';
 
 export const HIT_NONE = 0, HIT_MENU = 1, HIT_DROPDOWN = 2, HIT_SIDEBAR = 3, HIT_CHAT = 4, HIT_INPUT = 5,
   HIT_STATUS = 6, HIT_POPUP = 7, HIT_SCROLLBAR = 12; // the C lc_hit numbers
@@ -179,7 +179,7 @@ function drawInput(c: Cells, m: Model, d: DrawState): { cr: number; cc: number }
   c.fill(row + 1, 1, 1, iw - 2, 0x20);
   c.box(row, 0, 3, iw, m.focus === FOCUS_INPUT ? p.borderFocus : p.accent,
     m.pick !== '' ? '[PICK MESSAGE: Up/Down, Enter, Esc]' : m.editing ? '[EDITING]' : 'Message', p.ink);
-  c.text(row + 1, 1, faces(from, vis.length), room);
+  c.marked(row + 1, 1, inputMarked(m, m.input, from, room), 0, 0x7fffffff, room);
   if (m.inputAnchor >= 0 && m.inputAnchor !== m.inputCur) {
     const a = Math.max(Math.min(col(m.inputAnchor), cur), from), b = Math.min(Math.max(col(m.inputAnchor), cur), from + room);
     if (b > a) { c.pen(p.barInk, p.ink, 0); c.text(row + 1, 1 + a - from, faces(a, b), b - a); c.pen(p.ink, DEFAULT, 0); }

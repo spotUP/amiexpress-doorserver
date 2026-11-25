@@ -536,6 +536,39 @@ export function textMarked(m: Model, text: string, cap = MARKED_CAP): string {
   return b.s;
 }
 
+// LIVECHAT textbox.ts _convertEffectTags: the static preview colour per effect; rainbow cycles over the non-space characters.
+const PREVIEW_FX: Readonly<Record<string, number>> = { pulse: 6, sparkle: 3, shake: 1, wave: 4 }, PREVIEW_RAINBOW = [1, 3, 2, 6, 4, 5];
+/**
+ * textbox.ts _updateContent preview: the input as a marked string, visible units from..from+n, one cell each,
+ * {tags} and closed ~effects~ drawn as their style instead of shown. Columns match inputVisible.
+ */
+export function inputMarked(m: Model, text: string, from: number, n: number): string {
+  const pal = m.pal, b = new Sb(n * 8 + 16, pal);
+  const have: Style = { fg: -1, bold: 0, attr: 0 }, want: Style = { fg: -1, bold: 0, attr: 0 };
+  const f: Fmt = { bold: false, italic: false, under: false, strike: false, inv: false, tagFg: -1, effFg: -1, effBold: 0, eff: '', effI: 0, effN: 0 };
+  let vis = 0;
+  for (let c = 0; c < text.length && vis < from + n;) {
+    const u = inputUnitAt(text, c);
+    if (u.markup) {
+      const tag = text[c] === '~' ? effectTag(pal, text, c) : null;
+      if (tag?.closing) { f.eff = ''; f.effFg = -1; }
+      else if (tag && text.indexOf(`~/${tag.name}~`, c + u.len) >= 0) {
+        f.eff = tag.name; f.effI = 0;
+        f.effFg = tag.name === 'gradient' ? namedColor(/from=(\w+)/.exec(u.face)?.[1] ?? '') : PREVIEW_FX[tag.name] ?? -1;
+      }
+      else if (text[c] === '{') braceTag(text, c, f);
+    } else {
+      if (f.eff === 'rainbow') f.effFg = u.face === ' ' ? -1 : PREVIEW_RAINBOW[f.effI++ % PREVIEW_RAINBOW.length];
+      fmtWant(pal, f, want);
+      if (vis >= from) { styleSet(b, have, want); b.run(u.face); }
+      vis++;
+    }
+    c += u.len;
+  }
+  styleSet(b, have, { fg: -1, bold: 0, attr: 0 });
+  return b.s;
+}
+
 /** typing_marked: [time] <nick> buffer, then the blink cursor. */
 export function typingMarked(m: Model, t: Typing, cap = MARKED_CAP): string {
   const b = new Sb(cap, m.pal), color = nickColor(t.nick);
