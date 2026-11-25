@@ -68,8 +68,11 @@ describe('hub screen lane 1: LIVECHAT input, menus, sidebar and function keys', 
     expect(screen.over.search).toBe(false);
     fill('');
     const before = screen.model.lines.length;
-    send('\x1b[17~'); send('\x1b[18~'); send('\x13');
+    send('\x1b[17~'); send('\x1b[18~');
     expect(screen.model.lines.length).toBeGreaterThan(before);
+    expect(screen.over.view).toBe(true); // F7: pinned_typed opens the Pinned Messages view
+    send('\x1b\x1b'); // livechat.c handle_key: an open view takes every key, so it closes before Ctrl+S
+    send('\x13');
     expect(screen.over.settings).toBe(true); // Ctrl+S: settings_open
   });
 

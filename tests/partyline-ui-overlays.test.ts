@@ -5,8 +5,8 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { Cells } from '../src/partyline/ui/cells';
-import { Model, FOCUS_INPUT, newLine, newSide, SYSTEM, HISTORY, LIVE, SIDE_HEAD, SIDE_ROOM, SIDE_USER } from '../src/partyline/ui/model';
+import { Cells, cellBg, cellCh, cellFg } from '../src/partyline/ui/cells';
+import { Model, T_SELECTION_BG, T_SELECTION_INK, FOCUS_INPUT, newLine, newSide, SYSTEM, HISTORY, LIVE, SIDE_HEAD, SIDE_ROOM, SIDE_USER } from '../src/partyline/ui/model';
 import { draw, DrawState } from '../src/partyline/ui/draw';
 import {
   OverlayState, MODAL_MESSAGE, MODAL_QUIT, MODAL_PROMPT, MODAL_RECONNECT, MODAL_PROGRESS, SET_CLOSE,
@@ -84,9 +84,19 @@ describe('partyline engine overlays match the C door', () => {
     SETUP[tag](o, m);
     const caret = draw(c, m, new DrawState(), o);
     expect(k.words.length).toBe(k.cols * k.rows);
+    // 8b06c77 (sysop 2026-11-25, beyond livechat.c): the Quit dialog's focused button, Yes, wears the selection colours.
+    const focused = new Set<number>();
+    if (tag === 'modal-quit') {
+      const at = k.words.map((w) => String.fromCharCode(w & 0xff)).join('').indexOf('[ Yes ]');
+      expect(at).toBeGreaterThan(0);
+      for (let j = at; j < at + 7; j++) {
+        focused.add(j);
+        expect([cellCh(c.back[j]), cellFg(c.back[j]), cellBg(c.back[j])]).toEqual([k.words[j] & 0xff, m.pal.col[T_SELECTION_INK], m.pal.col[T_SELECTION_BG]]);
+      }
+    }
     const diffs: string[] = [];
     for (let j = 0; j < k.words.length && diffs.length < 8; j++) {
-      if (c.back[j] !== k.words[j]) diffs.push(`r${(j / k.cols) | 0} c${j % k.cols} want ${k.words[j].toString(16)} got ${c.back[j].toString(16)}`);
+      if (!focused.has(j) && c.back[j] !== k.words[j]) diffs.push(`r${(j / k.cols) | 0} c${j % k.cols} want ${k.words[j].toString(16)} got ${c.back[j].toString(16)}`);
     }
     expect(diffs).toEqual([]);
     expect([caret.cr, caret.cc]).toEqual([k.cr, k.cc]);
