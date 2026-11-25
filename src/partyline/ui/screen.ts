@@ -1469,6 +1469,8 @@ export class HubScreen implements PartylineScreen {
     // Leaving: hand the board a clean screen, as LIVECHAT's cleanup and every door exit do.
     if (this.quitting) return Buffer.from((this.info.hello.mouse ? '\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?1006l' : '') + '\x1b[0m\x1b[2J\x1b[H\x1b[?25h', 'latin1');
     if (full) this.cells.invalidate();
+    // livechat.c present: the typing rows show the time of this frame (hhmm_now into typing_time).
+    if (this.model.typing.length > 0) this.model.typingTime = stamp(Math.floor(Date.now() / 1000));
     const { cr, cc } = draw(this.cells, this.model, this.drawState, this.over);
     // A full frame (first paint, resize, redraw) re-arms SGR mouse reports; input() parses them. ?1002h adds drag motion (the input selection).
     // ?1003h (any motion) only while a menu is open, for LIVECHAT hover; off again re-arms ?1002h, the same mode slot.
