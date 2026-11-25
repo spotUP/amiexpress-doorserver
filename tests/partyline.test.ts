@@ -239,6 +239,8 @@ describe('live loop', () => {
     const last = await c.next('D');
     expect(text(last)).toBe('cleared');
     c.send('C', seqPayload(last.payload.readUInt32BE(0), Buffer.alloc(0)));
+    // X before the close: without it the relay took the close for a hub restart and resumed PL.
+    expect((await c.next('X')).payload.toString()).toBe('quit');
     await c.untilClosed();
   });
 

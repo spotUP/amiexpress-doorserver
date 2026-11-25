@@ -333,6 +333,8 @@ export class PartylineSession {
     // A resumed tab shares the sid: expiring it would strip the live tab of its rooms and events.
     if (sid && !this.deps.sidHeldElsewhere(sid, this)) withAchievementsDb(this.deps.ach, (db) => db.transaction(() => expireSession(db, sid))());
     this.sid = null;
+    // X tells the client this is a quit: a bare close after W reads as a hub restart, and the relay resumes (sysop 2026-11-25: "pl just redraws when i quit").
+    this.send(PLP_HUB.EXIT, reason || 'quit');
     this.end();
   }
 
