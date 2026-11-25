@@ -101,7 +101,8 @@ describe('PUT /rooms/:id/voice/audio', () => {
     await call('post', `/rooms/${id}/voice/join`, owner).send({});
     await call('post', `/rooms/${id}/voice/join`, ami).send({});
 
-    expect((await audio(`/rooms/${id}/voice/audio`, ami, Buffer.alloc(0))).body).toHaveLength(0);
+    const first = await audio(`/rooms/${id}/voice/audio`, ami, Buffer.alloc(0));
+    expect(`${first.status} ${(first.body as Buffer).toString()}`).toBe('200 ');
     const sent = Buffer.alloc(400, 0x9a);
     expect((await audio(`/rooms/${id}/voice/audio?mesh=1`, owner, sent)).status).toBe(200);
     const got = await audio(`/rooms/${id}/voice/audio`, ami, Buffer.alloc(0));
