@@ -30,7 +30,7 @@ import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, H
   MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, MODAL_RECONNECT, formatItems, OverlayState, pickCats, pickList, pickMove,
   SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashPickKind, slashScroll } from './slash';
-import { allEmoji, C_ALIAS, loadCustomEmoji, runCommand } from '../commands';
+import { allEmoji, C_ALIAS, canonical, loadCustomEmoji, runCommand } from '../commands';
 import { completeAtMention } from './at-complete';
 import type { Line } from './model';
 import type { AtCycle } from './at-complete';
@@ -1477,7 +1477,10 @@ export class HubScreen implements PartylineScreen {
       return true;
     }
     if (k === K_ENTER) {
-      if (slashComplete(m.input)) return false;
+      // LIVECHAT paletteEnterAction runs a command named in full by the registry, whose aliases include the C_ALIAS
+      // ones (j, d); a line with arguments is the caller's own and runs as typed, never replaced by a fill.
+      const word = m.input.trim().slice(1);
+      if (slashComplete(m.input) || /\s/.test(word) || (word !== '' && canonical(word) !== null)) return false;
       this.fillCommand(ghost >= 0 ? ghost : idx[Math.min(o.slashSel, idx.length - 1)]);
       return true;
     }

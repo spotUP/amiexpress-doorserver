@@ -115,6 +115,26 @@ describe('hub screen lane 1f: Create Channel form, pick lists, stored theme', ()
     expect(screen.model.popup?.title).toBe(' User ');
   });
 
+  it('Enter with the "/" menu open runs an alias or a line with arguments; only a partial word is filled', () => {
+    const r = screen.tryRun(true, (db, ctx) => createRoom(db, ctx, { name: 'far' })) as unknown as { id?: string; room?: { id: string } };
+    screen.tryRun(true, (db, ctx) => leaveRoom(db, ctx, r.id ?? r.room?.id ?? ''));
+    key('/j\r'); // C_ALIAS j: LIVECHAT's registry lists it, so Enter runs /join (its pick list), no fill to "/join "
+    expect(screen.model.popup?.items).toEqual(['far']);
+    esc();
+    expect(screen.model.input).toBe('');
+    key('/j'); key('\x1b'); key('\r'); // a lone Esc chunk, then Enter: the typed alias still runs
+    expect(screen.model.popup?.items).toEqual(['far']);
+    esc();
+    key('/j'); key('\x1b\r'); // Esc and Enter in one telnet chunk
+    expect(screen.model.popup?.items).toEqual(['far']);
+    esc();
+    key('/away status\r'); // "away status" is in the /away description, so the menu is open: the typed line runs as typed
+    expect(screen.model.lines.some((l) => l.text.includes('You are now away: status'))).toBe(true);
+    expect(screen.model.lines.some((l) => /^\/(j|away)/.test(l.text))).toBe(false); // no slash line posted as chat
+    key('/jo\r'); // a partial word is still filled, as LIVECHAT does
+    expect(screen.model.input).toBe('/join ');
+  });
+
   it('/note takes a listed handle with a space whole, else the first word', () => {
     screen.model.side.push(newSide(SIDE_USER, false, 'big bob'));
     expect(noteTarget(screen, '@big bob owes me')).toBe('@big bob');
