@@ -4,7 +4,7 @@
  * Overlays (help, view, search, settings, modal) live in overlays.ts. The slash menu is slash.ts. Not ported yet:
  * format picker, theme and the canvas/pen picker.
  */
-import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, REVERSE, wrap } from './cells';
+import { Cells, Hits, DEFAULT, BOLD, BG_DEFAULT, REVERSE, menuWidth, wrap } from './cells';
 import { cover, drawOverlays, OverlayState, Rect } from './overlays';
 import { drawSlash } from './slash';
 import { atGhostTail } from './at-complete';
@@ -214,7 +214,7 @@ export function draw(c: Cells, m: Model, d: DrawState, o?: OverlayState): { cr: 
     cover(d, 1, MENU_COL[m.menu] - 1, MENU_ITEMS[m.menu].length + 2, mw);
   }
   if (m.popup) { // LIVECHAT showContextMenu: clamped on screen like scm's mx/my
-    const pu = m.popup, wd = Math.max(...pu.items.map((s) => s.length), pu.title?.length ?? 0) + 4;
+    const pu = m.popup, wd = menuWidth(pu.items, pu.title ?? null);
     const top = Math.max(0, Math.min(pu.row, H - pu.items.length - 2)), left = Math.max(0, Math.min(pu.col, W - wd));
     c.pen(p.ink, DEFAULT, 0);
     const pw = c.menu(top, left, pu.items, pu.sel, p.accent, p.ink, p.accent, pu.title ?? null);

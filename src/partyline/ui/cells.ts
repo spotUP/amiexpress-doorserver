@@ -113,6 +113,16 @@ export class Hits {
   }
 }
 
+/**
+ * The width Cells.menu draws: the longest item plus "> " and the borders, and room for the title as box()
+ * paints it (".- Title -.", six cells around it). A padded LIVECHAT label (' Channel ') is trimmed, box() pads it.
+ */
+export function menuWidth(items: readonly string[], label: string | null): number {
+  let wide = 0;
+  for (const it of items) if (it.length > wide) wide = it.length;
+  return Math.max(wide + 4, label === null ? 0 : label.trim().length + 6);
+}
+
 export class Cells {
   back: Uint32Array;
   front: Uint32Array;
@@ -198,12 +208,9 @@ export class Cells {
   }
 
   menu(top: number, left: number, items: readonly string[], sel: number, borderFg: number, fg: number, selFg: number, label: string | null = null): number {
-    const pen = this.fg;
-    let wide = 0;
-    for (const it of items) if (it.length > wide) wide = it.length;
-    const w = Math.max(wide, label === null ? 0 : label.length) + 4;
+    const pen = this.fg, lab = label === null ? null : label.trim(), w = menuWidth(items, label);
     this.fill(top + 1, left + 1, items.length, w - 2, 0x20);
-    this.box(top, left, items.length + 2, w, borderFg, label, fg);
+    this.box(top, left, items.length + 2, w, borderFg, lab, fg);
     items.forEach((it, i) => {
       this.fg = i === sel ? selFg : fg;
       this.text(top + 1 + i, left + 1, i === sel ? '> ' : '  ', 2);
