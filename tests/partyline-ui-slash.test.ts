@@ -11,7 +11,7 @@ describe('partyline slash menu (slash_menu_rules)', () => {
     expect(names('/jo')[0]).toBe('join');
     const all = names('/');
     expect(all.length).toBe(CMD_HELP.length);
-    expect(CMD_HELP.length).toBe(59);
+    expect(CMD_HELP.length).toBe(60);
     expect([...all].sort()).toEqual(all);
     expect(names('/mute').slice(0, 2)).toEqual(['mute', 'deafen']);
     expect(names('/pin').slice(0, 2)).toEqual(['pin', 'pinned']);
