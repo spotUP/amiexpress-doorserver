@@ -24,7 +24,7 @@ import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
 import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, FX_ANIMATED, HISTORY, LIVE, mentionsSelf, Model, newLine, newSide, NOTE, SIDE_BLANK, SIDE_DM, SIDE_HEAD, SIDE_ROOM, SIDE_USER, SYSTEM, TEXT_MAX, THEMES, TK_ACCENT_ALT, TK_BAR, TK_DIM, TK_OK } from './model';
-import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_OK, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
+import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, HIT_OK, HIT_YES, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
   HIT_THEME_ROW, HIT_CREATE_F, HIT_CREATE_KIND, CREATE_KINDS, CF_NAME, CF_TOPIC, CF_KIND, CF_PRIVATE, CF_INVITE, CF_CREATE, CF_CANCEL, CF_COUNT,
   MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, formatItems, OverlayState, pickCats, pickList, pickMove,
   SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
@@ -723,6 +723,8 @@ export class HubScreen implements PartylineScreen {
         at = end;
       }
     } else this.inputBytes(bytes);
+    // shortcut: a chunk ending in a bare ESC is the Esc key (web terminals send it alone); a telnet client that splits ESC from '[' misreads, add a timer then.
+    if (this.esc === '\x1b' && !this.quitting) { this.esc = ''; this.key(K_ESC); }
     if (!this.quitting) this.typingSync();
     this.info.markDirty();
   }
@@ -1039,6 +1041,7 @@ export class HubScreen implements PartylineScreen {
   private mousePress(row: number, col: number, button: number): void {
     const m = this.model, o = this.over, h = this.drawState.hits.at(row, col);
     if (o.modal === MODAL_MESSAGE) { if (h.id === HIT_OK || h.id !== HIT_MODAL) o.modal = MODAL_NONE; return; }
+    if (o.modal === MODAL_QUIT) { if (h.id === HIT_YES) this.quit(); else if (h.id === HIT_NO) o.modal = MODAL_NONE; return; }
     if (o.create) { // a click focuses a field or a Type choice; a box toggles, a button presses
       if (h.id >= HIT_CREATE_KIND && h.id < HIT_CREATE_KIND + CREATE_KINDS.length) { o.createField = CF_KIND; o.createKind = h.id - HIT_CREATE_KIND; }
       else if (h.id >= HIT_CREATE_F && h.id < HIT_CREATE_F + CF_COUNT) { o.createField = h.id - HIT_CREATE_F; if (o.createField >= CF_PRIVATE) this.createPress(o.createField); }
