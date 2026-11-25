@@ -212,10 +212,10 @@ export function draw(c: Cells, m: Model, d: DrawState, o?: OverlayState): { cr: 
     cover(d, 1, MENU_COL[m.menu] - 1, MENU_ITEMS[m.menu].length + 2, mw);
   }
   if (m.popup) { // LIVECHAT showContextMenu: clamped on screen like scm's mx/my
-    const pu = m.popup, wd = Math.max(...pu.items.map((s) => s.length)) + 4;
+    const pu = m.popup, wd = Math.max(...pu.items.map((s) => s.length), pu.title?.length ?? 0) + 4;
     const top = Math.max(0, Math.min(pu.row, H - pu.items.length - 2)), left = Math.max(0, Math.min(pu.col, W - wd));
     c.pen(p.ink, DEFAULT, 0);
-    const pw = c.menu(top, left, pu.items, pu.sel, p.accent, p.ink, p.accent);
+    const pw = c.menu(top, left, pu.items, pu.sel, p.accent, p.ink, p.accent, pu.title ?? null);
     d.hits.add(HIT_POPUP, top + 1, left + 1, pu.items.length, pw - 2);
     cover(d, top, left, pu.items.length + 2, pw);
   }

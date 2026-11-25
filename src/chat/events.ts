@@ -75,7 +75,7 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
         WHERE e.seq > @since AND (
               (e.type = 'bbs' AND e.board_id = @board)
            OR (e.type <> 'bbs' AND (
-              e.type IN ('motd','board_joined','discord_mirror','discord_link')
+              e.type IN ('motd','board_joined','discord_mirror','discord_link','emoji')
            OR e.room_id IN (SELECT room_id FROM chat_members WHERE sid = @sid)
            OR (e.dm_a IS NOT NULL AND (e.dm_a = @user OR e.dm_b = @user))
            OR (e.type IN ('dm','file_shared','file_deleted') AND e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE user = @user))

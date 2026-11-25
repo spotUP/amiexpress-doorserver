@@ -14,11 +14,11 @@ import { openPreview } from '../chat/files';
 import fs from 'fs';
 import { SurfaceError } from '../achievements/errors';
 import { CMD_HELP } from './ui/slash';
-import { EMOJI, emojiBuiltin } from './ui/model';
+import { EMOJI, emojiBuiltin, SIDE_USER } from './ui/model';
 import { stamp } from './ui/screen';
 import type { HubScreen } from './ui/screen';
 
-const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg', 'clear-room': 'clear-room', clearroom: 'clear-room', 'archive-room': 'archive-room', 'mark-unread': 'mark-unread' };
+export const C_ALIAS: Record<string, string> = { l: 'rooms', list: 'rooms', w: 'who', j: 'join', n: 'create', np: 'create', h: 'help', d: 'msg', 'clear-room': 'clear-room', clearroom: 'clear-room', 'archive-room': 'archive-room', 'mark-unread': 'mark-unread' };
 const C_DROP = new Set(['users', 'channels', '+1', '-1', 'heart', 'fire']);
 
 const RAMP = ' .:-=+*#%@';
@@ -243,10 +243,10 @@ function whoisTyped(s: HubScreen, rest: string): void {
 /**
  * LIVECHAT context-menus.ts Add Note: the note goes on the board's user record, so the hub only
  * asks the caller's board (PLP T `note <user>\t<text>`); the relay answers U `note ok|fail <user>`.
- * shortcut: the name is the first word, so a handle with a space cannot be noted; take the rest after a known name if that matters.
+ * A handle with a space is taken whole when it is a listed user (longest match), else the name is the first word.
  */
 function noteTyped(s: HubScreen, rest: string): void {
-  const a = firstWord(rest);
+  const a = noteTarget(s, rest);
   const text = rest.slice(rest.indexOf(a) + a.length).replace(/[\x00-\x1f\x7f]/g, '').trim();
   if (a === '' || text === '') { usage(s, '/note @user <text>'); return; }
   if (!s.info.ctrl) { s.systemLine('Notes are unavailable.'); return; }
@@ -255,6 +255,14 @@ function noteTyped(s: HubScreen, rest: string): void {
   // Only users of the caller's own board have a record there (web chat's /api/chat/notes rule).
   if (user.includes('@') && user.slice(user.indexOf('@')).toLowerCase() !== own.toLowerCase()) { s.systemLine(`${shown.slice(0, 30)} is not a user of this board.`); return; }
   s.info.ctrl(`note ${user.split('@')[0]}\t${text.slice(0, 1000)}`);
+}
+
+/** The leading handle of `/note` args: the longest sidebar user name followed by a space, else the first word. */
+export function noteTarget(s: HubScreen, rest: string): string {
+  const t = rest.trim(), bare = t.replace(/^@/, '').toLowerCase();
+  const known = s.model.side.filter((x) => x.kind === SIDE_USER && x.label.includes(' ')).map((x) => x.label).sort((x, y) => y.length - x.length)
+    .find((n) => bare.startsWith(`${n.toLowerCase()} `));
+  return known === undefined ? firstWord(t) : t.slice(0, known.length + (t.startsWith('@') ? 1 : 0));
 }
 
 /** msg_typed: every leading @word is a target; one is a DM, two or more a group DM. */

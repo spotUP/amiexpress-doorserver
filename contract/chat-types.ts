@@ -91,6 +91,8 @@ export const CHAT_EVENT_TYPES = [
   'file_shared',
   /** A shared file went away; ref = the file id, text = `name|why` (uploader, op, sysop, expired or room-cleared). */
   'file_deleted',
+  /** A board's custom emoji set changed (put or delete); ref = the emoji name. Every session sees it. */
+  'emoji',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 
@@ -374,6 +376,8 @@ export interface PinRow {
 }
 export interface SearchHit {
   id: string;
+  /** The message's room seq, so a client can load history around a hit it has not paged in. */
+  seq: number;
   room: string;
   user: string;
   at: number;

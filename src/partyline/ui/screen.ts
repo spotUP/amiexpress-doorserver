@@ -29,7 +29,7 @@ import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, H
   MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, MODAL_RECONNECT, formatItems, OverlayState, pickCats, pickList, pickMove,
   SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashPickKind, slashScroll } from './slash';
-import { allEmoji, loadCustomEmoji, runCommand } from '../commands';
+import { allEmoji, C_ALIAS, loadCustomEmoji, runCommand } from '../commands';
 import { completeAtMention } from './at-complete';
 import type { Line } from './model';
 import type { AtCycle } from './at-complete';
@@ -323,13 +323,17 @@ export class HubScreen implements PartylineScreen {
   }
 
   /** LIVECHAT typedPickListCommand: users or channels just above the input; an empty list returns false so the usage line follows. */
-  private pickListOpen(word: string): boolean {
-    const pk = slashPickKind(word), m = this.model;
+  private pickListOpen(typed: string): boolean {
+    // C_ALIAS-only aliases (j, d) open the list of the command they stand for, as LIVECHAT's registry lookup does.
+    const word = C_ALIAS[typed.toLowerCase()] ?? typed, pk = slashPickKind(word), m = this.model;
     if (!pk) return false;
-    const items = pk.kind === 'user' ? this.userNames()
-      : m.side.filter((s) => s.kind === SIDE_ROOM && !(word === 'join' && s.id === this.roomId)).map((s) => s.label.replace(/^#/, ''));
+    // LIVECHAT visibleChannels(state.channels): /join offers every room the caller may join, not only the sidebar's.
+    const rooms = word.toLowerCase() === 'join' ? (this.tryRun(false, (db, ctx) => listRooms(db, ctx)) ?? []).filter((r) => r.id !== this.roomId).map((r) => r.name)
+      : m.side.filter((s) => s.kind === SIDE_ROOM).map((s) => s.label.replace(/^#/, ''));
+    const items = pk.kind === 'user' ? this.userNames() : rooms;
     if (items.length === 0) return false;
     this.popupOpen(items, Math.max(1, this.cells.rows - items.length - 6), 1, { pick: { cmd: word, sigil: pk.kind === 'user' ? '@' : '#', run: pk.run } });
+    if (this.model.popup) this.model.popup.title = pk.kind === 'user' ? ' User ' : ' Channel ';
     return true;
   }
 

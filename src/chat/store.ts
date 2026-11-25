@@ -1014,7 +1014,7 @@ export function search(db: Database.Database, ctx: ChatCtx, q: { q?: unknown; ro
   const user = typeof q.user === 'string' ? q.user.trim() : '';
   const rows = db
     .prepare(
-      `SELECT m.id, m.room_id, r.name, m.user, m.created_at, m.content
+      `SELECT m.id, m.seq, m.room_id, r.name, m.user, m.created_at, m.content
          FROM chat_messages_fts f JOIN chat_messages m ON m.rowid = f.rowid JOIN chat_rooms r ON r.id = m.room_id
         WHERE chat_messages_fts MATCH ? AND m.deleted_at IS NULL AND r.deleted_at IS NULL
           AND (? = '' OR m.room_id = ?)
@@ -1023,8 +1023,8 @@ export function search(db: Database.Database, ctx: ChatCtx, q: { q?: unknown; ro
         ORDER BY m.seq DESC LIMIT ?`
     )
     .all(match, room, room, user, user, user, ctx.admin ? 1 : 0, ctx.user, limit) as
-    { id: string; room_id: string; name: string; user: string; created_at: number; content: string }[];
-  return rows.map((r) => ({ id: r.id, room: r.name, user: r.user, at: r.created_at, content: r.content }));
+    { id: string; seq: number; room_id: string; name: string; user: string; created_at: number; content: string }[];
+  return rows.map((r) => ({ id: r.id, seq: r.seq, room: r.name, user: r.user, at: r.created_at, content: r.content }));
 }
 
 export function listEmoji(db: Database.Database): EmojiRow[] {
@@ -1048,6 +1048,7 @@ export function putEmoji(db: Database.Database, ctx: ChatCtx, name: string, b: B
     const display = checkEmojiText(b.display, 'display');
     const ascii = checkEmojiText(b.ascii, 'ascii');
     db.prepare("INSERT OR REPLACE INTO chat_emoji (board_id, name, data_url, display, ascii) VALUES (?, ?, '', ?, ?)").run(boardId, name, display, ascii);
+    emitEvent(db, { type: 'emoji', boardId, user: ctx.user, ref: name });
     return;
   }
   const url = b.dataUrl;
@@ -1055,6 +1056,7 @@ export function putEmoji(db: Database.Database, ctx: ChatCtx, name: string, b: B
     throw new SurfaceError('bad_request', 400, 'send {display, ascii} or a base64 png, gif or jpeg dataUrl under 24000 characters');
   }
   db.prepare("INSERT OR REPLACE INTO chat_emoji (board_id, name, data_url, display, ascii) VALUES (?, ?, ?, '', '')").run(boardId, name, url);
+  emitEvent(db, { type: 'emoji', boardId, user: ctx.user, ref: name });
 }
 
 /**
@@ -1085,6 +1087,7 @@ export function relayBbsEvent(db: Database.Database, boardId: string, b: Body): 
 export function deleteEmoji(db: Database.Database, ctx: ChatCtx, name: string, boardId: string): void {
   requireSysop(ctx);
   db.prepare('DELETE FROM chat_emoji WHERE board_id = ? AND name = ?').run(boardId, name);
+  emitEvent(db, { type: 'emoji', boardId, user: ctx.user, ref: name });
 }
 
 export { validHandle };

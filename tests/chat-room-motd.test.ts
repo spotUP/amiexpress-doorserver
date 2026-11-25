@@ -54,4 +54,23 @@ describe('room motd', () => {
     expect(cleared[1][7]).toBe('');
     expect((await call('post', `/rooms/${id}/join`, bob)).body.motd).toBe('');
   });
+  it('a custom emoji put or delete reaches every session as an emoji event', async () => {
+    const sys = await login('sys', true);
+    const bob = await login('bob', false);
+    expect((await call('put', '/emoji/wave', sys).send({ display: 'o/', ascii: 'o/' })).status).toBe(200);
+    expect((await request(fx.app).delete('/chat/v1/emoji/wave').set('Authorization', fx.auth).set('X-Chat-Session', sys)).status).toBe(200);
+    const r = await call('get', '/events.txt?since=0&wait=0', bob);
+    const rows = r.text.split('\r\n').filter((l) => l !== '').slice(1).map((l) => l.split('|')).filter((c) => c[1] === 'emoji');
+    expect(rows.map((c) => c[4])).toEqual(['wave', 'wave']);
+  });
+
+  it('a search hit carries the message seq', async () => {
+    const sys = await login('sys', true);
+    const id = (await call('post', '/rooms', sys).send({ name: 'lobby' })).body.id as string;
+    await call('post', `/rooms/${id}/join`, sys).send({});
+    await call('post', `/rooms/${id}/messages`, sys).send({ content: 'needle in hay', clientId: 'n1' });
+    const r = await call('get', '/search?q=needle', sys);
+    expect(r.status).toBe(200);
+    expect(r.body[0].seq).toBeGreaterThan(0);
+  });
 });

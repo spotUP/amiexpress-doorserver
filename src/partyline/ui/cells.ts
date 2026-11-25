@@ -197,13 +197,13 @@ export class Cells {
     return { top: t, left: l };
   }
 
-  menu(top: number, left: number, items: readonly string[], sel: number, borderFg: number, fg: number, selFg: number): number {
+  menu(top: number, left: number, items: readonly string[], sel: number, borderFg: number, fg: number, selFg: number, label: string | null = null): number {
     const pen = this.fg;
     let wide = 0;
     for (const it of items) if (it.length > wide) wide = it.length;
-    const w = wide + 4;
+    const w = Math.max(wide, label === null ? 0 : label.length) + 4;
     this.fill(top + 1, left + 1, items.length, w - 2, 0x20);
-    this.box(top, left, items.length + 2, w, borderFg, null, 0);
+    this.box(top, left, items.length + 2, w, borderFg, label, fg);
     items.forEach((it, i) => {
       this.fg = i === sel ? selFg : fg;
       this.text(top + 1 + i, left + 1, i === sel ? '> ' : '  ', 2);

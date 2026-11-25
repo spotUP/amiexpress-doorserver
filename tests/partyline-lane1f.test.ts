@@ -7,11 +7,12 @@ import type { AchievementsFixture } from './achievements/helpers';
 import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
-import { createRoom, getPrefs } from '../src/chat/store';
+import { createRoom, getPrefs, leaveRoom, listRooms } from '../src/chat/store';
+import { noteTarget } from '../src/partyline/commands';
 import { chatScreen } from '../src/partyline/ui/screen';
 import { CF_CANCEL, CF_CREATE, CF_PRIVATE, CF_TOPIC, HIT_CREATE_F, HIT_CREATE_KIND } from '../src/partyline/ui/overlays';
 import { slashPickKind } from '../src/partyline/ui/slash';
-import { THEMES } from '../src/partyline/ui/model';
+import { newSide, SIDE_USER, THEMES } from '../src/partyline/ui/model';
 import type { HubScreen } from '../src/partyline/ui/screen';
 import type { ScreenInfo } from '../src/partyline/session';
 
@@ -98,6 +99,27 @@ describe('hub screen lane 1f: Create Channel form, pick lists, stored theme', ()
     expect(screen.over.createField).toBe(CF_CANCEL);
     screen.render(true);
     for (const [fg, bg] of pens(HIT_CREATE_F + CF_CANCEL)) expect([fg, bg]).toEqual([p.col[9], p.col[8]]);
+  });
+
+  it('/join lists every joinable room, not only joined ones; titled Channel; /j and /d open their lists', () => {
+    const r = screen.tryRun(true, (db, ctx) => createRoom(db, ctx, { name: 'far' })) as unknown as { id?: string; room?: { id: string } };
+    const id = r.id ?? r.room?.id ?? '';
+    screen.tryRun(true, (db, ctx) => leaveRoom(db, ctx, id));
+    key('/j'); esc(); key('\r'); // Esc closes the "/" menu, which would complete /j to /join
+    expect(screen.model.popup?.items).toEqual(['far']);
+    expect(screen.model.popup?.title).toBe(' Channel ');
+    esc();
+    screen.model.side.push(newSide(SIDE_USER, false, 'carol'));
+    key('/d'); esc(); key('\r');
+    expect(screen.model.popup?.items).toContain('carol');
+    expect(screen.model.popup?.title).toBe(' User ');
+  });
+
+  it('/note takes a listed handle with a space whole, else the first word', () => {
+    screen.model.side.push(newSide(SIDE_USER, false, 'big bob'));
+    expect(noteTarget(screen, '@big bob owes me')).toBe('@big bob');
+    expect(noteTarget(screen, 'big bob owes me')).toBe('big bob');
+    expect(noteTarget(screen, 'bigger x')).toBe('bigger');
   });
 
   it('pick-list kinds follow the usage line', () => {
