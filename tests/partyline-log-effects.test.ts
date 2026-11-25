@@ -49,3 +49,31 @@ describe('partyline format picker place and log effects', () => {
     expect(out()).not.toBe(first);
   });
 });
+
+describe('partyline format picker demos each format', () => {
+  let fx: AchievementsFixture;
+  let screen: HubScreen;
+  beforeEach(() => {
+    fx = makeAchievementsFixture();
+    const chat = loadChatConfig();
+    const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'bob', sysop: true, client: 'test' }).sid);
+    const hello = { cols: 132, rows: 40, mouse: true } as ScreenInfo['hello'];
+    screen = chatScreen(fx.ach, chat)({ sid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined }) as HubScreen;
+  });
+  afterEach(() => { screen.close(); _stopChatSweepersForTests(); fx.cleanup(); });
+
+  // Sysop 2026-11-25: the Effects list showed only the raw codes; each name now shows its own effect, the code after it.
+  it('the Effects list paints Rainbow in rainbow colours that move, the code still readable', () => {
+    screen.model.input = 'hi'; screen.model.inputCur = 2; screen.model.inputAnchor = -1; screen.render(true);
+    screen.input(Buffer.from('\x1b[1;2H\x1b[15~', 'latin1')); screen.render(true);
+    screen.over.pickCat = 1; // Effects
+    screen.model.fxFrame = 0;
+    const first = screen.render(true).toString('latin1');
+    const m = /\x1b\[([0-9;]+)mR\x1b\[([0-9;]+)ma\x1b\[([0-9;]+)mi\x1b\[([0-9;]+)mn/.exec(first);
+    expect(m).not.toBeNull();
+    expect(new Set(m!.slice(1)).size).toBe(4);
+    expect(first).toContain('~rainbow~text~/rainbow~'.slice(0, 15));
+    screen.model.fxFrame = 1;
+    expect(screen.render(true).toString('latin1')).not.toBe(first);
+  });
+});

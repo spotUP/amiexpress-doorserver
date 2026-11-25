@@ -4,7 +4,7 @@
  * lc_progress_bar/bytes, lc_settings_layout). Grid-tested against the C in tests/partyline-ui-overlays.test.ts.
  */
 import { Cells, DEFAULT, wrap } from './cells';
-import { Model, THEMES, TK_BASE, T_BAR, T_CHROME, T_SELECTION_BG, T_SELECTION_INK } from './model';
+import { Model, textMarked, THEMES, TK_BASE, T_BAR, T_CHROME, T_SELECTION_BG, T_SELECTION_INK } from './model';
 import type { DrawState } from './draw';
 
 export const HIT_YES = 8, HIT_NO = 9, HIT_OK = 10, HIT_MODAL = 11,
@@ -343,7 +343,10 @@ function drawPicker(c: Cells, m: Model, d: DrawState, o: OverlayState): void {
     c.pen(k === o.pickItem ? p.barInk : p.ink, k === o.pickItem ? p.accent : DEFAULT, 0);
     c.fill(top + 2 + i, ix + 1, 1, iw - 2, 0x20);
     const e = items[k];
-    c.text(top + 2 + i, ix + 2, iw - 3 <= 16 ? e.face : e.face.padEnd(16) + e.code, iw - 3);
+    // LIVECHAT format-picker renderItem: the name painted in its own format, a live demo; then the code, so the syntax stays readable.
+    const demo = o.pickFmt && e.wrap ? textMarked(m, e.wrap(e.face)) : e.face, fw = Math.min(16, iw - 3);
+    c.marked(top + 2 + i, ix + 2, demo, 0, 0x7fffffff, fw);
+    if (iw - 3 > 16) c.text(top + 2 + i, ix + 18, e.code, iw - 19);
   }
   d.hits.add(HIT_FMT, top, left, H, w);
   d.hits.add(HIT_FMT_CAT, top + 2, left + 2, pickCats(o).length, catw - 2);

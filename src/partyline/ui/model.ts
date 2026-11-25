@@ -481,6 +481,13 @@ export function lineMarked(m: Model, l: Line, stamps: boolean, width: number, ca
   return b.s;
 }
 
+/** One message text as a marked string through the log's renderer: effects, colours and markdown as the log shows them. */
+export function textMarked(m: Model, text: string, cap = MARKED_CAP): string {
+  const b = new Sb(cap, m.pal);
+  sbMarkdown(m, b, text);
+  return b.s;
+}
+
 /** typing_marked: [time] <nick> buffer, then the blink cursor. */
 export function typingMarked(m: Model, t: Typing, cap = MARKED_CAP): string {
   const b = new Sb(cap, m.pal), color = nickColor(t.nick);

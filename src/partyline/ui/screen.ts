@@ -400,7 +400,7 @@ export class HubScreen implements PartylineScreen {
   private fxTick(): boolean {
     if (++this.fxTicks * TICK_MS < 100) return false;
     this.fxTicks = 0;
-    if (!this.model.lines.some((l) => FX_ANIMATED.test(l.text))) return false;
+    if (!(this.over.fmt && this.over.pickFmt) && !this.model.lines.some((l) => FX_ANIMATED.test(l.text))) return false;
     this.model.fxFrame++;
     return true;
   }
