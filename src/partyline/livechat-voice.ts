@@ -8,11 +8,13 @@
  * trailing `~`. Design: amiexpress-web thoughts/shared/research/2026-11-15-partyline-voice-design.md
  */
 import { PLP_MAX_PAYLOAD } from '../../contract/partyline-types';
+import { exchangeDoorAudio } from '../chat/voice';
+import { RELAY_MAX_BYTES } from '../chat/voice-relay';
 
 type Payload = Record<string, unknown>;
 
 /** Events whose body is raw bytes, not JSON. */
-const BINARY = new Set(['audio:data', 'video:cells']);
+const BINARY = new Set(['audio:data', 'audio:ulaw', 'video:cells']);
 
 /** One event as one or more `M` payloads. */
 export function encodeMedia(ev: string, body: Buffer | Payload): Buffer[] {
@@ -126,6 +128,14 @@ export function joinVoiceHub(sink: VoiceSink): VoiceSession {
       if (ev === 'audio:data') {
         // No echo to the sender (audio-video.handler.ts: hearing yourself late).
         for (const o of peers(me, false)) send(o.sink, 'audio:data', Buffer.concat([Buffer.from(`${sink.userId}\0`, 'utf8'), body]));
+        return;
+      }
+      if (ev === 'audio:ulaw') {
+        // Bridge to the chat/v1 voice relay (Amiga, /chat browsers): the browser sends 8 kHz
+        // mu-law every 500 ms next to its opus audio:data, and gets the room's relay mix back.
+        const c = where(me);
+        const mix = c && body.length <= RELAY_MAX_BYTES ? exchangeDoorAudio(c, sink.userId, body, me.isMuted) : null;
+        if (mix && mix.length > 0) send(sink, 'audio:ulaw', mix);
         return;
       }
       if (ev === 'video:cells') {

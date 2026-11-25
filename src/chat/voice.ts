@@ -131,7 +131,26 @@ export function exchangeAudio(db: Database.Database, ctx: ChatCtx, id: string, u
   me.at = Date.now();
   const relay = relays.get(room.id) ?? new AudioRelay();
   relays.set(room.id, relay);
-  return relay.exchange(ctx.user, ulaw, { mesh, muted: me.isMuted, inCall: (u) => call.has(u), now: me.at });
+  return relay.exchange(ctx.user, ulaw, { mesh, muted: me.isMuted, inCall: inCallOrDoor(call), now: me.at });
+}
+
+/** Relay key of a Partyline door caller: never collides with a chat/v1 call member. */
+export const doorRelayKey = (userId: string): string => `door:${userId}`;
+/** Door callers are not in the call roster; the relay's 5 s idle rule prunes them instead. */
+const inCallOrDoor = (call: Map<string, CallMember>) => (u: string): boolean => call.has(u) || u.startsWith('door:');
+
+/**
+ * A Partyline door caller's mic (8 kHz mu-law, from livechat-voice.ts) into the relay of the
+ * chat/v1 voice room it sits in; returns the mix for it, or null when that room has no call
+ * (nobody on the relay side to hear or be heard). Door callers hear each other over LIVECHAT's
+ * own audio:data, so they share the relay group `door` and are never relayed to each other.
+ */
+export function exchangeDoorAudio(roomId: string, userId: string, ulaw: Buffer, muted: boolean): Buffer | null {
+  const call = calls.get(roomId);
+  if (!call) return null;
+  const relay = relays.get(roomId) ?? new AudioRelay();
+  relays.set(roomId, relay);
+  return relay.exchange(doorRelayKey(userId), ulaw, { mesh: 'door', muted, inCall: inCallOrDoor(call), now: Date.now() });
 }
 
 /** Tests only. */

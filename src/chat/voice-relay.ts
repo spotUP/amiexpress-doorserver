@@ -40,17 +40,25 @@ export const RELAY_MAX_BYTES = 8000;
 /** A caller who has not exchanged for this long stops being sent audio. */
 export const RELAY_IDLE_MS = 5000;
 
-interface Listener { mesh: boolean; at: number; queued: Map<string, Int16Array> }
+/**
+ * Callers in one group already hear each other another way, so the relay never sends audio
+ * between two of them: `mesh` (browsers on WebRTC), `door` (web-terminal Partyline callers
+ * on LIVECHAT's audio:data). No group (the Amiga) hears and is heard by everyone.
+ */
+export type RelayGroup = 'mesh' | 'door' | null;
+
+interface Listener { group: RelayGroup; at: number; queued: Map<string, Int16Array> }
 
 /** One call's relay: listener -> sender -> samples waiting for that listener. */
 export class AudioRelay {
   private listeners = new Map<string, Listener>();
 
   /** Post `ulaw` from `user` (empty or `muted` = no microphone audio) and return their mix. */
-  exchange(user: string, ulaw: Buffer, opts: { mesh: boolean; muted: boolean; inCall: (u: string) => boolean; now: number }): Buffer {
+  exchange(user: string, ulaw: Buffer, opts: { mesh: boolean | RelayGroup; muted: boolean; inCall: (u: string) => boolean; now: number }): Buffer {
+    const group: RelayGroup = opts.mesh === true ? 'mesh' : opts.mesh === false ? null : opts.mesh;
     for (const [u, l] of this.listeners) if (u !== user && (!opts.inCall(u) || opts.now - l.at > RELAY_IDLE_MS)) this.listeners.delete(u);
-    const me = this.listeners.get(user) ?? { mesh: opts.mesh, at: opts.now, queued: new Map<string, Int16Array>() };
-    me.mesh = opts.mesh;
+    const me = this.listeners.get(user) ?? { group, at: opts.now, queued: new Map<string, Int16Array>() };
+    me.group = group;
     me.at = opts.now;
     this.listeners.set(user, me);
 
@@ -59,7 +67,7 @@ export class AudioRelay {
       const pcm = new Int16Array(n);
       for (let i = 0; i < n; i++) pcm[i] = DECODE[ulaw[i]];
       for (const [u, l] of this.listeners) {
-        if (u === user || (l.mesh && me.mesh)) continue;
+        if (u === user || (l.group !== null && l.group === me.group)) continue;
         const had = l.queued.get(user);
         const joined = had ? concat(had, pcm) : pcm;
         // A listener that stopped draining keeps only the newest second, never a growing backlog.
