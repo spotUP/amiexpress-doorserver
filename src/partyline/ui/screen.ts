@@ -366,7 +366,9 @@ export class HubScreen implements PartylineScreen {
 
   /** profile_overlay: "status: text, online|offline, idle Ns" in a message modal titled with the nick. */
   private profileOverlay(user: string): void {
-    const o = this.over, p = this.tryRun(false, (db, ctx) => { try { return profileOf(db, ctx, user); } catch { return null; } });
+    // livechat.c profile_fetch -> target_user: a bare handle (the sidebar label) means a user of this board.
+    const full = (me: string): string => (user.includes('@') || !me.includes('@') ? user : `${user}${me.slice(me.indexOf('@'))}`);
+    const o = this.over, p = this.tryRun(false, (db, ctx) => { try { return profileOf(db, ctx, full(ctx.user)); } catch { return null; } });
     if (p === undefined) return;
     o.modal = MODAL_MESSAGE;
     if (p === null) { o.modalTitle = 'Profile'; o.modalText = `User ${user.split('@')[0].slice(0, 40)} not found.`; return; }

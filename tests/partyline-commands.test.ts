@@ -145,6 +145,13 @@ describe('hub screen commands', () => {
     expect(screen.over.viewText.some((l) => l.endsWith(': in the thread'))).toBe(true);
   });
 
+  it('View Profile on a sidebar user (bare handle) finds the user of this board', () => {
+    withAchievementsDb(fx.ach, (db) => createSession(db, loadChatConfig(), fx.boardId, { handle: 'carol', sysop: false, client: 'test' }));
+    (screen as unknown as { profileOverlay(user: string): void }).profileOverlay('carol');
+    expect(screen.over.modalText).not.toMatch(/not found/);
+    expect(screen.over.modalText).toMatch(/online|offline/);
+  });
+
   it('join loads the backlog as numbered lines', () => {
     screen.run(true, (db, ctx) => { const r = createRoom(db, ctx, { name: 'old' }); joinRoom(db, ctx, r.id); postMessage(db, ctx, r.id, { content: 'older', clientId: 'a' }); postMessage(db, ctx, r.id, { content: 'newer', clientId: 'b' }); });
     type('/join #old');
