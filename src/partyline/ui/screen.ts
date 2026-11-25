@@ -19,7 +19,7 @@ import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
 import { createSession, newId, resolveSession } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
+import { dmThreads, editMessage, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { draw, DrawState, HIT_CHAT, HIT_DROPDOWN, HIT_POPUP, HIT_MENU, HIT_SCROLLBAR, HIT_SIDEBAR, HIT_STATUS, HIT_INPUT, MENU_COL, MENU_ITEMS, MENU_LABELS } from './draw';
@@ -497,6 +497,7 @@ export class HubScreen implements PartylineScreen {
     this.systemLine(`Joined #${r.name.slice(0, 40)} (${r.members} users)`);
     this.note(ACTIVITY_LINE, `Joined #${r.name.slice(0, 40)}`);
     this.takeHistory(r.id);
+    this.readCurrent();
     this.fillSidebar();
     return true;
   }
@@ -590,16 +591,27 @@ export class HubScreen implements PartylineScreen {
       return;
     }
     if (rows.length === 0) return;
-    let side = false;
+    let side = false, seen = false;
     for (const e of rows) {
       this.cursor = e.seq;
       this.event(e);
+      if (e.type === 'message' && this.roomId !== '' && e.room_id === this.roomId) seen = true;
       if (e.type === 'message' || e.type === 'joined' || e.type === 'left' || e.type === 'presence' ||
         e.type === 'room_created' || e.type === 'room_deleted' || e.type === 'dm') side = true;
     }
+    if (seen) this.readCurrent();
     if (side) this.fillSidebar();
     this.info.markDirty();
     if (rows.length > 0) this.take();
+  }
+
+  /**
+   * LIVECHAT core/state.ts: the channel on screen never counts unread (opening it zeroes the count,
+   * noteBackgroundMessage counts only other channels), so the room in view is read up to its newest message,
+   * the caller's own posts included.
+   */
+  private readCurrent(): void {
+    if (this.roomId !== '') this.tryRun(true, (db, ctx) => markRead(db, ctx, this.roomId, { seq: roomHeadSeq(db, this.roomId) }));
   }
 
   private poll(): EventRec[] {
