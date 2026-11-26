@@ -11,7 +11,7 @@ import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { _resetRateLimitsForTests } from '../src/achievements/ratelimit';
-import { fileStats, rebuildFileName, sweepFiles } from '../src/chat/files';
+import { fileStats, rebuildFileName, sniffVideo, sweepFiles } from '../src/chat/files';
 import { renderText } from '../src/chat/render';
 import { CHAT_LIMITS } from '../contract/chat-types';
 
@@ -263,6 +263,57 @@ describe('chat files', () => {
       expect((await call('get', `/rooms/${r}/files.txt`, a.sid)).text).toContain('same.bin');
       expect((await call('get', `/rooms/${r}/files.txt`, a.sid)).text).not.toContain('same_2.bin');
       expect(id).toBeDefined();
+    });
+  });
+  describe('video', () => {
+    const mp4 = (size: number): Buffer => {
+      const b = Buffer.alloc(size, 7);
+      b.writeUInt32BE(0x20, 0);
+      b.write('ftypisom', 4, 'latin1');
+      return b;
+    };
+
+    it('sniffs mp4, mov and webm by magic bytes, never a HEIC still', () => {
+      expect(sniffVideo(mp4(16))).toBe(true);
+      expect(sniffVideo(Buffer.from('00000008moov00000000', 'latin1').fill(0, 0, 3))).toBe(true);
+      expect(sniffVideo(Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe(true);
+      expect(sniffVideo(Buffer.from('\0\0\0\x18ftypheic\0\0\0\0', 'latin1'))).toBe(false);
+      expect(sniffVideo(Buffer.from('just some text here', 'latin1'))).toBe(false);
+    });
+
+    it('takes a video over the 2 MB file cap and shares it as kind video', async () => {
+      const a = await login('alice');
+      const r = await room(a);
+      const size = CHAT_LIMITS.fileMaxBytes + 65536;
+      const id = await upload(a, r, 'clip.mp4', mp4(size));
+      const f = await call('post', `/files/${id}/finish`, a).send({});
+      expect(f.body.kind).toBe('video');
+      expect(f.body.size).toBe(size);
+    });
+
+    it('refuses a non-video named .mp4 over 2 MB at finish and drops the upload', async () => {
+      const a = await login('alice');
+      const r = await room(a);
+      const size = CHAT_LIMITS.fileMaxBytes + 1;
+      const id = (await begin(a, r, 'fake.mp4', size)).body.id as string;
+      const junk = Buffer.alloc(size, 0x41);
+      for (let off = 0; off < size; off += 32768) {
+        await call('put', `/files/${id}/chunk?offset=${off}`, a).set('Content-Type', 'application/octet-stream').send(junk.subarray(off, off + 32768));
+      }
+      const f = await call('post', `/files/${id}/finish`, a).send({});
+      expect(f.status).toBe(413);
+      expect(f.body.error).toBe('too_large');
+      expect((await call('post', `/files/${id}/finish`, a).send({})).status).toBe(404);
+    });
+
+    it('refuses over 50 MB with a clear line, and a big non-video name up front', async () => {
+      const a = await login('alice');
+      const r = await room(a);
+      const big = await begin(a, r, 'clip.mov', CHAT_LIMITS.videoMaxBytes + 1);
+      expect(big.status).toBe(413);
+      expect(big.body.detail).toBe('Video is larger than 50 MB.');
+      expect((await begin(a, r, 'big.bin', CHAT_LIMITS.fileMaxBytes + 1)).status).toBe(413);
+      expect(CHAT_LIMITS.videoMaxBytes).toBe(52428800);
     });
   });
 });

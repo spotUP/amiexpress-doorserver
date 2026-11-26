@@ -184,14 +184,16 @@ export const CHAT_LIMITS = {
   replyMaxBytes: 7680,
   /** Largest shared file, in bytes (2 MB). */
   fileMaxBytes: 2097152,
+  /** Largest shared video (mp4, webm, mov by magic bytes), in bytes (50 MB); every other file stays at fileMaxBytes. */
+  videoMaxBytes: 52428800,
   /** Largest chunk of one PUT /files/:id/chunk, in bytes. */
   fileChunkMax: 32768,
   /** Ready files kept per room; the oldest expire first. */
   filesPerRoomKept: 200,
-  /** Upload bytes one user may start per day (10 MB). */
-  fileBytesPerUserPerDay: 10485760,
-  /** Upload bytes one board may start per day (100 MB). */
-  fileBytesPerBoardPerDay: 104857600,
+  /** Upload bytes one user may start per day (60 MB: one full-size video plus pictures). */
+  fileBytesPerUserPerDay: 62914560,
+  /** Upload bytes one board may start per day (300 MB). */
+  fileBytesPerBoardPerDay: 314572800,
   /** Days a ready file is kept. */
   fileRetentionDays: 14,
   /** An unfinished upload with no chunk for this long is dropped. */

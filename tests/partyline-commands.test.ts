@@ -378,6 +378,9 @@ describe('hub screen commands', () => {
     expect(last()).toBe('amy shared a picture: pic.png (/view)  #1 [PICTURE] pic.png');
     share('f2', 'notes.txt|5|text');
     type('/picture 3'); expect(last()).toBe('No file 3 (1-2)');
+    share('f3', 'clip.mp4|99|video');
+    expect(last()).toBe('amy shared a video: clip.mp4 (watch in web chat)  #3 [VIDEO] clip.mp4');
+    type('/picture 4'); expect(last()).toBe('No file 4 (1-3)');
     type('/view 2'); expect(last()).toBe('That file is not a picture');
     type('/view 1'); expect(last()).toBe('File sharing is off on this hub');
   });

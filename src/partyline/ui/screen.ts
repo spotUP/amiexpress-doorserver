@@ -774,6 +774,8 @@ export class HubScreen implements PartylineScreen {
       if (e.ref && this.shared.length < 64) {
         this.shared.push({ id: e.ref, name: name.slice(0, 63), kind: kind.slice(0, 11) });
         if (kind === 'image') m.addLine(newLine(SYSTEM, '', '', `${e.user.slice(0, 30)} shared a picture: ${name.slice(0, 60)} (/view)  #${this.shared.length} [PICTURE] ${name.slice(0, 60)}`));
+        // A terminal cannot play it: name it so the caller knows to watch in web chat.
+        else if (kind === 'video') m.addLine(newLine(SYSTEM, '', '', `${e.user.slice(0, 30)} shared a video: ${name.slice(0, 60)} (watch in web chat)  #${this.shared.length} [VIDEO] ${name.slice(0, 60)}`));
       }
     } else if (e.type === 'topic' && inRoom) {
       m.paneLabel = `${m.room.slice(0, 40)} - ${e.text.slice(0, 50)}`;

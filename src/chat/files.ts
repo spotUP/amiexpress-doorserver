@@ -186,7 +186,9 @@ function beginIn(db: Database.Database, d: string, ctx: ChatCtx, roomId: string 
   const orig = str(b, 'name', 255);
   const size = b.size;
   if (typeof size !== 'number' || !Number.isInteger(size) || size <= 0) throw new SurfaceError('bad_request', 400, 'size must be a positive integer');
-  if (size > CHAT_LIMITS.fileMaxBytes) throw new SurfaceError('too_large', 413, `files are limited to ${CHAT_LIMITS.fileMaxBytes} bytes`);
+  if (size > CHAT_LIMITS.videoMaxBytes) throw new SurfaceError('too_large', 413, size > CHAT_LIMITS.fileMaxBytes && VIDEO_NAME.test(orig) ? 'Video is larger than 50 MB.' : `files are limited to ${CHAT_LIMITS.fileMaxBytes} bytes`);
+  // The name only refuses early; finishUpload's magic-byte check is the authority for the larger cap.
+  if (size > CHAT_LIMITS.fileMaxBytes && !VIDEO_NAME.test(orig)) throw new SurfaceError('too_large', 413, `files are limited to ${CHAT_LIMITS.fileMaxBytes} bytes`);
 
   const again = db
     .prepare("SELECT * FROM chat_files WHERE room_id IS ? AND dm_thread IS ? AND uploader = ? AND client_id = ? AND status <> 'deleted'")
@@ -281,6 +283,20 @@ function hashAndHead(file: string): { sha256: string; head: Buffer } {
   return { sha256: h.digest('hex'), head };
 }
 
+const VIDEO_NAME = /\.(mp4|m4v|webm|mov)$/i;
+/** ftyp brands that are still pictures (HEIC, AVIF), not video. */
+const STILL_BRANDS = new Set(['heic', 'heix', 'hevc', 'mif1', 'msf1', 'avif', 'avis']);
+
+/** True when the first bytes are an MP4/MOV (ISO box) or WebM (EBML) video. Magic bytes, never the extension. */
+export function sniffVideo(head: Buffer): boolean {
+  if (head.length >= 4 && head.readUInt32BE(0) === 0x1a45dfa3) return true;
+  if (head.length < 12) return false;
+  const box = head.toString('latin1', 4, 8);
+  if (box === 'ftyp') return !STILL_BRANDS.has(head.toString('latin1', 8, 12));
+  // QuickTime files from older cameras open with a moov, mdat, wide or free atom instead.
+  return box === 'moov' || box === 'mdat' || box === 'wide' || box === 'free';
+}
+
 export interface FinishReply {
   id: string;
   sha256: string;
@@ -297,7 +313,11 @@ export function finishUpload(db: Database.Database, dir: string | null, ctx: Cha
   if (row.received !== row.size) throw new SurfaceError('conflict', 409, `only ${row.received} of ${row.size} bytes received`);
   const part = partPath(d, id);
   const { sha256, head } = hashAndHead(part);
-  let kind: string = sniffFileKind(head);
+  let kind: string = sniffVideo(head) ? 'video' : sniffFileKind(head);
+  if (kind !== 'video' && row.size > CHAT_LIMITS.fileMaxBytes) {
+    cancelRow(db, d, row, 'not a video');
+    throw new SurfaceError('too_large', 413, `files are limited to ${CHAT_LIMITS.fileMaxBytes} bytes`);
+  }
   let pic: Rgb | null = null;
   if (kind === 'image') {
     pic = decodeImage(fs.readFileSync(part));
