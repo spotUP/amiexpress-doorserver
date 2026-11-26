@@ -276,6 +276,8 @@ function msgTyped(s: HubScreen, rest: string): void {
     if (targets.length === 1) postDm(db, ctx, targets[0].user, body); else postDmGroup(db, ctx, { ...body, participants: targets.map((t) => t.user) });
     return true;
   });
+  // livechat.c msg_typed: to the peer of the open DM thread, the dm event paints the numbered line
+  if (ok && targets.length === 1 && s.dmThread !== '' && targets[0].user.toLowerCase() === s.dmPeer.toLowerCase()) return;
   // livechat.c dm_line(1, ...): an unnumbered note, so /react n on it says "No such message number."
   if (ok) s.note(NOTE, `[${targets.length > 1 ? 'Group DM' : 'DM'} to ${targets.map((t) => t.shown).join(', ').slice(0, 120)}]: ${r.slice(0, 190)}`);
 }

@@ -6,6 +6,8 @@
  *   (server.ts messagePicker onConfirm kind 'menu' -> showContextMenu 'chat'), it does not fill "/reply N".
  * - G3: "/j", Esc, Enter never posts "/j" as chat; Esc only hides the popup (server.ts hideCommandSuggestions).
  * - G4: the member menu acts on the row's full username (server.ts openUserMenuAtRow, sidebar-items-builder.ts u.username).
+ * - G7: livechat.c open_dm (:1827) / side_pick (:4239): Enter on a DM row opens the thread pane; its lines are numbered,
+ *   a plain line goes to the peer, /react n sends the DM id (the hub refuses it, as G5), Esc goes back to the room (:4421).
  * - G5: DM lines are not reactable or replyable: LIVECHAT renders them with no message id (chat-socket-handlers.ts chat:dm),
  *   and web/backend reaction-socket-handlers.ts looks the id up in chat_room_messages only.
  */
@@ -16,7 +18,7 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, postDm, postMessage, react, roomHistory } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
-import { NOTE, SIDE_ROOM, SIDE_USER, FOCUS_SIDEBAR, newLine, newSide } from '../src/partyline/ui/model';
+import { LIVE, NOTE, SIDE_DM, SIDE_ROOM, SIDE_USER, FOCUS_INPUT, FOCUS_SIDEBAR, newLine, newSide } from '../src/partyline/ui/model';
 import { DISCORD_INVITE, HELP_TEXT } from '../src/partyline/ui/overlays';
 import { HIT_SIDEBAR } from '../src/partyline/ui/draw';
 import type { HubScreen } from '../src/partyline/ui/screen';
@@ -142,6 +144,33 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     expect(() => withAchievementsDb(fx.ach, (db) => react(db, resolveSession(db, chat, sid, fx.boardId), dm?.id ?? '', { emoji: ':)' }))).toThrow(/no such message/);
     const room = withAchievementsDb(fx.ach, (db) => postMessage(db, resolveSession(db, chat, sid, fx.boardId), screen.roomId, { content: 'hi', clientId: 'g5room' }));
     expect(withAchievementsDb(fx.ach, (db) => react(db, resolveSession(db, chat, sid, fx.boardId), room.id, { emoji: ':)' })).count).toBe(1);
+  });
+  it('G7: a DM sidebar row opens the numbered thread view as livechat.c open_dm, and Esc returns to the room', () => {
+    const asid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'alice', sysop: false, client: 'test' }).sid);
+    const me = screen.tryRun(false, (_db, ctx) => ctx.user) ?? '';
+    const sent = withAchievementsDb(fx.ach, (db) => postDm(db, resolveSession(db, chat, asid, fx.boardId), me, { content: 'psst', clientId: 'g7a' }));
+    screen.take();
+    const m = screen.model, room = screen.roomId, row = m.side.findIndex((x) => x.kind === SIDE_DM);
+    expect(row).toBeGreaterThan(0);
+    expect(m.lines[m.lines.length - 2].text).toBe('[DM from alice]: psst'); // a DM outside the thread view stays a note
+    m.focus = FOCUS_SIDEBAR; m.sideSel = row;
+    send('\r');
+    expect(screen.dmThread).toBe(sent.threadId);
+    expect(m.focus).toBe(FOCUS_INPUT);
+    expect(m.paneLabel).toMatch(/^@alice@.* - Direct message$/);
+    expect(m.lines.map((l) => l.text)).toEqual([expect.stringMatching(/^Direct messages with alice/), '--- 1 earlier message ---', 'psst']);
+    expect(m.lines[2]).toMatchObject({ number: 1, id: sent.id });
+    send('hello back\r');
+    screen.take();
+    const last = m.lines[m.lines.length - 1];
+    expect(last).toMatchObject({ kind: LIVE, text: 'hello back', number: 2 });
+    expect(texts()).not.toContain('hello back'); // it went to the DM, not the room
+    send('/react 1 :)\r');
+    expect(m.lines[m.lines.length - 1].text).toBe('no such message'); // the hub refuses a DM id, as for LIVECHAT68
+    send('\x1b');
+    expect(screen.dmThread).toBe('');
+    expect(screen.roomId).toBe(room);
+    expect(m.paneLabel).not.toMatch(/Direct message/);
   });
   it('G6: a sent DM is an unnumbered "[DM to x]" note as in livechat.c dm_line, so /react n on it has no message', () => {
     withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'alice', sysop: false, client: 'test' }));

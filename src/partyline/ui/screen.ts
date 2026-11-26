@@ -19,7 +19,7 @@ import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
 import { createSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { applyCanvasOps, dmThreads, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
+import { applyCanvasOps, dmHistory, dmThreads, postDm, postDmGroup, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { DrawCanvas } from './canvas';
@@ -77,6 +77,10 @@ export class HubScreen implements PartylineScreen {
   readonly over = new OverlayState();
   /** The room the caller is in (livechat.c room_id); '' before the first join. */
   roomId = '';
+  /** livechat.c dm_thread / dm_peer: the DM thread the pane shows (open_dm), '' in a room. The peer is the full user (a,b,... for a group). */
+  dmThread = '';
+  dmPeer = '';
+  private readonly dmPeers = new Map<string, string>();
   /** Custom emoji with a picture and no ascii face: the picker lists them by :name:, a message cannot expand them. */
   imageEmoji: string[] = [];
   private cursor = 0;
@@ -425,7 +429,7 @@ export class HubScreen implements PartylineScreen {
     if (input === this.typingSeen) return;
     this.typingSeen = input;
     if (this.showTyping) this.typingSet(this.model.handle, input);
-    if (this.roomId === '') return;
+    if (this.dmThread !== '' || this.roomId === '') return;
     if (input === this.typingSent) { this.typingPending = false; return; }
     if (input === '' || this.typingWait <= 0) this.typingSend(input); else this.typingPending = true;
   }
@@ -444,7 +448,7 @@ export class HubScreen implements PartylineScreen {
   private typingTick(): boolean {
     let changed = false;
     if (this.typingWait > 0) this.typingWait -= TICK_MS;
-    if (this.typingPending && this.typingWait <= 0 && this.roomId !== '') this.typingSend(this.model.input);
+    if (this.typingPending && this.typingWait <= 0 && this.dmThread === '' && this.roomId !== '') this.typingSend(this.model.input);
     for (const t of [...this.model.typing]) {
       if (this.model.isSelf(t.nick)) continue;
       const age = (this.typingAge.get(t.nick) ?? 0) + TICK_MS;
@@ -508,6 +512,7 @@ export class HubScreen implements PartylineScreen {
     const r = this.tryRun(true, (db, ctx) => joinRoom(db, ctx, id));
     if (!r) return false;
     this.roomId = r.id;
+    this.dmThread = '';
     this.model.room = r.name;
     this.model.paneLabel = r.topic ? `${r.name.slice(0, 40)} - ${r.topic.slice(0, 50)}` : r.name;
     this.model.lines = [];
@@ -580,6 +585,7 @@ export class HubScreen implements PartylineScreen {
       for (const d of data.dms) {
         const it = newSide(SIDE_DM, false, d.peer.slice(0, 38));
         it.id = d.threadId;
+        this.dmPeers.set(d.threadId, d.peer);
         it.unread = d.unread;
         side.push(it);
       }
@@ -597,8 +603,8 @@ export class HubScreen implements PartylineScreen {
   readonly expanded = new Map<string, boolean>();
 
   /** livechat.c take_history: the newest HISTORY_LIMIT (30) messages, numbered like live lines so /reply, /edit and /react reach them. */
-  private takeHistory(id: string): void {
-    const rows = this.tryRun(false, (db, ctx) => roomHistory(db, ctx, id, { limit: 30 })) ?? [];
+  private takeHistory(id: string, dm = false): void {
+    const rows = this.tryRun(false, (db, ctx) => (dm ? dmHistory : roomHistory)(db, ctx, id, { limit: 30 })) ?? [];
     if (rows.length === 0) return;
     this.systemLine(`--- ${rows.length} earlier message${rows.length === 1 ? '' : 's'} ---`);
     for (const h of rows) {
@@ -608,6 +614,24 @@ export class HubScreen implements PartylineScreen {
       this.model.addLine(l);
     }
     this.info.markDirty();
+  }
+
+  /** livechat.c open_dm: the pane becomes the DM thread; its lines are numbered LIVE lines with ids, as in a room. */
+  openDm(thread: string, label: string): void {
+    const m = this.model;
+    this.dmThread = thread;
+    this.dmPeer = this.dmPeers.get(thread) ?? label;
+    m.paneLabel = `@${label.slice(0, 30)} - Direct message`;
+    m.lines = []; m.scroll = 0; this.msgNumber = 0;
+    m.linesChanged();
+    this.systemLine(`Direct messages with ${label.slice(0, 24)}`);
+    this.takeHistory(thread, true);
+  }
+
+  /** livechat.c submit in a DM thread: ae_chat_dm to the peer; the dm event paints the line. */
+  private sendDmLine(text: string): void {
+    const peer = this.dmPeer, body = { content: text, clientId: newId('pl') };
+    this.tryRun(true, (db, ctx) => (this.dmThread.startsWith('dg') ? postDmGroup(db, ctx, { ...body, participants: peer.split(',') }) : postDm(db, ctx, peer, body)));
   }
 
   /** livechat.c send_room_line: the line goes to the store; the event brings it back on screen. */
@@ -634,7 +658,7 @@ export class HubScreen implements PartylineScreen {
     for (const e of rows) {
       this.cursor = e.seq;
       this.event(e);
-      if (e.type === 'message' && this.roomId !== '' && e.room_id === this.roomId) seen = true;
+      if (e.type === 'message' && this.dmThread === '' && this.roomId !== '' && e.room_id === this.roomId) seen = true;
       if (e.type === 'message' || e.type === 'joined' || e.type === 'left' || e.type === 'presence' ||
         e.type === 'room_created' || e.type === 'room_deleted' || e.type === 'dm') side = true;
     }
@@ -686,7 +710,7 @@ export class HubScreen implements PartylineScreen {
 
   private event(e: EventRec): void {
     if (this.av.event(e)) return;
-    const inRoom = this.roomId !== '' && e.room_id === this.roomId;
+    const inRoom = this.dmThread === '' && this.roomId !== '' && e.room_id === this.roomId; // livechat.c take_events in_room
     const m = this.model;
     if (e.type === 'canvas') { if (inRoom) this.canvas.event(e.ref, e.text); return; }
     if (e.type === 'message' && inRoom) {
@@ -707,6 +731,11 @@ export class HubScreen implements PartylineScreen {
     } else if (e.type === 'typing' && inRoom && !m.isSelf(e.user)) {
       // livechat.c typing_set: the buffer replaces the row, an empty buffer removes it.
       if (this.showTyping) this.typingSet(e.user, e.text);
+    } else if (e.type === 'dm' && this.dmThread !== '' && e.label === this.dmThread) {
+      const l = newLine(LIVE, stamp(e.at), e.user, e.text); // livechat.c take_events: a line of the open thread, numbered
+      l.id = e.ref;
+      l.number = ++this.msgNumber;
+      m.addLine(l);
     } else if (e.type === 'dm' && !m.isSelf(e.user)) {
       const group = e.label.startsWith('dg'), who = this.shown(e).slice(0, 24);
       m.addLine(newLine(NOTE, '', '', `[${group ? 'Group DM' : 'DM'} from ${who}]: ${e.text.slice(0, 200)}`));
@@ -985,6 +1014,8 @@ export class HubScreen implements PartylineScreen {
       this.selectSoon();
       return;
     }
+    // livechat.c: Esc drops a selection first, then leaves the DM thread for the room
+    if (k === K_ESC && m.inputAnchor < 0 && this.dmThread !== '' && this.roomId !== '') { this.joinRoom(this.roomId); return; }
     if (k === K_LEFT || k === K_RIGHT || k === K_HOME || k === K_END || k === K_ESC) this.clearSelection();
     if (k === K_LEFT || k === K_RIGHT) { m.inputCur = inputStep(m.input, m.inputCur, k === K_LEFT ? -1 : 1); return; }
     if (k === K_HOME) { m.inputCur = 0; return; }
@@ -1092,7 +1123,7 @@ export class HubScreen implements PartylineScreen {
     if (b >= 64) {
       if (b >= 66) return;
       const up = b === 64;
-      if (d.hits.at(row, col).id === HIT_SIDEBAR) { this.sideMove(up ? -2 : 2); this.sideJoin(); }
+      if (d.hits.at(row, col).id === HIT_SIDEBAR) { this.sideMove(up ? -2 : 2); this.sideJoin(false); }
       else m.scroll = Math.max(0, Math.min(d.barRows > 0 ? d.barSpan : 0, m.scroll + (up ? 3 : -3)));
       return;
     }
@@ -1461,9 +1492,11 @@ export class HubScreen implements PartylineScreen {
   private runLine(cmd: string): void { if (!this.overlayCommand(cmd) && runCommand(this, cmd)) this.quit(); }
 
   /** LIVECHAT: a click (or a wheel step) on a channel row switches to that channel. */
-  private sideJoin(): void {
+  private sideJoin(pick = true): void {
     const it = this.model.side[this.model.sideSel];
-    if (it?.kind === SIDE_ROOM && it.id !== undefined && it.id !== this.roomId) this.joinRoom(it.id);
+    if (it?.kind === SIDE_ROOM && it.id !== undefined && (it.id !== this.roomId || this.dmThread !== '')) this.joinRoom(it.id);
+    // livechat.c side_pick: a DM row opens its thread (a wheel step only moves, as side_move)
+    else if (pick && it?.kind === SIDE_DM && it.id !== undefined) { this.openDm(it.id, it.label); this.model.focus = FOCUS_INPUT; }
   }
 
   /** The input character under a column, clamped to the text; markup is zero-width on screen. */
@@ -1527,6 +1560,7 @@ export class HubScreen implements PartylineScreen {
       }
       return;
     }
+    if (this.dmThread !== '') { this.sendDmLine(line); this.remember(line); return; }
     const id = this.sendRoomLine(line);
     this.remember(line, id);
   }
