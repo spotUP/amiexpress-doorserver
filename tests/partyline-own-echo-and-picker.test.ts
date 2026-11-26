@@ -9,6 +9,7 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { chatScreen, stamp } from '../src/partyline/ui/screen';
 import { typingMarked } from '../src/partyline/ui/model';
+import { wrap } from '../src/partyline/ui/cells';
 import type { HubScreen } from '../src/partyline/ui/screen';
 import type { ScreenInfo } from '../src/partyline/session';
 
@@ -33,6 +34,19 @@ describe('Partyline own typing row and format picker', () => {
     const row = typingMarked(screen.model, screen.model.typing[0]).replace(/[\x00-\x1f\x7f-\xff]./g, '');
     expect(screen.model.typingTime).toBe(stamp(Math.floor(Date.now() / 1000)));
     expect(row).not.toContain('[]');
+  });
+
+  // Sysop: a rainbow on the unsent line showed its ~rainbow~ markers in the own typing row, and the row jumped a line with the blink.
+  it('the typing row draws effects as the input does and keeps its height through the cursor blink', () => {
+    const plain = (t: string): string => t.replace(/[\x00-\x1f\x7f-\xff]./g, '');
+    screen.typingSet('bob', '~rainbow~hi there~/rainbow~ {red-fg}x{/red-fg}');
+    screen.render(true);
+    expect(plain(typingMarked(screen.model, screen.model.typing[0]))).not.toMatch(/~|\{/);
+    for (let n = 1; n < 160; n++) {
+      screen.typingSet('bob', 'w'.repeat(n));
+      const rows = [false, true].map((b) => { screen.model.typingBlink = b; return wrap(typingMarked(screen.model, screen.model.typing[0]), 78, 8).length; });
+      expect(rows[1]).toBe(rows[0]);
+    }
   });
 
   it.each([['CR NUL', '\r\0'], ['CR LF', '\r\n']])('the format picker applies and closes on Enter over %s', (_n, enter) => {

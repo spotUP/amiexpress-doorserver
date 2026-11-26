@@ -591,7 +591,8 @@ export function typingMarked(m: Model, t: Typing, cap = MARKED_CAP): string {
   const b = new Sb(cap, m.pal), color = nickColor(t.nick);
   b.fg(m.pal.dim); b.run('['); b.run(m.typingTime); b.run(']'); b.ch(M_BASE);
   b.run(' <'); b.fg(color); b.run(t.nick); b.ch(M_BASE);
-  b.run('> '); b.run(t.text);
+  // Sysop: the buffer draws as the input line does (TS blessed parsed its {tags}), never its raw ~effect~ markers.
+  b.run('> '); b.run(inputMarked(m, t.text, 0, inputVisible(t.text).length));
   if (m.typingBlink) { b.fg(color); b.ch(M_ATTR); b.ch(0x40 | A_REVERSE); b.ch(32); b.ch(M_BASE); }
   else b.ch(32);
   return b.s;

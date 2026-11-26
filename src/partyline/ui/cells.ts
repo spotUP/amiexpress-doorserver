@@ -477,7 +477,8 @@ export function wrap(s: string, width: number, max: number): Array<[number, numb
       cols++; j++;
     }
     const cj = j < len ? s.charCodeAt(j) : 0;
-    if (cj === 0) { rows.push([i, j]); break; }
+    // A remainder of markers only (the blink cursor's M_BASE after a break at its space) is no row.
+    if (cj === 0) { if (cols > 0 || rows.length === 0) rows.push([i, j]); break; }
     if (cj === 0x0a) { rows.push([i, j]); i = j + 1; continue; }
     if (cj === 0x20) { brk = j; brkNext = j + 1; }
     if (brk <= i) { brk = j; brkNext = j; }
