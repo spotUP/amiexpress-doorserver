@@ -562,7 +562,7 @@ const emojiLine = (e: EmojiEntry): string => `  ${e.face}  ${e.code} (${e.keywor
 
 /** load_custom_emoji: the hub's custom emoji, so ":name:" in a message shows its ascii face. Best effort. */
 export function loadCustomEmoji(s: HubScreen): void {
-  const rows = s.tryRun(false, (db) => listEmoji(db));
+  const rows = s.tryRun(false, (db, ctx) => listEmoji(db, ctx));
   s.imageEmoji = (rows ?? []).filter((r) => r.ascii === '' && r.display !== '').map((r) => r.name);
   s.model.customEmoji = (rows ?? []).filter((r) => r.ascii !== '').map((r) => ({ name: r.name, ascii: r.ascii }));
 }
@@ -597,7 +597,7 @@ function customEmojiTyped(s: HubScreen, rest: string): void {
   const sub = firstWord(rest).toLowerCase();
   const args = afterWord(rest).split(/ +/).filter((x) => x !== '');
   if (sub === '' || sub === 'list') {
-    const rows = (s.tryRun(false, (db) => listEmoji(db)) ?? []).filter((r) => r.display !== '' && r.ascii !== '');
+    const rows = (s.tryRun(false, (db, ctx) => listEmoji(db, ctx)) ?? []).filter((r) => r.display !== '' && r.ascii !== '');
     for (const r of rows) s.systemLine(`  ${r.name.slice(0, 32)}  web ${r.display.slice(0, 32)}  telnet ${r.ascii.slice(0, 32)}`);
     if (rows.length === 0) s.systemLine('No custom emoji yet.');
     return;

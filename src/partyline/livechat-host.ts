@@ -264,7 +264,7 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
           else throw e;
         }
       },
-      'chat:emoji:list': () => reply('chat:emoji-list', { emojis: store(false, (_db) => listEmoji(_db)) }),
+      'chat:emoji:list': () => reply('chat:emoji-list', { emojis: store(false, (db, ctx) => listEmoji(db, ctx)) }),
       'chat:typing': (d) => needRoom(d, (id) => { store(true, (db, ctx) => setTyping(db, ctx, id, { text: str(d, 'text') })); }),
       // The door sends one event per key (like the board's chat:keystroke); the store keeps the whole line, so fold them here.
       'chat:keystroke': (d) => { const c = str(d, 'char'); typed = c === 'BACKSPACE' ? typed.slice(0, -1) : typed + c; showTyped(); },

@@ -1028,8 +1028,15 @@ export function search(db: Database.Database, ctx: ChatCtx, q: { q?: unknown; ro
   return rows.map((r) => ({ id: r.id, seq: r.seq, room: r.name, user: r.user, at: r.created_at, content: r.content }));
 }
 
-export function listEmoji(db: Database.Database): EmojiRow[] {
-  const rows = db.prepare('SELECT board_id, name, data_url, display, ascii FROM chat_emoji ORDER BY board_id, name').all() as
+/**
+ * The caller's board's custom emoji. putEmoji/deleteEmoji act on one board, so the list must too:
+ * a merged list kept a name another board still had after this board removed it. A hub admin
+ * session without a board sees every board's rows.
+ */
+export function listEmoji(db: Database.Database, ctx: ChatCtx): EmojiRow[] {
+  const rows = db.prepare(
+    "SELECT board_id, name, data_url, display, ascii FROM chat_emoji WHERE (? = '' OR lower(board_id) = lower(?)) ORDER BY board_id, name"
+  ).all(ctx.boardId, ctx.boardId) as
     { board_id: string; name: string; data_url: string; display: string; ascii: string }[];
   return rows.map((r) => ({ boardId: r.board_id, name: r.name, dataUrl: r.data_url, display: r.display, ascii: r.ascii }));
 }

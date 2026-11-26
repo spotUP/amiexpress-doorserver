@@ -573,11 +573,11 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     res.json(run(req, false, (db, ctx) => store.search(db, ctx, req.query)));
   });
   router.get('/emoji', (req: Request, res: Response) => {
-    res.json(run(req, false, (db) => store.listEmoji(db)));
+    res.json(run(req, false, (db, ctx) => store.listEmoji(db, ctx)));
   });
   // The 68K door's list: image data URLs do not fit its reply buffer, so the text form carries only the text fields.
   router.get('/emoji.txt', (req: Request, res: Response) => {
-    const out = run(req, false, (db) => ({ rev: headSeq(db), rows: store.listEmoji(db) }));
+    const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), rows: store.listEmoji(db, ctx) }));
     sendText(res, renderText('EMOJI', out.rev, out.rows.map((r) => [r.name, r.display, r.ascii])));
   });
   // A board relays its own BBS activity; board auth only, no chat session.

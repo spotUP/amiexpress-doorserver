@@ -3,16 +3,18 @@ import request from 'supertest';
 import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
+import Database from 'better-sqlite3';
+import { createBoard } from '../src/achievements/boards';
 
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });
 afterEach(() => { _stopChatSweepersForTests(); fx.cleanup(); });
 
-async function login(handle: string, sysop: boolean): Promise<string> {
-  return (await request(fx.app).post('/chat/v1/sessions').set('Authorization', fx.auth).send({ handle, sysop })).body.sid as string;
+async function login(handle: string, sysop: boolean, auth = fx.auth): Promise<string> {
+  return (await request(fx.app).post('/chat/v1/sessions').set('Authorization', auth).send({ handle, sysop })).body.sid as string;
 }
-const call = (method: 'get' | 'put' | 'delete', path: string, sid: string) =>
-  request(fx.app)[method](`/chat/v1${path}`).set('Authorization', fx.auth).set('X-Chat-Session', sid);
+const call = (method: 'get' | 'put' | 'delete', path: string, sid: string, auth = fx.auth) =>
+  request(fx.app)[method](`/chat/v1${path}`).set('Authorization', auth).set('X-Chat-Session', sid);
 
 describe('custom emoji', () => {
   it('stores {display, ascii} from a sysop, lists it, refuses a plain user and bad input', async () => {
@@ -46,5 +48,19 @@ describe('custom emoji', () => {
     expect(lines).toContain('party|PARTY|\\o/');
     expect(lines).toContain('pic||');
     expect(res.text).not.toContain('base64');
+  });
+
+  it('lists only the caller board: a name one board removed is gone there while another board keeps it', async () => {
+    const db = new Database(fx.achievementsDbPath);
+    let otherAuth: string;
+    try { otherAuth = `Board ${createBoard(db, 'other', 'Other Board', null).key}`; } finally { db.close(); }
+    const sysA = await login('sysop', true);
+    const sysB = await login('sysop', true, otherAuth);
+    expect((await call('put', '/emoji/yyy', sysA).send({ display: 'A', ascii: 'a' })).status).toBeLessThan(300);
+    expect((await call('put', '/emoji/yyy', sysB, otherAuth).send({ display: 'B', ascii: 'b' })).status).toBeLessThan(300);
+    expect((await call('delete', '/emoji/yyy', sysA)).status).toBeLessThan(300);
+    expect((await call('get', '/emoji', sysA)).body).toEqual([]);
+    expect((await call('get', '/emoji.txt', sysA)).text).not.toContain('yyy|');
+    expect((await call('get', '/emoji', sysB, otherAuth)).body).toEqual([expect.objectContaining({ name: 'yyy', display: 'B', ascii: 'b' })]);
   });
 });
