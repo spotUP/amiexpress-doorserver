@@ -138,6 +138,9 @@ export class HubMedia {
       case 'join': {
         const id = this.roomOf(arg);
         if (!id) { s.systemLine(arg ? 'No such channel.' : 'Usage: /voice join <channel>'); return; }
+        // The kind is checked here (livechat.c:1857): the hub's forbidden would print the generic "Not allowed.".
+        const kind = s.tryRun(false, (db, ctx) => listRooms(db, ctx).find((r) => r.id === id)?.kind);
+        if (kind !== undefined && kind !== 'voice') { s.systemLine('only a voice room has a call'); return; }
         const r = s.tryRun(true, (db, ctx) => joinVoice(db, ctx, id, { isMuted: this.muted, hasVideo: false }));
         if (!r) return;
         this.call = id;

@@ -85,7 +85,7 @@ describe('Partyline media commands', () => {
     bob.run(true, (db, ctx) => createRoom(db, ctx, { name: 'text' }));
     type(bob, '/join #text');
     type(bob, '/voice join'); expect(last(bob)).toBe('only a voice room has a call');
-    type(bob, '/voice join #talk'); expect(last(bob)).toBe('join the room first');
+    type(bob, '/voice join #talk'); expect(last(bob)).toBe('Join the room first.'); // livechat.c show_error not_member
     type(bob, '/join #talk'); type(bob, '/voice join #talk');
     expect(last(bob)).toBe('Joined the call (1 in call)');
     const talk = bob.av.call;
