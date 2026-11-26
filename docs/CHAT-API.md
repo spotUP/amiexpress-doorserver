@@ -376,6 +376,7 @@ itself hold `!`-escaped sub-fields):
 | `dm` | `dm:<threadId>` | sender | message id | content |
 | `role` | room id, or empty | the user whose role changed | empty | `roleName!colorHex!colorAnsi` |
 | `motd` | empty | admin | empty | the message of the day |
+| `emoji` | empty | the sysop who changed it | the emoji name | empty; the board's custom emoji set changed (put or delete), every session sees it |
 | `presence` | room id of each room the user is in (empty when in none) | the user | empty | `status!statusText` |
 | `board_joined` | empty | empty | empty | the display name of the board that just opened its first chat session ever |
 | `discord_mirror` | empty | the sysop who switched it | the board id, upper-cased | `1` mirror on, `0` off |

@@ -34,8 +34,8 @@ export function noteTarget(ctx: ChatCtx, raw: string): string {
 export function addNote(db: Database.Database, ctx: ChatCtx, rawTarget: string, rawText: unknown): { id: number; at: number } {
   requireSession(ctx);
   const target = noteTarget(ctx, rawTarget);
-  // A note is one line: control bytes and the text format's field separator do not survive the wire.
-  const text = (typeof rawText === 'string' ? rawText : '').replace(/[\x00-\x1f\x7f|]+/g, ' ').trim().slice(0, NOTE_TEXT_MAX);
+  // A note is one line: control bytes and the text format's field separator do not survive the wire, and a run of them with spaces folds to one space.
+  const text = (typeof rawText === 'string' ? rawText : '').replace(/[\s\x00-\x1f\x7f|]+/g, ' ').trim().slice(0, NOTE_TEXT_MAX);
   if (!text) throw new SurfaceError('bad_request', 400, 'text is required');
   const at = nowSec();
   const r = db.prepare('INSERT INTO chat_user_notes (board_id, target, author, text, created_at) VALUES (?, ?, ?, ?, ?)')

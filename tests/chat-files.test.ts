@@ -290,7 +290,7 @@ describe('chat files', () => {
       const f = await call('post', `/files/${id}/finish`, a).send({});
       expect(f.body.kind).toBe('video');
       expect(f.body.size).toBe(size);
-    });
+    }, 30000); // ~66 chunk requests: 5 s is too tight on a loaded machine
 
     it('refuses a non-video named .mp4 over 2 MB at finish and drops the upload', async () => {
       const a = await login('alice');
@@ -305,7 +305,7 @@ describe('chat files', () => {
       expect(f.status).toBe(413);
       expect(f.body.error).toBe('too_large');
       expect((await call('post', `/files/${id}/finish`, a).send({})).status).toBe(404);
-    });
+    }, 30000); // ~66 chunk requests: 5 s is too tight on a loaded machine
 
     it('refuses over 50 MB with a clear line, and a big non-video name up front', async () => {
       const a = await login('alice');
