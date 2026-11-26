@@ -314,8 +314,8 @@ export function finishUpload(db: Database.Database, dir: string | null, ctx: Cha
   const part = partPath(d, id);
   const { sha256, head } = hashAndHead(part);
   let kind: string = sniffVideo(head) ? 'video' : sniffFileKind(head);
+  // The router drops the upload in its own transaction: this throw rolls this one back.
   if (kind !== 'video' && row.size > CHAT_LIMITS.fileMaxBytes) {
-    cancelRow(db, d, row, 'not a video');
     throw new SurfaceError('too_large', 413, `files are limited to ${CHAT_LIMITS.fileMaxBytes} bytes`);
   }
   let pic: Rgb | null = null;

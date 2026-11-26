@@ -125,22 +125,23 @@ describe('chat files', () => {
     expect(binary(res).toString()).toBe('2345');
   });
 
-  it('quota: charged on begin, refunded on cancel (6 rooms is the per-board creation cap)', async () => {
+  it('quota: charged on begin, refunded on cancel (per-user daily quota)', async () => {
     const a = await login('alice');
-    const mb2 = 2 * 1024 * 1024;
+    const size = CHAT_LIMITS.videoMaxBytes;
+    const fits = Math.floor(CHAT_LIMITS.fileBytesPerUserPerDay / size);
     const rooms: string[] = [];
-    for (let i = 0; i < 6; i += 1) rooms.push(await room(a));
+    for (let i = 0; i <= fits; i += 1) rooms.push(await room(a));
     const held: string[] = [];
-    for (let i = 0; i < 5; i += 1) {
-      const x = await begin(a, rooms[i], `g${i}.bin`, mb2, `g${i}`);
+    for (let i = 0; i < fits; i += 1) {
+      const x = await begin(a, rooms[i], `g${i}.mp4`, size, `g${i}`);
       expect(x.status).toBe(200);
       held.push(x.body.id as string);
     }
-    const over = await begin(a, rooms[5], 'over.bin', mb2, 'over');
+    const over = await begin(a, rooms[fits], 'over.mp4', size, 'over');
     expect(over.status).toBe(429);
     expect(over.body.error).toBe('quota');
     await call('delete', `/files/${held[0]}`, a);
-    expect((await begin(a, rooms[5], 'over.bin', mb2, 'over2')).status).toBe(200);
+    expect((await begin(a, rooms[fits], 'over.mp4', size, 'over2')).status).toBe(200);
   });
 
   it('delete: uploader, op and admin may; a plain member may not; sweeper expiry removes the blob', async () => {
@@ -275,7 +276,7 @@ describe('chat files', () => {
 
     it('sniffs mp4, mov and webm by magic bytes, never a HEIC still', () => {
       expect(sniffVideo(mp4(16))).toBe(true);
-      expect(sniffVideo(Buffer.from('00000008moov00000000', 'latin1').fill(0, 0, 3))).toBe(true);
+      expect(sniffVideo(Buffer.from('\0\0\0\x08moov\0\0\0\0', 'latin1'))).toBe(true);
       expect(sniffVideo(Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe(true);
       expect(sniffVideo(Buffer.from('\0\0\0\x18ftypheic\0\0\0\0', 'latin1'))).toBe(false);
       expect(sniffVideo(Buffer.from('just some text here', 'latin1'))).toBe(false);

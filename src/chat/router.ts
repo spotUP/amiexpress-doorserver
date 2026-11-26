@@ -404,7 +404,13 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     else res.status(507).json({ error: 'quota', detail: 'the hub could not store the chunk; the upload was cancelled' });
   });
   router.post('/files/:id/finish', (req: Request, res: Response) => {
-    res.json(runAs(req, (db, ctx) => files.finishUpload(db, filesDir, ctx, p(req, 'id'))));
+    try {
+      res.json(runAs(req, (db, ctx) => files.finishUpload(db, filesDir, ctx, p(req, 'id'))));
+    } catch (err) {
+      // A body over the file cap that is not a video: drop the upload so it frees its quota and the room slot.
+      if (err instanceof SurfaceError && err.code === 'too_large') runAs(req, (db, ctx) => files.deleteFile(db, filesDir, ctx, p(req, 'id')));
+      throw err;
+    }
   });
   router.delete('/files/:id', (req: Request, res: Response) => {
     runAs(req, (db, ctx) => files.deleteFile(db, filesDir, ctx, p(req, 'id')));
