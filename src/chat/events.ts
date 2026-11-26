@@ -60,7 +60,7 @@ export function headSeq(db: Database.Database): number {
 
 /**
  * What a session may see: its joined rooms, its direct messages, events about
- * its user, the lifecycle of public rooms, the message of the day, board_joined,
+ * its user, the lifecycle of public rooms, the deletion of a private room it was invited to or owns, the message of the day, board_joined,
  * and the `bbs` events of its own board (never another board's, even for the same user name).
  * A relay board (boards.chat_relay) also gets every `dm` that has a participant `x@<its board>`,
  * because it speaks for those users (`as`) and no session of its own is that participant.
@@ -85,6 +85,10 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
            OR e.user = @user
            OR (e.type IN ('room_created','room_deleted','room_renamed','topic')
                AND e.room_id IN (SELECT id FROM chat_rooms WHERE visibility = 'public'))
+           -- deleteRoom drops the members before this poll runs; invites and the owner survive the
+           -- soft delete, so everyone who could list a private room still hears it go (LIVECHAT channel-deleted).
+           OR (e.type = 'room_deleted' AND e.room_id IN (SELECT room_id FROM chat_invites WHERE user = @user
+                                                         UNION SELECT id FROM chat_rooms WHERE owner_user = @user))
         )))
         ORDER BY e.seq LIMIT @limit`
     )
