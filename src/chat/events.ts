@@ -136,7 +136,11 @@ function scheduleWake(): void {
   setImmediate(() => {
     wakePending = false;
     wakeAll();
-    for (const fn of [...listeners]) fn();
+    // One listener that throws (a screen whose store call failed) must not skip the others
+    // or escape setImmediate as an uncaught exception that ends the process.
+    for (const fn of [...listeners]) {
+      try { fn(); } catch (err) { console.error(`[ERROR] chat event listener: ${(err as Error)?.message ?? String(err)}`); }
+    }
   });
 }
 
