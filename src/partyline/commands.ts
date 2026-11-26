@@ -603,6 +603,9 @@ function customEmojiTyped(s: HubScreen, rest: string): void {
     return;
   }
   if (sub !== 'add' && sub !== 'remove') { s.systemLine('Usage: /customemoji add <name> <display> <ascii> | remove <name> | list'); return; }
+  const sysop = s.tryRun(false, (_db, ctx) => ctx.sysop);
+  if (sysop === undefined) return;
+  if (!sysop) { s.systemLine('Only the sysop can add or remove custom emoji.'); return; } // livechat.c :3511
   const name = (args[0] ?? '').replace(/^:/, '').replace(/:$/, '').toLowerCase();
   if (sub === 'remove') {
     if (name === '') { s.systemLine('Usage: /customemoji remove <name>'); return; }
@@ -695,7 +698,9 @@ export function runCommand(s: HubScreen, line: string): boolean {
     case 'emojis': emojisTyped(s, rest); return false;
     case 'customemoji': customEmojiTyped(s, rest); return false;
     case 'draw': case 'view': drawViewTyped(s, cmd, rest); return false;
-    case 'files': case 'upload': case 'voice': case 'mic': case 'deafen': case 'undeafen': s.av.command(cmd, rest); return false;
+    // livechat.c upload_typed (:2900): a DM thread view has no room; no room at all keeps the TS LIVECHAT line (media.ts).
+    case 'upload': if (s.dmThread !== '') s.systemLine('Join a room first.'); else s.av.command(cmd, rest); return false;
+    case 'files': case 'voice': case 'mic': case 'deafen': case 'undeafen': s.av.command(cmd, rest); return false;
     case 'discord': discordTyped(s, rest); return false;
     case 'clear-room': clearRoomTyped(s, rest); return false;
     case 'archive-room': archiveRoomTyped(s, rest); return false;

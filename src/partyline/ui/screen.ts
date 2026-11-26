@@ -36,6 +36,20 @@ import type { Line } from './model';
 import type { AtCycle } from './at-complete';
 import { HubMedia } from '../media';
 
+/** livechat.c show_error (:520): the hub's error code as LIVECHAT words it; any other code shows the hub's own reason. */
+const SHOW_ERROR: Partial<Record<string, string>> = {
+  muted: 'You are muted in this room.',
+  moderated: 'Room is moderated (+m); you need voice (+v) or op (+o) to speak',
+  banned: 'You are banned from this room.',
+  not_member: 'Join the room first.',
+  not_found: 'Not found.',
+  invite_required: 'That room is private.',
+  too_long: 'Message too long.',
+  rate_limited: 'Slow down a moment.',
+  forbidden: 'Not allowed.',
+  conflict: 'Already sent.',
+};
+
 /** ui_key.h codes. */
 export const K_UP = 1000, K_DOWN = 1001, K_PGUP = 1002, K_PGDN = 1003, K_HOME = 1004, K_END = 1005, K_ENTER = 1006, K_ESC = 1007,
   K_LEFT = 1008, K_RIGHT = 1009, K_BACKTAB = 1010, K_F1 = 1011, K_F2 = 1012, K_F3 = 1013, K_F4 = 1014, K_F5 = 1015, K_F6 = 1016, K_F7 = 1017, K_DEL = 1020,
@@ -150,7 +164,7 @@ export class HubScreen implements PartylineScreen {
       return this.run(write, fn);
     } catch (err) {
       if (!(err instanceof SurfaceError)) throw err;
-      this.systemLine(err.message);
+      this.systemLine(SHOW_ERROR[err.code] ?? err.message);
       return undefined;
     }
   }

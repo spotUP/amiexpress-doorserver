@@ -8,6 +8,10 @@
  * - G4: the member menu acts on the row's full username (server.ts openUserMenuAtRow, sidebar-items-builder.ts u.username).
  * - G7: livechat.c open_dm (:1827) / side_pick (:4239): Enter on a DM row opens the thread pane; its lines are numbered,
  *   a plain line goes to the peer, /react n sends the DM id (the hub refuses it, as G5), Esc goes back to the room (:4421).
+ * - G8: livechat.c upload_typed (:2900): /upload in a DM thread view says "Join a room first."
+ * - G9: livechat.c show_error (:529): a hub not_found prints "Not found." for /react, /edit, /deletemsg, /pin.
+ * - G10: livechat.c customemoji_typed (:3511): a non-sysop add/remove is "Only the sysop can ..."; a sysop
+ *   add/remove prints nothing (then_poll, :2289), list prints the rows.
  * - G5: DM lines are not reactable or replyable: LIVECHAT renders them with no message id (chat-socket-handlers.ts chat:dm),
  *   and web/backend reaction-socket-handlers.ts looks the id up in chat_room_messages only.
  */
@@ -166,7 +170,7 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     expect(last).toMatchObject({ kind: LIVE, text: 'hello back', number: 2 });
     expect(texts()).not.toContain('hello back'); // it went to the DM, not the room
     send('/react 1 :)\r');
-    expect(m.lines[m.lines.length - 1].text).toBe('no such message'); // the hub refuses a DM id, as for LIVECHAT68
+    expect(m.lines[m.lines.length - 1].text).toBe('Not found.'); // the hub refuses a DM id; livechat.c show_error words not_found as "Not found."
     send('\x1b');
     expect(screen.dmThread).toBe('');
     expect(screen.roomId).toBe(room);
@@ -181,5 +185,36 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     expect(dm.number).toBe(0);
     send('/react 1 :)\r');
     expect(screen.model.lines[screen.model.lines.length - 1].text).toBe('No such message number.');
+  });
+  it('G8: /upload in a DM thread view says "Join a room first." as livechat.c upload_typed', () => {
+    screen.dmThread = 'some-thread';
+    send('/upload\r');
+    expect(screen.model.lines[screen.model.lines.length - 1].text).toBe('Join a room first.');
+  });
+  it('G9: a missing message id prints LIVECHAT\'s "Not found." for /react, /edit, /deletemsg and /pin', () => {
+    screen.model.lines.push({ ...newLine(0, '12:00', 'bob', 'gone'), number: 77, id: 'no-such-id' });
+    for (const c of ['/react 77 :)', '/edit 77 new text', '/deletemsg 77', '/pin 77']) {
+      send(`${c}\r`);
+      expect([c, screen.model.lines[screen.model.lines.length - 1].text]).toEqual([c, 'Not found.']);
+    }
+  });
+  it('G10: /customemoji add and remove: non-sysop refused as livechat.c, sysop gets no confirmation line', () => {
+    send('/customemoji add sixgap o/ o/\r');
+    expect(screen.model.lines[screen.model.lines.length - 1].text).toBe('Only the sysop can add or remove custom emoji.');
+    const ssid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'sysop', sysop: true, client: 'test' }).sid);
+    const suser = withAchievementsDb(fx.ach, (db) => resolveSession(db, chat, ssid, fx.boardId).user);
+    const hello = { cols: 80, rows: 25, mouse: true } as ScreenInfo['hello'];
+    const ss = chatScreen(fx.ach, chat)({ sid: ssid, user: suser, boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined }) as HubScreen;
+    try {
+      ss.render(true);
+      const n = ss.model.lines.length;
+      ss.input(Buffer.from('/customemoji add sixgap o/ o/\r', 'latin1'));
+      expect(ss.model.lines.slice(n).map((l) => l.text)).toEqual([]);
+      ss.input(Buffer.from('/customemoji list\r', 'latin1'));
+      expect(ss.model.lines[ss.model.lines.length - 1].text).toBe('  sixgap  web o/  telnet o/');
+      const m = ss.model.lines.length;
+      ss.input(Buffer.from('/customemoji remove sixgap\r', 'latin1'));
+      expect(ss.model.lines.length).toBe(m);
+    } finally { ss.close(); }
   });
 });
