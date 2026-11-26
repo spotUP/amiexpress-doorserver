@@ -13,7 +13,7 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, roomHistory } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
-import { SIDE_USER, FOCUS_SIDEBAR, newLine } from '../src/partyline/ui/model';
+import { SIDE_ROOM, SIDE_USER, FOCUS_SIDEBAR, newLine, newSide } from '../src/partyline/ui/model';
 import { DISCORD_INVITE, HELP_TEXT } from '../src/partyline/ui/overlays';
 import { HIT_SIDEBAR } from '../src/partyline/ui/draw';
 import type { HubScreen } from '../src/partyline/ui/screen';
@@ -30,7 +30,8 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     withAchievementsDb(fx.ach, (db) => createRoom(db, resolveSession(db, chat, sid, fx.boardId), { name: 'Lobby' }));
     withAchievementsDb(fx.ach, (db) => createRoom(db, resolveSession(db, chat, sid, fx.boardId), { name: 'Random' }));
     const hello = { cols: 80, rows: 25, mouse: true } as ScreenInfo['hello'];
-    screen = chatScreen(fx.ach, chat)({ sid, user: 'bob', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined }) as HubScreen;
+    const user = withAchievementsDb(fx.ach, (db) => resolveSession(db, chat, sid, fx.boardId).user);
+    screen = chatScreen(fx.ach, chat)({ sid, user, boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined }) as HubScreen;
     screen.render(true);
   });
   afterEach(() => { screen.close(); _stopChatSweepersForTests(); fx.cleanup(); });
@@ -95,5 +96,27 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     expect(screen.model.room).toBe('Random');
     expect(invites()).toBe(0);
     expect(HELP_TEXT.some((t) => t.includes(DISCORD_INVITE))).toBe(true);
+  });
+
+  it('lists the room members inline under the active room and Up from the first member selects that room (LIVECHAT sidebar-items-builder)', () => {
+    const m = screen.model;
+    const active = m.side.findIndex((s) => s.kind === SIDE_ROOM && s.id === screen.roomId);
+    expect(active).toBeGreaterThanOrEqual(0);
+    expect(m.side[active + 1].kind).toBe(SIDE_USER);
+    expect(m.side.some((s) => s.label === 'USERS')).toBe(false);
+    m.focus = FOCUS_SIDEBAR; m.sideSel = active + 1;
+    send('\x1b[A');
+    expect(m.sideSel).toBe(active);
+  });
+
+  it('Enter on a same-nick user from another board opens the member menu (isSelf compares the full handle)', () => {
+    const m = screen.model;
+    expect(m.handle).toContain('@');
+    const other = newSide(SIDE_USER, false, 'bob');
+    other.id = 'bob@OTHERBOARD';
+    m.side.push(other);
+    m.focus = FOCUS_SIDEBAR; m.sideSel = m.side.length - 1;
+    send('\r');
+    expect(m.popup?.items[0]).toBe('View Profile');
   });
 });

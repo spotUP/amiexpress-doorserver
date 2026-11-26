@@ -120,7 +120,7 @@ describe('hub screen sidebar', () => {
       const rooms = screen.model.side.filter((s) => s.kind === 1);
       expect(rooms.find((s) => s.label === 'Random')?.unread).toBe(1);
       expect(rooms.find((s) => s.label === 'Lobby')?.unread).toBe(0);
-      expect(labels()).toContain('USERS');
+      expect(labels()).not.toContain('USERS'); // LIVECHAT: members sit inline under the active room
       expect(labels()).toContain('amy');
     } finally {
       screen.close();

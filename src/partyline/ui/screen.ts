@@ -195,7 +195,7 @@ export class HubScreen implements PartylineScreen {
     o.settingsVal[SET_LOGINS] = ev.logins; o.settingsVal[SET_FILES] = ev.files; o.settingsVal[SET_DOORS] = ev.doors;
     o.settingsVal[SET_MESSAGES] = ev.messages; o.settingsVal[SET_ANNOUNCE] = ev.announcements;
     o.settingsVal[SET_MUTE] = !this.prefs.sounds; o.settingsVal[SET_TYPING] = this.showTyping; o.settingsVal[SET_STAMPS] = this.model.timestamps;
-    const room = this.roomId, self = room !== '' ? this.tryRun(false, (db, ctx) => roomMembers(db, ctx, room).find((u) => this.model.isSelf(u.user))) : undefined;
+    const room = this.roomId, self = room !== '' ? this.tryRun(false, (db, ctx) => roomMembers(db, ctx, room).find((u) => this.model.isSelfHandle(u.user))) : undefined;
     o.settingsStatus = Math.max(0, ['online', 'away', 'busy', 'dnd'].indexOf(self?.status ?? 'online'));
   }
 
@@ -543,7 +543,7 @@ export class HubScreen implements PartylineScreen {
 
   /**
    * The sidebar the livechat engine used to fill: joined rooms with unreads,
-   * then the users in this room. Only marks dirty when something changed,
+   * the users of this room inline under it. Only marks dirty when something changed,
    * so an unrelated event does not repaint anyone.
    */
   private fillSidebar(): void {
@@ -565,6 +565,15 @@ export class HubScreen implements PartylineScreen {
       it.unread = r.unread;
       it.open = this.expanded.get(r.roomId) ?? it.open;
       side.push(it);
+      // LIVECHAT sidebar-items-builder: the members sit inline under the active channel while it is expanded.
+      if (r.roomId !== this.roomId || !it.open) continue;
+      for (const u of data.users) {
+        const u2 = newSide(SIDE_USER, false, u.user.split('@')[0].slice(0, 38));
+        u2.id = u.user; // the full handle: two boards can share a nick
+        u2.note = (u.statusText ?? '').slice(0, 14);
+        u2.status = u.status === 'online' && u.active ? 0 : 1; // LIVECHAT: a green O only when online and active, else red
+        side.push(u2);
+      }
     }
     if (data.dms.length > 0) {
       side.push(newSide(SIDE_HEAD, false, 'DIRECT MESSAGES'));
@@ -572,15 +581,6 @@ export class HubScreen implements PartylineScreen {
         const it = newSide(SIDE_DM, false, d.peer.slice(0, 38));
         it.id = d.threadId;
         it.unread = d.unread;
-        side.push(it);
-      }
-    }
-    if (data.users.length > 0) {
-      side.push(newSide(SIDE_HEAD, false, 'USERS'));
-      for (const u of data.users) {
-        const it = newSide(SIDE_USER, false, u.user.split('@')[0].slice(0, 38));
-        it.note = (u.statusText ?? '').slice(0, 14);
-        it.status = u.status === 'online' && u.active ? 0 : 1; // LIVECHAT: a green O only when online and active, else red
         side.push(it);
       }
     }
@@ -1306,7 +1306,7 @@ export class HubScreen implements PartylineScreen {
     if (!it) return;
     const sysop = this.tryRun(false, (_db, ctx) => ctx.sysop) === true;
     if (it.kind === SIDE_USER) {
-      if (this.model.isSelf(it.label)) return; // LIVECHAT userList select/rightclick skip the caller's own row
+      if (this.model.isSelfHandle(it.id ?? it.label)) return; // LIVECHAT userList select/rightclick skip the caller's own row
       const items = ['View Profile', 'Send Message', 'Whois', '---', 'Mention', 'Add Note', 'View History', '---', 'Mute User', 'Ignore', 'Block'];
       this.popupOpen(sysop ? [...items, '---', 'Kick User', 'Ban User'] : items, row, col, { user: it.label });
     } else if (it.kind === SIDE_ROOM) {

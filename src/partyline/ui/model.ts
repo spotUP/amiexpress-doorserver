@@ -149,6 +149,8 @@ export class Model {
   setSelf(handle: string): void { const at = handle.indexOf('@'); this.selfNick = (at >= 0 ? handle.slice(0, at) : handle).slice(0, 31); }
   /** Events carry the full handle (bob@BOARD); the screen knows only the nick. */
   isSelf(user: string): boolean { const at = user.indexOf('@'); return sameWord(at >= 0 ? user.slice(0, at) : user, this.selfNick); }
+  /** A full handle against the caller's full handle, so bob@OTHER is not the caller bob@HERE; a bare name falls back to isSelf. */
+  isSelfHandle(user: string): boolean { return user.includes('@') && this.handle.includes('@') ? sameWord(user, this.handle) : this.isSelf(user); }
   sidebarWidth(): number {
     if (this.sidebarHidden || this.cols <= 40) return 0;
     const w = Math.min(this.cols - 24, 21);
