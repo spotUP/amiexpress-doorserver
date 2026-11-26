@@ -14,6 +14,13 @@ describe('partyline engine line rules', () => {
     expect(off).not.toContain('17:03');
     expect(off).toContain('hi');
   });
+  it('shows the bare nick for a name@board sender and keeps the full handle on the line', () => {
+    const l = newLine(LIVE, '17:03', 'bob@REMOTE', 'hi');
+    const s = lineMarked(m, l, false, 0);
+    expect(s).toContain('bob');
+    expect(s).not.toContain('@REMOTE');
+    expect(l.nick).toBe('bob@REMOTE');
+  });
   it('draws a toned system line in the tone inside a dim frame (system_line_tone)', () => {
     const l = newLine(SYSTEM, '', '', '[MOTD] Be nice');
     l.tone = m.pal.activity;

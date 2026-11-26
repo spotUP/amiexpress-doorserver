@@ -499,6 +499,9 @@ export function reactRows(l: Line, indent: number, width: number, cap = 8 * 40):
   return out;
 }
 
+/** Sysop: the log shows the nick only; bob@BOARD stays the line's identity (nick) for routing and self checks. */
+export function bareNick(user: string): string { const at = user.indexOf('@'); return at > 0 ? user.slice(0, at) : user; }
+
 export const MARKED_CAP = TEXT_MAX * 2 + 96;
 /** lc_line_marked: one log line as a marked string, the C buffer cap applied. */
 export function lineMarked(m: Model, l: Line, stamps: boolean, width: number, cap = MARKED_CAP): string {
@@ -506,7 +509,7 @@ export function lineMarked(m: Model, l: Line, stamps: boolean, width: number, ca
   let indent = stamps ? 8 : 0;
   const chat = l.kind === HISTORY || l.kind === LIVE;
   if (chat && l.quote !== '') { b.fg(pal.dim); b.run('  > '); b.run(l.quote); b.ch(10); b.ch(M_BASE); }
-  const name = l.label !== '' ? l.label : l.nick;
+  const name = l.label !== '' ? l.label : bareNick(l.nick);
   switch (l.kind) {
     case SYSTEM:
       b.fg(pal.dim); b.run('*** ');
@@ -590,7 +593,7 @@ export function inputMarked(m: Model, text: string, from: number, n: number): st
 export function typingMarked(m: Model, t: Typing, cap = MARKED_CAP): string {
   const b = new Sb(cap, m.pal), color = nickColor(t.nick);
   b.fg(m.pal.dim); b.run('['); b.run(m.typingTime); b.run(']'); b.ch(M_BASE);
-  b.run(' <'); b.fg(color); b.run(t.nick); b.ch(M_BASE);
+  b.run(' <'); b.fg(color); b.run(bareNick(t.nick)); b.ch(M_BASE);
   // Sysop: the buffer draws as the input line does (TS blessed parsed its {tags}), never its raw ~effect~ markers.
   b.run('> '); b.run(inputMarked(m, t.text, 0, inputVisible(t.text).length));
   if (m.typingBlink) { b.fg(color); b.ch(M_ATTR); b.ch(0x40 | A_REVERSE); b.ch(32); b.ch(M_BASE); }
