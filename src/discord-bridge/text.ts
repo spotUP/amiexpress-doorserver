@@ -243,6 +243,16 @@ function foldGrapheme(g: string): string {
   return g;
 }
 
+/**
+ * Text above Latin-1 folded grapheme by grapheme (emoji to `:name:`, punctuation to
+ * ASCII), so a hub text format written as Latin-1 keeps an emoji readable instead of
+ * `?`. Any writer of the text formats uses it, not only the Discord inbound path.
+ */
+export function foldToLatin1(text: string): string {
+  if (/^[\x00-\xff]*$/.test(text)) return text;
+  return Array.from(graphemes.segment(text), (s) => foldGrapheme(s.segment)).join('');
+}
+
 const MARKDOWN_CHARS = /\\([\\*_~`|<>[\]()#>:-])/g;
 
 /** `<t:unix[:style]>` as `YYYY-MM-DD HH:MM UTC`. */
@@ -292,7 +302,7 @@ export function discordToHub(content: string, attachmentUrls: readonly string[] 
   t = t.replace(/(\d+)/g, (_m, i: string) => kept[Number(i)] ?? '');
   // One line.
   t = t.replace(/\s*[\r\n]+\s*/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
-  t = Array.from(graphemes.segment(t), (s) => foldGrapheme(s.segment)).join('');
+  t = foldToLatin1(t);
 
   const joined = [t, ...attachmentUrls].filter((p) => p.length > 0).join(' ');
   const safe = toLatin1Safe(joined);

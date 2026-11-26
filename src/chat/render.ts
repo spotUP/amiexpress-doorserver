@@ -7,9 +7,11 @@
 import type { Response } from 'express';
 import { CHAT_DISCORD_BOARD, CHAT_LIMITS, CHAT_DISCORD_MARKER, CHAT_TEXT_VERSION } from '../../contract/chat-types';
 import { esc, oneLine, toLatin1Safe } from '../text-format';
+import { foldToLatin1 } from '../discord-bridge/text';
 
 export function f(v: string | number | null | undefined): string {
-  return toLatin1Safe(esc(oneLine(String(v ?? ''))));
+  // A web or app client may post a raw emoji; fold it to its `:name:` so text clients read it, not `?`.
+  return toLatin1Safe(esc(oneLine(foldToLatin1(String(v ?? '')))));
 }
 
 export function renderText(name: string, revision: number | string, rows: (string | number)[][]): Buffer {
