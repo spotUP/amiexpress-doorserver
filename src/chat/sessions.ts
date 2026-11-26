@@ -132,8 +132,13 @@ export function expireSession(db: Database.Database, sid: string): void {
   }
 }
 
+/** How old a stored last_seen may get before resolveSession rewrites it: 15 s, or a sixth of a short test TTL. */
+export function lastSeenSlackSeconds(cfg: ChatConfig): number {
+  return Math.min(15, Math.floor(cfg.sessionTtlSeconds / 6));
+}
+
 /**
- * The live session behind a sid, touched. A stale or foreign sid is refused;
+ * The live session behind a sid, touched when its stamp is older than the slack. A stale or foreign sid is refused;
  * a stale one is removed first, committed on its own so the refusal cannot
  * roll the `left` events back.
  */
@@ -148,7 +153,12 @@ export function resolveSession(db: Database.Database, cfg: ChatConfig, sid: stri
     db.transaction(() => expireSession(db, sid)).immediate();
     throw new SurfaceError('session_expired', 401, 'the session timed out; start a new one');
   }
-  db.prepare('UPDATE chat_sessions SET last_seen = ? WHERE sid = ?').run(now, sid);
+  // The touch is a write transaction (journal create/fsync/delete) on every request; voice PUTs
+  // at 2/s made it the hub's p95. Only a stale stamp is rewritten: a client then stays alive
+  // while its request gap is under ttl - slack (90 - 15 = 75 s), and `idle` reads in slack steps.
+  if (now - row.last_seen >= lastSeenSlackSeconds(cfg)) {
+    db.prepare('UPDATE chat_sessions SET last_seen = ? WHERE sid = ?').run(now, sid);
+  }
   return { sid, boardId, handle: row.handle, user: row.user, sysop: row.sysop === 1, admin: false };
 }
 
