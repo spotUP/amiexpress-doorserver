@@ -19,7 +19,7 @@ import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
 import { createSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
-import { applyCanvasOps, dmHistory, dmThreads, postDm, postDmGroup, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, memberUsers, postMessage, profileOf, reactionRows, roomHistory, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
+import { applyCanvasOps, dmHistory, dmThreads, postDm, postDmGroup, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, entryHistory, memberUsers, postMessage, profileOf, reactionRows, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
 import { Cells } from './cells';
 import { DrawCanvas } from './canvas';
@@ -538,7 +538,7 @@ export class HubScreen implements PartylineScreen {
     // Once per session: joinRoom clears the lines, so the invite rides on the first join.
     if (!this.invited) { this.invited = true; this.systemLine(`Join our Discord server (bridged to Partyline): ${DISCORD_INVITE}`); }
     this.note(ACTIVITY_LINE, `Joined #${r.name.slice(0, 40)}`);
-    this.takeHistory(r.id);
+    this.takeHistory(r.id, false, r.lastRead);
     this.readCurrent();
     this.fillSidebar();
     // livechat.c join_room: an art room opens its canvas, any other room closes it
@@ -616,9 +616,9 @@ export class HubScreen implements PartylineScreen {
   readonly pinned = new Set<string>();
   readonly expanded = new Map<string, boolean>();
 
-  /** livechat.c take_history: the newest HISTORY_LIMIT (30) messages, numbered like live lines so /reply, /edit and /react reach them. */
-  private takeHistory(id: string, dm = false): void {
-    const rows = this.tryRun(false, (db, ctx) => (dm ? dmHistory : roomHistory)(db, ctx, id, { limit: 30 })) ?? [];
+  /** livechat.c take_replay: a room shows entryHistory (since the marker, at least the newest 100); a DM the newest 30. Numbered like live lines so /reply, /edit and /react reach them. */
+  private takeHistory(id: string, dm = false, lastRead = 0): void {
+    const rows = this.tryRun(false, (db, ctx) => (dm ? dmHistory(db, ctx, id, { limit: 30 }) : entryHistory(db, ctx, id, lastRead))) ?? [];
     if (rows.length === 0) return;
     this.systemLine(`--- ${rows.length} earlier message${rows.length === 1 ? '' : 's'} ---`);
     for (const h of rows) {

@@ -524,6 +524,15 @@ export function roomHistory(db: Database.Database, ctx: ChatCtx, id: string, q: 
   return rows.reverse().map(toHistory);
 }
 
+/** The newest messages a room entry shows even when nothing is unread (sysop 2026-11-13: the log is there to read on return). */
+export const REPLAY_TAIL = 100;
+
+/** Room entry: everything after the caller's marker when that is REPLAY_TAIL or more, else the newest REPLAY_TAIL. Read before markRead. */
+export function entryHistory(db: Database.Database, ctx: ChatCtx, id: string, lastRead: number): HistoryRec[] {
+  const missed = lastRead > 0 ? roomHistory(db, ctx, id, { after: lastRead, limit: HISTORY_AFTER_MAX }) : [];
+  return missed.length >= REPLAY_TAIL ? missed : roomHistory(db, ctx, id, { limit: REPLAY_TAIL });
+}
+
 function toHistory(m: MsgRow): HistoryRec {
   return { seq: m.seq, id: m.id, user: m.user, at: m.created_at, replyTo: m.reply_to ?? '', threadId: m.thread_id ?? '', text: m.content };
 }

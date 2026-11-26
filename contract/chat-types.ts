@@ -156,7 +156,7 @@ export const CHAT_LIMITS = {
   emojiMaxBytes: 32,
   roleNameMax: 24,
   historyDefault: 20,
-  historyMax: 50,
+  historyMax: 100,
   eventsPerPoll: 200,
   pollMaxWaitSeconds: 25,
   pollDefaultWaitSeconds: 20,

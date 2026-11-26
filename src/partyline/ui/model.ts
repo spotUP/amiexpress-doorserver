@@ -90,7 +90,8 @@ export function rgbCube(rgb: number): number {
 export const SYSTEM = 0, ACTIVITY_LINE = 1, HISTORY = 2, LIVE = 3, NOTE = 4, EVENT = 5, PICTURE = 6;
 export const SIDE_HEAD = 0, SIDE_ROOM = 1, SIDE_USER = 2, SIDE_DM = 3, SIDE_BLANK = 4;
 export const FOCUS_INPUT = 0, FOCUS_SIDEBAR = 1, FOCUS_MENU = 2;
-export const LINES_MAX = 80;
+// Holds a full entry replay (store HISTORY_AFTER_MAX = 500 missed lines) plus live talk; 80 evicted the history the sysop came back to read.
+export const LINES_MAX = 600;
 export const TEXT_MAX = 640;
 
 export interface React { emoji: string; count: number }

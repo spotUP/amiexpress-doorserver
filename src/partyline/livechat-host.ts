@@ -25,7 +25,7 @@ import { newId, resolveSession, splitUser } from '../chat/sessions';
 import type { ChatCtx } from '../chat/sessions';
 import {
   addIgnore, createRoom, deleteMessage, dmHistory, dmParticipants, dmThreads, editMessage, invite, joinRoom, leaveRoom, listEmoji, listIgnores,
-  clearRoom, deleteRoom, doorRoster, markRead, roomHeadSeq, listMemberships, getPrefs, listPins, listRooms, moderate, muteSecondsLeft, pin, setOp, setPrefs, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
+  clearRoom, deleteRoom, doorRoster, markRead, roomHeadSeq, entryHistory, listMemberships, getPrefs, listPins, listRooms, moderate, muteSecondsLeft, pin, setOp, setPrefs, postDm, postDmGroup, postMessage, postThread, profileOf, react, reactionRows, removeIgnore, roomHistory,
   search, setMode, setPresence, setRoomMotd, setTopic, setTyping, threadHistory, unreact, getDiscordMirror, setDiscordMirror,
 } from '../chat/store';
 import { SurfaceError } from '../achievements/errors';
@@ -125,8 +125,9 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
         let row = listRooms(db, ctx).find((x) => x.name === name);
         const id = row ? row.id : createRoom(db, ctx, name.startsWith('art:') ? { name, kind: 'art' } : { ...made, name }).id;
         const j = joinRoom(db, ctx, id);
-        markRead(db, ctx, id, { seq: roomHeadSeq(db, id) }); // viewing it reads it; plain recent history, no replay
-        return { j, history: roomHistory(db, ctx, id, { limit: 50 }), roster: doorRoster(db, id, (u) => (u === me ? info.user : short(u))) };
+        const history = entryHistory(db, ctx, id, j.lastRead); // before markRead: it needs the old marker
+        markRead(db, ctx, id, { seq: roomHeadSeq(db, id) }); // viewing it reads it
+        return { j, history, roster: doorRoster(db, id, (u) => (u === me ? info.user : short(u))) };
       });
       joined.set(r.j.id, r.j.name);
       room = { id: r.j.id, name: r.j.name };
