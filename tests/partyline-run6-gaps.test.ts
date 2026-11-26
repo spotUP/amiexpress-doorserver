@@ -16,7 +16,7 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, postDm, postMessage, react, roomHistory } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
-import { SIDE_ROOM, SIDE_USER, FOCUS_SIDEBAR, newLine, newSide } from '../src/partyline/ui/model';
+import { NOTE, SIDE_ROOM, SIDE_USER, FOCUS_SIDEBAR, newLine, newSide } from '../src/partyline/ui/model';
 import { DISCORD_INVITE, HELP_TEXT } from '../src/partyline/ui/overlays';
 import { HIT_SIDEBAR } from '../src/partyline/ui/draw';
 import type { HubScreen } from '../src/partyline/ui/screen';
@@ -142,5 +142,15 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     expect(() => withAchievementsDb(fx.ach, (db) => react(db, resolveSession(db, chat, sid, fx.boardId), dm?.id ?? '', { emoji: ':)' }))).toThrow(/no such message/);
     const room = withAchievementsDb(fx.ach, (db) => postMessage(db, resolveSession(db, chat, sid, fx.boardId), screen.roomId, { content: 'hi', clientId: 'g5room' }));
     expect(withAchievementsDb(fx.ach, (db) => react(db, resolveSession(db, chat, sid, fx.boardId), room.id, { emoji: ':)' })).count).toBe(1);
+  });
+  it('G6: a sent DM is an unnumbered "[DM to x]" note as in livechat.c dm_line, so /react n on it has no message', () => {
+    withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'alice', sysop: false, client: 'test' }));
+    send('/msg @alice psst\r');
+    const dm = screen.model.lines[screen.model.lines.length - 1];
+    expect(dm.text).toBe('[DM to alice]: psst');
+    expect(dm.kind).toBe(NOTE);
+    expect(dm.number).toBe(0);
+    send('/react 1 :)\r');
+    expect(screen.model.lines[screen.model.lines.length - 1].text).toBe('No such message number.');
   });
 });

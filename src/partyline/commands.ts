@@ -14,7 +14,7 @@ import { openPreview } from '../chat/files';
 import fs from 'fs';
 import { SurfaceError } from '../achievements/errors';
 import { CMD_HELP } from './ui/slash';
-import { EMOJI, emojiBuiltin, SIDE_USER } from './ui/model';
+import { EMOJI, emojiBuiltin, NOTE, SIDE_USER } from './ui/model';
 import { stamp } from './ui/screen';
 import type { HubScreen } from './ui/screen';
 
@@ -276,7 +276,8 @@ function msgTyped(s: HubScreen, rest: string): void {
     if (targets.length === 1) postDm(db, ctx, targets[0].user, body); else postDmGroup(db, ctx, { ...body, participants: targets.map((t) => t.user) });
     return true;
   });
-  if (ok) s.systemLine(`-> ${targets.map((t) => t.shown).join(', ').slice(0, 100)}: ${r.slice(0, 190)}`);
+  // livechat.c dm_line(1, ...): an unnumbered note, so /react n on it says "No such message number."
+  if (ok) s.note(NOTE, `[${targets.length > 1 ? 'Group DM' : 'DM'} to ${targets.map((t) => t.shown).join(', ').slice(0, 120)}]: ${r.slice(0, 190)}`);
 }
 
 /** motd_typed: no text shows the room's, --clear clears it. */
