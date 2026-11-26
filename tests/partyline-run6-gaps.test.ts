@@ -5,13 +5,16 @@
  * - G2: Up on an empty line starts message pick with action 'menu'; Enter opens the message context menu
  *   (server.ts messagePicker onConfirm kind 'menu' -> showContextMenu 'chat'), it does not fill "/reply N".
  * - G3: "/j", Esc, Enter never posts "/j" as chat; Esc only hides the popup (server.ts hideCommandSuggestions).
+ * - G4: the member menu acts on the row's full username (server.ts openUserMenuAtRow, sidebar-items-builder.ts u.username).
+ * - G5: DM lines are not reactable or replyable: LIVECHAT renders them with no message id (chat-socket-handlers.ts chat:dm),
+ *   and web/backend reaction-socket-handlers.ts looks the id up in chat_room_messages only.
  */
 import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
-import { createRoom, roomHistory } from '../src/chat/store';
+import { createRoom, postDm, postMessage, react, roomHistory } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
 import { SIDE_ROOM, SIDE_USER, FOCUS_SIDEBAR, newLine, newSide } from '../src/partyline/ui/model';
 import { DISCORD_INVITE, HELP_TEXT } from '../src/partyline/ui/overlays';
@@ -118,5 +121,26 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     m.focus = FOCUS_SIDEBAR; m.sideSel = m.side.length - 1;
     send('\r');
     expect(m.popup?.items[0]).toBe('View Profile');
+  });
+  it('G4: the member menu on bob@OTHERBOARD sends to the full handle, not the local bob', () => {
+    const m = screen.model;
+    const other = newSide(SIDE_USER, false, 'bob');
+    other.id = 'bob@OTHERBOARD';
+    m.side.push(other);
+    m.focus = FOCUS_SIDEBAR; m.sideSel = m.side.length - 1;
+    send('\r');
+    expect(m.popup?.items[1]).toBe('Send Message');
+    send('\x1b[B'); send('\r');
+    expect(m.input).toBe('/msg @bob@OTHERBOARD ');
+  });
+
+  it('G5: a DM id is not a room message, so react 404s as in LIVECHAT; a room message reacts', () => {
+    withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'alice', sysop: false, client: 'test' }));
+    const peer = screen.tryRun(false, (_db, ctx) => `alice${ctx.user.slice(ctx.user.indexOf('@'))}`) ?? '';
+    const dm = screen.tryRun(true, (db, ctx) => postDm(db, ctx, peer, { content: 'psst', clientId: 'g5dm' }));
+    expect(dm?.id).toBeTruthy();
+    expect(() => withAchievementsDb(fx.ach, (db) => react(db, resolveSession(db, chat, sid, fx.boardId), dm?.id ?? '', { emoji: ':)' }))).toThrow(/no such message/);
+    const room = withAchievementsDb(fx.ach, (db) => postMessage(db, resolveSession(db, chat, sid, fx.boardId), screen.roomId, { content: 'hi', clientId: 'g5room' }));
+    expect(withAchievementsDb(fx.ach, (db) => react(db, resolveSession(db, chat, sid, fx.boardId), room.id, { emoji: ':)' })).count).toBe(1);
   });
 });

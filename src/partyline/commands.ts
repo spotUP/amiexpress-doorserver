@@ -260,7 +260,7 @@ function noteTyped(s: HubScreen, rest: string): void {
 /** The leading handle of `/note` args: the longest sidebar user name followed by a space, else the first word. */
 export function noteTarget(s: HubScreen, rest: string): string {
   const t = rest.trim(), bare = t.replace(/^@/, '').toLowerCase();
-  const known = s.model.side.filter((x) => x.kind === SIDE_USER && x.label.includes(' ')).map((x) => x.label).sort((x, y) => y.length - x.length)
+  const known = s.model.side.filter((x) => x.kind === SIDE_USER).flatMap((x) => [x.label, x.id ?? '']).filter((n) => n.includes(' ')).sort((x, y) => y.length - x.length)
     .find((n) => bare.startsWith(`${n.toLowerCase()} `));
   return known === undefined ? firstWord(t) : t.slice(0, known.length + (t.startsWith('@') ? 1 : 0));
 }

@@ -1308,7 +1308,8 @@ export class HubScreen implements PartylineScreen {
     if (it.kind === SIDE_USER) {
       if (this.model.isSelfHandle(it.id ?? it.label)) return; // LIVECHAT userList select/rightclick skip the caller's own row
       const items = ['View Profile', 'Send Message', 'Whois', '---', 'Mention', 'Add Note', 'View History', '---', 'Mute User', 'Ignore', 'Block'];
-      this.popupOpen(sysop ? [...items, '---', 'Kick User', 'Ban User'] : items, row, col, { user: it.label });
+      // LIVECHAT server.ts openUserMenuAtRow gets the row's full username (sidebar-items-builder.ts u.username), not the shown nick.
+      this.popupOpen(sysop ? [...items, '---', 'Kick User', 'Ban User'] : items, row, col, { user: it.id ?? it.label });
     } else if (it.kind === SIDE_ROOM) {
       const items = ['Join', 'Leave', 'Info', 'Expand/Collapse', '---', it.id !== undefined && this.pinned.has(it.id) ? 'Unpin Channel' : 'Pin Channel'];
       this.popupOpen(sysop ? [...items, 'Clear History', 'Archive', 'Delete Channel'] : items, row, col, { roomId: it.id, user: it.label });
@@ -1350,7 +1351,7 @@ export class HubScreen implements PartylineScreen {
       case 'Delete': this.runLine(`/deletemsg ${n}`); return;
       case 'View Profile': this.profileOverlay(user); return;
       case 'Whois': this.runLine(`/whois ${user}`); return;
-      case 'Send Message': this.fillInput(`/msg ${user} `); return;
+      case 'Send Message': this.fillInput(`/msg @${user} `); return; // msg_typed takes @-prefixed targets only
       case 'Add Note': this.fillInput(`/note ${user} `); this.systemLine(`Note about ${user}: type it after /note ${user} and press Enter.`); return;
       case 'Mention': m.input = `@${user} ${m.input}`; m.inputCur = m.input.length; return;
       case 'View History': {
