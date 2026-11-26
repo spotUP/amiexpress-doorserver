@@ -106,14 +106,14 @@ describe('hub screen lane 1: LIVECHAT input, menus, sidebar and function keys', 
     expect(screen.model.editing).toBe(false);
   });
 
-  it('Up on an empty line picks a message and Enter replies to it', () => {
+  it('Up on an empty line picks a message and Enter opens its context menu (LIVECHAT kind "menu")', () => {
     post('pick me');
     send('\x1b[A');
     expect(screen.model.pick).not.toBe('');
-    const n = screen.model.lines[screen.model.pickIndex()].number;
     send('\r');
     expect(screen.model.pick).toBe('');
-    expect(screen.model.input).toBe(`/reply ${n} `);
+    expect(screen.model.input).toBe('');
+    expect(screen.model.popup?.items[0]).toBe('Reply');
   });
 
   it('Tab completes @name from the room users and the ghost shows the rest', () => {

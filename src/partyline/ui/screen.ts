@@ -66,6 +66,8 @@ export function stamp(at: number): string {
 }
 
 /** What a context popup acts on; pick: a typed pick list fills (or runs) `/cmd <sigil><item>`. */
+/** LIVECHAT context-menus.ts chat menu: a right-click on a message, or Enter in message pick. */
+const LINE_MENU = ['Reply', 'React', '---', 'Copy Text', 'Pin Message', '---', 'Mark Unread', 'Edit', 'Delete'];
 type PopupCtx = { line?: Line; user?: string; roomId?: string; pick?: { cmd: string; sigil: string; run: boolean } };
 
 export class HubScreen implements PartylineScreen {
@@ -1197,7 +1199,7 @@ export class HubScreen implements PartylineScreen {
     } else if (h.id === HIT_CHAT && button === 2) {
       const r = row - this.drawState.chatBody, li = r >= 0 && r < this.drawState.chatRowLine.length ? this.drawState.chatRowLine[r] : -1;
       const line = li >= 0 ? m.lines[li] : undefined;
-      if (line && line.number > 0) this.popupOpen(['Reply', 'React', '---', 'Copy Text', 'Pin Message', '---', 'Mark Unread', 'Edit', 'Delete'], row, col, { line });
+      if (line && line.number > 0) this.popupOpen(LINE_MENU, row, col, { line });
       else this.systemLine('Right-click on a message first.');
     } else if (h.id === HIT_SIDEBAR && h.dr < m.side.length && m.side[h.dr].kind !== SIDE_HEAD && m.side[h.dr].kind !== SIDE_BLANK) {
       m.sideSel = h.dr;
@@ -1235,11 +1237,17 @@ export class HubScreen implements PartylineScreen {
     this.clearSelection();
   }
 
-  /** LIVECHAT message pick: Up/Down step, Enter replies to the picked message, Esc leaves; other keys leave and type. */
+  /** LIVECHAT message pick (kind 'menu'): Up/Down step, Enter opens the picked message's context menu at the chat's
+   *  top left (server.ts onConfirm showContextMenu 'chat'), Esc leaves; other keys leave and type. */
   private pickLineKey(k: number): boolean {
     const m = this.model;
     if (k === K_UP || k === K_DOWN) { m.pickMove(k === K_UP ? -1 : 1); return true; }
-    if (k === K_ENTER) { const l = m.lines[m.pickIndex()]; m.pickStop(); if (l) this.fillInput(`/reply ${l.number} `); return true; }
+    if (k === K_ENTER) {
+      const line = m.lines[m.pickIndex()];
+      m.pickStop();
+      if (line) this.popupOpen(LINE_MENU, this.drawState.chatBody + 1, this.drawState.chatLeft + 1, { line });
+      return true;
+    }
     m.pickStop();
     return k === K_ESC;
   }
@@ -1295,6 +1303,7 @@ export class HubScreen implements PartylineScreen {
     if (!it) return;
     const sysop = this.tryRun(false, (_db, ctx) => ctx.sysop) === true;
     if (it.kind === SIDE_USER) {
+      if (this.model.isSelf(it.label)) return; // LIVECHAT userList select/rightclick skip the caller's own row
       const items = ['View Profile', 'Send Message', 'Whois', '---', 'Mention', 'Add Note', 'View History', '---', 'Mute User', 'Ignore', 'Block'];
       this.popupOpen(sysop ? [...items, '---', 'Kick User', 'Ban User'] : items, row, col, { user: it.label });
     } else if (it.kind === SIDE_ROOM) {
