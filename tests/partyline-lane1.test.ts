@@ -189,6 +189,6 @@ describe('hub screen lane 1: LIVECHAT input, menus, sidebar and function keys', 
     expect(screen.model.popup?.items).toContain('Kick User');
     const p = hit(HIT_POPUP, 1);
     click(0, p.row, p.col);
-    expect(screen.model.input).toBe(`/msg ${screen.model.side[i].label} `);
+    expect(screen.model.input).toBe(`/msg @${screen.model.side[i].id} `); // 9d691ce: the full handle, @-prefixed for msg_typed
   });
 });
