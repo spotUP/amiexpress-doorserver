@@ -37,6 +37,9 @@ import type { AtCycle } from './at-complete';
 import { HubMedia } from '../media';
 
 /** livechat.c show_error (:520): the hub's error code as LIVECHAT words it; any other code shows the hub's own reason. */
+/** A store call that failed outright (not a refusal): the caller's action did not happen. */
+export const STORE_FAILED = 'Partyline could not reach its message store. Try again in a moment.';
+
 const SHOW_ERROR: Partial<Record<string, string>> = {
   muted: 'You are muted in this room.',
   moderated: 'Room is moderated (+m); you need voice (+v) or op (+o) to speak',
@@ -158,15 +161,26 @@ export class HubScreen implements PartylineScreen {
     }
   }
 
-  /** A store refusal is a system line (livechat.c show_error), never a dropped caller. */
+  /**
+   * A store refusal is a system line (livechat.c show_error), never a dropped caller. A store
+   * that fails outright (SQLITE_CANTOPEN, a full disk) is logged and shown as one line too: it
+   * is this caller's failed action, and rethrowing it from a socket or event callback is an
+   * uncaught exception that ends the hub for every caller.
+   */
   tryRun<T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T): T | undefined {
     try {
       return this.run(write, fn);
     } catch (err) {
-      if (!(err instanceof SurfaceError)) throw err;
-      this.systemLine(SHOW_ERROR[err.code] ?? err.message);
+      this.systemLine(this.storeFailure(err));
       return undefined;
     }
+  }
+
+  /** The line a failed store call shows: the refusal's own text, or a short store error (logged). */
+  private storeFailure(err: unknown): string {
+    if (err instanceof SurfaceError) return SHOW_ERROR[err.code] ?? err.message;
+    console.error(`[ERROR] partyline screen ${this.info.sid}: ${(err as Error)?.message ?? String(err)}`);
+    return STORE_FAILED;
   }
 
   /** The last message number handed to a pane line (C msg_number); line_by_number looks it up. */
@@ -554,7 +568,7 @@ export class HubScreen implements PartylineScreen {
     post: (base, ops) => this.canvasCall(true, (db, ctx) => applyCanvasOps(db, ctx, this.roomId, { base, ops })),
   });
   private canvasCall<T>(write: boolean, fn: (db: Database.Database, ctx: ChatCtx) => T): T | string {
-    try { return this.run(write, fn); } catch (err) { if (!(err instanceof SurfaceError)) throw err; return err.message; }
+    try { return this.run(write, fn); } catch (err) { return err instanceof SurfaceError ? err.message : this.storeFailure(err); }
   }
   canvasOpen(): void { this.canvas.enter(); this.cells.invalidate(); this.info.markDirty(); this.savePlace(); }
   /** dr_leave, then the chat screen comes back as a full repaint. */

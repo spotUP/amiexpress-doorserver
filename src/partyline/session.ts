@@ -69,6 +69,9 @@ export type ScreenFactory = (info: ScreenInfo) => PartylineScreen;
 export const OLD_CLIENT_SCREEN = 'This board runs an old Partyline client. Ask the sysop to update.';
 const DRAIN_TEXT = 'Partyline is restarting, reconnecting...';
 
+/** The line a session ended by fail() shows before its X quit. */
+export const SESSION_FAILED = 'Partyline hit an error and closed this session. Try again in a moment.';
+
 const REFUSAL_TEXT: Record<PlpRefusal, string> = {
   old_client: OLD_CLIENT_SCREEN,
   bad_hello: 'Partyline could not read this board\'s login. Ask the sysop to check the door setup.',
@@ -165,8 +168,25 @@ export class PartylineSession {
     }
     for (const f of frames) {
       if (this.state === 'closed') return;
-      this.onFrame(f);
+      try {
+        this.onFrame(f);
+      } catch (err) {
+        this.fail(err);
+        return;
+      }
     }
+  }
+
+  /**
+   * This caller's screen threw something no refusal covers (its store could not be opened, a
+   * bug): end this one session with a line and X quit. Rethrown from the socket's data
+   * callback it is an uncaught exception, and the hub process dies for every caller.
+   */
+  private fail(err: unknown): void {
+    this.deps.log(`[ERROR] partyline ${this.id} ended: ${(err as Error)?.message ?? String(err)}`);
+    if (this.state === 'closed') return;
+    this.send(PLP_HUB.OUTPUT, seqPayload(++this.seq, Buffer.from(`\r\n${SESSION_FAILED}\r\n`, 'latin1')));
+    this.bye('quit');
   }
 
   private onFrame(f: PlpFrame): void {
@@ -257,7 +277,12 @@ export class PartylineSession {
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
     this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
-    this.screen = this.deps.screen({ sid, user, boardId, hello, renewed: (fresh) => { if (this.state === 'live') this.sid = fresh; }, markDirty: () => this.markDirty(), quit: () => this.quitAfterOutput(), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
+    try {
+      this.screen = this.deps.screen({ sid, user, boardId, hello, renewed: (fresh) => { if (this.state === 'live') this.sid = fresh; }, markDirty: () => this.markDirty(), quit: () => this.quitAfterOutput(), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
+    } catch (err) {
+      this.fail(err);
+      return;
+    }
     this.markDirty(true);
   }
 
@@ -342,7 +367,12 @@ export class PartylineSession {
     this.deps.log(`[INFO] partyline ${this.id} bye ${reason || '?'}`);
     const sid = this.sid;
     // A resumed tab shares the sid: expiring it would strip the live tab of its rooms and events.
-    if (sid && !this.deps.sidHeldElsewhere(sid, this)) withAchievementsDb(this.deps.ach, (db) => db.transaction(() => expireSession(db, sid))());
+    // A store that cannot be opened must not stop the goodbye: the sweeper expires the row later.
+    try {
+      if (sid && !this.deps.sidHeldElsewhere(sid, this)) withAchievementsDb(this.deps.ach, (db) => db.transaction(() => expireSession(db, sid))());
+    } catch (err) {
+      this.deps.log(`[ERROR] partyline ${this.id} expire on bye: ${(err as Error)?.message ?? String(err)}`);
+    }
     this.sid = null;
     // X tells the client this is a quit: a bare close after W reads as a hub restart, and the relay resumes (sysop 2026-11-25: "pl just redraws when i quit").
     this.send(PLP_HUB.EXIT, reason || 'quit');
