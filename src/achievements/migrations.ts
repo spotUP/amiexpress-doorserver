@@ -502,4 +502,21 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('ALTER TABLE chat_sessions ADD COLUMN pl_canvas INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 23,
+    name: 'chat: chat_user_notes, the Partyline Add Note store shared by telnet, web and Amiga',
+    // The reference chat wrote notes into one board's account editor; Partyline callers come
+    // from many boards and clients, so the hub keeps one store all of them read.
+    up: (db) => {
+      db.exec(`CREATE TABLE chat_user_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        board_id TEXT NOT NULL DEFAULT '',
+        target TEXT NOT NULL,
+        author TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`);
+      db.exec('CREATE INDEX chat_user_notes_target ON chat_user_notes (lower(target))');
+    },
+  },
 ];

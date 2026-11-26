@@ -128,6 +128,11 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | POST | `/rooms/:id/pins` | `{messageId}`; room op |
 | DELETE | `/rooms/:id/pins/:messageId` | 204 |
 | GET | `/search` | optional, JSON; `?q=&room=&user=&limit=` |
+| POST | `/users/:user/notes` | `{text}` (1-1000 chars, one line); any session; 201 `{id, at}`; a bare handle means the caller's board |
+| GET | `/users/:user/notes` | JSON notes on that user; sysop/admin see all, others only their own |
+| GET | `/users/:user/notes.txt` | NOTES rows: `id|target|author|at|text` |
+| GET | `/users/:user/history` | JSON: that user's top-level messages in visible rooms, oldest first; `?room=&limit=` (default 15, max 50); a bare handle matches every board |
+| GET | `/users/:user/history.txt` | HISTORY rows, as `/users/:user/history` |
 | GET | `/emoji` | optional, JSON |
 | GET | `/emoji.txt` | EMOJI rows: `name|display|ascii` (image emoji list with empty text fields) |
 | PUT | `/emoji/:name` | `{display, ascii}` or `{dataUrl}`; sysop of the owning board |
@@ -176,6 +181,7 @@ Formats and their fields, in order:
   message id a `message` event answers, empty otherwise)
 - REACTIONS: `emoji|count|mine`
 - EMOJI: `name|display|ascii`
+- NOTES: `id|target|author|at|text`
 - WHO: `user|room|sysop|roleColor|idleSeconds|status|statusText|label`
 - DISCORD: `board`
 - DISCORD_LINKS: `id|room|channelId|board`
@@ -310,6 +316,11 @@ d1d2d3d4d5d6|zed@FRIEND|1762500100|2
 DISCORD|1|413|2
 AEW
 UPROUGH
+```
+
+```text example NOTES
+NOTES|1|413|1
+7|bob@UPROUGH|amy@UPROUGH|1762500100|pays in rare mods
 ```
 
 ```text example DISCORD_LINKS

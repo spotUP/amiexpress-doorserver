@@ -41,6 +41,8 @@ export const CHAT_TEXT_FORMATS = {
   CANVAS: ['y', 'cells'],
   /** One ready file of a room, newest first; `at` is the epoch second it was shared, `label` the uploader's board label, `kind` the sniffed type, `imgW`/`imgH` the pixel size of a picture (0 when not a picture). */
   FILES: ['id', 'name', 'size', 'uploader', 'at', 'label', 'kind', 'imgW', 'imgH'],
+  /** Notes on one user, oldest first: a sysop or hub admin reads every note, anyone else only their own. */
+  NOTES: ['id', 'target', 'author', 'at', 'text'],
 } as const;
 export type ChatTextFormat = keyof typeof CHAT_TEXT_FORMATS;
 
@@ -468,6 +470,11 @@ export const CHAT_ENDPOINTS = [
   'POST /rooms/:id/pins',
   'DELETE /rooms/:id/pins/:messageId',
   'GET /search',
+  'POST /users/:user/notes',
+  'GET /users/:user/notes',
+  'GET /users/:user/notes.txt',
+  'GET /users/:user/history',
+  'GET /users/:user/history.txt',
   'GET /emoji',
   'GET /emoji.txt',
   'POST /bbs-events',

@@ -27,6 +27,7 @@ import type { ChatCtx } from './sessions';
 import * as files from './files';
 import * as fs from 'fs';
 import * as store from './store';
+import * as notes from './notes';
 import * as voice from './voice';
 import { RELAY_MAX_BYTES } from './voice-relay';
 import type { Body } from './store';
@@ -572,6 +573,25 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   router.get('/search', (req: Request, res: Response) => {
     res.json(run(req, false, (db, ctx) => store.search(db, ctx, req.query)));
   });
+  // ---- user notes and per-user history (Partyline Add Note / View History) ----
+  router.post('/users/:user/notes', (req: Request, res: Response) => {
+    res.status(201).json(run(req, true, (db, ctx) => notes.addNote(db, ctx, p(req, 'user'), body(req).text)));
+  });
+  router.get('/users/:user/notes', (req: Request, res: Response) => {
+    res.json(run(req, false, (db, ctx) => notes.listNotes(db, ctx, p(req, 'user'))));
+  });
+  router.get('/users/:user/notes.txt', (req: Request, res: Response) => {
+    const out = run(req, false, (db, ctx) => ({ rev: headSeq(db), rows: notes.listNotes(db, ctx, p(req, 'user')) }));
+    sendText(res, renderText('NOTES', out.rev, out.rows.map((n) => [n.id, n.target, n.author, n.at, n.text])));
+  });
+  router.get('/users/:user/history', (req: Request, res: Response) => {
+    res.json(run(req, false, (db, ctx) => notes.userHistory(db, ctx, p(req, 'user'), req.query)));
+  });
+  router.get('/users/:user/history.txt', (req: Request, res: Response) =>
+    historyText((db, ctx) => {
+      const recs = notes.userHistory(db, ctx, p(req, 'user'), req.query);
+      return { recs, rooms: typeof req.query.room === 'string' ? [req.query.room] : [] };
+    })(req, res));
   router.get('/emoji', (req: Request, res: Response) => {
     res.json(run(req, false, (db, ctx) => store.listEmoji(db, ctx)));
   });

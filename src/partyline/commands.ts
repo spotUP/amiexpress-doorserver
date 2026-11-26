@@ -10,6 +10,7 @@
  */
 import { addIgnore, archiveRoom, clearPresence, clearRoom, markUnread, createRoom, discordInvite, getDiscordMirror, listOwnDiscordJoins, requestDiscordJoin, setDiscordMirror, deleteEmoji, deleteMessage, deleteRoom, editMessage, invite, listPins, pin, react, reactionRows, threadHistory, unreact, leaveRoom, listEmoji, listIgnores, listRooms, moderate, postDm, postDmGroup, profileOf, putEmoji, removeIgnore, setMode, setOp, setPresence, setRoomMotd, setTopic, whoRows } from '../chat/store';
 import { newId } from '../chat/sessions';
+import { addNote, listNotes } from '../chat/notes';
 import { openPreview } from '../chat/files';
 import fs from 'fs';
 import { SurfaceError } from '../achievements/errors';
@@ -248,13 +249,21 @@ function whoisTyped(s: HubScreen, rest: string): void {
 function noteTyped(s: HubScreen, rest: string): void {
   const a = noteTarget(s, rest);
   const text = rest.slice(rest.indexOf(a) + a.length).replace(/[\x00-\x1f\x7f]/g, '').trim();
-  if (a === '' || text === '') { usage(s, '/note @user <text>'); return; }
-  if (!s.info.ctrl) { s.systemLine('Notes are unavailable.'); return; }
+  if (a === '') { usage(s, '/note @user <text>'); return; }
   const { user, shown } = targetOf(s, a);
-  const own = s.info.user.includes('@') ? s.info.user.slice(s.info.user.indexOf('@')) : '';
-  // Only users of the caller's own board have a record there (web chat's /api/chat/notes rule).
-  if (user.includes('@') && user.slice(user.indexOf('@')).toLowerCase() !== own.toLowerCase()) { s.systemLine(`${shown.slice(0, 30)} is not a user of this board.`); return; }
-  s.info.ctrl(`note ${user.split('@')[0]}\t${text.slice(0, 1000)}`);
+  const who = shown.slice(0, 30);
+  // Notes live in the hub (sysop 2026-11-26): one store for telnet, web /chat and the Amiga client.
+  if (text === '') {
+    // `/note @user` alone reads the notes back: the sysop sees every note, anyone else their own.
+    const got = s.tryRun(false, (db, ctx) => listNotes(db, ctx, user));
+    if (!got) return;
+    if (got.length === 0) { s.systemLine(`No notes about ${who}.`); return; }
+    s.systemLine(`--- notes about ${who} ---`);
+    for (const n of got) s.systemLine(`${stamp(n.at)} ${n.author.split('@')[0]}: ${n.text}`);
+    return;
+  }
+  const ok = s.tryRun(true, (db, ctx) => addNote(db, ctx, user, text));
+  s.systemLine(ok ? `Note saved for ${who}.` : `Could not save note for ${who}.`);
 }
 
 /** The leading handle of `/note` args: the longest sidebar user name followed by a space, else the first word. */

@@ -395,24 +395,39 @@ describe('hub screen commands', () => {
     type('/discord off'); expect(last()).toBe('Discord mirror is OFF for this board.');
   });
 
-  it('note: Add Note asks the caller\'s board over PLP T and prints its U answer', () => {
+  it('note: Add Note writes the hub store, and /note @user reads it back (sysop sees all)', () => {
     const chat = loadChatConfig();
     const sid = withAchievementsDb(fx.ach, (db) => createSession(db, chat, fx.boardId, { handle: 'amy', sysop: false, client: 'test' }).sid);
     const hello = { cols: 80, rows: 25 } as ScreenInfo['hello'];
     const sent: string[] = [];
-    const amy = chatScreen(fx.ach, chat)({ sid, user: 'amy@HOME', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined, ctrl: (t) => sent.push(t) }) as HubScreen;
+    // No board control channel on purpose: notes no longer go to the caller's board.
+    const amy = chatScreen(fx.ach, chat)({ sid, user: 'amy@HOME', boardId: fx.boardId, hello, markDirty: () => undefined, quit: () => undefined }) as HubScreen;
     const say = (l: string): string => { amy.input(Buffer.from(`${l}\r`, 'latin1')); amy.take(); return amy.model.lines[amy.model.lines.length - 1]?.text ?? ''; };
     try {
-      say('/note bob pays in rare mods');
-      say('/note bob@home second');
-      expect(say('/note eve@AWAY hi')).toBe('eve@AWAY is not a user of this board.');
-      expect(say('/note bob')).toBe('Error: Usage: /note @user <text>');
-      expect(sent).toEqual(['note bob\tpays in rare mods', 'note bob\tsecond']);
-      amy.upload(Buffer.from('note ok bob', 'latin1'));
-      expect(amy.model.lines[amy.model.lines.length - 1].text).toBe('Note saved for bob.');
-      amy.upload(Buffer.from('note fail bob', 'latin1'));
-      expect(amy.model.lines[amy.model.lines.length - 1].text).toBe('Could not save note for bob.');
+      expect(say('/note bob pays in rare mods')).toBe('Note saved for bob.');
+      expect(say('/note eve@AWAY from another board')).toBe('Note saved for eve@AWAY.');
+      expect(say('/note')).toBe('Error: Usage: /note @user <text>');
+      expect(say('/note carl')).toBe('No notes about carl.');
+      expect(sent).toEqual([]);
+      say('/note bob');
+      expect(amy.model.lines.slice(-2).map((l) => l.text)).toEqual(['--- notes about bob ---', expect.stringMatching(/^\d\d:\d\d amy: pays in rare mods$/)]);
+      // The sysop's screen (bob here) reads amy's note from the same store.
+      type('/note bob@HOME');
+      expect(screen.model.lines[screen.model.lines.length - 1].text).toMatch(/amy: pays in rare mods$/);
     } finally { amy.close(); }
+  });
+
+  it('View History reads the hub store, not the pane, and says when there is nothing', () => {
+    screen.run(true, (db, ctx) => { const r = createRoom(db, ctx, { name: 'hist' }); joinRoom(db, ctx, r.id); for (let i = 1; i <= 17; i++) postMessage(db, ctx, r.id, { content: `m${i}`, clientId: `h${i}` }); });
+    type('/join #hist');
+    screen.model.lines.length = 0;
+    const s = screen as unknown as { popupOpen(i: string[], r: number, c: number, x: object): void; popupPick(i: number): void };
+    const view = (user: string): string[] => { s.popupOpen(['View History'], 2, 2, { user }); s.popupPick(0); return screen.model.lines.map((l) => l.text); };
+    const got = view('bob');
+    expect(got[0]).toBe('--- recent messages from bob ---');
+    expect(got.slice(1)).toEqual(Array.from({ length: 15 }, (_, i) => `bob: m${i + 3}`));
+    screen.model.lines.length = 0;
+    expect(view('nobody')).toEqual(['No recent messages from nobody.']);
   });
 
   it('discord: a caller who is not the sysop may look but not switch', () => {

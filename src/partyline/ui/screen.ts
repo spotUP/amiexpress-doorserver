@@ -17,6 +17,7 @@ import type { ChatConfig } from '../../chat/config';
 import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
 import { displayLabels } from '../../chat/render';
+import { userHistory } from '../../chat/notes';
 import { createSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
 import { applyCanvasOps, dmHistory, dmThreads, postDm, postDmGroup, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, entryHistory, memberUsers, postMessage, profileOf, reactionRows, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
@@ -1400,9 +1401,12 @@ export class HubScreen implements PartylineScreen {
       case 'Add Note': this.fillInput(`/note ${user} `); this.systemLine(`Note about ${user}: type it after /note ${user} and press Enter.`); return;
       case 'Mention': m.input = `@${user} ${m.input}`; m.inputCur = m.input.length; return;
       case 'View History': {
-        const mine = m.lines.filter((l) => l.number > 0 && l.nick === user).slice(-15);
+        // The hub store, not the pane: a message scrolled off or sent before this caller joined still counts.
+        const mine = this.tryRun(false, (db, ctx) => userHistory(db, ctx, user, { room: this.roomId }));
+        if (!mine) return;
+        if (mine.length === 0) { this.systemLine(`No recent messages from ${user}.`); return; }
         this.systemLine(`--- recent messages from ${user} ---`);
-        for (const l of mine) this.systemLine(`${l.nick}: ${l.text}`);
+        for (const h of mine) this.systemLine(`${h.user.split('@')[0]}: ${h.text}`);
         return;
       }
       case 'Mute User': this.runLine(`/mute ${user}`); return;
