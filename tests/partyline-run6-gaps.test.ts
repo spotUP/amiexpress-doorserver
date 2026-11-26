@@ -13,7 +13,8 @@ import { loadChatConfig } from '../src/chat/config';
 import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
 import { createRoom, roomHistory } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
-import { SIDE_USER, newLine } from '../src/partyline/ui/model';
+import { SIDE_USER, FOCUS_SIDEBAR, newLine } from '../src/partyline/ui/model';
+import { DISCORD_INVITE, HELP_TEXT } from '../src/partyline/ui/overlays';
 import { HIT_SIDEBAR } from '../src/partyline/ui/draw';
 import type { HubScreen } from '../src/partyline/ui/screen';
 import type { ScreenInfo } from '../src/partyline/session';
@@ -66,9 +67,33 @@ describe('Partyline telnet run 6 gaps (LIVECHAT parity)', () => {
     const own = m.side.findIndex((s) => s.kind === SIDE_USER && m.isSelf(s.label));
     expect(own).toBeGreaterThanOrEqual(0);
     const at = (screen as unknown as { hitAt(id: number, dr: number): { row: number; col: number } }).hitAt(HIT_SIDEBAR, own);
-    send(`\x1b[<0;${at.col + 2};${at.row + 1}M\x1b[<0;${at.col + 2};${at.row + 1}m`);
+    m.sideSel = -1;
+    // Same 1-based col offset as lane1's click helper; the sideSel check proves the click landed on the row.
+    send(`\x1b[<0;${at.col + 1};${at.row + 1}M\x1b[<0;${at.col + 1};${at.row + 1}m`);
+    expect(m.sideSel).toBe(own);
     expect(m.popup).toBeNull();
-    send(`\x1b[<2;${at.col + 2};${at.row + 1}M\x1b[<2;${at.col + 2};${at.row + 1}m`);
+    send(`\x1b[<2;${at.col + 1};${at.row + 1}M\x1b[<2;${at.col + 1};${at.row + 1}m`);
     expect(m.popup).toBeNull();
+    m.focus = FOCUS_SIDEBAR; m.sideSel = own;
+    send('\r');
+    expect(m.popup).toBeNull();
+    expect(m.sideSel).toBe(own);
+  });
+
+  it('Up on an empty line with nothing to pick says so, as LIVECHAT does', () => {
+    screen.model.lines = screen.model.lines.filter((l) => l.number === 0);
+    send('\x1b[A');
+    expect(screen.model.pick).toBe('');
+    expect(screen.model.lines[screen.model.lines.length - 1].text).toBe('No messages to pick.');
+  });
+
+  it('shows the Discord invite once on the first join and in the F1 help', () => {
+    const invites = (): number => screen.model.lines.filter((l) => l.text.includes(DISCORD_INVITE)).length;
+    expect(DISCORD_INVITE).toBe('https://discord.gg/7VGHTkbCGW');
+    expect(invites()).toBe(1);
+    send('/join Random\r');
+    expect(screen.model.room).toBe('Random');
+    expect(invites()).toBe(0);
+    expect(HELP_TEXT.some((t) => t.includes(DISCORD_INVITE))).toBe(true);
   });
 });

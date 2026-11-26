@@ -27,6 +27,9 @@ export const SETTINGS_LABELS = ['Show User Logins/Logouts', 'Show File Uploads/D
   'Online', 'Away', 'Busy', 'Do Not Disturb', 'Close'];
 
 /** The TS door's help (board/Doors/livechat help content), voice section left out as in the C. */
+/** The board's permanent Discord invite; the server is bridged to the Partyline rooms. */
+export const DISCORD_INVITE = 'https://discord.gg/7VGHTkbCGW';
+
 export const HELP_TEXT: readonly string[] = [
   '=== LIVECHAT v4.0 - DESKTOP-LEVEL BBS CHAT ===', 'A full-featured multi-user chat system with neo-blessed UI', '',
   '--- KEYBOARD SHORTCUTS ---', 'Navigation:', '  Tab              Next channel', '  Shift+Tab        Previous channel',
@@ -46,7 +49,8 @@ export const HELP_TEXT: readonly string[] = [
   '  /status <status> Set status (online/away/busy/dnd)', 'Other Commands:', '  /me <action>     Send action message',
   '  /clear           Clear chat window', '  /draw <channel>  Open drawing whiteboard', '  /files           Open file sharing browser',
   '  /emoji [search]  Open emoji picker or search', '  /events [type]   Manage event notifications',
-  '  /react [emoji] <msg-id>, /thread <msg-id> message', '  /help            Show this help',
+  '  /react [emoji] <msg-id>, /thread <msg-id> message', '  /help            Show this help', '',
+  '--- DISCORD ---', `Join the bridged Discord server: ${DISCORD_INVITE}`,
 ];
 
 /** The overlay state lc_model carries (help, view, modal, search, settings). */

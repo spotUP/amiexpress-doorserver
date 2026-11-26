@@ -28,7 +28,7 @@ import { ACTIVITY_LINE, EV_GREEN, EV_RED, EV_YELLOW, EVENT, FOCUS_INPUT, FOCUS_M
 import { HIT_FMT, HIT_FMT_CAT, HIT_FMT_CLOSE, HIT_FMT_ITEM, HIT_MODAL, HIT_NO, HIT_OK, HIT_YES, HIT_SEARCH_Q, HIT_SEARCH_ROW, HIT_SEARCH_USER, HIT_SETTINGS_ROW,
   HIT_THEME_ROW, HIT_CREATE_F, HIT_CREATE_KIND, CREATE_KINDS, CF_NAME, CF_TOPIC, CF_KIND, CF_PRIVATE, CF_INVITE, CF_CREATE, CF_CANCEL, CF_COUNT,
   MODAL_MESSAGE, MODAL_NONE, MODAL_QUIT, MODAL_RECONNECT, formatItems, OverlayState, pickCats, pickList, pickMove,
-  SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING } from './overlays';
+  SEARCH_MAX, SET_ANNOUNCE, SET_DND, SET_DOORS, SET_FILES, SET_ITEMS, SET_LOGINS, SET_MESSAGES, SET_MUTE, SET_ONLINE, SET_STAMPS, SET_TYPING, DISCORD_INVITE } from './overlays';
 import { CMD_HELP, slashComplete, slashGhost, slashMatch, slashPickKind, slashScroll } from './slash';
 import { allEmoji, C_ALIAS, canonical, loadCustomEmoji, runCommand } from '../commands';
 import { completeAtMention } from './at-complete';
@@ -65,9 +65,9 @@ export function stamp(at: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** What a context popup acts on; pick: a typed pick list fills (or runs) `/cmd <sigil><item>`. */
 /** LIVECHAT context-menus.ts chat menu: a right-click on a message, or Enter in message pick. */
 const LINE_MENU = ['Reply', 'React', '---', 'Copy Text', 'Pin Message', '---', 'Mark Unread', 'Edit', 'Delete'];
+/** What a context popup acts on; pick: a typed pick list fills (or runs) `/cmd <sigil><item>`. */
 type PopupCtx = { line?: Line; user?: string; roomId?: string; pick?: { cmd: string; sigil: string; run: boolean } };
 
 export class HubScreen implements PartylineScreen {
@@ -516,6 +516,8 @@ export class HubScreen implements PartylineScreen {
     this.msgNumber = 0;
     this.cursor = Math.max(this.cursor, r.since);
     this.systemLine(`Joined #${r.name.slice(0, 40)} (${r.members} users)`);
+    // Once per session: joinRoom clears the lines, so the invite rides on the first join.
+    if (!this.invited) { this.invited = true; this.systemLine(`Join our Discord server (bridged to Partyline): ${DISCORD_INVITE}`); }
     this.note(ACTIVITY_LINE, `Joined #${r.name.slice(0, 40)}`);
     this.takeHistory(r.id);
     this.readCurrent();
@@ -1219,12 +1221,13 @@ export class HubScreen implements PartylineScreen {
   private anyMotion = false;
   private osc = '';
   private popupCtx: PopupCtx = {};
+  private invited = false;
 
   /** LIVECHAT input history (100 lines): Up on an empty line picks a message, else Up/Down step through sent lines. */
   private historyKey(up: boolean): void {
     const m = this.model;
     if (up) {
-      if (m.input === '' && this.histPos < 0) { m.pickStart(); return; }
+      if (m.input === '' && this.histPos < 0) { if (!m.pickStart()) this.systemLine('No messages to pick.'); return; }
       if (this.history.length === 0) return;
       if (this.histPos < 0) { this.histSaved = m.input; this.histPos = this.history.length; }
       if (this.histPos > 0) this.histPos--;
