@@ -7,8 +7,8 @@ import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { withAchievementsDb } from '../src/achievements/db';
 import { loadChatConfig } from '../src/chat/config';
-import { createSession, _stopChatSweepersForTests } from '../src/chat/sessions';
-import { createRoom } from '../src/chat/store';
+import { createSession, resolveSession, _stopChatSweepersForTests } from '../src/chat/sessions';
+import { createRoom, joinRoom } from '../src/chat/store';
 import { chatScreen } from '../src/partyline/ui/screen';
 import { FOCUS_INPUT, FOCUS_MENU, FOCUS_SIDEBAR, SIDE_ROOM, SIDE_USER, newLine } from '../src/partyline/ui/model';
 import { HIT_POPUP, HIT_SIDEBAR, MENU_COL, MENU_ITEMS } from '../src/partyline/ui/draw';
@@ -175,7 +175,15 @@ describe('hub screen lane 1: LIVECHAT input, menus, sidebar and function keys', 
   });
 
   it('a click on a user opens the user menu; Send Message opens a DM line', () => {
-    const i = screen.model.side.findIndex((s) => s.kind === SIDE_USER);
+    // The own row opens no menu (LIVECHAT skips username), so another member is needed.
+    const chat = loadChatConfig();
+    withAchievementsDb(fx.ach, (db) => {
+      const amy = createSession(db, chat, fx.boardId, { handle: 'amy', sysop: false, client: 'test' }).sid;
+      joinRoom(db, resolveSession(db, chat, amy, fx.boardId), screen.roomId);
+    });
+    screen.take(); screen.render(true);
+    const i = screen.model.side.findIndex((s) => s.kind === SIDE_USER && s.label === 'amy');
+    expect(i).toBeGreaterThan(0);
     const at = hit(HIT_SIDEBAR, i);
     click(0, at.row, at.col);
     expect(screen.model.popup?.items).toContain('Kick User');
