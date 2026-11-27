@@ -12,6 +12,8 @@ import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { TOKEN_TTL_SECONDS, USER_COLUMNS } from '../src/chat/accounts';
 import { _setChatClockForTests } from '../src/chat/config';
 
+// scrypt (~100 ms per hash) dominates; under machine load a test of several hashes passes 5 s.
+jest.setTimeout(30_000);
 let fx: AchievementsFixture;
 beforeEach(() => {
   process.env.CHAT_GLOBAL_ADMINS = 'Root';

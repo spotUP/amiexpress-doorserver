@@ -5,6 +5,8 @@ import type { AchievementsFixture } from './achievements/helpers';
 import Database from 'better-sqlite3';
 import { createBoard } from '../src/achievements/boards';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
+// scrypt (~100 ms per hash) dominates; under machine load a test of several hashes passes 5 s.
+jest.setTimeout(30_000);
 
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });

@@ -10,6 +10,8 @@ import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 
+// The history test posts 16+ messages through the routes; under machine load that passes 5 s.
+jest.setTimeout(30_000);
 let fx: AchievementsFixture;
 beforeEach(() => { fx = makeAchievementsFixture(); });
 afterEach(() => { _stopChatSweepersForTests(); fx.cleanup(); });
