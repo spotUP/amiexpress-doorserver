@@ -39,10 +39,15 @@ export function clientId(b: Body): string {
   return v;
 }
 
-function targetUser(b: Body): string {
+/** A user key that can name somebody: `handle@BOARD`, or a bare handle an account holds (as unknownDmTargets). */
+function isUserKey(db: Database.Database, user: unknown): boolean {
+  const p = splitUser(user);
+  return !!p && (p.board !== '' || !!db.prepare('SELECT 1 FROM players WHERE handle = ? COLLATE NOCASE').get(p.handle));
+}
+
+function targetUser(db: Database.Database, b: Body): string {
   const u = b.user;
-  const p = splitUser(u);
-  if (!p) throw new SurfaceError('bad_request', 400, 'user must be an account handle or handle@BOARD');
+  if (!isUserKey(db, u)) throw new SurfaceError('bad_request', 400, 'user must be an account handle or handle@BOARD');
   return u as string;
 }
 
@@ -315,7 +320,7 @@ export interface ProfileRec {
 export function profileOf(db: Database.Database, ctx: ChatCtx, userParam: string): ProfileRec {
   requireSession(ctx);
   const parts = splitUser(userParam);
-  if (!parts) throw new SurfaceError('bad_request', 400, 'user must be an account handle or handle@BOARD');
+  if (!parts || !isUserKey(db, userParam)) throw new SurfaceError('bad_request', 400, 'user must be an account handle or handle@BOARD');
   const live = db.prepare('SELECT user, handle, MAX(last_seen) AS last_seen, MIN(created_at) AS created FROM chat_sessions WHERE user = ?').get(userParam) as
     { user: string | null; handle: string | null; last_seen: number | null; created: number | null };
   const ev = db.prepare('SELECT MIN(at) AS first, MAX(at) AS last, MIN(user) AS user FROM chat_events WHERE user = ?').get(userParam) as
@@ -358,7 +363,7 @@ export function listIgnores(db: Database.Database, ctx: ChatCtx): { user: string
 
 export function addIgnore(db: Database.Database, ctx: ChatCtx, b: Body): void {
   requireSession(ctx);
-  const target = targetUser(b);
+  const target = targetUser(db, b);
   if (target.toLowerCase() === ctx.user.toLowerCase()) throw new SurfaceError('bad_request', 400, 'you cannot ignore yourself');
   const have = (db.prepare('SELECT COUNT(*) AS n FROM chat_ignores WHERE owner = ?').get(ctx.user) as { n: number }).n;
   if (have >= CHAT_LIMITS.ignoresPerUser && !db.prepare('SELECT 1 FROM chat_ignores WHERE owner = ? AND target = ?').get(ctx.user, target)) {
@@ -762,7 +767,7 @@ function dmGroupHistory(db: Database.Database, ctx: ChatCtx, threadId: string, b
 
 export function invite(db: Database.Database, ctx: ChatCtx, id: string, b: Body, add: boolean, userParam?: string): void {
   const room = getRoom(db, id);
-  const user = add ? targetUser(b) : userParam ?? '';
+  const user = add ? targetUser(db, b) : userParam ?? '';
   requireMod(db, room, ctx, 'topic');
   if (add) db.prepare('INSERT OR IGNORE INTO chat_invites (room_id, user) VALUES (?, ?)').run(id, user);
   else db.prepare('DELETE FROM chat_invites WHERE room_id = ? AND user = ?').run(id, user);
@@ -781,7 +786,7 @@ function modReason(b: Body): string {
 
 export function moderate(db: Database.Database, ctx: ChatCtx, id: string, action: 'kick' | 'ban' | 'unban' | 'mute' | 'unmute', b: Body): void {
   const room = getRoom(db, id);
-  const user = targetUser(b);
+  const user = targetUser(db, b);
   requireMod(db, room, ctx, action === 'unban' ? 'ban' : action === 'unmute' ? 'mute' : action, user);
   const reason = modReason(b);
   const actor = ctx.user || 'admin';
@@ -823,7 +828,7 @@ export function muteSecondsLeft(db: Database.Database, roomId: string, user: str
 export function setOp(db: Database.Database, ctx: ChatCtx, id: string, b: Body, on: boolean): void {
   const room = getRoom(db, id);
   requireOwner(room, ctx);
-  const user = targetUser(b);
+  const user = targetUser(db, b);
   if (on) db.prepare('INSERT OR IGNORE INTO chat_room_ops (room_id, user) VALUES (?, ?)').run(id, user);
   else db.prepare('DELETE FROM chat_room_ops WHERE room_id = ? AND user = ?').run(id, user);
   emitEvent(db, { type: on ? 'op' : 'deop', roomId: id, user, ref: ctx.user || 'admin' });

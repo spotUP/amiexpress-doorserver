@@ -7,6 +7,8 @@ import * as net from 'net';
 import type { BoardAccountReply, NeedsAccountReply, RegisterViaBoardRequest } from '../contract/chat-types';
 import type { PlpFrame } from '../contract/partyline-types';
 import { _clearBoardKeyCacheForTests } from '../src/achievements/boards';
+import { withAchievementsDb } from '../src/achievements/db';
+import { linkAccount, registerAccount } from '../src/chat/accounts';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { AccountForm, FORM_TEXT } from '../src/partyline/account-form';
 import type { AccountFormInfo, AccountGateway } from '../src/partyline/account-form';
@@ -154,6 +156,47 @@ describe('PLP login without an account link', () => {
       expect(accounts.link).toHaveBeenCalledWith(expect.anything(), fx.boardId, expect.objectContaining({ bbs_user: 'spot', handle: 'spot', password: 'partyon' }));
     } finally {
       sock.destroy();
+      await hub.drain();
+    }
+  });
+
+  it('opens and resumes the linked account session under another handle, and logs an account in by password', async () => {
+    const screens: ScreenInfo[] = [];
+    const chatScreen: ScreenFactory = (info) => { screens.push(info); return { resize() {}, input() {}, render: () => Buffer.from('chat') }; };
+    withAchievementsDb(fx.ach, (db) => linkAccount(db, fx.boardId, 'spot', registerAccount(db, { handle: 'Spotty', password: 'partyon123' })));
+    const hub = createPartylineServer({ enabled: true, port: 0, host: '127.0.0.1', tlsCert: null, tlsKey: null }, fx.ach, { screen: chatScreen, log: () => undefined, accounts: true });
+    const port = await hub.listen();
+    /** One PLP login as BBS user spot; returns WELCOME's resume token. */
+    const login = async (resume?: string, password?: string): Promise<string> => {
+      const dec = new FrameDecoder();
+      const sock = await new Promise<net.Socket>((resolve) => { const s = net.connect(port, '127.0.0.1', () => resolve(s)); });
+      sock.on('error', () => undefined);
+      const frame = (type: string) => new Promise<PlpFrame>((resolve) => {
+        sock.on('data', function on(c: Buffer) { const f = dec.push(c).find((x) => x.type === type); if (f) { sock.off('data', on); resolve(f); } });
+      });
+      try {
+        const n = frame('N');
+        sock.write(encodeFrame('H', kvPayload({ proto: '1.0', client: 'test/1', board: password ? '' : fx.boardId, handle: password ? 'spotty' : 'spot', cols: 80, rows: 25, ...(resume ? { resume } : {}) })));
+        const nonce = (await n).payload.toString('latin1');
+        const w = Promise.race([frame('W'), frame('X')]);
+        sock.write(password ? encodeFrame('A', password) : encodeFrame('A', authMac(plpKeyOf(fx.boardKey.split('.').slice(1).join('.')), nonce, fx.boardId, 'spot')));
+        const got = await w;
+        return got.type === 'W' ? parseKv(got.payload).get('resume') ?? '' : `refused ${got.payload.toString('latin1')}`;
+      } finally {
+        sock.destroy();
+      }
+    };
+    try {
+      const sid = await login();
+      expect(sid).toMatch(/^[0-9a-f]{32}$/);
+      expect(screens[0]).toMatchObject({ sid, user: 'Spotty' });
+      expect(await login(sid)).toBe(sid);
+      // Direct account login: empty board, the password in AUTH, no form.
+      const direct = await login(undefined, 'partyon123');
+      expect(direct).toMatch(/^[0-9a-f]{32}$/);
+      expect(screens.at(-1)).toMatchObject({ sid: direct, user: 'Spotty', boardId: '' });
+      expect(await login(undefined, 'wrong-password')).toBe('refused unauthenticated');
+    } finally {
       await hub.drain();
     }
   });

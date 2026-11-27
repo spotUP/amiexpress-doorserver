@@ -196,7 +196,7 @@ describe('D7 labels', () => {
     expect(hist.find((r) => r[2] === 'alice@UPROUGH')?.[8]).toBe('alice');
 
     const members = rowsOf((await call(alice, 'get', `/rooms/${room}/members.txt`)).text);
-    expect(members.every((r) => r.length === 8)).toBe(true);
+    expect(members.every((r) => r.length === 10)).toBe(true);
     expect(members.find((r) => r[0] === 'alice@UPROUGH')?.[7]).toBe('alice');
 
     const who = rowsOf((await call(alice, 'get', '/who.txt')).text);

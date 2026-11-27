@@ -32,7 +32,7 @@ describe('chat roles', () => {
     expect((await call('delete', `/roles/${made.body.id}`, s)).status).toBe(200);
   });
 
-  it('a role moderates only users of its own board', async () => {
+  it('a role moderates only in channels of its own board (D6), whatever board the user is from', async () => {
     const db = new Database(fx.achievementsDbPath);
     let otherAuth: string;
     try { otherAuth = `Board ${createBoard(db, 'other', 'Other Board', null).key}`; } finally { db.close(); }
@@ -50,7 +50,11 @@ describe('chat roles', () => {
     for (const sid of [bob, carol]) expect((await call('post', `/rooms/${room.body.id}/join`, sid)).status).toBe(200);
     expect((await request(fx.app).post(`/chat/v1/rooms/${room.body.id}/join`).set('Authorization', otherAuth).set('X-Chat-Session', alice)).status).toBe(200);
 
-    expect((await call('post', `/rooms/${room.body.id}/kick`, bob).send({ user: 'alice@OTHER' })).status).toBe(403);
-    expect((await call('post', `/rooms/${room.body.id}/kick`, bob).send({ user: 'carol@UPROUGH' })).status).toBe(200);
+    expect((await call('post', `/rooms/${room.body.id}/kick`, bob).send({ user: 'alice@OTHER' })).status).toBe(200);
+
+    // The role stops at the board line: in the other board's channel bob is nobody.
+    const theirs = (await request(fx.app).post('/chat/v1/rooms').set('Authorization', otherAuth).set('X-Chat-Session', alice).send({ name: 'theirs' })).body.id as string;
+    for (const sid of [bob, carol]) expect((await call('post', `/rooms/${theirs}/join`, sid)).status).toBe(200);
+    expect((await call('post', `/rooms/${theirs}/kick`, bob).send({ user: 'carol@UPROUGH' })).status).toBe(403);
   });
 });
