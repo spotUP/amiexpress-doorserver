@@ -107,7 +107,6 @@ export function createRoom(db: Database.Database, ctx: ChatCtx, b: Body): Create
   if (vis === 'private' && !ctx.sysop && !permsOf(db, ctx.boardId, ctx.handle).createPrivate) {
     throw new SurfaceError('forbidden', 403, 'you may not create private rooms');
   }
-  charge([{ key: `chat:rooms:${ctx.boardId}`, limit: { max: CHAT_LIMITS.roomCreationsPerBoardPerHour, windowSeconds: 3600 } }]);
   const key = name.toLowerCase();
   if (db.prepare('SELECT 1 FROM chat_rooms WHERE name_key = ?').get(key)) throw new SurfaceError('conflict', 409, 'a room with that name exists');
   const id = newId('room');

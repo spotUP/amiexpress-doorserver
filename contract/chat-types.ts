@@ -168,7 +168,6 @@ export const CHAT_LIMITS = {
   messagesPerSessionWindowSeconds: 10,
   messagesPerBoardPerMinute: 300,
   sessionsPerBoard: 30,
-  roomCreationsPerBoardPerHour: 6,
   heldPollsPerBoard: 64,
   eventsKept: 50000,
   statusTextMax: 120,
