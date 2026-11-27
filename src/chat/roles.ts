@@ -10,7 +10,7 @@ import { CHAT_LIMITS } from '../../contract/chat-types';
 import type { ChatRolePerms, RoleInput, RoleRow } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
 import { emitEvent } from './events';
-import { newId, splitUser, validHandle } from './sessions';
+import { newId, splitUser, userOf, validHandle } from './sessions';
 
 const NO_PERMS: ChatRolePerms = { kick: false, ban: false, mute: false, topic: false, createPrivate: false };
 const PERM_KEYS = Object.keys(NO_PERMS) as (keyof ChatRolePerms)[];
@@ -125,22 +125,48 @@ export interface UserRole {
   colorAnsi: number;
 }
 
-/** The highest role of a user on their own board, or null. */
-export function roleOf(db: Database.Database, user: string): UserRole | null {
+/**
+ * The assignment key of the old identity `handle@BOARD`. Assignments are keyed (board, handle), and an
+ * account named `handle` that reached the board through another BBS user owns the plain key there; the
+ * board's unrelated legacy `handle` then keeps its rows under its own user key (parked by claimLegacyUser)
+ * until it links itself. Sysop decision 2026-11-27: drop roles on clash.
+ */
+export function legacyRoleKey(db: Database.Database, boardId: string, handle: string): string {
+  const clash = db
+    .prepare(
+      `SELECT 1 FROM account_links l JOIN players p ON p.id = l.account_id
+        WHERE l.board_id = ? AND p.handle = ? COLLATE NOCASE AND l.bbs_user <> lower(?)`
+    )
+    .get(boardId, handle, handle);
+  return clash ? userOf(boardId, handle) : handle;
+}
+
+/** A user key -> its assignment (board, handle), or null. An account's board is '' (it wears the roles of the boards it is linked on). */
+function roleKey(db: Database.Database, user: string): { board: string; handle: string } | null {
   const parts = splitUser(user);
-  if (!parts) return null;
+  if (!parts || parts.board === '') return parts;
+  return { board: parts.board, handle: legacyRoleKey(db, parts.board, parts.handle) };
+}
+
+/** The highest role of a user on their own board (an account, which has no board: on the boards it is linked on), or null. */
+export function roleOf(db: Database.Database, user: string): UserRole | null {
+  const key = roleKey(db, user);
+  if (!key) return null;
   const r = db
     .prepare(
       `SELECT r.name, r.color_hex, r.color_ansi FROM chat_role_assignments a
          JOIN chat_roles r ON r.id = a.role_id
-        WHERE a.board_id = ? AND a.handle = ? ORDER BY r.position DESC, r.name LIMIT 1`
+        WHERE (a.board_id = @board OR (@board = '' AND a.board_id IN (
+                SELECT l.board_id FROM account_links l JOIN players p ON p.id = l.account_id WHERE p.handle = @handle COLLATE NOCASE)))
+          AND a.handle = @handle ORDER BY r.position DESC, r.name LIMIT 1`
     )
-    .get(parts.board, parts.handle) as { name: string; color_hex: string; color_ansi: number } | undefined;
+    .get(key) as { name: string; color_hex: string; color_ansi: number } | undefined;
   return r ? { name: r.name, colorHex: r.color_hex, colorAnsi: r.color_ansi } : null;
 }
 
-/** The union of a user's role permissions on their own board. */
-export function permsOf(db: Database.Database, boardId: string, handle: string): ChatRolePerms {
+/** The union of a user's (a session's user key) role permissions on the board it is on. */
+export function permsOf(db: Database.Database, boardId: string, user: string): ChatRolePerms {
+  const handle = roleKey(db, user)?.handle ?? '';
   const rows = db
     .prepare(
       `SELECT r.perms FROM chat_role_assignments a JOIN chat_roles r ON r.id = a.role_id
@@ -157,7 +183,9 @@ export function permsOf(db: Database.Database, boardId: string, handle: string):
 
 /** Tell every room the user sits in (or just the user) that the role changed. */
 export function emitRoleEvents(db: Database.Database, boardId: string, handle: string): void {
-  const user = `${handle}@${boardId.toUpperCase()}`;
+  // An account's bare handle where it is linked on this board, else the board's own `handle@BOARD` (a parked key already is one).
+  const linked = db.prepare('SELECT 1 FROM account_links l JOIN players p ON p.id = l.account_id WHERE l.board_id = ? AND p.handle = ? COLLATE NOCASE').get(boardId, handle);
+  const user = handle.includes('@') ? handle : linked ? handle : userOf(boardId, handle);
   const role = roleOf(db, user);
   const text = role ? `${role.name}|${role.colorHex}|${role.colorAnsi}` : '';
   const rooms = db.prepare('SELECT DISTINCT room_id FROM chat_members WHERE user = ?').all(user) as { room_id: string }[];

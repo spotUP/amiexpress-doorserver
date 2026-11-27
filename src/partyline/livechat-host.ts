@@ -139,8 +139,9 @@ export function livechatScreen(ach: AchievementsConfig, chat: ChatConfig, doorDi
 
     const me = store(false, (_db, ctx) => ctx.user);
     const board = splitUser(me)?.board ?? info.boardId;
-    const full = (n: string): string => (splitUser(n) ? n : `${n}@${board}`);
-    const short = (u: string): string => { const p = splitUser(u); return p && p.board.toLowerCase() === board.toLowerCase() ? p.handle : u; };
+    // An account (board '') names users by their key as typed; an old per-board session means its own board by a bare name.
+    const full = (n: string): string => (n.includes('@') || board === '' || !splitUser(n) ? n : `${n}@${board}`);
+    const short = (u: string): string => { const p = splitUser(u); return p && board !== '' && p.board.toLowerCase() === board.toLowerCase() ? p.handle : u; };
     const str = (d: Payload, ...keys: string[]): string => { for (const k of keys) { const v = d[k]; if (typeof v === 'string' && v !== '') return v; } return ''; };
     const target = (d: Payload): string => full(str(d, 'targetUsername', 'target', 'targetUserId', 'username', 'user'));
     const when = (at: number): Date => new Date(at * 1000);

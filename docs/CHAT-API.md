@@ -37,8 +37,15 @@ its own sysops). A handle is 1 to 32 characters with no whitespace, `|` or `@`.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/health` | no key; counts only |
-| POST | `/sessions` | body `{handle, sysop?, client?}`; reply `{sid, user, expiresIn, activeWindow}` (`activeWindow`: seconds a member stays active, the hub admin's Chat integrations setting, else `CHAT_ACTIVE_WINDOW`) |
+| POST | `/sessions` | board key: body `{bbs_user, prefill?, sysop?, client?}`; a `bbs_user` with no account link gets 200 `{needs_account: true, prefill, handle_free}` and no session. `Authorization: Account <token>`: empty body. Reply `{sid, user, expiresIn, activeWindow}` (`activeWindow`: seconds a member stays active, the hub admin's Chat integrations setting, else `CHAT_ACTIVE_WINDOW`) |
 | DELETE | `/sessions/current` | 204 |
+| POST | `/accounts/register` | no key; body `{handle, password, email?, realname?, location?}`; reply `{account, token}`; 409 `handle_taken` / `email_taken` |
+| POST | `/accounts/login` | no key; body `{handle, password}`; reply `{account, token}`; 401 on a wrong handle or password |
+| POST | `/accounts/password-reset/request` | no key; body `{email}`; always 204; mails a 6-character code |
+| POST | `/accounts/password-reset/confirm` | no key; body `{email, code, password}`; 204; 400 `bad_code` |
+| POST | `/accounts/:id/password` | global admin only; body `{password}`; 204 |
+| POST | `/accounts/register-via-board` | board key; body `{bbs_user, handle, password, email?, realname?, location?, sysop?, client?}`; creates the account and the link, claims the old `bbs_user@BOARD` rows; reply `{account, sid, user, expiresIn, activeWindow}` |
+| POST | `/accounts/link-via-board` | board key; body `{bbs_user, handle, password}`; checks the account's password, links, claims; same reply |
 | GET | `/rooms.txt` | `?mine=1` optional; ROOMS rows |
 | GET | `/rooms` | the same as a JSON array |
 | POST | `/rooms` | `{name, topic?, visibility?, kind?}`; kind is `text` (default), `voice` or `art`; reply `{id, name, visibility, kind}` |
@@ -432,14 +439,14 @@ recolour live.
 Errors are JSON `{"error": "<code>", "detail": "<text>", "retryAfter"?: n}`.
 Codes: `bad_request`, `unauthorized`, `session_expired`, `forbidden`,
 `banned`, `muted`, `not_member`, `invite_required`, `not_found`, `too_long`,
-`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op), `not_relay` (the request carried `as` but the board is not a relay board), `too_large` (413; a file or chunk over its limit), `quota` (429 daily upload quota, 507 hub store full), `file_gone` (404; the file was deleted or expired), `files_disabled` (503; the hub has no `CHAT_FILES_DIR`), `not_image` (415; a preview was asked for a file that is not a decodable picture). A 429 also carries a `Retry-After` header.
+`conflict`, `rate_limited`, `moderated` (a +m room; the caller has no voice or op), `not_relay` (the request carried `as` but the board is not a relay board), `too_large` (413; a file or chunk over its limit), `quota` (429 daily upload quota, 507 hub store full), `file_gone` (404; the file was deleted or expired), `files_disabled` (503; the hub has no `CHAT_FILES_DIR`), `not_image` (415; a preview was asked for a file that is not a decodable picture), `handle_taken` (409; another account holds the handle), `email_taken` (409), `bad_code` (400; a password-reset code is wrong, spent or expired). A 429 also carries a `Retry-After` header.
 
 Limits (fixed windows in process): 20 messages per session per 10 seconds,
 300 messages per board per minute, 30 live sessions per board, 6 room
 creations per board per hour, 64 held polls per board, 40 canvas posts per
 session per 10 seconds. Reads other than
 `events.txt` are not limited. Environment overrides: `CHAT_POLL_MAX_WAIT`
-(default 25), `CHAT_SESSION_TTL` (default 90), `CHAT_FILES_DIR` (where file blobs live, outside any served directory; unset turns file sharing off).
+(default 25), `CHAT_SESSION_TTL` (default 90), `CHAT_FILES_DIR` (where file blobs live, outside any served directory; unset turns file sharing off), `CHAT_GLOBAL_ADMINS` (comma-separated Partyline account handles, any case, that moderate every board's channels and reset passwords; a board sysop moderates only its own board's channels; a `handle@BOARD` session is never a global admin).
 
 File limits: 2 MB per file, 32 KB per chunk, 10 MB per user and 100 MB per board
 per day (a relay `as` upload charges the board only), 200 files kept per room,

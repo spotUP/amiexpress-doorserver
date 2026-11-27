@@ -44,7 +44,7 @@ export function isMember(db: Database.Database, roomId: string, user: string): b
 }
 
 export function isOwnerLevel(room: RoomRec, ctx: ChatCtx): boolean {
-  return ctx.admin || room.owner_user.toLowerCase() === ctx.user.toLowerCase() || (ctx.sysop && ctx.boardId === room.owner_board);
+  return ctx.admin || room.owner_user.toLowerCase() === ctx.user.toLowerCase() || (ctx.sysop && ctx.boardId !== '' && ctx.boardId === room.owner_board);
 }
 
 export function isRoomStaff(db: Database.Database, room: RoomRec, ctx: ChatCtx): boolean {
@@ -64,14 +64,14 @@ export function requireMod(
   target?: string
 ): void {
   const t = target ? splitUser(target) : null;
-  if (target && !t) throw new SurfaceError('bad_request', 400, 'user must be handle@BOARD');
+  if (target && !t) throw new SurfaceError('bad_request', 400, 'user must be an account handle or handle@BOARD');
   if (target && room.owner_user.toLowerCase() === target.toLowerCase() && !ctx.admin) {
     throw new SurfaceError('forbidden', 403, 'the room owner cannot be moderated');
   }
+  // D6: a board's sysop is owner-level in that board's channels only (isOwnerLevel); a global admin everywhere.
   if (isRoomStaff(db, room, ctx)) return;
-  if (ctx.sysop && (!t || t.board === ctx.boardId)) return;
-  // A role is worn on its own board only: it never reaches users of another board.
-  if (ctx.boardId && (!t || t.board === ctx.boardId) && permsOf(db, ctx.boardId, ctx.handle)[perm]) return;
+  // A role is worn on its own board only: it never reaches another board's channel.
+  if (ctx.boardId && ctx.boardId === room.owner_board && permsOf(db, ctx.boardId, ctx.user)[perm]) return;
   throw new SurfaceError('forbidden', 403, 'you may not do that in this room');
 }
 

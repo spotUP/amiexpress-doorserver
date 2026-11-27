@@ -5,6 +5,9 @@
  * plpKey = hex(HMAC-SHA256(board secret, "PLP/1 board key")) (plpKeyOf).
  * The hub stores plpKey (boards.plp_key), never the secret, so the board
  * secret never travels and a leaked row cannot call the HTTP surfaces.
+ *
+ * A HELLO without `board` is a direct client logging into its Partyline
+ * account: `handle` is the account handle and AUTH carries the password.
  */
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
@@ -12,6 +15,8 @@ import { PLP_MAJOR, PLP_MINOR } from '../../contract/partyline-types';
 import type { PlpHello, PlpRefusal } from '../../contract/partyline-types';
 import { BOARD_ID, plpKeyOf } from '../achievements/boards';
 import { validHandle } from '../chat/sessions';
+import { loginAccount } from '../chat/accounts';
+import { SurfaceError } from '../achievements/errors';
 import { parseKv } from './frames';
 
 export { plpKeyOf };
@@ -55,6 +60,9 @@ export function parseHello(payload: Buffer): PlpHello {
     conn: oneOf(kv.get('conn'), ['telnet', 'web', 'ssh'] as const, 'telnet'),
     modem: int(kv.get('modem'), 0),
     resume: kv.get('resume') ?? '',
+    realname: kv.get('realname')?.slice(0, 128) || undefined,
+    location: kv.get('location')?.slice(0, 128) || undefined,
+    email: kv.get('email')?.slice(0, 128) || undefined,
   };
 }
 
@@ -87,6 +95,16 @@ export type AuthResult =
  * board is told so (403 board_suspended there).
  */
 export function verifyAuth(db: Database.Database, hello: PlpHello, nonce: string, mac: Buffer): AuthResult {
+  if (hello.board === '') {
+    // shortcut: the password travels as sent, so it is only private on a TLS listener; move to a challenge (SRP) if plain PLP stays in use.
+    try {
+      loginAccount(db, hello.handle, mac.toString('utf8'));
+      return { ok: true, boardId: '', boardName: '' };
+    } catch (err) {
+      if (err instanceof SurfaceError && err.status === 429) throw err;
+      return { ok: false, reason: 'unauthenticated' };
+    }
+  }
   if (!BOARD_ID.test(hello.board) || !validHandle(hello.handle)) return { ok: false, reason: 'unauthenticated' };
   const row = db.prepare('SELECT id, name, suspended_at, plp_key FROM boards WHERE id = ?').get(hello.board) as
     | { id: string; name: string; suspended_at: number | null; plp_key: string | null }

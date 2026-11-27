@@ -133,6 +133,12 @@ export const CHAT_ERROR_CODES = [
   'files_disabled',
   /** A preview was asked for a file that is not a decodable picture (415). */
   'not_image',
+  /** Global accounts: the handle is held by another account (409). Pick a new handle. */
+  'handle_taken',
+  /** Global accounts: the email is held by another account (409). */
+  'email_taken',
+  /** Global accounts: the password-reset code is wrong, spent or expired (400). */
+  'bad_code',
 ] as const;
 export type ChatErrorCode = (typeof CHAT_ERROR_CODES)[number];
 
@@ -226,19 +232,122 @@ export interface ChatRolePerms {
   createPrivate: boolean;
 }
 
+/**
+ * POST /sessions.
+ *
+ * `Authorization: Board <id>.<secret>`: the body names the board's own user as `bbs_user`.
+ * A linked user gets a SessionReply as its account; an unlinked one gets a
+ * NeedsAccountReply and NO session (the user then registers or links, below).
+ * A board token alone never opens a session as an existing account.
+ *
+ * `Authorization: Account <token>`: the body may be empty; the session is the account's.
+ */
 export interface SessionRequest {
-  handle: string;
+  /** The board's username for this caller (case-folded by the hub). Board key only. */
+  bbs_user?: string;
+  /** What the board knows about the user, echoed back in NeedsAccountReply to prefill the form. */
+  prefill?: AccountPrefill;
   sysop?: boolean;
   client?: string;
   /** The board's own bot (never a caller): every client shows it as `[BOT] <handle>` and the handle is reserved. */
   bot?: boolean;
+  /** Bot sessions only (`bot: true`): the bot's handle. A user session takes its handle from the account. */
+  handle?: string;
 }
 export interface SessionReply {
   sid: string;
+  /** The account handle. No `@BOARD` suffix. */
   user: string;
   expiresIn: number;
   /** Seconds a member counts as active after typing or sending (members' `active` uses the same window). */
   activeWindow: number;
+}
+
+/** A Partyline account: one identity on the hub, shared by every board and client. */
+export interface Account {
+  id: number;
+  /** Globally unique, case-insensitive. 1-32 characters, no whitespace, `|` or `@`. */
+  handle: string;
+  realname: string;
+  location: string;
+  /** True when the account has an email (self-service password reset works). The address itself is never returned. */
+  hasEmail: boolean;
+  bot: boolean;
+  globalAdmin: boolean;
+  /** Unix seconds. */
+  createdAt: number;
+}
+
+/** What a board (or any client) offers as form defaults. Never trusted as identity. */
+export interface AccountPrefill {
+  handle?: string;
+  realname?: string;
+  location?: string;
+  email?: string;
+}
+
+/** POST /sessions from a board whose `bbs_user` has no account link: 200, no session. */
+export interface NeedsAccountReply {
+  needs_account: true;
+  prefill: AccountPrefill;
+  /** Whether `prefill.handle` is a valid handle no account holds. */
+  handle_free: boolean;
+}
+export type BoardSessionReply = SessionReply | NeedsAccountReply;
+
+/** POST /accounts/register (no key). 409 `handle_taken` / `email_taken`. Password: 8-128 characters. */
+export interface AccountRegisterRequest {
+  handle: string;
+  password: string;
+  email?: string;
+  realname?: string;
+  location?: string;
+}
+/** `token` goes in `Authorization: Account <token>`. It dies when the password changes. */
+export interface AccountAuthReply {
+  account: Account;
+  token: string;
+}
+/** POST /accounts/login (no key). 401 `unauthorized` on a wrong handle or password (same answer for both). */
+export interface AccountLoginRequest {
+  handle: string;
+  password: string;
+}
+/** POST /accounts/password-reset/request (no key). Always 204: the reply never says whether the email is known. */
+export interface PasswordResetRequest {
+  email: string;
+}
+/** POST /accounts/password-reset/confirm (no key). 204; 400 `bad_code`. */
+export interface PasswordResetConfirmRequest {
+  email: string;
+  code: string;
+  password: string;
+}
+/** POST /accounts/:id/password. Global admin only (a global-admin Account token, or the hub's X-Admin-Token). 204. */
+export interface AdminPasswordRequest {
+  password: string;
+}
+/**
+ * POST /accounts/register-via-board (Board key). Creates the account, links
+ * (board, bbs_user) to it, claims the old `bbs_user@BOARD` rows and opens a session.
+ */
+export interface RegisterViaBoardRequest extends AccountRegisterRequest {
+  bbs_user: string;
+  sysop?: boolean;
+  client?: string;
+}
+/**
+ * POST /accounts/link-via-board (Board key). Verifies the ACCOUNT's password
+ * (401 `unauthorized` when wrong), links, claims and opens a session.
+ */
+export interface LinkViaBoardRequest extends AccountLoginRequest {
+  bbs_user: string;
+  sysop?: boolean;
+  client?: string;
+}
+/** The reply to both -via-board calls. */
+export interface BoardAccountReply extends SessionReply {
+  account: Account;
 }
 
 export interface RoomRow {
@@ -403,6 +512,13 @@ export interface EmojiRow {
 export const CHAT_ENDPOINTS = [
   'GET /health',
   'POST /sessions',
+  'POST /accounts/register',
+  'POST /accounts/login',
+  'POST /accounts/password-reset/request',
+  'POST /accounts/password-reset/confirm',
+  'POST /accounts/:id/password',
+  'POST /accounts/register-via-board',
+  'POST /accounts/link-via-board',
   'DELETE /sessions/current',
   'GET /rooms.txt',
   'GET /rooms',

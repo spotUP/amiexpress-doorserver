@@ -61,6 +61,9 @@ Hub to client:
 session, never typed>`, `access`, `sysop=0|1`, `node`, `cols`, `rows`,
 `charset=latin1|utf8`, `kitty=0|1`, `wide=0|1` (the caller's Alt+Enter choice this call), `mouse=0|1`, `media=0|1`,
 `upload=none|zmodem|web|aew`, `console=0|1`, `conn=telnet|web|ssh`, `modem=<bps or 0>`, `resume=<token or empty>`.
+Optional, from a board: `realname=`, `location=`, `email=` (at most 128 characters each) prefill the
+register form a caller without a Partyline account link sees; they are never identity. An empty
+`board=` is a direct account login: `handle` is the account handle and `A` carries its password.
 Unknown keys are ignored; missing ones take defaults (80x25, latin1, flags off).
 
 ## Login

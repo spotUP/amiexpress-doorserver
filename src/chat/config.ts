@@ -16,6 +16,8 @@ export interface ChatConfig {
   heldPollsPerBoard: number;
   sessionsPerBoard: number;
   eventsKept: number;
+  /** D6: account handles (lower-cased) that control every channel; CHAT_GLOBAL_ADMINS, comma separated. */
+  globalAdmins?: string[];
 }
 
 function positiveInt(raw: string | undefined, fallback: number): number {
@@ -32,6 +34,7 @@ export function loadChatConfig(env: NodeJS.ProcessEnv = process.env): ChatConfig
     heldPollsPerBoard: positiveInt(env.CHAT_MAX_HELD_POLLS, CHAT_LIMITS.heldPollsPerBoard),
     sessionsPerBoard: CHAT_LIMITS.sessionsPerBoard,
     eventsKept: CHAT_LIMITS.eventsKept,
+    globalAdmins: (env.CHAT_GLOBAL_ADMINS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
   };
 }
 
