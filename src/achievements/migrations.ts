@@ -527,4 +527,35 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('CREATE TABLE chat_bots (user TEXT PRIMARY KEY, created_at INTEGER NOT NULL)');
     },
   },
+  {
+    version: 25,
+    name: 'accounts: players become the one Partyline identity (password, profile, bot), plus board links, tokens and reset codes',
+    // D7: no second table. A player without a password (pw_hash '') is an achievements-only
+    // player; it becomes a chat account through the emailed password reset.
+    up: (db) => {
+      db.exec("ALTER TABLE players ADD COLUMN pw_hash TEXT NOT NULL DEFAULT ''");
+      db.exec("ALTER TABLE players ADD COLUMN realname TEXT NOT NULL DEFAULT ''");
+      db.exec("ALTER TABLE players ADD COLUMN location TEXT NOT NULL DEFAULT ''");
+      db.exec('ALTER TABLE players ADD COLUMN bot INTEGER NOT NULL DEFAULT 0');
+      db.exec(`CREATE TABLE account_links (
+        board_id TEXT NOT NULL,
+        bbs_user TEXT NOT NULL,
+        account_id INTEGER NOT NULL REFERENCES players(id),
+        linked_at INTEGER NOT NULL,
+        PRIMARY KEY (board_id, bbs_user)
+      )`);
+      db.exec('CREATE INDEX account_links_account ON account_links (account_id)');
+      db.exec(`CREATE TABLE account_tokens (
+        token_hash TEXT PRIMARY KEY,
+        account_id INTEGER NOT NULL REFERENCES players(id),
+        created_at INTEGER NOT NULL
+      )`);
+      db.exec(`CREATE TABLE account_reset_codes (
+        account_id INTEGER PRIMARY KEY REFERENCES players(id),
+        code_hash TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0
+      )`);
+    },
+  },
 ];
