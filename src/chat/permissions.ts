@@ -71,7 +71,7 @@ export function requireMod(
   // D6: a board's sysop is owner-level in that board's channels only (isOwnerLevel); a global admin everywhere.
   if (isRoomStaff(db, room, ctx)) return;
   // A role is worn on its own board only: it never reaches another board's channel.
-  if (ctx.boardId && ctx.boardId === room.owner_board && permsOf(db, ctx.boardId, ctx.handle)[perm]) return;
+  if (ctx.boardId && ctx.boardId === room.owner_board && permsOf(db, ctx.boardId, ctx.user)[perm]) return;
   throw new SurfaceError('forbidden', 403, 'you may not do that in this room');
 }
 

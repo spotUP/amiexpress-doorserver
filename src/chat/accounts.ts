@@ -22,6 +22,7 @@ import type { ChatConfig } from './config';
 import { nowSec } from './config';
 import { userOf, validHandle } from './sessions';
 import { dmThreadId } from './store';
+import { legacyRoleKey } from './roles';
 
 export const RESET_CODE_TTL_SECONDS = 30 * 60;
 const PASSWORD_MIN = 8;
@@ -320,9 +321,16 @@ export function claimLegacyUser(db: Database.Database, oldUser: string, newUser:
   const at = oldUser.lastIndexOf('@');
   const oldHandle = oldUser.slice(0, at);
   const board = oldUser.slice(at + 1).toLowerCase();
-  // Roles are worn per board under the session handle, which is now the account handle.
-  db.prepare('DELETE FROM chat_role_assignments WHERE board_id = @b AND lower(handle) = lower(@old) AND role_id IN (SELECT role_id FROM chat_role_assignments WHERE lower(handle) = lower(@new))').run({ b: board, old: oldHandle, new: newUser });
-  moved += db.prepare('UPDATE OR IGNORE chat_role_assignments SET handle = @new WHERE board_id = @b AND lower(handle) = lower(@old)').run({ b: board, old: oldHandle, new: newUser }).changes;
+  // Roles are worn per board under the session handle, which is now the account handle. Drop roles on
+  // clash (sysop 2026-11-27): on the account's first arrival here through another BBS user, the plain key
+  // (board, newUser) still holds the board's unrelated legacy newUser; park it under that user's own key.
+  const links = db.prepare('SELECT COUNT(*) AS n FROM account_links l JOIN players p ON p.id = l.account_id WHERE l.board_id = ? AND p.handle = ? COLLATE NOCASE').get(board, newUser) as { n: number };
+  if (links.n <= 1 && oldHandle.toLowerCase() !== newUser.toLowerCase()) {
+    db.prepare('UPDATE OR IGNORE chat_role_assignments SET handle = @park WHERE board_id = @b AND lower(handle) = lower(@new)').run({ b: board, new: newUser, park: `${newUser}@${board.toUpperCase()}` });
+  }
+  const old = legacyRoleKey(db, board, oldHandle);
+  db.prepare('DELETE FROM chat_role_assignments WHERE board_id = @b AND lower(handle) = lower(@old) AND role_id IN (SELECT role_id FROM chat_role_assignments WHERE lower(handle) = lower(@new))').run({ b: board, old, new: newUser });
+  moved += db.prepare('UPDATE OR IGNORE chat_role_assignments SET handle = @new WHERE board_id = @b AND lower(handle) = lower(@old)').run({ b: board, old, new: newUser }).changes;
   db.prepare('UPDATE chat_sessions SET handle = @new WHERE lower(user) = lower(@new) AND lower(handle) = lower(@old) AND board_id = @b').run({ b: board, old: oldHandle, new: newUser });
   rethreadDms(db, newUser);
   return moved;

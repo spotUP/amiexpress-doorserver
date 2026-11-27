@@ -109,7 +109,7 @@ export function createRoom(db: Database.Database, ctx: ChatCtx, b: Body): Create
   if (vis !== 'public' && vis !== 'private') throw new SurfaceError('bad_request', 400, 'visibility must be public or private');
   const kind = b.kind === undefined ? 'text' : b.kind;
   if (!(CHAT_ROOM_KINDS as readonly unknown[]).includes(kind)) throw new SurfaceError('bad_request', 400, `kind must be one of ${CHAT_ROOM_KINDS.join(', ')}`);
-  if (vis === 'private' && !ctx.sysop && !permsOf(db, ctx.boardId, ctx.handle).createPrivate) {
+  if (vis === 'private' && !ctx.sysop && !permsOf(db, ctx.boardId, ctx.user).createPrivate) {
     throw new SurfaceError('forbidden', 403, 'you may not create private rooms');
   }
   charge([{ key: `chat:rooms:${ctx.boardId}`, limit: { max: CHAT_LIMITS.roomCreationsPerBoardPerHour, windowSeconds: 3600 } }]);

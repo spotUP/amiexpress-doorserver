@@ -181,6 +181,43 @@ describe('Partyline accounts', () => {
   });
 });
 
+describe('drop roles on clash (sysop 2026-11-27): a role stays with the BBS user it was given to', () => {
+  async function setup(): Promise<{ room: string; mod: string }> {
+    const sys = (await post('/sessions', { handle: 'sys', sysop: true })).body.sid as string;
+    const mod = (await api('post', '/roles', sys).send({ name: 'Mod', colorHex: '#ff0000', colorAnsi: 9, perms: { kick: true } })).body.id as string;
+    expect((await api('put', '/roles/assignments/bob', sys).send({ roleIds: [mod] })).status).toBe(200);
+    const room = (await api('post', '/rooms', sys).send({ name: 'lobby' })).body.id as string;
+    return { room, mod };
+  }
+  const kickCarol = async (room: string, sid: string): Promise<number> => {
+    const carol = (await post('/sessions', { handle: 'carol' })).body.sid as string;
+    expect((await api('post', `/rooms/${room}/join`, carol)).status).toBe(200);
+    expect((await api('post', `/rooms/${room}/join`, sid)).status).toBe(200);
+    return (await api('post', `/rooms/${room}/kick`, sid).send({ user: 'carol@UPROUGH' })).status;
+  };
+
+  it('account bob arriving as BBS user robert does not wear the role given to legacy bob', async () => {
+    const { room } = await setup();
+    expect((await post('/accounts/register-via-board', { bbs_user: 'bob', handle: 'bob', password: PW }, secondBoard())).status).toBe(201);
+    const robert = await post('/accounts/link-via-board', { bbs_user: 'robert', handle: 'bob', password: PW });
+    expect(robert.status).toBe(201);
+    expect(await kickCarol(room, robert.body.sid as string)).toBe(403);
+    // Legacy bob still has his role, and takes it with him when he links himself.
+    const legacy = (await post('/sessions', { handle: 'bob' })).body.sid as string;
+    expect(await kickCarol(room, legacy)).toBe(200);
+    const own = await post('/accounts/register-via-board', { bbs_user: 'bob', handle: 'bobby', password: PW });
+    expect(own.status).toBe(201);
+    expect(await kickCarol(room, own.body.sid as string)).toBe(200);
+  });
+
+  it('legacy bob linking his own account bob keeps his role', async () => {
+    const { room } = await setup();
+    const own = await post('/accounts/register-via-board', { bbs_user: 'bob', handle: 'bob', password: PW });
+    expect(own.status).toBe(201);
+    expect(await kickCarol(room, own.body.sid as string)).toBe(200);
+  });
+});
+
 describe('account tokens (D10: 30 days sliding, a password change revokes all)', () => {
   let now = 1_800_000_000;
   beforeEach(() => { now = 1_800_000_000; _setChatClockForTests(() => now); });
