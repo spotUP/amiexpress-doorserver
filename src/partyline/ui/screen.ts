@@ -18,7 +18,7 @@ import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
 import { BOT_PREFIX, displayLabels } from '../../chat/render';
 import { userHistory } from '../../chat/notes';
-import { botUsers, createSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
+import { botUsers, loginSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
 import { applyCanvasOps, dmHistory, dmThreads, postDm, postDmGroup, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, entryHistory, memberUsers, postMessage, profileOf, reactionRows, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
@@ -151,7 +151,7 @@ export class HubScreen implements PartylineScreen {
       if (!(err instanceof SurfaceError) || err.code !== 'session_expired') throw err;
       const h = this.info.hello;
       const ctx = db.transaction(() => {
-        const s = createSession(db, this.chat, this.info.boardId, { handle: h.handle, sysop: h.sysop, client: h.client });
+        const s = loginSession(db, this.chat, this.info.boardId, { handle: h.handle, sysop: h.sysop, client: h.client });
         this.info.sid = s.sid;
         const fresh = resolveSession(db, this.chat, s.sid, this.info.boardId);
         if (this.roomId) joinRoom(db, fresh, this.roomId);

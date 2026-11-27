@@ -8,7 +8,7 @@
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import { CHAT_LIMITS } from '../../contract/chat-types';
-import type { SessionReply } from '../../contract/chat-types';
+import type { NeedsAccountReply, SessionReply } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
 import { withAchievementsDb } from '../achievements/db';
@@ -17,6 +17,8 @@ import { activeWindowSeconds, nowSec } from './config';
 import type { ChatConfig } from './config';
 import { emitEvent, pruneEvents } from './events';
 import { sweepFiles } from './files';
+import { accountByHandle, botAccount, cleanPrefill, handleFree, isGlobalAdmin, linkedAccount, validBbsUser } from './accounts';
+import type { AccountRow } from './accounts';
 
 export interface ChatCtx {
   sid: string | null;
@@ -36,7 +38,10 @@ export interface ChatCtx {
 
 const HANDLE = /^[^\s|@]{1,32}$/;
 
-/** The identity on the wire: the handle and the registered board id, upper-cased. */
+/**
+ * The old per-board identity `handle@BOARD`: a board session without an account link, and a relay
+ * board's unlinked author. An account's user key is its bare handle (accounts.ts).
+ */
 export function userOf(boardId: string, handle: string): string {
   return `${handle}@${boardId.toUpperCase()}`;
 }
@@ -45,10 +50,11 @@ export function validHandle(handle: unknown): handle is string {
   return typeof handle === 'string' && HANDLE.test(handle);
 }
 
-/** `handle@BOARD` -> parts, or null when it is not an identity. */
+/** A user key -> parts, or null when it is not an identity. An account handle has board ''; `handle@BOARD` its board, lower-cased. */
 export function splitUser(user: unknown): { handle: string; board: string } | null {
   if (typeof user !== 'string') return null;
   const at = user.lastIndexOf('@');
+  if (at < 0) return validHandle(user) ? { handle: user, board: '' } : null;
   if (at < 1) return null;
   const handle = user.slice(0, at);
   const board = user.slice(at + 1);
@@ -78,33 +84,92 @@ export function createSession(
   db: Database.Database,
   cfg: ChatConfig,
   boardId: string,
-  body: { handle?: unknown; sysop?: unknown; client?: unknown; bot?: unknown }
+  body: { handle?: unknown; bbs_user?: unknown; sysop?: unknown; client?: unknown; bot?: unknown }
 ): SessionReply {
-  if (!validHandle(body.handle)) {
-    throw new SurfaceError('bad_request', 400, 'handle must be 1 to 32 characters with no whitespace, | or @');
-  }
-  const handle = body.handle;
-  const client = typeof body.client === 'string' ? body.client.slice(0, 64) : '';
+  // The BBS user the board vouches for. `handle` is the pre-account spelling of the same thing.
+  const bbsUser = body.bbs_user ?? body.handle;
+  if (!validBbsUser(bbsUser)) throw new SurfaceError('bad_request', 400, 'bbs_user is required');
   charge([{ key: `chat:sess:${boardId}`, limit: { max: 60, windowSeconds: 60 } }]);
   sweepSessions(db, cfg);
   const live = db.prepare('SELECT COUNT(*) AS n FROM chat_sessions WHERE board_id = ?').get(boardId) as { n: number };
   if (live.n >= cfg.sessionsPerBoard) {
     throw new SurfaceError('rate_limited', 429, 'this board has too many live chat sessions', 10);
   }
+  // `bot` is set by the board's own code under its board token (like `sysop`); a caller only picks a name.
+  if (body.bot === true) return openSession(db, cfg, boardId, botAccount(db, boardId, bbsUser).handle, null, body);
+  // A board reaches an account only through its own link (accounts.ts); a bot's link is the bot's alone.
+  const linked = linkedAccount(db, boardId, bbsUser);
+  if (linked) {
+    if (linked.bot === 1) throw new SurfaceError('conflict', 409, 'that handle belongs to this board\'s bot');
+    return openSession(db, cfg, boardId, linked.handle, null, body);
+  }
+  // No link: the old per-board identity `handle@BOARD`. It is never an account, whatever its handle.
+  // shortcut: kept so boards and tests that predate accounts still chat; remove once every client sends bbs_user and handles needs_account.
+  if (!validHandle(bbsUser)) {
+    throw new SurfaceError('bad_request', 400, 'handle must be 1 to 32 characters with no whitespace, | or @');
+  }
+  const legacy = userOf(boardId, bbsUser);
+  if (accountByHandle(db, bbsUser)?.bot === 1 || db.prepare('SELECT 1 FROM chat_bots WHERE lower(user) = lower(?)').get(legacy)) {
+    throw new SurfaceError('conflict', 409, 'that handle belongs to a bot');
+  }
+  return openSession(db, cfg, boardId, bbsUser, legacy, body);
+}
+
+/**
+ * POST /sessions from a board: the session of the linked account, or, for a `bbs_user` with no
+ * link, `needs_account` and no session (the caller then registers or links through the board).
+ */
+export function boardSession(
+  db: Database.Database,
+  cfg: ChatConfig,
+  boardId: string,
+  body: { handle?: unknown; bbs_user?: unknown; prefill?: unknown; sysop?: unknown; client?: unknown; bot?: unknown }
+): SessionReply | NeedsAccountReply {
+  if (body.bbs_user !== undefined && body.bot !== true && validBbsUser(body.bbs_user) && !linkedAccount(db, boardId, body.bbs_user)) {
+    const prefill = cleanPrefill(body.prefill);
+    return { needs_account: true, prefill, handle_free: handleFree(db, prefill.handle ?? body.bbs_user) };
+  }
+  return createSession(db, cfg, boardId, body);
+}
+
+/** A session for a caller who proved the account itself (token or password); it belongs to no board. */
+export function accountSession(db: Database.Database, cfg: ChatConfig, account: AccountRow, body: { client?: unknown }): SessionReply {
+  charge([{ key: `chat:sess:acct:${account.id}`, limit: { max: 20, windowSeconds: 60 } }]);
+  sweepSessions(db, cfg);
+  return openSession(db, cfg, '', account.handle, null, body);
+}
+
+/** A fresh session for a caller who already logged in (PLP/1 login, and its renewal): board '' is an account login. */
+export function loginSession(
+  db: Database.Database,
+  cfg: ChatConfig,
+  boardId: string,
+  body: { handle: string; sysop?: unknown; client?: unknown }
+): SessionReply {
+  if (boardId !== '') return createSession(db, cfg, boardId, body);
+  const account = accountByHandle(db, body.handle);
+  if (!account || account.bot === 1) throw new SurfaceError('unauthorized', 401, 'wrong handle or password');
+  return accountSession(db, cfg, account, body);
+}
+
+/** Insert the session row. `legacyUser` null: an account session, keyed by the bare handle. */
+export function openSession(
+  db: Database.Database,
+  cfg: ChatConfig,
+  boardId: string,
+  handle: string,
+  legacyUser: string | null,
+  body: { sysop?: unknown; client?: unknown }
+): SessionReply {
+  const client = typeof body.client === 'string' ? body.client.slice(0, 64) : '';
   const sid = crypto.randomBytes(16).toString('hex');
   const now = nowSec();
-  const user = userOf(boardId, handle);
-  // `bot` is set by the board's own code under its board token (like `sysop`); a caller only picks a handle.
-  // Once a board opened a user as a bot, that handle on that board is the bot's: a plain session for it is refused.
-  if (body.bot === true) {
-    db.prepare('INSERT OR IGNORE INTO chat_bots (user, created_at) VALUES (?, ?)').run(user, now);
-  } else if (db.prepare('SELECT 1 FROM chat_bots WHERE lower(user) = lower(?)').get(user)) {
-    throw new SurfaceError('conflict', 409, 'that handle belongs to this board\'s bot');
-  }
+  const user = legacyUser ?? handle;
+  // Only a board says who its sysop is; a board-less session has none.
   db.prepare(
     `INSERT INTO chat_sessions (sid, board_id, handle, user, sysop, client, created_at, last_seen)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(sid, boardId, handle, user, body.sysop === true ? 1 : 0, client, now, now);
+  ).run(sid, boardId, handle, user, boardId !== '' && body.sysop === true ? 1 : 0, client, now, now);
   // The hub's own `away` (last session expired) ends with the first new session.
   db.prepare('DELETE FROM chat_presence WHERE user = ? AND auto = 1').run(user);
   // The board's first chat session ever: the conditional UPDATE is the atomic
@@ -171,7 +236,8 @@ export function resolveSession(db: Database.Database, cfg: ChatConfig, sid: stri
   if (now - row.last_seen >= lastSeenSlackSeconds(cfg)) {
     db.prepare('UPDATE chat_sessions SET last_seen = ? WHERE sid = ?').run(now, sid);
   }
-  return { sid, boardId, handle: row.handle, user: row.user, sysop: row.sysop === 1, admin: false };
+  // D6: a global admin is an account (a bare-handle user key); `handle@BOARD` never matches the list.
+  return { sid, boardId, handle: row.handle, user: row.user, sysop: row.sysop === 1, admin: isGlobalAdmin(cfg, row.user) };
 }
 
 /** The Partyline room and /draw mode this session was on (migration 22), for a resume onto a new screen. */
@@ -241,8 +307,9 @@ export function _stopChatSweepersForTests(): void {
 /**
  * The identity a request acts as. No `as`: the session itself. With `as`: the
  * board must be a relay board (admin-set boards.chat_relay) and `as` a valid
- * bare handle; the author becomes `as@<this board>`, never another board's
- * user, and loses the session's sysop/admin standing.
+ * bare handle; the author becomes the account this board linked `as` to, else
+ * `as@<this board>`, never another board's user, and loses the session's
+ * sysop/admin standing.
  */
 export function actingCtx(db: Database.Database, ctx: ChatCtx, as: unknown): ChatCtx {
   if (as === undefined || as === null || as === '') return ctx;
@@ -250,5 +317,6 @@ export function actingCtx(db: Database.Database, ctx: ChatCtx, as: unknown): Cha
   const b = db.prepare('SELECT chat_relay FROM boards WHERE id = ?').get(ctx.boardId) as { chat_relay: number } | undefined;
   if (b?.chat_relay !== 1) throw new SurfaceError('not_relay', 403, 'only a relay board may speak as another user');
   if (!validHandle(as)) throw new SurfaceError('bad_request', 400, 'as must be a bare handle (no @, |, or spaces)');
-  return { sid: ctx.sid, boardId: ctx.boardId, handle: as, user: userOf(ctx.boardId, as), sysop: false, admin: false, relayOf: ctx.user };
+  const handle = linkedAccount(db, ctx.boardId, as)?.handle;
+  return { sid: ctx.sid, boardId: ctx.boardId, handle: handle ?? as, user: handle ?? userOf(ctx.boardId, as), sysop: false, admin: false, relayOf: ctx.user };
 }

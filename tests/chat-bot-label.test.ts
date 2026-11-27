@@ -29,14 +29,14 @@ describe('board bot label', () => {
     expect((await api('post', `/rooms/${id}/messages`, bot).send({ content: 'hello', clientId: 'c1' })).status).toBeLessThan(300);
 
     const mem = rowsOf((await api('get', `/rooms/${id}/members.txt`, alice)).text);
-    expect(mem.find((r) => r[0] === 'Uptown@UPROUGH')![7]).toBe('[BOT] Uptown');
+    expect(mem.find((r) => r[0] === 'Uptown')![7]).toBe('[BOT] Uptown');
     expect(mem.find((r) => r[0] === 'alice@UPROUGH')![7]).toBe('alice');
-    const who = rowsOf((await api('get', '/who.txt', alice)).text).find((r) => r[0] === 'Uptown@UPROUGH')!;
+    const who = rowsOf((await api('get', '/who.txt', alice)).text).find((r) => r[0] === 'Uptown')!;
     expect(who[who.length - 1]).toBe('[BOT] Uptown');
-    const hist = rowsOf((await api('get', `/rooms/${id}/history.txt`, alice)).text).find((r) => r[2] === 'Uptown@UPROUGH')!;
+    const hist = rowsOf((await api('get', `/rooms/${id}/history.txt`, alice)).text).find((r) => r[2] === 'Uptown')!;
     expect(hist[hist.length - 1]).toBe('[BOT] Uptown');
     const ev = rowsOf((await api('get', '/events.txt?since=0&wait=0', alice)).text)
-      .find((r) => r[1] === 'message' && r[3] === 'Uptown@UPROUGH')!;
+      .find((r) => r[1] === 'message' && r[3] === 'Uptown')!;
     expect(ev[9]).toBe('[BOT] Uptown');
 
     for (const handle of ['Uptown', 'uptown']) {

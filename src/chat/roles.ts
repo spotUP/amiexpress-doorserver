@@ -125,7 +125,7 @@ export interface UserRole {
   colorAnsi: number;
 }
 
-/** The highest role of a user on their own board, or null. */
+/** The highest role of a user on their own board (an account, which has no board: on any board), or null. */
 export function roleOf(db: Database.Database, user: string): UserRole | null {
   const parts = splitUser(user);
   if (!parts) return null;
@@ -133,9 +133,9 @@ export function roleOf(db: Database.Database, user: string): UserRole | null {
     .prepare(
       `SELECT r.name, r.color_hex, r.color_ansi FROM chat_role_assignments a
          JOIN chat_roles r ON r.id = a.role_id
-        WHERE a.board_id = ? AND a.handle = ? ORDER BY r.position DESC, r.name LIMIT 1`
+        WHERE (a.board_id = @board OR @board = '') AND a.handle = @handle ORDER BY r.position DESC, r.name LIMIT 1`
     )
-    .get(parts.board, parts.handle) as { name: string; color_hex: string; color_ansi: number } | undefined;
+    .get(parts) as { name: string; color_hex: string; color_ansi: number } | undefined;
   return r ? { name: r.name, colorHex: r.color_hex, colorAnsi: r.color_ansi } : null;
 }
 
@@ -157,7 +157,8 @@ export function permsOf(db: Database.Database, boardId: string, handle: string):
 
 /** Tell every room the user sits in (or just the user) that the role changed. */
 export function emitRoleEvents(db: Database.Database, boardId: string, handle: string): void {
-  const user = `${handle}@${boardId.toUpperCase()}`;
+  // Roles are assigned by session handle: an account's bare handle, else the board's own `handle@BOARD`.
+  const user = db.prepare('SELECT 1 FROM players WHERE handle = ? COLLATE NOCASE').get(handle) ? handle : `${handle}@${boardId.toUpperCase()}`;
   const role = roleOf(db, user);
   const text = role ? `${role.name}|${role.colorHex}|${role.colorAnsi}` : '';
   const rooms = db.prepare('SELECT DISTINCT room_id FROM chat_members WHERE user = ?').all(user) as { room_id: string }[];

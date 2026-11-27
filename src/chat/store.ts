@@ -42,7 +42,7 @@ export function clientId(b: Body): string {
 function targetUser(b: Body): string {
   const u = b.user;
   const p = splitUser(u);
-  if (!p) throw new SurfaceError('bad_request', 400, 'user must be handle@BOARD');
+  if (!p) throw new SurfaceError('bad_request', 400, 'user must be an account handle or handle@BOARD');
   return u as string;
 }
 
@@ -315,7 +315,7 @@ export interface ProfileRec {
 export function profileOf(db: Database.Database, ctx: ChatCtx, userParam: string): ProfileRec {
   requireSession(ctx);
   const parts = splitUser(userParam);
-  if (!parts) throw new SurfaceError('bad_request', 400, 'user must be handle@BOARD');
+  if (!parts) throw new SurfaceError('bad_request', 400, 'user must be an account handle or handle@BOARD');
   const live = db.prepare('SELECT user, handle, MAX(last_seen) AS last_seen, MIN(created_at) AS created FROM chat_sessions WHERE user = ?').get(userParam) as
     { user: string | null; handle: string | null; last_seen: number | null; created: number | null };
   const ev = db.prepare('SELECT MIN(at) AS first, MAX(at) AS last, MIN(user) AS user FROM chat_events WHERE user = ?').get(userParam) as
@@ -604,6 +604,7 @@ export function dmThreadId(a: string, b: string): string {
  */
 function unknownDmTargets(db: Database.Database, ctx: ChatCtx, targets: string[]): string[] {
   const boardOk = db.prepare('SELECT 1 FROM boards WHERE id = ?');
+  const isAccount = db.prepare('SELECT 1 FROM players WHERE handle = ? COLLATE NOCASE');
   const userSeen = db.prepare(
     `SELECT 1 WHERE EXISTS (SELECT 1 FROM chat_sessions WHERE user = @u)
               OR EXISTS (SELECT 1 FROM chat_messages WHERE user = @u)
@@ -614,6 +615,8 @@ function unknownDmTargets(db: Database.Database, ctx: ChatCtx, targets: string[]
   return targets.filter((t) => {
     if (t.toLowerCase() === ctx.user.toLowerCase()) return false;
     const parts = splitUser(t)!;
+    // An account handle is a real person once registered; `handle@BOARD` once seen on a registered board.
+    if (parts.board === '') return !isAccount.get(t);
     return !boardOk.get(parts.board) || !userSeen.get({ u: t });
   });
 }

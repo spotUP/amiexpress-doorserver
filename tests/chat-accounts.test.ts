@@ -1,0 +1,150 @@
+/**
+ * Partyline global accounts (plan 2026-11-27): one test per security invariant.
+ * A board key alone never reaches an existing account; a link needs the account's
+ * password; handles are global; a claim rekeys the old handle@BOARD rows; a board's
+ * sysop moderates that board's channels only.
+ */
+import request from 'supertest';
+import { makeAchievementsFixture } from './achievements/helpers';
+import type { AchievementsFixture } from './achievements/helpers';
+import { createBoard } from '../src/achievements/boards';
+import { _stopChatSweepersForTests } from '../src/chat/sessions';
+import { USER_COLUMNS } from '../src/chat/accounts';
+
+let fx: AchievementsFixture;
+beforeEach(() => {
+  process.env.CHAT_GLOBAL_ADMINS = 'Root';
+  fx = makeAchievementsFixture();
+});
+afterEach(() => {
+  _stopChatSweepersForTests();
+  fx.cleanup();
+  delete process.env.CHAT_GLOBAL_ADMINS;
+});
+
+const PW = 'correct horse';
+const post = (path: string, body: object, auth = fx.auth) => request(fx.app).post(`/chat/v1${path}`).set('Authorization', auth).send(body);
+const anon = (path: string, body: object) => request(fx.app).post(`/chat/v1${path}`).send(body);
+function api(method: 'get' | 'post' | 'put', path: string, sid: string, auth = fx.auth) {
+  return request(fx.app)[method](`/chat/v1${path}`).set('Authorization', auth).set('X-Chat-Session', sid);
+}
+const rowsOf = (text: string): string[][] => text.split('\r\n').filter((l) => l !== '').slice(1).map((l) => l.split('|'));
+function secondBoard(): string {
+  const db = fx.openAchievements();
+  try {
+    return `Board ${createBoard(db, 'other', 'Other', null).key}`;
+  } finally {
+    db.close();
+  }
+}
+
+describe('Partyline accounts', () => {
+  it('a board key alone never opens a session as an existing account', async () => {
+    expect((await anon('/accounts/register', { handle: 'Spot', password: PW })).status).toBe(201);
+    const r = await post('/sessions', { bbs_user: 'Spot', prefill: { handle: 'Spot', location: 'Lund' } });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ needs_account: true, prefill: { handle: 'Spot', location: 'Lund' }, handle_free: false });
+    // The pre-account call still answers, but as the board's own Spot@UPROUGH, never the account.
+    expect((await post('/sessions', { handle: 'Spot' })).body.user).toBe('Spot@UPROUGH');
+    // And a bot session cannot take the account's handle either.
+    expect((await post('/sessions', { handle: 'spot', bot: true })).status).toBe(409);
+  });
+
+  it('linking to an existing account needs its password, once', async () => {
+    await anon('/accounts/register', { handle: 'Spot', password: PW });
+    const bad = await post('/accounts/link-via-board', { bbs_user: 'johan', handle: 'Spot', password: 'not the password' });
+    expect(bad.status).toBe(401);
+    expect((await post('/sessions', { bbs_user: 'johan' })).body.needs_account).toBe(true);
+    const ok = await post('/accounts/link-via-board', { bbs_user: 'johan', handle: 'Spot', password: PW });
+    expect(ok.status).toBe(201);
+    expect(ok.body.user).toBe('Spot');
+    expect(ok.body.account.handle).toBe('Spot');
+    // From now on the link alone opens the session; another board has no link.
+    const again = await post('/sessions', { bbs_user: 'JOHAN' });
+    expect(again.status).toBe(201);
+    expect(again.body.user).toBe('Spot');
+    expect((await post('/sessions', { bbs_user: 'johan' }, secondBoard())).body.needs_account).toBe(true);
+  });
+
+  it('a taken handle answers 409 handle_taken, in any case, and creates no link', async () => {
+    await anon('/accounts/register', { handle: 'Spot', password: PW });
+    for (const r of [
+      await anon('/accounts/register', { handle: 'sPOT', password: PW }),
+      await post('/accounts/register-via-board', { bbs_user: 'johan', handle: 'spot', password: PW }),
+    ]) {
+      expect(r.status).toBe(409);
+      expect(r.body.error).toBe('handle_taken');
+    }
+    expect((await post('/sessions', { bbs_user: 'johan' })).body.needs_account).toBe(true);
+  });
+
+  it('registering through the board rekeys the old handle@BOARD rows to the account handle', async () => {
+    const old = (await post('/sessions', { handle: 'alice' })).body.sid as string;
+    const id = (await api('post', '/rooms', old).send({ name: 'lobby' })).body.id as string;
+    await api('post', `/rooms/${id}/join`, old);
+    await api('post', `/rooms/${id}/messages`, old).send({ content: 'hello', clientId: 'c1' });
+
+    const reg = await post('/accounts/register-via-board', { bbs_user: 'alice', handle: 'Alice', password: PW });
+    expect(reg.status).toBe(201);
+    expect(reg.body.user).toBe('Alice');
+    const sid = reg.body.sid as string;
+    const hist = rowsOf((await api('get', `/rooms/${id}/history.txt`, sid)).text);
+    expect(hist.some((r) => r[2] === 'Alice')).toBe(true);
+    expect(hist.some((r) => r.includes('alice@UPROUGH'))).toBe(false);
+    const mem = rowsOf((await api('get', `/rooms/${id}/members.txt`, sid)).text).map((r) => r[0]);
+    expect(mem).toEqual(['Alice']);
+    // The room she made is still hers.
+    expect((await api('put', `/rooms/${id}/topic`, sid).send({ topic: 'mine' })).status).toBe(200);
+  });
+
+  it('a board sysop cannot moderate another board\'s channel; a global admin can', async () => {
+    const other = secondBoard();
+    const owner = (await post('/sessions', { handle: 'alice' })).body.sid as string;
+    const id = (await api('post', '/rooms', owner).send({ name: 'lobby' })).body.id as string;
+    const sysop = (await post('/sessions', { handle: 'boss', sysop: true }, other)).body.sid as string;
+    await api('post', `/rooms/${id}/join`, sysop, other);
+    expect((await api('put', `/rooms/${id}/topic`, sysop, other).send({ topic: 'taken over' })).status).toBe(403);
+    // The same flag on the channel's own board does moderate it.
+    const home = (await post('/sessions', { handle: 'boss', sysop: true })).body.sid as string;
+    expect((await api('put', `/rooms/${id}/topic`, home).send({ topic: 'house rules' })).status).toBe(200);
+
+    const root = (await anon('/accounts/register', { handle: 'Root', password: PW })).body.token as string;
+    const acct = `Account ${root}`;
+    const rs = await post('/sessions', {}, acct);
+    expect(rs.status).toBe(201);
+    expect(rs.body.user).toBe('Root');
+    expect((await api('put', `/rooms/${id}/topic`, rs.body.sid, acct).send({ topic: 'global' })).status).toBe(200);
+  });
+
+  it('a password reset by a global admin revokes the old token; nobody else may reset', async () => {
+    const spot = (await anon('/accounts/register', { handle: 'Spot', password: PW })).body;
+    const root = (await anon('/accounts/register', { handle: 'Root', password: PW })).body.token as string;
+    const path = `/accounts/${spot.account.id}/password`;
+    expect((await post(path, { password: 'another one' }, `Account ${spot.token}`)).status).toBe(403);
+    expect((await post(path, { password: 'another one' })).status).toBe(403);
+    expect((await post(path, { password: 'another one' }, `Account ${root}`)).status).toBe(204);
+    expect((await post('/sessions', {}, `Account ${spot.token}`)).status).toBe(401);
+    expect((await anon('/accounts/login', { handle: 'spot', password: PW })).status).toBe(401);
+    expect((await anon('/accounts/login', { handle: 'spot', password: 'another one' })).status).toBe(200);
+  });
+
+  it('the claim covers every column of the built schema that holds a user key', () => {
+    const db = fx.openAchievements();
+    try {
+      const listed = new Set(USER_COLUMNS.map((c) => `${c.table}.${c.col}`));
+      const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'chat_%'").all() as { name: string }[]).map((t) => t.name);
+      const userish: string[] = [];
+      for (const t of tables) {
+        for (const c of db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]) {
+          if (/user|author|uploader|owner|^dm_[ab]$|^actor$|^target$|^peer$|^by$/.test(c.name)) userish.push(`${t}.${c.name}`);
+        }
+      }
+      // Rekeyed apart from the list (claimLegacyUser), or not a user key at all.
+      const apart = ['chat_rooms.owner_board'];
+      expect(userish.filter((c) => !listed.has(c) && !apart.includes(c))).toEqual([]);
+      for (const c of USER_COLUMNS) expect(db.prepare(`SELECT 1 FROM pragma_table_info('${c.table}') WHERE name = ?`).get(c.col)).toBeTruthy();
+    } finally {
+      db.close();
+    }
+  });
+});

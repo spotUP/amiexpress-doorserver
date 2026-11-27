@@ -14,7 +14,7 @@ import { withAchievementsDb } from '../achievements/db';
 import type { AchievementsConfig } from '../achievements/config';
 import { SurfaceError } from '../achievements/errors';
 import type { ChatConfig } from '../chat/config';
-import { createSession, expireSession, newId, resolveSession } from '../chat/sessions';
+import { expireSession, loginSession, newId, resolveSession } from '../chat/sessions';
 import { encodeFrame, FrameDecoder, FrameError, kvPayload, readAck, seqPayload } from './frames';
 import { newNonce, parseHello, pickVersion, verifyAuth } from './auth';
 
@@ -246,7 +246,8 @@ export class PartylineSession {
     this.deps.log(`[INFO] partyline hello client=${hello.client || '?'} proto=${hello.proto || '?'} board=${hello.board || '?'} ${this.deps.tls ? 'tls' : 'plain'}`);
     if (this.deps.isDraining()) return this.refuse('draining');
     if (pickVersion(hello.proto) === null) return this.refuse('old_client');
-    if (!hello.board || !hello.handle) return this.refuse('bad_hello');
+    // No board: a direct client logging into its account (auth.ts).
+    if (!hello.handle) return this.refuse('bad_hello');
     this.hello = hello;
     this.nonce = newNonce();
     this.state = 'auth';
@@ -287,7 +288,7 @@ export class PartylineSession {
   }
 
   /** Resume the chat session the token names when it is still this caller's; else a fresh one. */
-  private openChatSession(db: Parameters<typeof createSession>[0], boardId: string, hello: PlpHello): { sid: string; user: string } {
+  private openChatSession(db: Parameters<typeof loginSession>[0], boardId: string, hello: PlpHello): { sid: string; user: string } {
     if (hello.resume) {
       try {
         const ctx = resolveSession(db, this.deps.chat, hello.resume, boardId);
@@ -296,7 +297,7 @@ export class PartylineSession {
         // stale or foreign token: fall through to a fresh session
       }
     }
-    const s = createSession(db, this.deps.chat, boardId, { handle: hello.handle, sysop: hello.sysop, client: hello.client });
+    const s = loginSession(db, this.deps.chat, boardId, { handle: hello.handle, sysop: hello.sysop, client: hello.client });
     return { sid: s.sid, user: s.user };
   }
 

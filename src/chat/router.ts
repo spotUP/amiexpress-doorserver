@@ -1,8 +1,9 @@
 /**
  * The federated live-chat surface, mounted at /chat/v1.
  *
- * Auth: a board key (`Authorization: Board <id>.<secret>`) on everything but
- * /health, then `X-Chat-Session: <sid>` on everything but POST /sessions. A
+ * Auth: a board key (`Authorization: Board <id>.<secret>`) or an account token
+ * (`Authorization: Account <token>`) on everything but /health and the public
+ * /accounts calls, then `X-Chat-Session: <sid>` on everything but POST /sessions. A
  * server admin may add `X-Admin-Token: Bearer <jwt>`. Handlers here are glue:
  * the rules live in store.ts, permissions.ts and roles.ts.
  */
@@ -22,7 +23,9 @@ import { fetchVisibleEvents, headSeq, heldPollCount, waitForEvents } from './eve
 import type { EventRec } from './events';
 import { clampMaxBytes, displayLabels, fitRows, markOrigin, renderText, sendText } from './render';
 import * as roles from './roles';
-import { actingCtx, botUsers, createSession, expireSession, resolveSession, startSweeper } from './sessions';
+import { accountSession, actingCtx, boardSession, botUsers, createSession, expireSession, resolveSession, startSweeper } from './sessions';
+import * as accounts from './accounts';
+import { charge } from '../achievements/ratelimit';
 import type { ChatCtx } from './sessions';
 import * as files from './files';
 import * as fs from 'fs';
@@ -32,6 +35,10 @@ import * as voice from './voice';
 import { RELAY_MAX_BYTES } from './voice-relay';
 import type { Body } from './store';
 import { requireSysop } from './permissions';
+
+interface AccountRequest extends BoardRequest {
+  account?: accounts.AccountRow;
+}
 
 const ADMIN_CTX: ChatCtx = { sid: null, boardId: '', handle: 'admin', user: '', sysop: false, admin: true };
 
@@ -55,7 +62,67 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     res.json({ status: 'ok', contractVersion: CHAT_CONTRACT_VERSION, sessions, heldPolls: heldPollCount() });
   });
 
-  router.use(requireBoard(ach));
+  const body = (req: Request): Body => (req.body && typeof req.body === 'object' ? (req.body as Body) : {});
+  /** The account an `Authorization: Account <token>` header proves, null for a bad token, undefined for no such header. */
+  const accountOf = (req: Request): accounts.AccountRow | null | undefined => {
+    const m = /^Account\s+(\S+)$/i.exec(req.header('authorization') ?? '');
+    return m ? withAchievementsDb(ach, (db) => accounts.accountByToken(db, m[1]), { readonly: true }) : undefined;
+  };
+
+  // ---- accounts: the calls a person makes with no key ----
+  router.post('/accounts/register', (req: Request, res: Response) => {
+    charge([{ key: `acct:reg:${req.ip}`, limit: { max: 10, windowSeconds: 3600 } }]);
+    const out = withAchievementsDb(ach, (db) => db.transaction(() => {
+      const a = accounts.registerAccount(db, body(req));
+      return { account: accounts.toAccount(chat, a), token: accounts.issueToken(db, a.id) };
+    })());
+    res.status(201).json(out);
+  });
+  router.post('/accounts/login', (req: Request, res: Response) => {
+    res.json(withAchievementsDb(ach, (db) => {
+      const a = accounts.loginAccount(db, body(req).handle, body(req).password);
+      return { account: accounts.toAccount(chat, a), token: accounts.issueToken(db, a.id) };
+    }));
+  });
+  router.post('/accounts/password-reset/request', (req: Request, res: Response) => {
+    charge([{ key: `acct:reset:${req.ip}`, limit: { max: 10, windowSeconds: 3600 } }]);
+    withAchievementsDb(ach, (db) => accounts.requestPasswordReset(db, body(req).email));
+    res.status(204).end();
+  });
+  // No transaction: a wrong code must keep its counted attempt.
+  router.post('/accounts/password-reset/confirm', (req: Request, res: Response) => {
+    withAchievementsDb(ach, (db) => accounts.confirmPasswordReset(db, body(req).email, body(req).code, body(req).password));
+    res.status(204).end();
+  });
+  // D8: an account without email is reset by a global admin (or the hub's own admin token).
+  router.post('/accounts/:id/password', (req: Request, res: Response) => {
+    const caller = accountOf(req);
+    if (!isAdmin(req) && !(caller && accounts.isGlobalAdmin(chat, caller.handle))) {
+      throw new SurfaceError('forbidden', 403, 'global admin only');
+    }
+    withAchievementsDb(ach, (db) => db.transaction(() => accounts.setPassword(db, Number(req.params.id), body(req).password))());
+    res.status(204).end();
+  });
+
+  // An account token stands where the board key does; its sessions belong to no board (board id '').
+  const boardAuth = requireBoard(ach);
+  router.use((req: AccountRequest, res: Response, next: NextFunction) => {
+    const account = accountOf(req);
+    if (account === undefined) return boardAuth(req, res, next);
+    if (!account) {
+      res.status(401).json({ error: 'unauthenticated' });
+      return;
+    }
+    req.account = account;
+    req.board = { id: '', name: '', suspended: false };
+    next();
+  });
+  /** The board a board-only call came from; an account token is not a board. */
+  const boardOf = (req: Request): string => {
+    const id = (req as BoardRequest).board?.id ?? '';
+    if (!id) throw new SurfaceError('forbidden', 403, 'a board key is required');
+    return id;
+  };
 
   function isAdmin(req: Request): boolean {
     const raw = req.header('x-admin-token');
@@ -82,6 +149,9 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     }
     const boardId = (req as BoardRequest).board?.id ?? '';
     const ctx = resolveSession(db, chat, sid, boardId);
+    // A board-less session is its account's alone: another account's token does not open it.
+    const account = (req as AccountRequest).account;
+    if (account && ctx.user.toLowerCase() !== account.handle.toLowerCase()) throw new SurfaceError('unauthorized', 401, 'chat session expired');
     return admin ? { ...ctx, admin: true } : ctx;
   }
 
@@ -103,7 +173,6 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     return run(req, true, (db, ctx) => fn(db, actingCtx(db, ctx, as)));
   }
 
-  const body = (req: Request): Body => (req.body && typeof req.body === 'object' ? (req.body as Body) : {});
   const p = (req: Request, k: string): string => String(req.params[k] ?? '');
   const roleColor = (db: Database.Database, cache: Map<string, string>, user: string): string => {
     let c = cache.get(user);
@@ -117,9 +186,27 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
 
   // ---- sessions ----
   router.post('/sessions', (req: BoardRequest, res: Response) => {
-    const out = withAchievementsDb(ach, (db) => db.transaction(() => createSession(db, chat, req.board!.id, body(req)))());
-    res.status(201).json(out);
+    const account = (req as AccountRequest).account;
+    const out = withAchievementsDb(ach, (db) => db.transaction(() =>
+      account ? accountSession(db, chat, account, body(req)) : boardSession(db, chat, req.board!.id, body(req)))());
+    res.status('needs_account' in out ? 200 : 201).json(out);
   });
+  // ---- accounts through a board: the user types the password, the board only carries it ----
+  const viaBoard = (req: Request, res: Response, account: (db: Database.Database) => accounts.AccountRow): void => {
+    const boardId = boardOf(req);
+    const b = body(req);
+    if (!accounts.validBbsUser(b.bbs_user)) throw new SurfaceError('bad_request', 400, 'bbs_user is required');
+    const bbsUser = b.bbs_user;
+    const out = withAchievementsDb(ach, (db) => db.transaction(() => {
+      const a = account(db);
+      accounts.linkAccount(db, boardId, bbsUser, a);
+      return { ...createSession(db, chat, boardId, { bbs_user: bbsUser, sysop: b.sysop, client: b.client }), account: accounts.toAccount(chat, a) };
+    })());
+    res.status(201).json(out);
+  };
+  router.post('/accounts/register-via-board', (req: Request, res: Response) => viaBoard(req, res, (db) => accounts.registerAccount(db, body(req))));
+  // Invariant 3: the link is made with the account's own password, whatever the board says.
+  router.post('/accounts/link-via-board', (req: Request, res: Response) => viaBoard(req, res, (db) => accounts.loginAccount(db, body(req).handle, body(req).password)));
   router.delete('/sessions/current', (req: Request, res: Response) => {
     const sid = req.header('x-chat-session') ?? '';
     run(req, true, (db, ctx) => {
@@ -608,7 +695,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   });
   // A board relays its own BBS activity; board auth only, no chat session.
   router.post('/bbs-events', (req: Request, res: Response) => {
-    const boardId = (req as BoardRequest).board!.id;
+    const boardId = boardOf(req);
     withAchievementsDb(ach, (db) => db.transaction(() => store.relayBbsEvent(db, boardId, body(req)))());
     res.status(204).end();
   });
