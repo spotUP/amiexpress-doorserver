@@ -56,6 +56,11 @@ export function splitUser(user: unknown): { handle: string; board: string } | nu
   return { handle, board: board.toLowerCase() };
 }
 
+/** Every user a board opened as a bot (createSession `bot: true`), for displayLabels. */
+export function botUsers(db: Database.Database): Set<string> {
+  return new Set((db.prepare('SELECT user FROM chat_bots').all() as { user: string }[]).map((r) => r.user));
+}
+
 export function newId(prefix: string): string {
   return prefix + crypto.randomBytes(6).toString('hex');
 }
@@ -73,7 +78,7 @@ export function createSession(
   db: Database.Database,
   cfg: ChatConfig,
   boardId: string,
-  body: { handle?: unknown; sysop?: unknown; client?: unknown }
+  body: { handle?: unknown; sysop?: unknown; client?: unknown; bot?: unknown }
 ): SessionReply {
   if (!validHandle(body.handle)) {
     throw new SurfaceError('bad_request', 400, 'handle must be 1 to 32 characters with no whitespace, | or @');
@@ -89,6 +94,13 @@ export function createSession(
   const sid = crypto.randomBytes(16).toString('hex');
   const now = nowSec();
   const user = userOf(boardId, handle);
+  // `bot` is set by the board's own code under its board token (like `sysop`); a caller only picks a handle.
+  // Once a board opened a user as a bot, that handle on that board is the bot's: a plain session for it is refused.
+  if (body.bot === true) {
+    db.prepare('INSERT OR IGNORE INTO chat_bots (user, created_at) VALUES (?, ?)').run(user, now);
+  } else if (db.prepare('SELECT 1 FROM chat_bots WHERE lower(user) = lower(?)').get(user)) {
+    throw new SurfaceError('conflict', 409, 'that handle belongs to this board\'s bot');
+  }
   db.prepare(
     `INSERT INTO chat_sessions (sid, board_id, handle, user, sysop, client, created_at, last_seen)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`

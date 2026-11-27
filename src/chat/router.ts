@@ -22,7 +22,7 @@ import { fetchVisibleEvents, headSeq, heldPollCount, waitForEvents } from './eve
 import type { EventRec } from './events';
 import { clampMaxBytes, displayLabels, fitRows, markOrigin, renderText, sendText } from './render';
 import * as roles from './roles';
-import { actingCtx, createSession, expireSession, resolveSession, startSweeper } from './sessions';
+import { actingCtx, botUsers, createSession, expireSession, resolveSession, startSweeper } from './sessions';
 import type { ChatCtx } from './sessions';
 import * as files from './files';
 import * as fs from 'fs';
@@ -157,7 +157,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     const out = run(req, false, (db, ctx) => {
       const cache = new Map<string, string>();
       const members = store.roomMembers(db, ctx, p(req, 'id'));
-      const labels = displayLabels(members.map((m) => m.user));
+      const labels = displayLabels(members.map((m) => m.user), botUsers(db));
       const rows = members.map((m) => [m.user, m.sysop ? 1 : 0, m.op ? 1 : 0, roleColor(db, cache, m.user), roleName(db, m.user), m.status, m.statusText, labels.get(m.user) ?? m.user, m.active ? 1 : 0, m.lastActive]);
       return { rev: headSeq(db), rows };
     });
@@ -166,7 +166,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   /** HISTORY rows with the D7 label column and ` [Discord]` marker; `present` adds the room's members to the clash set. */
   const historyRows = (db: Database.Database, recs: store.HistoryRec[], present: string[]): (string | number)[][] => {
     const cache = new Map<string, string>();
-    const labels = displayLabels([...recs.map((h) => h.user), ...present]);
+    const labels = displayLabels([...recs.map((h) => h.user), ...present], botUsers(db));
     return recs.map((h) => [h.seq, h.id, h.user, h.at, h.replyTo, h.threadId, roleColor(db, cache, h.user), markOrigin(h.user, h.text), labels.get(h.user) ?? h.user]);
   };
   const historyText = (fetch: (db: Database.Database, ctx: ChatCtx) => { recs: store.HistoryRec[]; rooms: string[] }) => (req: Request, res: Response) => {
@@ -210,7 +210,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
     const out = run(req, false, (db, ctx) => {
       const cache = new Map<string, string>();
       const who = store.whoRows(db, ctx);
-      const labels = displayLabels(who.map((w) => w.user));
+      const labels = displayLabels(who.map((w) => w.user), botUsers(db));
       return { rev: headSeq(db), rows: who.map((w) => [w.user, w.room, w.sysop ? 1 : 0, roleColor(db, cache, w.user), w.idle, w.status, w.statusText, labels.get(w.user) ?? w.user]) };
     });
     sendText(res, renderText('WHO', out.rev, out.rows));
@@ -294,7 +294,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
         // The session may have been replaced or have expired while held; touch it again.
         context(db, req, false);
         const cache = new Map<string, string>();
-        const labels = displayLabels([...events.map((e) => e.user), ...store.memberUsers(db, events.map((e) => e.room_id ?? ''))]);
+        const labels = displayLabels([...events.map((e) => e.user), ...store.memberUsers(db, events.map((e) => e.room_id ?? ''))], botUsers(db));
         const text = (e: EventRec): string => (e.type === 'message' || e.type === 'edit' ? markOrigin(e.user, e.text) : e.text);
         return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), text(e), e.reply_to, e.user ? labels.get(e.user) ?? e.user : '']);
       });

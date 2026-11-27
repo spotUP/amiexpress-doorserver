@@ -16,9 +16,9 @@ import { SurfaceError } from '../../achievements/errors';
 import type { ChatConfig } from '../../chat/config';
 import { fetchVisibleEvents, headSeq, onEvents } from '../../chat/events';
 import type { EventRec } from '../../chat/events';
-import { displayLabels } from '../../chat/render';
+import { BOT_PREFIX, displayLabels } from '../../chat/render';
 import { userHistory } from '../../chat/notes';
-import { createSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
+import { botUsers, createSession, getScreenPlace, newId, resolveSession, setScreenPlace } from '../../chat/sessions';
 import type { ChatCtx } from '../../chat/sessions';
 import { applyCanvasOps, dmHistory, dmThreads, postDm, postDmGroup, editMessage, getCanvas, getPrefs, joinRoom, listMemberships, markRead, roomHeadSeq, listPins, listRooms, entryHistory, memberUsers, postMessage, profileOf, reactionRows, roomMembers, search, setPrefs, setPresence, setTyping, threadHistory } from '../../chat/store';
 import type { PartylineScreen, ScreenFactory, ScreenInfo } from '../session';
@@ -601,8 +601,9 @@ export class HubScreen implements PartylineScreen {
       side.push(it);
       // LIVECHAT sidebar-items-builder: the members sit inline under the active channel while it is expanded.
       if (r.roomId !== this.roomId || !it.open) continue;
+      const bots = this.bots();
       for (const u of data.users) {
-        const u2 = newSide(SIDE_USER, false, u.user.split('@')[0].slice(0, 38));
+        const u2 = newSide(SIDE_USER, false, ((bots.has(u.user) ? BOT_PREFIX : '') + u.user.split('@')[0]).slice(0, 38));
         u2.id = u.user; // the full handle: two boards can share a nick
         u2.note = (u.statusText ?? '').slice(0, 14);
         u2.status = u.status === 'online' && u.active ? 0 : 1; // LIVECHAT: a green O only when online and active, else red
@@ -636,8 +637,10 @@ export class HubScreen implements PartylineScreen {
     const rows = this.tryRun(false, (db, ctx) => (dm ? dmHistory(db, ctx, id, { limit: 30 }) : entryHistory(db, ctx, id, lastRead))) ?? [];
     if (rows.length === 0) return;
     this.systemLine(`--- ${rows.length} earlier message${rows.length === 1 ? '' : 's'} ---`);
+    const bots = this.bots();
     for (const h of rows) {
       const l = newLine(HISTORY, stamp(h.at), h.user, h.text);
+      if (bots.has(h.user)) l.label = BOT_PREFIX + h.user.split('@')[0];
       l.id = h.id;
       l.number = ++this.msgNumber;
       this.model.addLine(l);
@@ -742,8 +745,10 @@ export class HubScreen implements PartylineScreen {
     const inRoom = this.dmThread === '' && this.roomId !== '' && e.room_id === this.roomId; // livechat.c take_events in_room
     const m = this.model;
     if (e.type === 'canvas') { if (inRoom) this.canvas.event(e.ref, e.text); return; }
+    const bot = this.bots().has(e.user) ? BOT_PREFIX + e.user.split('@')[0] : '';
     if (e.type === 'message' && inRoom) {
       const l = newLine(LIVE, stamp(e.at), e.user, e.text);
+      l.label = bot;
       l.id = e.ref;
       l.number = ++this.msgNumber; // livechat.c msg_number: the number a user types in /reply, /react ...
       m.addLine(l);
@@ -762,6 +767,7 @@ export class HubScreen implements PartylineScreen {
       if (this.showTyping) this.typingSet(e.user, e.text);
     } else if (e.type === 'dm' && this.dmThread !== '' && e.label === this.dmThread) {
       const l = newLine(LIVE, stamp(e.at), e.user, e.text); // livechat.c take_events: a line of the open thread, numbered
+      l.label = bot;
       l.id = e.ref;
       l.number = ++this.msgNumber;
       m.addLine(l);
@@ -800,7 +806,12 @@ export class HubScreen implements PartylineScreen {
   /** livechat.c `shown` (EVENTS index 9): the D7 display label, the bare handle unless two users in the room share it. */
   private shown(e: EventRec): string {
     const users = this.tryRun(false, (db) => memberUsers(db, [e.room_id ?? ''])) ?? [];
-    return displayLabels([e.user, ...users]).get(e.user) ?? e.user;
+    return displayLabels([e.user, ...users], this.bots()).get(e.user) ?? e.user;
+  }
+
+  /** The users boards opened as bots (sessions.ts botUsers): their lines and sidebar rows read `[BOT] <handle>`. */
+  private bots(): Set<string> {
+    return this.tryRun(false, (db) => botUsers(db)) ?? new Set<string>();
   }
 
   /** LIVECHAT sounds.ts: a cue when /sounds is on. */

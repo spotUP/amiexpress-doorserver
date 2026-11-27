@@ -519,4 +519,12 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec('CREATE INDEX chat_user_notes_target ON chat_user_notes (lower(target))');
     },
   },
+  {
+    version: 24,
+    name: 'chat: chat_bots, the users a board opened as a bot (shown as [BOT] <handle>, handle reserved)',
+    // Kept apart from chat_sessions: a bot's history and its reserved handle outlive its session.
+    up: (db) => {
+      db.exec('CREATE TABLE chat_bots (user TEXT PRIMARY KEY, created_at INTEGER NOT NULL)');
+    },
+  },
 ];

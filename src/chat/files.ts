@@ -26,7 +26,7 @@ import { emitEvent } from './events';
 import { getRoom, isMember, requireMod } from './permissions';
 import { displayLabels } from './render';
 import type { ChatCtx } from './sessions';
-import { newId } from './sessions';
+import { botUsers, newId } from './sessions';
 import { clientId, dmParticipants, requireMemberOf, requireNotMuted, requireSession, requireVoice, str } from './store';
 import type { Body } from './store';
 
@@ -411,7 +411,7 @@ export function listFiles(db: Database.Database, ctx: ChatCtx, roomId: string, d
   const rows = db
     .prepare("SELECT * FROM chat_files WHERE room_id = ? AND status = 'ready' ORDER BY created_at DESC, rowid DESC LIMIT ?")
     .all(room.id, CHAT_LIMITS.filesPerRoomKept) as FileRow[];
-  const labels = displayLabels(rows.map((r) => r.uploader));
+  const labels = displayLabels(rows.map((r) => r.uploader), botUsers(db));
   return rows.map((r) => ({ ...r, label: labels.get(r.uploader) ?? r.uploader }));
 }
 

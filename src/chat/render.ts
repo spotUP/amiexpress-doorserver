@@ -52,13 +52,16 @@ export function sendText(res: Response, body: Buffer): void {
   res.end(body);
 }
 
+/** What every client prints before a bot's name (sessions.ts botUsers). */
+export const BOT_PREFIX = '[BOT] ';
+
 /**
- * D7 display labels. Every user shows as the bare handle; when two different
+ * D7 display labels. A user in `bots` gets BOT_PREFIX in front. Every user shows as the bare handle; when two different
  * users in `users` share a handle (case-insensitive) those two, and only
  * those, keep `@BOARD`. `users` is everyone present in what the caller
  * renders: the rows themselves plus the room's members.
  */
-export function displayLabels(users: Iterable<string>): Map<string, string> {
+export function displayLabels(users: Iterable<string>, bots: ReadonlySet<string> = new Set()): Map<string, string> {
   const byHandle = new Map<string, Set<string>>();
   const all = new Set<string>();
   for (const u of users) {
@@ -74,7 +77,7 @@ export function displayLabels(users: Iterable<string>): Map<string, string> {
   for (const u of all) {
     const at = u.lastIndexOf('@');
     const handle = at > 0 ? u.slice(0, at) : u;
-    out.set(u, (byHandle.get(handle.toLowerCase())?.size ?? 0) > 1 ? u : handle);
+    out.set(u, (bots.has(u) ? BOT_PREFIX : '') + ((byHandle.get(handle.toLowerCase())?.size ?? 0) > 1 ? u : handle));
   }
   return out;
 }

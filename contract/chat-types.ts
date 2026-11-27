@@ -231,6 +231,8 @@ export interface SessionRequest {
   handle: string;
   sysop?: boolean;
   client?: string;
+  /** The board's own bot (never a caller): every client shows it as `[BOT] <handle>` and the handle is reserved. */
+  bot?: boolean;
 }
 export interface SessionReply {
   sid: string;
