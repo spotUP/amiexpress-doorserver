@@ -127,16 +127,29 @@ export function loginAccount(db: Database.Database, handle: unknown, password: u
 
 const tokenHash = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
 
-// shortcut: tokens are opaque and never expire (a password change revokes them all); add a TTL when a client can refresh.
+/** D10: a token lives this long after its last use; a password change revokes them all (setPassword). */
+export const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
+// A use within this long of the last renewal does not write again (a polling client would write per request).
+const TOKEN_RENEW_GRANULARITY_SECONDS = 60;
+
 export function issueToken(db: Database.Database, accountId: number): string {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('INSERT INTO account_tokens (token_hash, account_id, created_at) VALUES (?, ?, ?)').run(tokenHash(token), accountId, nowSec());
+  const now = nowSec();
+  db.prepare('DELETE FROM account_tokens WHERE account_id = ? AND expires_at <= ?').run(accountId, now);
+  db.prepare('INSERT INTO account_tokens (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(tokenHash(token), accountId, now, now + TOKEN_TTL_SECONDS);
   return token;
 }
 
+/** The one token check: an unknown or expired token is null; a good one is renewed to now + TTL. */
 export function accountByToken(db: Database.Database, token: string): AccountRow | null {
-  const t = db.prepare('SELECT account_id FROM account_tokens WHERE token_hash = ?').get(tokenHash(token)) as { account_id: number } | undefined;
-  return t ? accountById(db, t.account_id) : null;
+  const now = nowSec();
+  const h = tokenHash(token);
+  const t = db.prepare('SELECT account_id, expires_at FROM account_tokens WHERE token_hash = ?').get(h) as { account_id: number; expires_at: number } | undefined;
+  if (!t || t.expires_at <= now) return null;
+  if (t.expires_at < now + TOKEN_TTL_SECONDS - TOKEN_RENEW_GRANULARITY_SECONDS) {
+    db.prepare('UPDATE account_tokens SET expires_at = ? WHERE token_hash = ?').run(now + TOKEN_TTL_SECONDS, h);
+  }
+  return accountById(db, t.account_id);
 }
 
 /** Store a new password and end every token and reset code of the account. */

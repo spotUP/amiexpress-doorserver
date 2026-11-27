@@ -66,7 +66,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   /** The account an `Authorization: Account <token>` header proves, null for a bad token, undefined for no such header. */
   const accountOf = (req: Request): accounts.AccountRow | null | undefined => {
     const m = /^Account\s+(\S+)$/i.exec(req.header('authorization') ?? '');
-    return m ? withAchievementsDb(ach, (db) => accounts.accountByToken(db, m[1]), { readonly: true }) : undefined;
+    return m ? withAchievementsDb(ach, (db) => accounts.accountByToken(db, m[1])) : undefined;
   };
 
   // ---- accounts: the calls a person makes with no key ----

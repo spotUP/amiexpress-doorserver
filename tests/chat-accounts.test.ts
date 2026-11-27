@@ -9,7 +9,8 @@ import { makeAchievementsFixture } from './achievements/helpers';
 import type { AchievementsFixture } from './achievements/helpers';
 import { createBoard } from '../src/achievements/boards';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
-import { USER_COLUMNS } from '../src/chat/accounts';
+import { TOKEN_TTL_SECONDS, USER_COLUMNS } from '../src/chat/accounts';
+import { _setChatClockForTests } from '../src/chat/config';
 
 let fx: AchievementsFixture;
 beforeEach(() => {
@@ -177,5 +178,52 @@ describe('Partyline accounts', () => {
     } finally {
       db.close();
     }
+  });
+});
+
+describe('account tokens (D10: 30 days sliding, a password change revokes all)', () => {
+  let now = 1_800_000_000;
+  beforeEach(() => { now = 1_800_000_000; _setChatClockForTests(() => now); });
+  afterEach(() => _setChatClockForTests(null));
+  const useToken = (token: string) => post('/sessions', {}, `Account ${token}`);
+
+  it('each use renews the expiry; an expired token answers like an unknown one', async () => {
+    const token = (await anon('/accounts/register', { handle: 'Spot', password: PW })).body.token as string;
+    now += TOKEN_TTL_SECONDS - 10;
+    expect((await useToken(token)).status).toBe(200);
+    // Past the first 30 days: alive only because the use above renewed it.
+    now += TOKEN_TTL_SECONDS - 10;
+    expect((await useToken(token)).status).toBe(200);
+    now += TOKEN_TTL_SECONDS + 1;
+    const expired = await useToken(token);
+    const unknown = await useToken('0'.repeat(64));
+    expect(expired.status).toBe(401);
+    expect(expired.body).toEqual(unknown.body);
+  });
+
+  it('a self-service password reset revokes every token of the account', async () => {
+    const t1 = (await anon('/accounts/register', { handle: 'Spot', password: PW, email: 'spot@example.com' })).body.token as string;
+    const t2 = (await anon('/accounts/login', { handle: 'Spot', password: PW })).body.token as string;
+    expect((await anon('/accounts/password-reset/request', { email: 'spot@example.com' })).status).toBe(204);
+    const db = fx.openAchievements();
+    let code: string;
+    try {
+      const mail = db.prepare('SELECT body FROM mail_queue ORDER BY id DESC LIMIT 1').get() as { body: string };
+      code = (/The code is:\n\n(\S+)\n/.exec(mail.body) as RegExpExecArray)[1];
+    } finally {
+      db.close();
+    }
+    expect((await anon('/accounts/password-reset/confirm', { email: 'spot@example.com', code, password: 'another one' })).status).toBe(204);
+    expect((await useToken(t1)).status).toBe(401);
+    expect((await useToken(t2)).status).toBe(401);
+  });
+
+  it('a global admin password reset revokes every token of the account', async () => {
+    const spot = (await anon('/accounts/register', { handle: 'Spot', password: PW })).body;
+    const t2 = (await anon('/accounts/login', { handle: 'Spot', password: PW })).body.token as string;
+    const root = (await anon('/accounts/register', { handle: 'Root', password: PW })).body.token as string;
+    expect((await post(`/accounts/${spot.account.id}/password`, { password: 'another one' }, `Account ${root}`)).status).toBe(204);
+    expect((await useToken(spot.token as string)).status).toBe(401);
+    expect((await useToken(t2)).status).toBe(401);
   });
 });

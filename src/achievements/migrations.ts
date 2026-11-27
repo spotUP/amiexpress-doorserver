@@ -558,4 +558,13 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       )`);
     },
   },
+  {
+    version: 26,
+    name: 'accounts: account tokens expire 30 days after their last use (D10)',
+    // Tokens issued before this get a fresh 30 days, so nobody is logged out by the upgrade.
+    up: (db) => {
+      db.exec('ALTER TABLE account_tokens ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0');
+      db.exec("UPDATE account_tokens SET expires_at = CAST(strftime('%s','now') AS INTEGER) + 30 * 24 * 3600");
+    },
+  },
 ];
