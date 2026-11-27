@@ -18,6 +18,7 @@ import { PartylineSession } from './session';
 import { chatScreen } from './ui/screen';
 import { livechatScreen } from './livechat-host';
 import type { ScreenFactory } from './session';
+import type { AccountGateway } from './account-form';
 
 export interface PartylineConfig {
   enabled: boolean;
@@ -59,6 +60,8 @@ export interface PartylineOptions {
   log?: (line: string) => void;
   /** Tests hand in PEM text instead of paths. */
   tlsContext?: tls.SecureContextOptions;
+  /** The global-account endpoints in process; absent, callers keep board-handle sessions. */
+  accounts?: AccountGateway;
 }
 
 export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsConfig, opts: PartylineOptions = {}): PartylineServer {
@@ -76,7 +79,7 @@ export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsCon
 
   const attach = (sock: Duplex, isTls: boolean): void => {
     const s = new PartylineSession(sock, {
-      ach, chat, screen, tls: isTls,
+      ach, chat, screen, tls: isTls, accounts: opts.accounts,
       isDraining: () => draining,
       onClose: (gone) => sessions.delete(gone),
       sidHeldElsewhere: (sid, self) => [...sessions].some((o) => o !== self && o.live && o.sid === sid),

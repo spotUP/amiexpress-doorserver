@@ -15,7 +15,11 @@ import type { AchievementsConfig } from '../achievements/config';
 import { SurfaceError } from '../achievements/errors';
 import type { ChatConfig } from '../chat/config';
 import { expireSession, loginSession, newId, resolveSession } from '../chat/sessions';
+import { linkedAccount } from '../chat/accounts';
+import type { NeedsAccountReply } from '../../contract/chat-types';
 import { encodeFrame, FrameDecoder, FrameError, kvPayload, readAck, seqPayload } from './frames';
+import { AccountForm, isNeedsAccount } from './account-form';
+import type { AccountGateway } from './account-form';
 import { newNonce, parseHello, pickVersion, verifyAuth } from './auth';
 
 /**
@@ -113,6 +117,11 @@ export interface SessionDeps {
   /** Another live connection resumed the same chat session (a second tab). */
   sidHeldElsewhere: (sid: string, self: PartylineSession) => boolean;
   log: (line: string) => void;
+  /**
+   * The global-account endpoints (POST /sessions, register-via-board, link-via-board) in process.
+   * Absent: every board caller gets a session under its board handle, as before accounts.
+   */
+  accounts?: AccountGateway;
 }
 
 const PLP_MEDIA_BACKLOG = 256 * 1024;
@@ -259,6 +268,7 @@ export class PartylineSession {
     let sid: string;
     let user: string;
     let boardId: string;
+    let needs: NeedsAccountReply | undefined;
     try {
       const out = withAchievementsDb(this.deps.ach, (db) => {
         const auth = verifyAuth(db, hello, this.nonce, mac);
@@ -266,7 +276,7 @@ export class PartylineSession {
         return db.transaction(() => ({ ok: true as const, boardId: auth.boardId, ...this.openChatSession(db, auth.boardId, hello) }))();
       });
       if (!out.ok) return this.refuse(out.reason);
-      ({ sid, user, boardId } = out);
+      ({ sid, user, boardId, needs } = out);
     } catch (err) {
       if (err instanceof SurfaceError && err.status === 429) return this.refuse('rate_limited');
       this.deps.log(`[ERROR] partyline ${this.id} login failed: ${(err as Error).message}`);
@@ -274,10 +284,26 @@ export class PartylineSession {
     }
     if (this.loginTimer) clearTimeout(this.loginTimer);
     this.loginTimer = null;
-    this.sid = sid;
     this.state = 'live';
     const features = [hello.kitty ? 'kitty' : '', hello.media ? 'media' : ''].filter(Boolean).join(',');
-    this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: sid }));
+    // No account link yet: no chat session and no resume token until the form registers or links one.
+    this.send(PLP_HUB.WELCOME, kvPayload({ proto: `1.${pickVersion(hello.proto) ?? PLP_MINOR}`, features, session: this.id, resume: needs ? '' : sid }));
+    if (needs) {
+      this.screen = new AccountForm({
+        bbsUser: hello.handle, reply: needs, hello,
+        register: (req) => withAchievementsDb(this.deps.ach, (db) => db.transaction(() => this.deps.accounts!.register(db, boardId, req))()),
+        link: (req) => withAchievementsDb(this.deps.ach, (db) => db.transaction(() => this.deps.accounts!.link(db, boardId, req))()),
+        markDirty: () => this.markDirty(), quit: () => this.quitAfterOutput(),
+        done: (r) => { this.deps.log(`[INFO] partyline ${this.id} account ${r.user} linked`); this.enterChat(r.sid, r.user, boardId, hello); },
+      });
+      this.markDirty(true);
+      return;
+    }
+    this.enterChat(sid, user, boardId, hello);
+  }
+
+  private enterChat(sid: string, user: string, boardId: string, hello: PlpHello): void {
+    this.sid = sid;
     try {
       this.screen = this.deps.screen({ sid, user, boardId, hello, renewed: (fresh) => { if (this.state === 'live') this.sid = fresh; }, markDirty: () => this.markDirty(), quit: () => this.quitAfterOutput(), ctrl: (t) => this.send(PLP_HUB.CTRL, t), sound: (c) => this.send(PLP_HUB.SOUND, c), media: hello.media ? (p) => this.sendMedia(p) : undefined });
     } catch (err) {
@@ -288,14 +314,24 @@ export class PartylineSession {
   }
 
   /** Resume the chat session the token names when it is still this caller's; else a fresh one. */
-  private openChatSession(db: Parameters<typeof loginSession>[0], boardId: string, hello: PlpHello): { sid: string; user: string } {
+  private openChatSession(db: Parameters<typeof loginSession>[0], boardId: string, hello: PlpHello): { sid: string; user: string; needs?: NeedsAccountReply } {
+    // A board caller goes through the account gateway; a direct account login (board '') already gave its password.
+    const gate = boardId !== '' ? this.deps.accounts : undefined;
     if (hello.resume) {
       try {
         const ctx = resolveSession(db, this.deps.chat, hello.resume, boardId);
-        if (ctx.handle === hello.handle && ctx.sid) return { sid: ctx.sid, user: ctx.user };
+        // The session's handle is the account handle, which need not be the board's name for this caller.
+        // With the gateway on, an unlinked caller's old handle@BOARD session is not resumed: the form comes first.
+        const mine = (gate ? linkedAccount(db, boardId, hello.handle)?.handle : hello.handle)?.toLowerCase();
+        if (ctx.handle.toLowerCase() === mine && ctx.sid) return { sid: ctx.sid, user: ctx.user };
       } catch {
         // stale or foreign token: fall through to a fresh session
       }
+    }
+    if (gate) {
+      const prefill = { handle: hello.handle, realname: hello.realname, location: hello.location, email: hello.email };
+      const r = gate.open(db, boardId, { bbs_user: hello.handle, prefill, sysop: hello.sysop, client: hello.client });
+      return isNeedsAccount(r) ? { sid: '', user: '', needs: r } : { sid: r.sid, user: r.user };
     }
     const s = loginSession(db, this.deps.chat, boardId, { handle: hello.handle, sysop: hello.sysop, client: hello.client });
     return { sid: s.sid, user: s.user };
