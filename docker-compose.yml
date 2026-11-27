@@ -45,6 +45,8 @@ services:
       # SMTP, the server refuses to start (D7), which is the point.
       # Shared chat files (docs/CHAT-API.md section 9), on the same volume.
       CHAT_FILES_DIR: ${CHAT_FILES_DIR:-/data/chat-files}
+      # Partyline account handles (comma separated) that moderate every board's channels (D6).
+      CHAT_GLOBAL_ADMINS: ${CHAT_GLOBAL_ADMINS:-}
       ACHIEVEMENTS_DB: ${ACHIEVEMENTS_DB:-}
       ACHIEVEMENTS_SMTP_URL: ${ACHIEVEMENTS_SMTP_URL:-}
       ACHIEVEMENTS_MAIL_FROM: ${ACHIEVEMENTS_MAIL_FROM:-}

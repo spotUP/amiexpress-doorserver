@@ -128,6 +128,37 @@ describe('Partyline accounts', () => {
     expect((await anon('/accounts/login', { handle: 'spot', password: 'another one' })).status).toBe(200);
   });
 
+  it('a wrong link password claims nothing; the right one rekeys u@BOARD and keeps the newest of a clash', async () => {
+    const acct = `Account ${(await anon('/accounts/register', { handle: 'Spot', password: PW })).body.token as string}`;
+    const mine = (await post('/sessions', {}, acct)).body.sid as string;
+    const id = (await api('post', '/rooms', mine, acct).send({ name: 'lobby' })).body.id as string;
+    await api('post', `/rooms/${id}/join`, mine, acct);
+    const old = (await post('/sessions', { handle: 'johan' })).body.sid as string;
+    await api('post', `/rooms/${id}/join`, old);
+    await api('post', `/rooms/${id}/messages`, old).send({ content: 'from the board', clientId: 'j1' });
+    const db = fx.openAchievements();
+    const q = <T>(sql: string, ...a: unknown[]): T[] => db.prepare(sql).all(...a) as T[];
+    try {
+      // Memberships clash on (user, room): the old row is newer and wins. Prefs clash on user: the account's is newer and wins.
+      db.prepare('UPDATE chat_memberships SET last_active = ? WHERE user = ?').run(100, 'Spot');
+      db.prepare('UPDATE chat_memberships SET last_active = ? WHERE user = ?').run(200, 'johan@UPROUGH');
+      db.prepare('INSERT INTO chat_prefs (user, json, updated_at) VALUES (?, ?, ?), (?, ?, ?)').run('Spot', '{"v":"account"}', 300, 'johan@UPROUGH', '{"v":"board"}', 50);
+
+      expect((await post('/accounts/link-via-board', { bbs_user: 'johan', handle: 'Spot', password: 'not the password' })).status).toBe(401);
+      expect(q('SELECT 1 FROM chat_messages WHERE user = ?', 'johan@UPROUGH')).toHaveLength(1);
+      expect(q('SELECT 1 FROM chat_memberships WHERE user = ?', 'johan@UPROUGH')).toHaveLength(1);
+      expect(q('SELECT 1 FROM chat_prefs WHERE user = ?', 'johan@UPROUGH')).toHaveLength(1);
+
+      expect((await post('/accounts/link-via-board', { bbs_user: 'johan', handle: 'Spot', password: PW })).status).toBe(201);
+      for (const t of ['chat_messages', 'chat_memberships', 'chat_prefs']) expect(q(`SELECT 1 FROM ${t} WHERE lower(user) = 'johan@uprough'`)).toEqual([]);
+      expect(q<{ content: string }>('SELECT content FROM chat_messages WHERE user = ?', 'Spot').map((r) => r.content)).toContain('from the board');
+      expect(q<{ last_active: number }>('SELECT last_active FROM chat_memberships WHERE user = ? AND room_id = ?', 'Spot', id)).toEqual([{ last_active: 200 }]);
+      expect(q<{ json: string }>('SELECT json FROM chat_prefs WHERE user = ?', 'Spot')).toEqual([{ json: '{"v":"account"}' }]);
+    } finally {
+      db.close();
+    }
+  });
+
   it('the claim covers every column of the built schema that holds a user key', () => {
     const db = fx.openAchievements();
     try {

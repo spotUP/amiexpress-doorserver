@@ -446,7 +446,7 @@ Limits (fixed windows in process): 20 messages per session per 10 seconds,
 creations per board per hour, 64 held polls per board, 40 canvas posts per
 session per 10 seconds. Reads other than
 `events.txt` are not limited. Environment overrides: `CHAT_POLL_MAX_WAIT`
-(default 25), `CHAT_SESSION_TTL` (default 90), `CHAT_FILES_DIR` (where file blobs live, outside any served directory; unset turns file sharing off).
+(default 25), `CHAT_SESSION_TTL` (default 90), `CHAT_FILES_DIR` (where file blobs live, outside any served directory; unset turns file sharing off), `CHAT_GLOBAL_ADMINS` (comma-separated Partyline account handles, any case, that moderate every board's channels and reset passwords; a board sysop moderates only its own board's channels; a `handle@BOARD` session is never a global admin).
 
 File limits: 2 MB per file, 32 KB per chunk, 10 MB per user and 100 MB per board
 per day (a relay `as` upload charges the board only), 200 files kept per room,
