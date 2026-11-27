@@ -126,6 +126,33 @@ describe('PUT /rooms/:id/voice/audio', () => {
     expect((await audio(`/rooms/${id}/voice/audio`, ami, Buffer.alloc(RELAY_MAX_BYTES + 1))).status).toBe(413);
   });
 
+  it('logs voice join and each caller first audio post under LOG_LEVEL=debug only', async () => {
+    const lines: string[] = [];
+    const spy = jest.spyOn(console, 'log').mockImplementation((l: string) => { lines.push(l); });
+    const prev = process.env.LOG_LEVEL;
+    try {
+      const owner = await login('sys', true);
+      const id = (await call('post', '/rooms', owner).send({ name: 'lounge', kind: 'voice' })).body.id as string;
+      await call('post', `/rooms/${id}/join`, owner);
+      const ami = await login('ami', false);
+      await call('post', `/rooms/${id}/join`, ami);
+      delete process.env.LOG_LEVEL;
+      await call('post', `/rooms/${id}/voice/join`, owner).send({});
+      expect(lines.filter((l) => l.startsWith('[voice]'))).toEqual([]);
+      process.env.LOG_LEVEL = 'debug';
+      await call('post', `/rooms/${id}/voice/join`, ami).send({});
+      await audio(`/rooms/${id}/voice/audio`, owner, Buffer.alloc(0));
+      await audio(`/rooms/${id}/voice/audio`, ami, Buffer.alloc(160, 0x9a));
+      const v = lines.filter((l) => l.startsWith('[voice]'));
+      expect(v[0]).toMatch(/^\[voice\] join room=\S+ user=\S+ muted=0 members=2$/);
+      expect(v[1]).toMatch(/audio .* bytes=0 .* to=0 .* posts=1 withBytes=0 forwarded=0$/);
+      expect(v[2]).toMatch(/audio .* bytes=160 muted=0 to=1 listeners=2 posts=1 withBytes=1 forwarded=1$/);
+    } finally {
+      spy.mockRestore();
+      if (prev === undefined) delete process.env.LOG_LEVEL; else process.env.LOG_LEVEL = prev;
+    }
+  });
+
   it('bridges a Partyline door caller in the room into the call, both ways, muted dropped', async () => {
     resetVoiceHub();
     const owner = await login('sys', true);

@@ -32,6 +32,23 @@ const SIGNAL_MAX = 32_768;
 
 export interface VoiceView { user: string; isMuted: boolean; hasVideo: boolean }
 
+/** LOG_LEVEL=debug: one line per voice join, per caller's first audio post, and a running count every 40 posts. */
+const voiceDebug = (line: string): void => { if (process.env.LOG_LEVEL === 'debug') console.log(`[voice] ${line}`); };
+/** relay key -> audio posts seen, posts with bytes, posts forwarded to at least one listener (debug log only). */
+const audioStats = new Map<string, { posts: number; withBytes: number; forwarded: number }>();
+function logAudio(roomId: string, user: string, bytes: number, muted: boolean, relay: AudioRelay): void {
+  if (process.env.LOG_LEVEL !== 'debug') return;
+  const key = `${roomId} ${user}`;
+  const s = audioStats.get(key) ?? { posts: 0, withBytes: 0, forwarded: 0 };
+  audioStats.set(key, s);
+  s.posts++;
+  if (bytes > 0) s.withBytes++;
+  if (relay.lastForwarded > 0) s.forwarded++;
+  if (s.posts === 1 || (bytes > 0 && s.withBytes === 1) || s.posts % 40 === 0) {
+    voiceDebug(`audio room=${roomId} user=${user} bytes=${bytes} muted=${muted ? 1 : 0} to=${relay.lastForwarded} listeners=${relay.size} posts=${s.posts} withBytes=${s.withBytes} forwarded=${s.forwarded}`);
+  }
+}
+
 const flags = (m: CallMember): string => `${m.isMuted ? 1 : 0}${m.hasVideo ? 1 : 0}`;
 
 function voiceRoom(db: Database.Database, ctx: ChatCtx, id: string): RoomRec {
@@ -83,6 +100,7 @@ export function joinVoice(db: Database.Database, ctx: ChatCtx, id: string, b: Bo
   call.set(ctx.user, m);
   if (started) for (const fn of callWatchers) fn();
   emitEvent(db, { type: 'voice', roomId: room.id, user: ctx.user, ref: 'joined', text: flags(m) });
+  voiceDebug(`join room=${room.id} user=${ctx.user} muted=${m.isMuted ? 1 : 0} members=${call.size}`);
   return { members: view(room.id) };
 }
 
@@ -139,7 +157,9 @@ export function exchangeAudio(db: Database.Database, ctx: ChatCtx, id: string, u
   me.at = Date.now();
   const relay = relays.get(room.id) ?? new AudioRelay();
   relays.set(room.id, relay);
-  return relay.exchange(ctx.user, ulaw, { mesh, muted: me.isMuted, inCall: inCallOrDoor(call), now: me.at });
+  const mix = relay.exchange(ctx.user, ulaw, { mesh, muted: me.isMuted, inCall: inCallOrDoor(call), now: me.at });
+  logAudio(room.id, ctx.user, ulaw.length, me.isMuted, relay);
+  return mix;
 }
 
 /** Relay key of a Partyline door caller: never collides with a chat/v1 call member. */
@@ -158,8 +178,10 @@ export function exchangeDoorAudio(roomId: string, userId: string, ulaw: Buffer, 
   if (!call) return null;
   const relay = relays.get(roomId) ?? new AudioRelay();
   relays.set(roomId, relay);
-  return relay.exchange(doorRelayKey(userId), ulaw, { mesh: 'door', muted, inCall: inCallOrDoor(call), now: Date.now() });
+  const mix = relay.exchange(doorRelayKey(userId), ulaw, { mesh: 'door', muted, inCall: inCallOrDoor(call), now: Date.now() });
+  logAudio(roomId, doorRelayKey(userId), ulaw.length, muted, relay);
+  return mix;
 }
 
 /** Tests only. */
-export function _resetVoiceForTests(): void { calls.clear(); relays.clear(); }
+export function _resetVoiceForTests(): void { calls.clear(); relays.clear(); audioStats.clear(); }

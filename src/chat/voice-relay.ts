@@ -52,6 +52,8 @@ interface Listener { group: RelayGroup; at: number; queued: Map<string, Int16Arr
 /** One call's relay: listener -> sender -> samples waiting for that listener. */
 export class AudioRelay {
   private listeners = new Map<string, Listener>();
+  /** How many listeners the last exchange's microphone bytes were queued for (debug log). */
+  lastForwarded = 0;
 
   /** Post `ulaw` from `user` (empty or `muted` = no microphone audio) and return their mix. */
   exchange(user: string, ulaw: Buffer, opts: { mesh: boolean | RelayGroup; muted: boolean; inCall: (u: string) => boolean; now: number }): Buffer {
@@ -63,6 +65,7 @@ export class AudioRelay {
     this.listeners.set(user, me);
 
     const n = Math.min(ulaw.length, RELAY_MAX_BYTES);
+    this.lastForwarded = 0;
     if (n > 0 && !opts.muted) {
       const pcm = new Int16Array(n);
       for (let i = 0; i < n; i++) pcm[i] = DECODE[ulaw[i]];
@@ -72,6 +75,7 @@ export class AudioRelay {
         const joined = had ? concat(had, pcm) : pcm;
         // A listener that stopped draining keeps only the newest second, never a growing backlog.
         l.queued.set(user, joined.length > RELAY_MAX_BYTES ? joined.subarray(joined.length - RELAY_MAX_BYTES) : joined);
+        this.lastForwarded++;
       }
     }
     return this.drain(me);
