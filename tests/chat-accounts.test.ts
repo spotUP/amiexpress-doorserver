@@ -190,10 +190,10 @@ describe('account tokens (D10: 30 days sliding, a password change revokes all)',
   it('each use renews the expiry; an expired token answers like an unknown one', async () => {
     const token = (await anon('/accounts/register', { handle: 'Spot', password: PW })).body.token as string;
     now += TOKEN_TTL_SECONDS - 10;
-    expect((await useToken(token)).status).toBe(200);
+    expect((await useToken(token)).status).toBe(201);
     // Past the first 30 days: alive only because the use above renewed it.
     now += TOKEN_TTL_SECONDS - 10;
-    expect((await useToken(token)).status).toBe(200);
+    expect((await useToken(token)).status).toBe(201);
     now += TOKEN_TTL_SECONDS + 1;
     const expired = await useToken(token);
     const unknown = await useToken('0'.repeat(64));
