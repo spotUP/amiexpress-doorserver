@@ -329,8 +329,11 @@ export function claimLegacyUser(db: Database.Database, oldUser: string, newUser:
     db.prepare('UPDATE OR IGNORE chat_role_assignments SET handle = @park WHERE board_id = @b AND lower(handle) = lower(@new)').run({ b: board, new: newUser, park: `${newUser}@${board.toUpperCase()}` });
   }
   const old = legacyRoleKey(db, board, oldHandle);
-  db.prepare('DELETE FROM chat_role_assignments WHERE board_id = @b AND lower(handle) = lower(@old) AND role_id IN (SELECT role_id FROM chat_role_assignments WHERE lower(handle) = lower(@new))').run({ b: board, old, new: newUser });
-  moved += db.prepare('UPDATE OR IGNORE chat_role_assignments SET handle = @new WHERE board_id = @b AND lower(handle) = lower(@old)').run({ b: board, old, new: newUser }).changes;
+  // The same key on both sides (legacy bob linking account bob): the rows are already his; the dedupe below would delete them.
+  if (old.toLowerCase() !== newUser.toLowerCase()) {
+    db.prepare('DELETE FROM chat_role_assignments WHERE board_id = @b AND lower(handle) = lower(@old) AND role_id IN (SELECT role_id FROM chat_role_assignments WHERE lower(handle) = lower(@new))').run({ b: board, old, new: newUser });
+    moved += db.prepare('UPDATE OR IGNORE chat_role_assignments SET handle = @new WHERE board_id = @b AND lower(handle) = lower(@old)').run({ b: board, old, new: newUser }).changes;
+  }
   db.prepare('UPDATE chat_sessions SET handle = @new WHERE lower(user) = lower(@new) AND lower(handle) = lower(@old) AND board_id = @b').run({ b: board, old: oldHandle, new: newUser });
   rethreadDms(db, newUser);
   return moved;
