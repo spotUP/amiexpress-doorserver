@@ -14,7 +14,7 @@ import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
 import { activeWindowSeconds, nowSec } from './config';
 import { emitEvent, headSeq } from './events';
-import { isBoardUser } from './accounts';
+import { accountByHandle, isBoardUser } from './accounts';
 import { getRoom, isMember, isOp, isOwnerLevel, isRoomStaff, requireCanvasClear, requireMod, requireOwner, requireSysop } from './permissions';
 import { applyParsed, blankCanvas, CANVAS_ROWS, CanvasGrammarError, encodeRow, parseOps } from './canvas-codec';
 import type { RoomRec } from './permissions';
@@ -867,7 +867,9 @@ export function setMode(db: Database.Database, ctx: ChatCtx, id: string, b: Body
       applied.push(`${sign}m`);
     } else if (MODE_TAKES_USER[flag]) {
       if (!param) { errors.push(`Mode ${sign}${flag} requires a username`); continue; }
-      if (!splitUser(param)) { errors.push(`User ${param} not found`); continue; }
+      const who = splitUser(param);
+      // a bare key is a global account handle; it must name a real account
+      if (!who || (!who.board && !accountByHandle(db, param))) { errors.push(`User ${param} not found`); continue; }
       if (flag !== 'v' && room.owner_user.toLowerCase() === param.toLowerCase() && !ctx.admin) {
         errors.push(`Mode ${sign}${flag} ${param}: the room owner cannot be moderated`);
         continue;
