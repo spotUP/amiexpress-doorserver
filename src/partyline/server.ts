@@ -19,6 +19,8 @@ import { chatScreen } from './ui/screen';
 import { livechatScreen } from './livechat-host';
 import type { ScreenFactory } from './session';
 import type { AccountGateway } from './account-form';
+import { boardSession, sessionViaBoard } from '../chat/sessions';
+import { loginAccount, registerAccount } from '../chat/accounts';
 
 export interface PartylineConfig {
   enabled: boolean;
@@ -60,8 +62,8 @@ export interface PartylineOptions {
   log?: (line: string) => void;
   /** Tests hand in PEM text instead of paths. */
   tlsContext?: tls.SecureContextOptions;
-  /** The global-account endpoints in process; absent, callers keep board-handle sessions. */
-  accounts?: AccountGateway;
+  /** `true`: a board caller without an account link gets the register-or-link form (tests may hand in a gateway). Absent: board-handle sessions as before. */
+  accounts?: AccountGateway | true;
 }
 
 export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsConfig, opts: PartylineOptions = {}): PartylineServer {
@@ -77,9 +79,16 @@ export function createPartylineServer(cfg: PartylineConfig, ach: AchievementsCon
     ?? (cfg.tlsCert && cfg.tlsKey ? { cert: fs.readFileSync(cfg.tlsCert), key: fs.readFileSync(cfg.tlsKey) } : null);
   const secureContext = tlsOpts ? tls.createSecureContext(tlsOpts) : null;
 
+  // The same functions the HTTP routes run (router.ts), so the form and the API cannot drift.
+  const accounts: AccountGateway | undefined = opts.accounts === true ? {
+    open: (db, boardId, req) => boardSession(db, chat, boardId, req),
+    register: (db, boardId, req) => sessionViaBoard(db, chat, boardId, req, registerAccount(db, req)),
+    link: (db, boardId, req) => sessionViaBoard(db, chat, boardId, req, loginAccount(db, req.handle, req.password)),
+  } : opts.accounts || undefined;
+
   const attach = (sock: Duplex, isTls: boolean): void => {
     const s = new PartylineSession(sock, {
-      ach, chat, screen, tls: isTls, accounts: opts.accounts,
+      ach, chat, screen, tls: isTls, accounts,
       isDraining: () => draining,
       onClose: (gone) => sessions.delete(gone),
       sidHeldElsewhere: (sid, self) => [...sessions].some((o) => o !== self && o.live && o.sid === sid),

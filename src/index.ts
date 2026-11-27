@@ -139,7 +139,7 @@ function main(): void {
   if (plp.enabled && !cfg.achievements) {
     console.error('[ERROR] Partyline needs ACHIEVEMENTS_DB; partyline not started (PARTYLINE_ENABLED=0 silences this)');
   } else if (plp.enabled && cfg.achievements) {
-    const partyline = createPartylineServer(plp, cfg.achievements, { filesDir: cfg.chatFilesDir });
+    const partyline = createPartylineServer(plp, cfg.achievements, { filesDir: cfg.chatFilesDir, accounts: true });
     partyline.listen().catch((err: Error) => console.error(`[ERROR] partyline listen on ${plp.port} failed: ${err.message}`));
     // Drain on SIGTERM so callers see a status line and resume onto the new process.
     process.once('SIGTERM', () => {

@@ -8,7 +8,7 @@
 import * as crypto from 'crypto';
 import type Database from 'better-sqlite3';
 import { CHAT_LIMITS } from '../../contract/chat-types';
-import type { NeedsAccountReply, SessionReply } from '../../contract/chat-types';
+import type { BoardAccountReply, NeedsAccountReply, SessionReply } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
 import { withAchievementsDb } from '../achievements/db';
@@ -17,7 +17,7 @@ import { activeWindowSeconds, nowSec } from './config';
 import type { ChatConfig } from './config';
 import { emitEvent, pruneEvents } from './events';
 import { sweepFiles } from './files';
-import { accountByHandle, botAccount, cleanPrefill, handleFree, isGlobalAdmin, linkedAccount, validBbsUser } from './accounts';
+import { accountByHandle, botAccount, cleanPrefill, handleFree, isGlobalAdmin, linkAccount, linkedAccount, toAccount, validBbsUser } from './accounts';
 import type { AccountRow } from './accounts';
 
 export interface ChatCtx {
@@ -130,6 +130,22 @@ export function boardSession(
     return { needs_account: true, prefill, handle_free: handleFree(db, prefill.handle ?? body.bbs_user) };
   }
   return createSession(db, cfg, boardId, body);
+}
+
+/**
+ * register-via-board / link-via-board: `account` creates or proves the account (its password), then
+ * the link, the claim of the old rows and the session, all in the caller's transaction.
+ */
+export function sessionViaBoard(
+  db: Database.Database,
+  cfg: ChatConfig,
+  boardId: string,
+  body: { bbs_user?: unknown; sysop?: unknown; client?: unknown },
+  account: AccountRow
+): BoardAccountReply {
+  if (!validBbsUser(body.bbs_user)) throw new SurfaceError('bad_request', 400, 'bbs_user is required');
+  linkAccount(db, boardId, body.bbs_user, account);
+  return { ...createSession(db, cfg, boardId, { bbs_user: body.bbs_user, sysop: body.sysop, client: body.client }), account: toAccount(cfg, account) };
 }
 
 /** A session for a caller who proved the account itself (token or password); it belongs to no board. */

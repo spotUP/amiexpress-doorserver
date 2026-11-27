@@ -23,7 +23,7 @@ import { fetchVisibleEvents, headSeq, heldPollCount, waitForEvents } from './eve
 import type { EventRec } from './events';
 import { clampMaxBytes, displayLabels, fitRows, markOrigin, renderText, sendText } from './render';
 import * as roles from './roles';
-import { accountSession, actingCtx, boardSession, botUsers, createSession, expireSession, resolveSession, startSweeper } from './sessions';
+import { accountSession, actingCtx, boardSession, botUsers, expireSession, sessionViaBoard, resolveSession, startSweeper } from './sessions';
 import * as accounts from './accounts';
 import { charge } from '../achievements/ratelimit';
 import type { ChatCtx } from './sessions';
@@ -194,14 +194,8 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
   // ---- accounts through a board: the user types the password, the board only carries it ----
   const viaBoard = (req: Request, res: Response, account: (db: Database.Database) => accounts.AccountRow): void => {
     const boardId = boardOf(req);
-    const b = body(req);
-    if (!accounts.validBbsUser(b.bbs_user)) throw new SurfaceError('bad_request', 400, 'bbs_user is required');
-    const bbsUser = b.bbs_user;
-    const out = withAchievementsDb(ach, (db) => db.transaction(() => {
-      const a = account(db);
-      accounts.linkAccount(db, boardId, bbsUser, a);
-      return { ...createSession(db, chat, boardId, { bbs_user: bbsUser, sysop: b.sysop, client: b.client }), account: accounts.toAccount(chat, a) };
-    })());
+    if (!accounts.validBbsUser(body(req).bbs_user)) throw new SurfaceError('bad_request', 400, 'bbs_user is required');
+    const out = withAchievementsDb(ach, (db) => db.transaction(() => sessionViaBoard(db, chat, boardId, body(req), account(db)))());
     res.status(201).json(out);
   };
   router.post('/accounts/register-via-board', (req: Request, res: Response) => viaBoard(req, res, (db) => accounts.registerAccount(db, body(req))));

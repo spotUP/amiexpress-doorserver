@@ -80,6 +80,13 @@ export interface PlpHello {
   modem: number;
   /** Empty for a fresh login. */
   resume: string;
+  /**
+   * Defaults for the register form a board caller without a Partyline account sees (hello
+   * `realname=`, `location=`, `email=`, at most 128 characters each). Never identity. Absent from an older board.
+   */
+  realname?: string;
+  location?: string;
+  email?: string;
 }
 
 /** The WELCOME payload, sent as `key=value` lines. */

@@ -60,6 +60,9 @@ export function parseHello(payload: Buffer): PlpHello {
     conn: oneOf(kv.get('conn'), ['telnet', 'web', 'ssh'] as const, 'telnet'),
     modem: int(kv.get('modem'), 0),
     resume: kv.get('resume') ?? '',
+    realname: kv.get('realname')?.slice(0, 128) || undefined,
+    location: kv.get('location')?.slice(0, 128) || undefined,
+    email: kv.get('email')?.slice(0, 128) || undefined,
   };
 }
 
