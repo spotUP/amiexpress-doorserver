@@ -49,7 +49,7 @@ describe('parseRoomMap with several guilds', () => {
 });
 
 describe('hub -> every linked guild', () => {
-  const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'message', room: 'r', user: 'amy@B', ref: 'h1', at: '', roleColor: '', text: 'hi', replyTo: '', label: 'amy', ...over });
+  const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'message', room: 'r', user: 'amy@B', ref: 'h1', at: '', roleColor: '', text: 'hi', replyTo: '', board: '', label: 'amy', ...over });
 
   it('posts, edits and deletes in each channel once', async () => {
     const { state } = tmpState();
@@ -146,7 +146,7 @@ describe('multi-guild review fixes (2026-11-12)', () => {
   const rooms = new Map([['r', ['A', 'B', 'C']]]);
   const nolog = (): void => undefined;
   const gone = (): Error & { status: number } => Object.assign(new Error('Unknown Message'), { status: 404, code: 10008 });
-  const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'delete', room: 'r', user: 'sys@BBS', ref: 'h1', at: '', roleColor: '', text: '', replyTo: '', label: '', ...over });
+  const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'delete', room: 'r', user: 'sys@BBS', ref: 'h1', at: '', roleColor: '', text: '', replyTo: '', board: '', label: '', ...over });
   const seed = (state: BridgeState, source = true): void => {
     if (source) state.putLink({ hubMessageId: 'h1', discordMessageId: 'd1', roomId: 'r', channelId: 'B', source: true, createdAt: 1, authorLabel: 'bob', content: 'hello' });
     state.putLink({ hubMessageId: 'h1', discordMessageId: 'w1', roomId: 'r', channelId: 'A', createdAt: 1, authorLabel: 'bob (Guild B)', content: 'hello' });

@@ -184,8 +184,10 @@ Formats and their fields, in order:
 - ROOMS: `id|name|topic|visibility|members|owner|kind` (kind: `text`, `voice` or `art`)
 - MEMBERS: `user|sysop|op|roleColor|roleName|status|statusText|label|active|lastActive` (`active` is `1` when the member holds a live session and typed or sent within the last 10 minutes, the hub's active window: admin panel setting, else `CHAT_ACTIVE_WINDOW` seconds; `lastActive` the epoch second of that last typing or message, `0` never)
 - HISTORY: `seq|id|user|at|replyTo|threadId|roleColor|text|label`
-- EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo|label` (`replyTo` is the
-  message id a `message` event answers, empty otherwise)
+- EVENTS: `seq|type|room|user|ref|at|roleColor|text|replyTo|label|board` (`replyTo` is the
+  message id a `message` event answers, empty otherwise; `board` is the board a
+  `message` or `file_shared` came from, upper-cased, empty otherwise: a linked
+  account's bare `user` has no `@BOARD`)
 - REACTIONS: `emoji|count|mine`
 - EMOJI: `name|display|ascii`
 - NOTES: `id|target|author|at|text`
@@ -235,10 +237,10 @@ The same `as` works on `POST /dm/:peer`, `POST /dm-group` (body) and
 read as, `as@<relay board>`, with its own per-author rate limit. (Direct
 messages have no bans or ignore filtering on the server; a room ban does not
 stop a DM.) A relay board's `GET /events.txt` also carries every `dm` event
-that has a participant `x@<relay board>`, 1:1 or group, whichever user of the
+that has a participant `x@<relay board>` or an account linked on that board, 1:1 or group, whichever user of the
 board sent or received it. Row (the usual EVENTS columns):
-`seq|dm|<threadId>|<sender full user>|<message id>|<at>|<role color>|<content>||<sender label>`
-for example `42|dm|dm1a2b3c4d5e6f|alice@BBS|dabc123|1700000000||hello||alice`.
+`seq|dm|<threadId>|<sender full user>|<message id>|<at>|<role color>|<content>||<sender label>|`
+for example `42|dm|dm1a2b3c4d5e6f|alice@BBS|dabc123|1700000000||hello||alice|`.
 `threadId` starts with `dm` (1:1) or `dg` (group); the row does not name the
 recipient: `GET /dm/<threadId>/participants.txt` lists the thread's users
 (`PARTICIPANTS|1|<rev>|2` then `alice@BBS`, `zed@DISCORD`, one per row) so the
@@ -273,8 +275,8 @@ HISTORY|1|410|2
 
 ```text example EVENTS
 EVENTS|1|413|2
-412|message|a1b2c3d4e5f6|zed@FRIEND|m6e5d4c3b2a1|1762500005||Hi spot!|m1a2b3c4d5e6|zed
-413|react|a1b2c3d4e5f6|spot@UPROUGH|m6e5d4c3b2a1|1762500007|11|thumbsup!1||spot
+412|message|a1b2c3d4e5f6|zed@FRIEND|m6e5d4c3b2a1|1762500005||Hi spot!|m1a2b3c4d5e6|zed|FRIEND
+413|react|a1b2c3d4e5f6|spot@UPROUGH|m6e5d4c3b2a1|1762500007|11|thumbsup!1||spot|
 ```
 
 ```text example REACTIONS

@@ -227,6 +227,19 @@ export function linkedAccount(db: Database.Database, boardId: string, bbsUser: s
 }
 
 /**
+ * SQL true when `col` is a user of the board bound as @board: a legacy `x@BOARD` key (@suffix = '@board',
+ * lower-cased) or an account handle linked on that board. A relay board speaks for both kinds.
+ */
+export const boardUserSql = (col: string): string =>
+  `(lower(substr(${col}, -length(@suffix))) = @suffix OR ${col} IN (SELECT p.handle FROM account_links l JOIN players p ON p.id = l.account_id WHERE l.board_id = @board))`;
+
+export const boardUserParams = (boardId: string): { board: string; suffix: string } => ({ board: boardId, suffix: `@${boardId.toLowerCase()}` });
+
+export function isBoardUser(db: Database.Database, boardId: string, user: string): boolean {
+  return !!db.prepare(`SELECT 1 WHERE ${boardUserSql('@user COLLATE NOCASE')}`).get({ ...boardUserParams(boardId), user });
+}
+
+/**
  * Tie (board, bbs_user) to an account and claim the BBS user's old `bbs_user@BOARD` rows.
  * The caller has already proven the account: it was just created, or its password was given.
  */

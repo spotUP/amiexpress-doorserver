@@ -567,4 +567,11 @@ export const ACHIEVEMENTS_MIGRATIONS: Migration[] = [
       db.exec("UPDATE account_tokens SET expires_at = CAST(strftime('%s','now') AS INTEGER) + 30 * 24 * 3600");
     },
   },
+  {
+    version: 27,
+    name: 'chat: events record the board a message or file came from (a bare account key has no @BOARD)',
+    up: (db) => {
+      db.exec('ALTER TABLE chat_events ADD COLUMN origin_board TEXT');
+    },
+  },
 ];

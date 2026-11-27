@@ -188,13 +188,15 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
   }
 
   const fromDiscord = (ev: BridgeEvent): boolean => boardOf(ev.user) === CHAT_DISCORD_BOARD.toUpperCase();
+  // A bare account key has no @BOARD: the hub sends the board it spoke from; the suffix covers an older hub.
+  const boardOfEvent = (ev: BridgeEvent): string => ev.board || boardOf(ev.user);
 
   async function onMessage(ev: BridgeEvent): Promise<void> {
     // Loop guard: a Discord-origin message was already copied guild-to-guild by inbound.ts.
     if (fromDiscord(ev)) return;
     // Every linked channel has its twin: replayed after a restart, nothing to fetch.
     if (deps.rooms.get(ev.room).every((c) => deps.state.byHubIn(ev.ref, c))) return;
-    if (!(await mirrored(boardOf(ev.user)))) return;
+    if (!(await mirrored(boardOfEvent(ev)))) return;
     await fanout.post({ hubMessageId: ev.ref, room: ev.room, label: ev.label || ev.user, text: ev.text, replyTo: ev.replyTo });
   }
 
@@ -218,7 +220,7 @@ export function createOutbound(deps: OutboundDeps): (ev: BridgeEvent) => Promise
   async function onFileShared(ev: BridgeEvent): Promise<void> {
     if (fromDiscord(ev)) return; // an attachment copied in from Discord already sits in its own channel
     if (deps.rooms.get(ev.room).every((c) => deps.state.byHubIn(ev.ref, c))) return;
-    if (!(await mirrored(boardOf(ev.user)))) return;
+    if (!(await mirrored(boardOfEvent(ev)))) return;
     const { name, size, kind } = parseShared(ev.text);
     const base = { hubMessageId: ev.ref, room: ev.room, label: ev.label || ev.user };
     if (kind === 'image' && deps.fetchFile && size <= PICTURE_UPLOAD_MAX) {

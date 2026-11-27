@@ -40,7 +40,7 @@ describe('chat long poll', () => {
     expect(r.text).toContain('wake up');
   });
 
-  it('carries replyTo, then the label, as the last fields of a message event', async () => {
+  it('carries replyTo, the label, then the origin board as the last fields of a message event', async () => {
     const a = await login('alice');
     const id = (await call('post', '/rooms', a).send({ name: 'lobby' })).body.id as string;
     await call('post', `/rooms/${id}/join`, a);
@@ -49,7 +49,7 @@ describe('chat long poll', () => {
     await call('post', `/rooms/${id}/messages`, a).send({ content: 'answer', clientId: 'p2', replyTo: parent });
     const r = await call('get', `/events.txt?since=${since}&wait=0`, a);
     const row = r.text.split(/\r?\n/).find((l) => l.includes('|message|'));
-    expect(row?.split('|').slice(7)).toEqual(['answer', parent, 'alice']);
+    expect(row?.split('|').slice(7)).toEqual(['answer', parent, 'alice', 'UPROUGH']);
   });
   it('never sends more than maxBytes of events, however many canvas events wait', async () => {
     const a = await login('alice');

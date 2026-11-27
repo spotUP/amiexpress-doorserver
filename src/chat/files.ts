@@ -337,7 +337,7 @@ export function finishUpload(db: Database.Database, dir: string | null, ctx: Cha
   db.prepare("UPDATE chat_files SET status = 'ready', sha256 = ?, kind = ?, img_w = ?, img_h = ?, blob_id = ?, updated_at = ?, expires_at = ? WHERE id = ?").run(
     sha256, kind, pic && kind === 'image' ? pic.w : null, pic && kind === 'image' ? pic.h : null, blobId, now, now + CHAT_LIMITS.fileRetentionDays * DAY, id
   );
-  emitEvent(db, { type: 'file_shared', ...eventScope(db, row), user: row.uploader, ref: id, text: `${row.name}|${row.size}|${kind}` });
+  emitEvent(db, { type: 'file_shared', ...eventScope(db, row), user: row.uploader, ref: id, text: `${row.name}|${row.size}|${kind}`, originBoard: row.board_id });
   if (row.room_id) trimRoom(db, d, row.room_id);
   return { id, sha256, kind, name: row.name, size: row.size };
 }

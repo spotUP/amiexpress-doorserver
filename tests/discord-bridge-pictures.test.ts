@@ -14,7 +14,7 @@ import { parseEvents, decodeBody, type BridgeEvent } from '../src/discord-bridge
 import { renderText } from '../src/chat/render';
 
 const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({
-  seq: 1, type: 'file_shared', room: 'r', user: 'Bob@B', ref: 'f1', at: '', roleColor: '', text: 'cat.png|2048|image', replyTo: '', label: 'Bob', ...over,
+  seq: 1, type: 'file_shared', room: 'r', user: 'Bob@B', ref: 'f1', at: '', roleColor: '', text: 'cat.png|2048|image', replyTo: '', board: '', label: 'Bob', ...over,
 });
 
 function setup(opts: { fetchFile?: (id: string) => Promise<Buffer>; boards?: string[] } = {}) {

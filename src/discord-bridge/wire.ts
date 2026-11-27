@@ -43,6 +43,8 @@ export interface BridgeEvent {
   text: string;
   replyTo: string;
   label: string;
+  /** The board a message or file came from, upper-cased; '' from an older hub. */
+  board: string;
 }
 
 const EVENT_COLUMNS = CHAT_TEXT_FORMATS.EVENTS.length;
@@ -54,7 +56,7 @@ export function parseEvents(body: string): { revision: number; events: BridgeEve
     // Older hubs send fewer columns: pad rather than read undefined.
     const c = [...r];
     while (c.length < EVENT_COLUMNS) c.push('');
-    return { seq: Number(c[0]), type: c[1], room: c[2], user: c[3], ref: c[4], at: c[5], roleColor: c[6], text: c[7], replyTo: c[8], label: c[9] };
+    return { seq: Number(c[0]), type: c[1], room: c[2], user: c[3], ref: c[4], at: c[5], roleColor: c[6], text: c[7], replyTo: c[8], label: c[9], board: c[10] };
   });
   return { revision: t.revision, events };
 }

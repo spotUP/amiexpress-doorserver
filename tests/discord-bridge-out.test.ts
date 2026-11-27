@@ -224,7 +224,7 @@ describe('hub -> Discord through the bridge', () => {
 });
 
 describe('createOutbound without a hub', () => {
-  const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'message', room: 'r', user: 'a@B', ref: 'h1', at: '', roleColor: '', text: 'hi', replyTo: '', label: 'a', ...over });
+  const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'message', room: 'r', user: 'a@B', ref: 'h1', at: '', roleColor: '', text: 'hi', replyTo: '', board: '', label: 'a', ...over });
 
   it('filters by board list, never mirrors DISCORD authors, refreshes on discord_mirror and after 60 s', async () => {
     const { BridgeState } = await import('../src/discord-bridge/state');
@@ -268,6 +268,11 @@ describe('createOutbound without a hub', () => {
     t = 200000;
     await handler(ev({ ref: 'h1' }));
     expect(posts).toEqual(['a', 'c']);
+    // A bare linked account key has no @BOARD: the event's origin board decides.
+    await handler(ev({ ref: 'h7', user: 'Zed', board: 'B', label: 'Zed' }));
+    await handler(ev({ ref: 'h8', user: 'Yan', board: 'NOPE', label: 'Yan' }));
+    await handler(ev({ ref: 'h9', user: 'Xu', label: 'Xu' })); // no board, no suffix: not mirrored
+    expect(posts).toEqual(['a', 'c', 'Zed']);
     // Edit/delete of a message with no twin do nothing and do not throw.
     await handler(ev({ type: 'edit', ref: 'ghost' }));
     await handler(ev({ type: 'delete', ref: 'ghost' }));
@@ -365,7 +370,7 @@ describe('createOutbound edit of a reply (H5)', () => {
       log: () => undefined,
       now: () => 0,
     });
-    const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'message', room: 'r', user: 'a@B', ref: 'h1', at: '', roleColor: '', text: 'hi', replyTo: '', label: 'a', ...over });
+    const ev = (over: Partial<BridgeEvent>): BridgeEvent => ({ seq: 1, type: 'message', room: 'r', user: 'a@B', ref: 'h1', at: '', roleColor: '', text: 'hi', replyTo: '', board: '', label: 'a', ...over });
     await handler(ev({ ref: 'h1', text: 'parent text' }));
     await handler(ev({ ref: 'h2', text: 'answer', replyTo: 'h1' }));
     await handler(ev({ type: 'edit', ref: 'h2', text: 'answer edited', replyTo: 'h1' }));

@@ -25,7 +25,7 @@ export const CHAT_TEXT_FORMATS = {
   ROOMS: ['id', 'name', 'topic', 'visibility', 'members', 'owner', 'kind'],
   MEMBERS: ['user', 'sysop', 'op', 'roleColor', 'roleName', 'status', 'statusText', 'label', 'active', 'lastActive'],
   HISTORY: ['seq', 'id', 'user', 'at', 'replyTo', 'threadId', 'roleColor', 'text', 'label'],
-  EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo', 'label'],
+  EVENTS: ['seq', 'type', 'room', 'user', 'ref', 'at', 'roleColor', 'text', 'replyTo', 'label', 'board'],
   REACTIONS: ['emoji', 'count', 'mine'],
   WHO: ['user', 'room', 'sysop', 'roleColor', 'idleSeconds', 'status', 'statusText', 'label'],
   /** The boards whose callers the Discord bridge may copy (discord_mirror on), upper-cased. */

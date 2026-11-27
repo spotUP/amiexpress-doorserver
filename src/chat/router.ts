@@ -377,7 +377,7 @@ export function createChatRouter(cfg: ServerConfig, ach: AchievementsConfig): ex
         const cache = new Map<string, string>();
         const labels = displayLabels([...events.map((e) => e.user), ...store.memberUsers(db, events.map((e) => e.room_id ?? ''))], botUsers(db));
         const text = (e: EventRec): string => (e.type === 'message' || e.type === 'edit' ? markOrigin(e.user, e.text) : e.text);
-        return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), text(e), e.reply_to, e.user ? labels.get(e.user) ?? e.user : '']);
+        return events.map((e) => [e.seq, e.type, e.label, e.user, e.ref, e.at, roleColor(db, cache, e.user), text(e), e.reply_to, e.user ? labels.get(e.user) ?? e.user : '', e.origin_board.toUpperCase()]);
       });
       // A 68K reply buffer is 8 KB: stop before the reply passes maxBytes and let the client poll on from the last seq.
       const fitted = fitRows(out, clampMaxBytes(req.query.maxBytes));

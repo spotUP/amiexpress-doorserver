@@ -14,6 +14,7 @@ import { SurfaceError } from '../achievements/errors';
 import { charge } from '../achievements/ratelimit';
 import { activeWindowSeconds, nowSec } from './config';
 import { emitEvent, headSeq } from './events';
+import { isBoardUser } from './accounts';
 import { getRoom, isMember, isOp, isOwnerLevel, isRoomStaff, requireCanvasClear, requireMod, requireOwner, requireSysop } from './permissions';
 import { applyParsed, blankCanvas, CANVAS_ROWS, CanvasGrammarError, encodeRow, parseOps } from './canvas-codec';
 import type { RoomRec } from './permissions';
@@ -463,7 +464,7 @@ export function postMessage(db: Database.Database, ctx: ChatCtx, roomId: string,
   );
   indexFts(db, id);
   touchActivity(db, ctx.user);
-  const seq = emitEvent(db, { type: 'message', roomId, label: threadId ? `thread:${threadId}` : room.id, user: ctx.user, ref: id, text: content });
+  const seq = emitEvent(db, { type: 'message', roomId, label: threadId ? `thread:${threadId}` : room.id, user: ctx.user, ref: id, text: content, originBoard: ctx.boardId });
   db.prepare('UPDATE chat_messages SET seq = ? WHERE id = ?').run(seq, id);
   return { id, seq, at };
 }
@@ -746,8 +747,7 @@ export function dmParticipants(db: Database.Database, ctx: ChatCtx, threadId: st
     users = [...set];
   }
   const relay = (db.prepare('SELECT chat_relay FROM boards WHERE id = ?').get(ctx.boardId) as { chat_relay: number } | undefined)?.chat_relay === 1;
-  const suffix = `@${ctx.boardId.toLowerCase()}`;
-  const allowed = relay ? users.some((u) => u.toLowerCase().endsWith(suffix)) : users.includes(ctx.user);
+  const allowed = relay ? users.some((u) => isBoardUser(db, ctx.boardId, u)) : users.includes(ctx.user);
   if (!allowed) throw new SurfaceError('forbidden', 403, 'not a participant of this thread');
   return users.sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase()));
 }

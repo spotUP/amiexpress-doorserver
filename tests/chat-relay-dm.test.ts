@@ -9,6 +9,8 @@ import type { AchievementsFixture } from './achievements/helpers';
 import { _stopChatSweepersForTests } from '../src/chat/sessions';
 import { CHAT_LIMITS } from '../contract/chat-types';
 
+// scrypt for the account test can pass 5 s under load.
+jest.setTimeout(30_000);
 let fx: AchievementsFixture;
 let discordAuth: string;
 beforeEach(async () => {
@@ -148,5 +150,25 @@ describe('relay boards: as on direct messages', () => {
     expect((await call(carol, 'get', path(one))).status).toBe(403);
     expect((await call(carol, 'get', path(grp))).status).toBe(403);
     expect((await call(alice, 'get', path(none))).status).toBe(403);
+  });
+
+  it('a bare account linked on the relay board counts as its user: its dm events reach the relay stream and its threads read', async () => {
+    const reg = await request(fx.app).post('/chat/v1/accounts/register').send({ handle: 'Zed', password: 'correct horse' });
+    expect(reg.status).toBe(201);
+    const link = await request(fx.app).post('/chat/v1/accounts/link-via-board').set('Authorization', discordAuth).send({ bbs_user: 'zed', handle: 'Zed', password: 'correct horse' });
+    expect(link.status).toBe(201);
+    const bridge = await login(discordAuth, 'bridge');
+    const alice = await login(fx.auth, 'alice');
+    const bob = await login(fx.auth, 'bob');
+    const since = (await call(bob, 'post', `/dm/${alice.user}`).send({ content: 'seed', clientId: cid() })).body.seq as number;
+
+    const one = await call(alice, 'post', '/dm/Zed').send({ content: 'hi bare zed', clientId: cid() });
+    const grp = await call(alice, 'post', '/dm-group').send({ participants: ['Zed', bob.user], content: 'grp bare', clientId: cid() });
+    expect([one.status, grp.status]).toEqual([201, 201]);
+
+    const dms = (await events(bridge, since)).filter((r) => r[1] === 'dm');
+    expect(dms.map((r) => r[7])).toEqual(['hi bare zed', 'grp bare']);
+    expect((await call(bridge, 'get', `/dm/${one.body.threadId as string}/participants.txt`)).status).toBe(200);
+    expect((await call(bridge, 'get', `/dm/${grp.body.threadId as string}/participants.txt`)).status).toBe(200);
   });
 });

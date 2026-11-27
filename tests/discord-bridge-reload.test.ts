@@ -181,7 +181,7 @@ describe('refreshLinks', () => {
     const rooms = new LiveRooms(new Map([['r1', ['a']]]));
     const o = fakeOut();
     const outbound = createOutbound({ rooms, state, out: o.out, fetchBoards: async () => ({ rev: 1, boards: new Set() }), log: () => undefined });
-    const ev: BridgeEvent = { seq: 3, type: 'discord_link', room: 'r1', user: 'sysop@B', ref: '7', at: '', roleColor: '', text: 'linked', replyTo: '', label: '' };
+    const ev: BridgeEvent = { seq: 3, type: 'discord_link', room: 'r1', user: 'sysop@B', ref: '7', at: '', roleColor: '', text: 'linked', replyTo: '', board: '', label: '' };
     await outbound(ev);
     expect(o.posts).toEqual([]);
     state.close();

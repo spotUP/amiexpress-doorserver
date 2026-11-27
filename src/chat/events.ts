@@ -11,6 +11,7 @@ import { CHAT_LIMITS } from '../../contract/chat-types';
 import type { ChatEventType } from '../../contract/chat-types';
 import { SurfaceError } from '../achievements/errors';
 import { nowSec } from './config';
+import { boardUserParams, boardUserSql } from './accounts';
 
 export interface EventRec {
   seq: number;
@@ -23,6 +24,8 @@ export interface EventRec {
   text: string;
   /** The message a `message` or `edit` event answers, '' otherwise. */
   reply_to: string;
+  /** The board a `message` or `file_shared` came from, '' otherwise. */
+  origin_board: string;
 }
 
 export interface NewEvent {
@@ -37,6 +40,8 @@ export interface NewEvent {
   dmB?: string;
   /** Set for board-local events: only sessions of this board see them. */
   boardId?: string;
+  /** The board the author spoke from; a bare account key cannot tell it (Discord mirror). */
+  originBoard?: string;
 }
 
 export function emitEvent(db: Database.Database, e: NewEvent): number {
@@ -45,10 +50,10 @@ export function emitEvent(db: Database.Database, e: NewEvent): number {
   if (e.type === 'typing') db.prepare("DELETE FROM chat_events WHERE type = 'typing' AND user = ? AND room_id IS ?").run(e.user, e.roomId ?? null);
   const res = db
     .prepare(
-      `INSERT INTO chat_events (type, room_id, label, user, ref, at, text, dm_a, dm_b, board_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO chat_events (type, room_id, label, user, ref, at, text, dm_a, dm_b, board_id, origin_board)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(e.type, e.roomId ?? null, e.label ?? e.roomId ?? '', e.user, e.ref ?? '', nowSec(), e.text ?? '', e.dmA ?? null, e.dmB ?? null, e.boardId ?? null);
+    .run(e.type, e.roomId ?? null, e.label ?? e.roomId ?? '', e.user, e.ref ?? '', nowSec(), e.text ?? '', e.dmA ?? null, e.dmB ?? null, e.boardId ?? null, e.originBoard ?? null);
   scheduleWake();
   return Number(res.lastInsertRowid);
 }
@@ -62,14 +67,14 @@ export function headSeq(db: Database.Database): number {
  * What a session may see: its joined rooms, its direct messages, events about
  * its user, the lifecycle of public rooms, the deletion of a private room it was invited to or owns, the message of the day, board_joined,
  * and the `bbs` events of its own board (never another board's, even for the same user name).
- * A relay board (boards.chat_relay) also gets every `dm` that has a participant `x@<its board>`,
+ * A relay board (boards.chat_relay) also gets every `dm` that has a participant `x@<its board>` or an account linked on it,
  * because it speaks for those users (`as`) and no session of its own is that participant.
  */
 export function fetchVisibleEvents(db: Database.Database, sid: string, user: string, since: number, board: string): EventRec[] {
   return db
     .prepare(
       `SELECT e.seq, e.type, e.room_id, e.label, e.user, e.ref, e.at, e.text,
-              COALESCE(m.reply_to, '') AS reply_to
+              COALESCE(m.reply_to, '') AS reply_to, COALESCE(e.origin_board, '') AS origin_board
          FROM chat_events e
          LEFT JOIN chat_messages m ON e.type IN ('message','edit') AND m.id = e.ref
         WHERE e.seq > @since AND (
@@ -80,8 +85,8 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
            OR (e.dm_a IS NOT NULL AND (e.dm_a = @user OR e.dm_b = @user))
            OR (e.type IN ('dm','file_shared','file_deleted') AND e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE user = @user))
            OR (e.type IN ('dm','file_shared','file_deleted') AND EXISTS (SELECT 1 FROM boards WHERE id = @board AND chat_relay = 1) AND (
-                 lower(substr(e.dm_a, -length(@suffix))) = @suffix OR lower(substr(e.dm_b, -length(@suffix))) = @suffix
-              OR (e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE lower(substr(user, -length(@suffix))) = @suffix))))
+                 ${boardUserSql('e.dm_a')} OR ${boardUserSql('e.dm_b')}
+              OR (e.dm_a IS NULL AND e.label IN (SELECT thread_id FROM chat_dm_members WHERE ${boardUserSql('user')}))))
            OR e.user = @user
            OR (e.type IN ('room_created','room_deleted','room_renamed','topic')
                AND e.room_id IN (SELECT id FROM chat_rooms WHERE visibility = 'public'))
@@ -92,7 +97,7 @@ export function fetchVisibleEvents(db: Database.Database, sid: string, user: str
         )))
         ORDER BY e.seq LIMIT @limit`
     )
-    .all({ since, sid, user, board, suffix: `@${board.toLowerCase()}`, limit: CHAT_LIMITS.eventsPerPoll }) as EventRec[];
+    .all({ since, sid, user, ...boardUserParams(board), limit: CHAT_LIMITS.eventsPerPoll }) as EventRec[];
 }
 
 /** Keep the newest `keep` events. */
